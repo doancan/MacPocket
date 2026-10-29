@@ -64,7 +64,7 @@ struct SimilarImagesView: View {
                     if model.root == nil {
                         Button("Klasör Seç…") { model.chooseFolder() }
                     } else {
-                        Button("Karşılaştır") { model.scan() }.buttonStyle(.borderedProminent)
+                        Button("Karşılaştır") { model.scan() }.buttonStyle(.pocketPrimary)
                     }
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -89,7 +89,7 @@ struct SimilarImagesView: View {
                     .help("Karşılaştırmayı durdur")
             } else {
                 Button("Karşılaştır") { model.scan() }
-                    .buttonStyle(.borderedProminent)
+                    .buttonStyle(.pocketPrimary)
                     .disabled(model.root == nil)
                     .help("Seçili klasördeki görselleri karşılaştır")
             }

@@ -281,7 +281,8 @@ public struct CleanupScanner: Sendable {
         var symlinked = false
         var complete = true
         let cutoff = target.minimumAgeDays.map { now.addingTimeInterval(-Double($0) * 86_400) }
-        control.setCurrent(target.title)
+        control.beginTarget(target.title)
+        defer { control.endTarget(target.title) }
         for root in target.roots {
             guard let rootIdentity = lstatIdentity(root.path) else { continue }
             existing += 1

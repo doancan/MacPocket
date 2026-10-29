@@ -97,6 +97,13 @@ struct CleanupView: View {
                     Text("Taranıyor…").font(.title.weight(.bold))
                     Text(pocketScanProgressText(model.progress)).font(.callout).foregroundStyle(.secondary).monospacedDigit()
                         .lineLimit(1)
+                    if model.stalled {
+                        Label("Bekleniyor: \(model.progress?.currentName ?? ""). macOS bir izin penceresi göstermiş olabilir; yanıt verince tarama sürer.",
+                              systemImage: "hand.raised.fill")
+                            .font(.subheadline).foregroundStyle(.orange)
+                            .fixedSize(horizontal: false, vertical: true)
+                            .transition(.opacity)
+                    }
                     Button("İptal Et", role: .cancel) { model.cancel() }
                         .controlSize(.large)
                         .keyboardShortcut(.cancelAction)
@@ -114,7 +121,7 @@ struct CleanupView: View {
                             Label(model.selectedBytes > 0 ? ("Temizle · \(pocketBytes(model.selectedBytes))" as LocalizedStringKey) : "Temizle", systemImage: "sparkles")
                                 .padding(.horizontal, PocketSpacing.s)
                         }
-                        .buttonStyle(.borderedProminent)
+                        .buttonStyle(.pocketPrimary)
                         .tint(tint)
                         .controlSize(.large)
                         .keyboardShortcut(.defaultAction)
@@ -136,7 +143,7 @@ struct CleanupView: View {
                     } label: {
                         Label("Tara", systemImage: "magnifyingglass").padding(.horizontal, PocketSpacing.m)
                     }
-                    .buttonStyle(.borderedProminent)
+                    .buttonStyle(.pocketPrimary)
                     .tint(tint)
                     .controlSize(.large)
                     .keyboardShortcut(.defaultAction)
@@ -484,7 +491,7 @@ private struct EmptyTrashConfirmation: View {
                 Spacer()
                 Button("Vazgeç", role: .cancel, action: cancel).keyboardShortcut(.cancelAction)
                 Button("Kalıcı Olarak Sil", role: .destructive, action: confirm)
-                    .buttonStyle(.borderedProminent)
+                    .buttonStyle(.pocketPrimary)
                     .tint(.red)
                     .disabled(!understood)
             }

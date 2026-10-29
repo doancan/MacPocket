@@ -225,7 +225,7 @@ private struct ShortcutRow: View {
                     .font(.system(.body, design: .rounded).weight(.semibold))
                     .frame(minWidth: 96)
             }
-            .buttonStyle(.bordered)
+            .buttonStyle(.pocketSecondary)
             .tint(recording ? .accentColor : nil)
             .help("Yeni kısayolu kaydetmek için tıkla, ardından tuş birleşimine bas (esc: vazgeç)")
             .accessibilityLabel("Kısayol \(shortcut.displayName), değiştirmek için tıkla")
@@ -396,8 +396,7 @@ private struct SwitcherWindowTable: View {
                 PocketMessage("Diğer masaüstlerindeki pencereleri listelemek için Ekran Kaydı izni gerekir.", tone: .neutral)
             }
             HStack {
-                TextField("Uygulama veya pencere ara…", text: $model.search).textFieldStyle(.roundedBorder)
-                    .focused($searchFocused).frame(maxWidth: 360)
+                PocketSearchField("Uygulama veya pencere ara…", text: $model.search, focus: $searchFocused).frame(maxWidth: 360)
                 Spacer()
                 if model.busy { ProgressView().controlSize(.small) }
                 Button { Task { await model.refresh() } } label: { Label("Yenile", systemImage: "arrow.clockwise") }.disabled(model.busy)
@@ -438,7 +437,7 @@ private struct SwitcherWindowTable: View {
                 Text("\(model.filtered.count) öğe").font(.subheadline).foregroundStyle(.secondary)
                 Spacer()
                 Button(model.selected?.isRealWindow == true ? "Pencereyi Öne Getir" : "Uygulamayı Öne Getir") { Task { await model.focus() } }
-                    .buttonStyle(.borderedProminent).keyboardShortcut(.defaultAction).disabled(model.selected == nil || model.busy)
+                    .buttonStyle(.pocketPrimary).keyboardShortcut(.defaultAction).disabled(model.selected == nil || model.busy)
             }
         }
         .task { await model.refresh() }

@@ -434,7 +434,7 @@ struct PowerKeepAwakeCard: View {
                 Button { run { await model.startAwake(duration: minutes > 0 ? minutes * 60 : nil, display: displayAwake) } } label: {
                     Label("Uyanık Tutmayı Başlat", systemImage: "cup.and.saucer")
                 }
-                .buttonStyle(.borderedProminent)
+                .buttonStyle(.pocketPrimary)
                 .disabled(changing)
             }
             Text("Boşta uyku geçici olarak engellenir; süre dolunca veya MacPocket kapanınca sona erer. Kalıcı ayar değişmez.")

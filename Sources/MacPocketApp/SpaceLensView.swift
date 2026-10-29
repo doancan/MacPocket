@@ -84,7 +84,7 @@ struct SpaceLensView: View {
                     .keyboardShortcut(.cancelAction)
             } else {
                 Button(model.tree == nil ? ("Tara" as LocalizedStringKey) : "Yeniden Tara") { model.scan() }
-                    .buttonStyle(.borderedProminent)
+                    .buttonStyle(.pocketPrimary)
                     .disabled(model.working)
                     .help("\((model.rootURL.path as NSString).abbreviatingWithTildeInPath) klasörünü tara")
             }
@@ -140,7 +140,7 @@ struct SpaceLensView: View {
                 Text("Klasördeki her öğe kapladığı alanla orantılı bir kutu olarak gösterilir. Bir klasöre tıklayınca içine girersin.")
             } actions: {
                 Button("Ev Klasörünü Tara") { model.scan(URL(fileURLWithPath: NSHomeDirectory(), isDirectory: true)) }
-                    .buttonStyle(.borderedProminent)
+                    .buttonStyle(.pocketPrimary)
                 Button("Klasör Seç…") { model.chooseFolder() }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -337,7 +337,10 @@ private struct SpaceLensTreemap: View {
             context.stroke(shape, with: .color(.white.opacity(0.9)), lineWidth: 2)
         }
         guard rect.width > 54, rect.height > 22 else { return }
-        let label = Text(tile.node.name).font(.system(size: 11, weight: .semibold)).foregroundStyle(.white)
+        // Tiles with nested children have no room below the name, so their size rides on the same line.
+        let label = tile.nested.isEmpty
+            ? Text(tile.node.name).font(.system(size: 11, weight: .semibold)).foregroundStyle(.white)
+            : Text("\(Text(tile.node.name).font(.system(size: 11, weight: .semibold)))  \(Text(pocketBytes(tile.node.allocatedBytes)).font(.system(size: 10, weight: .medium)).foregroundStyle(.white.opacity(0.85)))").foregroundStyle(.white)
         let size = Text(pocketBytes(tile.node.allocatedBytes)).font(.system(size: 10, weight: .medium)).foregroundStyle(.white.opacity(0.85))
         var clipped = context
         clipped.clip(to: Path(rect.insetBy(dx: 5, dy: 3)))

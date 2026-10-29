@@ -71,7 +71,9 @@ struct SystemToolsView: View {
                 }
             }
         }
-        .listStyle(.sidebar)
+        .listStyle(.inset)
+            .scrollContentBackground(.hidden)
+            .environment(\.defaultMinListRowHeight, 34)
         .frame(width: 250)
         .disabled(running)
     }
@@ -98,7 +100,7 @@ struct SystemToolsView: View {
                         Label(report == nil ? "Raporu Oluştur" : "Raporu Yenile",
                               systemImage: "arrow.clockwise")
                     }
-                    .buttonStyle(.borderedProminent)
+                    .buttonStyle(.pocketPrimary)
                     .disabled(!validProcessID)
                 }
             }
@@ -123,8 +125,7 @@ struct SystemToolsView: View {
                 HStack(spacing: PocketSpacing.s) {
                     Toggle("Ham çıktı", isOn: $showRawOutput).toggleStyle(.checkbox)
                     if showRawOutput {
-                        TextField("Çıktıda ara…", text: $outputSearch)
-                            .textFieldStyle(.roundedBorder)
+                        PocketSearchField("Çıktıda ara…", text: $outputSearch)
                             .frame(maxWidth: 280)
                             .focused($searchFocused)
                             .accessibilityLabel("Rapor çıktısında ara")

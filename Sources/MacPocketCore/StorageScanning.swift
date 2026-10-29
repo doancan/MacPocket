@@ -17,6 +17,9 @@ public final class StorageScanControl: @unchecked Sendable {
     private var bytes: Int64 = 0
     private var limitFlag = false
     private var currentName = ""
+    /// Targets in flight. Parallel scans used to overwrite one label, so the UI named a finished target
+    /// while another (often one blocked on a macOS privacy prompt) was still running.
+    private var activeNames: [String] = []
 
     public init(maximumDuration: TimeInterval = 90, maximumEntries: Int = 3_000_000) {
         deadline = Date().addingTimeInterval(max(0.05, maximumDuration))
@@ -35,10 +38,17 @@ public final class StorageScanControl: @unchecked Sendable {
     }
 
     public var snapshot: Snapshot {
-        lock.withLock { Snapshot(visitedEntries: visited, measuredBytes: bytes, currentName: currentName) }
+        lock.withLock {
+            Snapshot(visitedEntries: visited, measuredBytes: bytes,
+                     currentName: activeNames.isEmpty ? currentName : activeNames.joined(separator: ", "))
+        }
     }
 
     public func setCurrent(_ name: String) { lock.withLock { currentName = name } }
+    public func beginTarget(_ name: String) { lock.withLock { activeNames.append(name) } }
+    public func endTarget(_ name: String) {
+        lock.withLock { if let index = activeNames.firstIndex(of: name) { activeNames.remove(at: index) } }
+    }
 
     /// Records a batch of work. Returns false when the walker must stop (cancelled or out of budget).
     func record(entries: Int, bytes added: Int64) -> Bool {

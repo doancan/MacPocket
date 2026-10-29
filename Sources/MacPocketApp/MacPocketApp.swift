@@ -9,6 +9,11 @@ struct MacPocketApplication: App {
     @NSApplicationDelegateAdaptor(PocketAppDelegate.self) var delegate
     @StateObject private var state = PocketApplicationState.shared
 
+    init() {
+        // Must run before any localized string is resolved.
+        PocketDefaults.applyLanguageDefault()
+    }
+
     var body: some Scene {
         Window("MacPocket", id: "main") {
             PocketRootView(model: state.model)

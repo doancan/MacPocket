@@ -31,7 +31,7 @@ struct FileWorkspaceView: View {
                 } actions: {
                     HStack {
                         Button("Klasör Seç…") { model.chooseFolder() }
-                        if model.root != nil { Button("Tara") { model.scan() }.buttonStyle(.borderedProminent) }
+                        if model.root != nil { Button("Tara") { model.scan() }.buttonStyle(.pocketPrimary) }
                     }
                     quickRoots
                 }
@@ -95,7 +95,7 @@ struct FileWorkspaceView: View {
                     .help("Süren işlemi durdur")
             } else {
                 Button(model.report == nil ? ("Tara" as LocalizedStringKey) : "Yeniden Tara") { model.scan() }
-                    .buttonStyle(.borderedProminent)
+                    .buttonStyle(.pocketPrimary)
                     .disabled(model.root == nil)
                     .help(model.report == nil ? Text("Seçili klasörü tara") : Text("Klasörü yeniden tara"))
             }
@@ -178,9 +178,7 @@ struct FileWorkspaceView: View {
                 .frame(maxWidth: 480)
                 .disabled(model.busy)
                 Spacer(minLength: PocketSpacing.s)
-                TextField("Sonuçlarda ara…", text: $model.search)
-                    .textFieldStyle(.roundedBorder)
-                    .focused($searchFocused)
+                PocketSearchField("Sonuçlarda ara…", text: $model.search, focus: $searchFocused)
                     .frame(maxWidth: 220)
                     .accessibilityLabel("Sonuçlarda ara")
             }

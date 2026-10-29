@@ -267,6 +267,18 @@ final class CleanupModel: ObservableObject {
     private let service = CleanupService()
     private let emptier = TrashEmptier()
 
+    /// No new entries for a few seconds: usually a macOS privacy prompt (Downloads, Mail) awaiting an answer.
+    @Published private(set) var stalled = false
+    private var lastVisited = -1
+    private var unchangedPolls = 0
+
+    private func noteProgress(_ snapshot: StorageScanControl.Snapshot) {
+        progress = snapshot
+        if snapshot.visitedEntries == lastVisited { unchangedPolls += 1 } else { unchangedPolls = 0; lastVisited = snapshot.visitedEntries }
+        let isStalled = unchangedPolls >= 16
+        if isStalled != stalled { stalled = isStalled }
+    }
+
     var busy: Bool { scanning || working }
     var trashReport: CleanupTargetReport? { report?.targets.first { $0.target.isTrash } }
     /// Selected items whose owning app is open right now.
@@ -283,8 +295,9 @@ final class CleanupModel: ObservableObject {
         let control = StorageScanControl(maximumDuration: 90, maximumEntries: 4_000_000)
         self.control = control
         scanning = true; failure = nil; summary = nil; progress = nil
+        stalled = false; lastVisited = -1; unchangedPolls = 0
         task = Task { [weak self] in
-            let poller = pollProgress(control) { self?.progress = $0 }
+            let poller = pollProgress(control) { self?.noteProgress($0) }
             defer { poller.cancel() }
             do {
                 let report = try await CleanupScanner().scan(targets, running: running, control: control)

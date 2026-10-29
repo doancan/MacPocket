@@ -126,7 +126,7 @@ struct ApplicationLeftoversView: View {
                 } description: {
                     Text("Tarama dosyaları değiştirmez. Taşınacak öğeleri sonuçlardan sen seçersin.")
                 } actions: {
-                    Button("Tara") { model.scan() }.buttonStyle(.borderedProminent)
+                    Button("Tara") { model.scan() }.buttonStyle(.pocketPrimary)
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
@@ -161,7 +161,7 @@ struct ApplicationLeftoversView: View {
                     .help("Süren işlemi durdur")
             } else {
                 Button("Tara") { model.scan() }
-                    .buttonStyle(.borderedProminent)
+                    .buttonStyle(.pocketPrimary)
                     .help(model.scanned ? "Yeniden tara" : "Library konumlarını tara")
             }
         }
@@ -184,9 +184,7 @@ struct ApplicationLeftoversView: View {
     private var results: some View {
         VStack(alignment: .leading, spacing: PocketSpacing.m) {
             HStack(spacing: PocketSpacing.m) {
-                TextField("Bundle kimliği veya konum ara…", text: $model.search)
-                    .textFieldStyle(.roundedBorder)
-                    .focused($searchFocused)
+                PocketSearchField("Bundle kimliği veya konum ara…", text: $model.search, focus: $searchFocused)
                     .frame(maxWidth: 360)
                     .accessibilityLabel("Kalıntılarda ara")
                 Spacer(minLength: PocketSpacing.s)

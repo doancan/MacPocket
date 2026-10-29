@@ -55,8 +55,7 @@ struct ToolsHubView: View {
     private var filters: some View {
         VStack(alignment: .leading, spacing: PocketSpacing.m) {
             HStack(spacing: PocketSpacing.m) {
-                TextField("Araç ara…", text: $search)
-                    .textFieldStyle(.roundedBorder)
+                PocketSearchField("Araç ara…", text: $search)
                     .frame(maxWidth: 320)
                     .focused($searchFocused)
                     .accessibilityLabel("Araç ara")
@@ -310,7 +309,7 @@ private struct HubAwakeStopButton: View {
         }
         .disabled(stopping)
         if prominent {
-            button.buttonStyle(.borderedProminent).keyboardShortcut(.defaultAction)
+            button.buttonStyle(.pocketPrimary).keyboardShortcut(.defaultAction)
         } else {
             button
         }
@@ -347,7 +346,7 @@ private struct HubAwakeSheet: View {
                 } else {
                     Button("Vazgeç") { dismiss() }.keyboardShortcut(.cancelAction)
                     Button(starting ? "Başlatılıyor…" : "Başlat", action: start)
-                        .buttonStyle(.borderedProminent)
+                        .buttonStyle(.pocketPrimary)
                         .keyboardShortcut(.defaultAction)
                         .disabled(starting || !validDuration)
                 }

@@ -64,7 +64,7 @@ struct ScreenCleaningView: View {
             } label: {
                 Label("3 Saniye Sonra Başlat", systemImage: "play.fill")
             }
-            .buttonStyle(.borderedProminent)
+            .buttonStyle(.pocketPrimary)
             .help("Geri sayımdan sonra ekranları seçilen süre boyunca karartır")
         }
     }

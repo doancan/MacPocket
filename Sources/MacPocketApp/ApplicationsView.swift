@@ -64,7 +64,7 @@ struct ApplicationsView: View {
         HStack(spacing: PocketSpacing.s) {
             if model.showUpdates {
                 Button("Güncellemeleri Kontrol Et") { Task { await model.checkUpdates() } }
-                    .buttonStyle(.borderedProminent)
+                    .buttonStyle(.pocketPrimary)
                     .disabled(model.busy || model.checkingUpdates || model.updatingToken != nil)
                     .help("Homebrew kataloğunda yeni sürümleri ara")
             } else {
@@ -100,9 +100,7 @@ struct ApplicationsView: View {
     private var installedList: some View {
         VStack(alignment: .leading, spacing: PocketSpacing.m) {
             HStack(spacing: PocketSpacing.m) {
-                TextField("Uygulama veya bundle kimliği ara…", text: $model.search)
-                    .textFieldStyle(.roundedBorder)
-                    .focused($searchFocused)
+                PocketSearchField("Uygulama veya bundle kimliği ara…", text: $model.search, focus: $searchFocused)
                     .frame(maxWidth: 380)
                     .accessibilityLabel("Uygulama ara")
                 Spacer(minLength: PocketSpacing.s)
@@ -383,7 +381,10 @@ private struct UninstallPlanView: View {
                                 Text(candidate.request.url.path).font(.subheadline).foregroundStyle(.secondary)
                                     .lineLimit(2).truncationMode(.middle).textSelection(.enabled)
                             }.padding(.vertical, PocketSpacing.s)
-                        }.toggleStyle(.checkbox).padding(.horizontal, PocketSpacing.m)
+                        }
+                        .toggleStyle(.checkbox)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(.horizontal, PocketSpacing.m)
                         Divider()
                     }
                 }

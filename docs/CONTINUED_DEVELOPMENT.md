@@ -124,3 +124,33 @@ olarak sunulmaz. Kullanıcı tüm kapsamı istedi; bu belge kalan işleri açık
 - [iStat görünüm seçenekleri](research/2026-10-29-istat-display-options.md)
 - [macOS sorgu kaynakları](research/2026-10-29-macos-utilities.md)
 - [Vision benzer görseller](research/2026-10-29-similar-images.md)
+
+## Canlı işlev testi ve performans analizi — 29 Ekim 2026
+
+Kurulu uygulamada, kullanıcı verisine dokunmadan, test için oluşturulan dosya/süreçlerle:
+
+| İşlev | Sonuç |
+|---|---|
+| Uyanık tutma başlat/durdur | Geçti — `pmset` kaydı oluştu ve kalktı |
+| Uygulama kaldırma planı + Çöp | Geçti — sahte uygulamanın 4 ilişkili öğesi bulundu, hepsi Çöp’e taşındı |
+| Görev Yöneticisi ara/seç/sonlandır | Geçti — test sürecine SIGTERM gitti |
+| macOS Araçları | 11/11 sorgu çıkış 0 |
+| Sistem Raporları | 8/8 (açık dosyalar 256 KB sınırında bilinçli olarak kısmi) |
+| Disk Analizi kategorileri | Geçti — 1,75 M öğe, ~14 sn |
+| Space Lens | Geçti — ev klasörü ~24 sn, içine girme/geri dönme |
+| Menü çubuğu gruplu/ayrı, Liquid Glass sekmeler | Geçti |
+| Windows tarzı Alt+Tab, yazarak arama, stiller | Geçti (küçük resimler Ekran Kaydı izni bekliyor) |
+| Türkçe/İngilizce | Geçti — dil seçilmemişse Türkçe; İngilizce yeniden başlatınca |
+
+Performans (Mac Studio, sayfa yerleştikten sonra 10 sn ortalama): açılış 0,76–0,81 sn;
+boşta CPU %0,2–2,2 (Güç Merkezi ve Görev Yöneticisi canlı ölçümle ~%6–7).
+Ölçümle bulunup düzeltilenler: tablo kapsayıcısında `clipShape` (+230 MB GPU, Uygulamalar
+387 → 146 MB), kart içeriğine uygulanan gölge, tam çözünürlükte tutulan simgeler, MacPocket
+öne geldiğinde gereksiz AX pencere taraması, her ölçümde değişmeyen değerlerin yayımlanması,
+canlı metriklerde sürekli animasyon (~%10 → ~%2 CPU).
+
+Bilinen konular: disk kategori taraması sırasında bellek tepe noktası ~650 MB (tarama
+bitince ~200 MB’a iner); Güç Merkezi/Görev Yöneticisi’nde geçici GPU tepeleri; bu Mac’te
+pil denetleyicisi sistem gücü telemetrisi güncellenmediği için Güç halkası “Süreç gücü”
+gösterir. Temizlik’in “Temizle” adımı, Space Lens’ten Çöp’e taşıma, Benzer Görseller,
+Uygulama Kalıntıları, Ekran Temizleme ve Ayarlar canlı olarak henüz tıklanarak test edilmedi.

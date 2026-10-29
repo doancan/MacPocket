@@ -52,6 +52,8 @@ struct PocketRootView: View {
                     .animation(reduceMotion ? nil : .easeOut(duration: 0.2), value: destinationKey)
                     .frame(minWidth: 0, maxWidth: .infinity, minHeight: 0, maxHeight: .infinity, alignment: .topLeading)
                     .clipped()
+                    // One button language everywhere; explicit styles (.plain, .pocketPrimary…) still win.
+                    .buttonStyle(.pocketSecondary)
                     .background(PocketBackdrop(tint: navigation.page.tint))
                     .environment(\.pocketTint, navigation.page.tint)
                     .navigationTitle(navigation.title)

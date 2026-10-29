@@ -53,9 +53,7 @@ struct MacUtilitiesView: View {
 
     private var sidebar: some View {
         VStack(spacing: 0) {
-            TextField("Araç ara…", text: $search)
-                .textFieldStyle(.roundedBorder)
-                .focused($searchFocused)
+            PocketSearchField("Araç ara…", text: $search, focus: $searchFocused)
                 .accessibilityLabel("macOS aracı ara")
                 .padding(PocketSpacing.s)
             Divider()
@@ -72,7 +70,9 @@ struct MacUtilitiesView: View {
                     }
                 }
             }
-            .listStyle(.sidebar)
+            .listStyle(.inset)
+            .scrollContentBackground(.hidden)
+            .environment(\.defaultMinListRowHeight, 34)
             .overlay {
                 if visible.isEmpty { ContentUnavailableView.search(text: search) }
             }
@@ -96,7 +96,7 @@ struct MacUtilitiesView: View {
                     Button(action: run) {
                         Label(report == nil ? "Sorgula" : "Yenile", systemImage: "arrow.clockwise")
                     }
-                    .buttonStyle(.borderedProminent)
+                    .buttonStyle(.pocketPrimary)
                 }
             }
             if let failure { PocketMessage(failure, error: true) }
@@ -104,8 +104,7 @@ struct MacUtilitiesView: View {
             if let report {
                 reportHeader(report)
                 HStack(spacing: PocketSpacing.s) {
-                    TextField("Çıktıda ara…", text: $outputSearch)
-                        .textFieldStyle(.roundedBorder)
+                    PocketSearchField("Çıktıda ara…", text: $outputSearch)
                         .accessibilityLabel("Sorgu çıktısında ara")
                     Button { copy(report) } label: { Label("Kopyala", systemImage: "doc.on.doc") }
                         .help("Sonucu panoya kopyala")

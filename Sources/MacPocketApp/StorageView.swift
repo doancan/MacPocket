@@ -139,9 +139,10 @@ struct StorageOverviewPanel: View {
                     } description: {
                         Text("Uygulamalar, belgeler, önbellekler ve geliştirici verilerinin diskte gerçekte kapladığı alanı ölçer. Dosyalar değiştirilmez.")
                     } actions: {
-                        Button("Ölçmeyi Başlat") { model.scan() }.buttonStyle(.borderedProminent)
+                        Button("Ölçmeyi Başlat") { model.scan() }.buttonStyle(.pocketPrimary)
                     }
                     .padding(.vertical, PocketSpacing.xl)
+                    .frame(maxWidth: .infinity)
                 }
             }
             .padding(.bottom, PocketSpacing.l)
@@ -214,12 +215,13 @@ struct StorageOverviewPanel: View {
     }
 
     private func legend(_ report: StorageOverviewReport) -> some View {
-        LazyVGrid(columns: [GridItem(.adaptive(minimum: 170), spacing: PocketSpacing.m, alignment: .leading)],
+        // Wide enough for the longest category name ("Diğer Kullanıcı Dosyaları") plus its size.
+        LazyVGrid(columns: [GridItem(.adaptive(minimum: 250), spacing: PocketSpacing.l, alignment: .leading)],
                   alignment: .leading, spacing: PocketSpacing.xs) {
             ForEach(report.segments, id: \.category) { segment in
                 HStack(spacing: PocketSpacing.s) {
                     Circle().fill(segment.category.color).frame(width: 9, height: 9)
-                    Text(segment.category.title).lineLimit(1)
+                    Text(segment.category.title).lineLimit(1).layoutPriority(1)
                     Spacer(minLength: PocketSpacing.xs)
                     Text(pocketBytes(segment.bytes)).foregroundStyle(.secondary).monospacedDigit()
                 }

@@ -259,7 +259,7 @@ struct PowerChangeConfirmation: View {
                     if center.applying { ProgressView().controlSize(.small) } else { Text("Onayla ve Uygula") }
                 }
                 .keyboardShortcut(.defaultAction)
-                .buttonStyle(.borderedProminent)
+                .buttonStyle(.pocketPrimary)
                 .disabled(center.applying || isUnchanged || (try? command.get()) == nil)
             }
         }

@@ -105,8 +105,7 @@ struct TaskManagerView: View {
 
     private var controls: some View {
         HStack(spacing: PocketSpacing.m) {
-            TextField("Ad, PID veya kullanıcı ara…", text: $search)
-                .textFieldStyle(.roundedBorder)
+            PocketSearchField("Ad, PID veya kullanıcı ara…", text: $search)
                 .frame(maxWidth: 260)
                 .focused($searchFocused)
                 .accessibilityLabel("Süreç ara")
@@ -269,7 +268,7 @@ struct TaskManagerView: View {
             Button(role: .destructive) { requestTermination(entry, force: true) } label: {
                 Label("Zorla Sonlandır", systemImage: "xmark.octagon").frame(maxWidth: .infinity)
             }
-            .buttonStyle(.borderedProminent)
+            .buttonStyle(.pocketPrimary)
             .tint(.red)
             .controlSize(.large)
             .disabled(!canSignal(entry))

@@ -39,6 +39,15 @@ extension AppLanguage {
 enum PocketDefaults {
     /// The app's own preferences domain (the executable name when run outside the app bundle).
     static var domain: String { Bundle.main.bundleIdentifier ?? ProcessInfo.processInfo.processName }
+    static let languageConfiguredKey = "MacPocket.languageConfigured"
+
+    /// MacPocket was Turkish-only before English was added. Until the user picks a language, keep Turkish
+    /// instead of silently following an English system; an explicit "Sistem" choice is respected afterwards.
+    static func applyLanguageDefault(_ defaults: UserDefaults = .standard) {
+        guard defaults.object(forKey: languageConfiguredKey) == nil else { return }
+        if AppLanguage.load(from: defaults, domain: domain) == .system { AppLanguage.turkish.save(to: defaults) }
+        defaults.set(true, forKey: languageConfiguredKey)
+    }
 }
 
 @MainActor

@@ -242,7 +242,7 @@
 "Ağ: ölçüm bekleniyor" = "Network: waiting for data";
 "Ağdan gelen erişim isteği (Wake on LAN) Mac’i uyandırabilir." = "A network access request (Wake on LAN) can wake the Mac.";
 "Bakım" = "Maintenance";
-"Bakım ve izleme" = "Maintenance and monitoring";
+"Bakım ve izleme" = "Mac care";
 "Bayt" = "Bytes";
 "Bazı alt klasörler tam ölçülemedi." = "Some subfolders couldn’t be fully measured.";
 "Bazı ayarlar MacPocket yeniden başlatılınca uygulanır." = "Some settings take effect after MacPocket relaunches.";
@@ -1565,3 +1565,6 @@
 "⌘Q çık" = "⌘Q quit";
 "⌘W kapat" = "⌘W close";
 "⌘⇥ macOS uygulama geçişine ayrılmıştır." = "⌘⇥ is reserved for the macOS app switcher.";
+
+"Aramayı temizle" = "Clear search";
+"Bekleniyor: %@. macOS bir izin penceresi göstermiş olabilir; yanıt verince tarama sürer." = "Waiting for: %@. macOS may be showing a permission prompt; the scan continues once you answer.";

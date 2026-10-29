@@ -541,3 +541,119 @@ func pocketProcessStateTitle(_ state: String) -> String {
 // Note: never apply `.clipShape` to a container holding a Table/List/NSScrollView. It forces the whole
 // scrolled content into an offscreen mask (measured: +230 MB GPU memory on the Applications table).
 // Use a stroked overlay for the rounded frame instead.
+
+// MARK: - Controls
+
+/// Search field used on every page: fixed 30 pt height, magnifier, clear button, accent focus ring.
+/// Pass the page's FocusState binding to keep ⌘F (pocketFind) focusing working.
+struct PocketSearchField: View {
+    let prompt: LocalizedStringKey
+    @Binding var text: String
+    var focus: FocusState<Bool>.Binding?
+    @FocusState private var ownFocus: Bool
+    @State private var hovering = false
+
+    init(_ prompt: LocalizedStringKey, text: Binding<String>, focus: FocusState<Bool>.Binding? = nil) {
+        self.prompt = prompt; _text = text; self.focus = focus
+    }
+
+    private var isFocused: Bool { focus?.wrappedValue ?? ownFocus }
+
+    var body: some View {
+        let shape = RoundedRectangle(cornerRadius: 8, style: .continuous)
+        HStack(spacing: 6) {
+            Image(systemName: "magnifyingglass")
+                .font(.system(size: 12, weight: .semibold))
+                .foregroundStyle(isFocused ? Color.accentColor : .secondary)
+                .accessibilityHidden(true)
+            field
+            if !text.isEmpty {
+                Button { text = "" } label: {
+                    Image(systemName: "xmark.circle.fill").font(.system(size: 12))
+                }
+                .buttonStyle(.plain)
+                .foregroundStyle(.tertiary)
+                .help("Aramayı temizle")
+                .accessibilityLabel("Aramayı temizle")
+            }
+        }
+        .padding(.horizontal, 9)
+        .frame(height: 30)
+        .background(shape.fill(PocketTheme.panel))
+        .overlay {
+            shape.strokeBorder(isFocused ? Color.accentColor.opacity(0.85) : (hovering ? PocketTheme.line.opacity(2) : PocketTheme.line.opacity(1.4)),
+                               lineWidth: isFocused ? 1.5 : 0.75)
+        }
+        .contentShape(shape)
+        .onHover { hovering = $0 }
+        .animation(.easeOut(duration: 0.12), value: isFocused)
+    }
+
+    @ViewBuilder private var field: some View {
+        let textField = TextField(prompt, text: $text)
+            .textFieldStyle(.plain)
+            .font(.body)
+            .onExitCommand { text = "" }
+        if let focus { textField.focused(focus) } else { textField.focused($ownFocus) }
+    }
+}
+
+/// Primary (filled accent) and secondary (surface + hairline) buttons with one height and radius
+/// per control size, hover and pressed states. Applied app-wide as the default button style.
+struct PocketButtonStyle: ButtonStyle {
+    enum Kind { case primary, secondary }
+    let kind: Kind
+
+    func makeBody(configuration: Configuration) -> some View {
+        PocketButtonBody(configuration: configuration, kind: kind)
+    }
+}
+
+private struct PocketButtonBody: View {
+    let configuration: ButtonStyle.Configuration
+    let kind: PocketButtonStyle.Kind
+    @Environment(\.isEnabled) private var isEnabled
+    @Environment(\.controlSize) private var controlSize
+    @Environment(\.colorScheme) private var colorScheme
+    @State private var hovering = false
+
+    private var metrics: (height: CGFloat, padding: CGFloat, font: CGFloat) {
+        switch controlSize {
+        case .mini, .small: (24, 10, 12)
+        case .large, .extraLarge: (34, 16, 14)
+        default: (28, 13, 13)
+        }
+    }
+
+    var body: some View {
+        let shape = RoundedRectangle(cornerRadius: 8, style: .continuous)
+        let primary = kind == .primary
+        configuration.label
+            .font(.system(size: metrics.font, weight: primary ? .semibold : .medium))
+            .lineLimit(1)
+            .foregroundStyle(primary ? AnyShapeStyle(.white) : AnyShapeStyle(.primary))
+            .padding(.horizontal, metrics.padding)
+            .frame(minHeight: metrics.height)
+            .background {
+                if primary {
+                    shape.fill(Color.accentColor.gradient.shadow(.drop(color: .black.opacity(0.15), radius: 1.5, y: 1)))
+                } else {
+                    shape.fill(PocketTheme.panel.shadow(.drop(color: .black.opacity(colorScheme == .dark ? 0.3 : 0.06), radius: 1, y: 0.5)))
+                }
+            }
+            .overlay {
+                shape.fill(Color.primary.opacity(configuration.isPressed ? 0.12 : (hovering ? 0.05 : 0)))
+                shape.strokeBorder(primary ? Color.white.opacity(0.18) : PocketTheme.line.opacity(1.6), lineWidth: 0.75)
+            }
+            .contentShape(shape)
+            .opacity(isEnabled ? 1 : 0.45)
+            .scaleEffect(configuration.isPressed ? 0.98 : 1)
+            .animation(.easeOut(duration: 0.1), value: configuration.isPressed)
+            .onHover { hovering = $0 && isEnabled }
+    }
+}
+
+extension ButtonStyle where Self == PocketButtonStyle {
+    static var pocketPrimary: PocketButtonStyle { PocketButtonStyle(kind: .primary) }
+    static var pocketSecondary: PocketButtonStyle { PocketButtonStyle(kind: .secondary) }
+}

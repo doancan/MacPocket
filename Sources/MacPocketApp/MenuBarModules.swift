@@ -590,7 +590,7 @@ private struct PowerDetail: View {
         Button { Task { await model.startAwake(duration: seconds) } } label: {
             Text(title).frame(maxWidth: .infinity)
         }
-        .buttonStyle(.bordered)
+        .buttonStyle(.pocketSecondary)
         .controlSize(.small)
         .accessibilityLabel(spoken)
     }
