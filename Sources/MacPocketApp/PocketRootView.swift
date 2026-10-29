@@ -1,10 +1,12 @@
 import AppKit
+import MacPocketCore
 import ServiceManagement
 import SwiftUI
 
 struct PocketRootView: View {
     let model: PocketModel
     @ObservedObject private var navigation: PocketNavigation
+    @State private var utility = MacUtility.timeMachine
     @State private var columnVisibility = NavigationSplitViewVisibility.all
     @Environment(\.openWindow) private var openWindow
     @Environment(\.openSettings) private var openSettings
@@ -87,6 +89,10 @@ struct PocketRootView: View {
         case .applications: ApplicationsView(model: model.applications)
         case .tools:
             switch navigation.tool {
+            case .similarImages: SimilarImagesView()
+            case .screenCleaning: ScreenCleaningView()
+            case .utilities: MacUtilitiesView(initialTool: utility).id(utility)
+            case .leftovers: ApplicationLeftoversView()
             case .taskManager: TaskManagerView(model: model)
             case .diagnostics: SystemToolsView()
             case .windowSwitcher: WindowSwitcherView()
@@ -98,6 +104,19 @@ struct PocketRootView: View {
     private func openCatalogTool(_ id: String) {
         let home = FileManager.default.homeDirectoryForCurrentUser
         switch id {
+        case "similar-images": navigation.open(.similarImages)
+        case "screen-cleaning": navigation.open(.screenCleaning)
+        case "app-leftovers": navigation.open(.leftovers)
+        case "mac-utilities", "time-machine": utility = .timeMachine; navigation.open(.utilities)
+        case "launch-jobs": utility = .launchJobs; navigation.open(.utilities)
+        case "listening-ports": utility = .listeningPorts; navigation.open(.utilities)
+        case "disk-info": utility = .diskInfo; navigation.open(.utilities)
+        case "spotlight": utility = .spotlight; navigation.open(.utilities)
+        case "dns": utility = .dns; navigation.open(.utilities)
+        case "routes": utility = .routes; navigation.open(.utilities)
+        case "os-updates": utility = .updateHistory; navigation.open(.utilities)
+        case "security": utility = .systemIntegrity; navigation.open(.utilities)
+        case "permissions": NSWorkspace.shared.open(URL(fileURLWithPath: "/System/Applications/System Settings.app"))
         case "task-manager": navigation.open(.taskManager)
         case "system-reports", "maintenance": navigation.open(.diagnostics)
         case "window-switcher": navigation.open(.windowSwitcher)

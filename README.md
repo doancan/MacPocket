@@ -22,12 +22,21 @@ Dosya taraması, klasör boyutları, büyük/eski dosya filtreleri, SHA-256 ile
 aynı içerikli dosyalar ve onaylı Çöp işlemleri çalışır. Uygulama envanteri,
 bundle kimliğiyle ilişkili dosya kaldırma planı ve Homebrew güncelleme/kaldırma
 kanalı eklendi. Pencere Geçişi, macOS erişim durumuna göre uygulama veya pencere
-listesi sunar. Güç geçmişi yerel kaydedilir. **49 çekirdek testi geçti.**
+listesi sunar. Güç geçmişi yerel kaydedilir. **66 çekirdek testi geçti.**
 [Derleme ve canlı doğrulama](docs/NATIVE_BUILD.md) · [Native macOS davranışları](docs/NATIVE_MACOS.md).
 
-Geliştirme sürümüdür. Homebrew dışındaki güncelleme kanalları, global pencere
-geçiş kısayolu, gelişmiş güç otomasyonları ve MacBook şarj sınırı/durdurma henüz
-tamamlanmadı. Araç kataloğunda hazır olmayan servisler açıkça belirtilir.
+Geliştirme devam ediyor; sürüm numarası yalnız kullanıcı isteğiyle değiştirilir.
+Homebrew dışındaki güncelleme kanalları, gelişmiş güç otomasyonları ve MacBook
+şarj sınırı/durdurma henüz tamamlanmadı. Tam AltTab eşdeğerliği iddia edilmez;
+özel Spaces davranışları ve bütün görünüm seçenekleri henüz eşlenmedi.
+
+Menü çubuğu birleşik grup veya ayrı CPU/RAM/disk/pil/güç göstergeleri, sıralama,
+birim, etiket, yazı boyutu ve mini gösterge seçenekleri sunar. Pencere Geçişi
+isteğe bağlı global kısayol kaydı, klavye paneli, filtre/hariç tutma, AX pencere
+eylemleri ve izinli seçili pencere önizlemesi içerir. macOS araçlarına 11 gerçek
+sorgu, uygulama kalıntısı aday taraması, yerel Vision benzer görsel karşılaştırması
+ve süre sınırı olan ekran temizleme eklendi. AI Dosyaları kullanıcı isteğiyle kaldırıldı.
+[Devam eden geliştirme ve kabul kapsamı](docs/CONTINUED_DEVELOPMENT.md).
 
 ## Native uygulama
 

@@ -36,8 +36,8 @@
 
 MacBook şarj sınırı, şarj durdurma, sağlık ayrıntıları ve güç otomasyonları;
 Homebrew dışındaki güncelleme sağlayıcıları; global pencere geçiş kısayolu ve
-pencere küçük resimleri; malware, benzer görsel, e-posta/tarayıcı bakımı,
-AI önbelleği, uygulama kalıntısı taraması, Time Machine işlemleri ve giriş
+pencere küçük resimleri; malware, e-posta/tarayıcı bakımı,
+Time Machine mutasyonları ve bütün sistem girişini
 kilitleme servisleri geliştirme kapsamındadır. Hazır olmayan kartlar çalışıyor
 olarak sunulmaz. Süreç başına ağ/disk aktarım hızı henüz ölçülmez.
 
@@ -100,3 +100,8 @@ konu edilmedi.
   AX pencere geçişi izin verilmediği için bu Mac’te kabul testinden geçmedi.
 
 [0.2.0 platform temeli ve kısayollar](NATIVE_MACOS.md).
+
+## Mevcut sürüm üzerinde devam eden geliştirme
+
+29 Ekim devamı: [güncel kapsam ve kabul kayıtları](CONTINUED_DEVELOPMENT.md).
+Bu belgedeki 0.3.0 başlangıç kaydı tarihsel kabul kapsamıdır.

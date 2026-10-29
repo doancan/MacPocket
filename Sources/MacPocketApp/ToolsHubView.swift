@@ -287,7 +287,7 @@ struct ToolsHubView: View {
     }
 
     private var workingTools: Set<String> {
-        ["task-manager", "system-reports", "window-switcher", "uninstaller", "app-updater", "downloads", "duplicates", "large-old", "system-junk", "trash", "login-items", "background-items"]
+        ["screen-cleaning", "similar-images", "app-leftovers", "mac-utilities", "time-machine", "launch-jobs", "listening-ports", "disk-info", "spotlight", "dns", "routes", "os-updates", "security", "permissions", "task-manager", "system-reports", "window-switcher", "uninstaller", "app-updater", "downloads", "duplicates", "large-old", "system-junk", "trash", "login-items", "background-items"]
     }
 
     private var favoriteIDs: Set<String> { Set(favorites.split(separator: ",").map(String.init)) }
@@ -395,14 +395,22 @@ private struct HubTool: Identifiable {
     var integration = false
 
     static let catalog: [HubTool] = [
+        .init(id: "mac-utilities", title: "macOS Araçları", description: "Sistem raporları ve macOS ayarlarına hızlı erişim.", icon: "hammer", category: .system),
+        .init(id: "launch-jobs", title: "Başlatma Görevleri", description: "Kullanıcı oturumunun launchd görevlerini incele.", icon: "list.bullet", category: .system),
+        .init(id: "listening-ports", title: "Dinleyen Portlar", description: "Yerel sunucuları ve dinleyen ağ portlarını incele.", icon: "network", category: .system),
+        .init(id: "disk-info", title: "Disk Bilgileri", description: "Dosya sistemi, disk özellikleri ve desteklenen sağlık verilerini oku.", icon: "internaldrive", category: .files),
+        .init(id: "spotlight", title: "Spotlight Durumu", description: "Arama indekslemesinin sistemdeki durumunu incele.", icon: "magnifyingglass", category: .system),
+        .init(id: "dns", title: "DNS Yapılandırması", description: "Sistemin etkin DNS çözümleyici yapılandırmasını incele.", icon: "globe", category: .system),
+        .init(id: "routes", title: "Ağ Rotaları", description: "Etkin yönlendirme tablosunu incele.", icon: "arrow.triangle.branch", category: .system),
+        .init(id: "os-updates", title: "macOS Güncellemeleri", description: "Yüklü sistem güncellemelerini incele ve sistem ayarlarına git.", icon: "arrow.down.circle", category: .system),
+        .init(id: "security", title: "Sistem Güvenliği", description: "SIP ve Gatekeeper durumunu salt okunur olarak incele.", icon: "lock.shield", category: .privacy),
         .init(id: "task-manager", title: "Görev Yöneticisi", description: "Süreçleri ve kaynak kullanımını incele, seçtiğin uygulamayı sonlandır.", icon: "list.bullet.rectangle", category: .system),
         .init(id: "system-reports", title: "Sistem Raporları", description: "Bellek, ağ, açık dosyalar ve güç için salt okunur tanılar.", icon: "terminal", category: .system),
         .init(id: "keep-awake", title: "Mac'i Uyanık Tut", description: "Süreli veya sen durdurana kadar uyanık tut. Ekranı ayrıca açık tutabilirsin.", icon: "cup.and.saucer", category: .productivity),
         .init(id: "window-switcher", title: "Pencere Geçişi", description: "Açık pencereler arasında klavyeyle geçiş yap.", icon: "macwindow.on.rectangle", category: .productivity),
-        .init(id: "ai-clutter", title: "AI Dosyaları", description: "Yerel modellerin önbellek ve log dosyalarını incele.", icon: "sparkles", category: .files),
         .init(id: "app-leftovers", title: "Uygulama Kalıntıları", description: "Kaldırılan uygulamaların geride bıraktığı öğeleri bul.", icon: "square.dashed", category: .applications),
         .init(id: "app-updater", title: "Uygulama Güncelleme", description: "Kurulum kanalına göre uygulama güncellemelerini incele.", icon: "arrow.triangle.2.circlepath", category: .applications),
-        .init(id: "permissions", title: "Uygulama İzinleri", description: "Uygulama erişimlerini ve izin durumlarını incele.", icon: "hand.raised", category: .privacy),
+        .init(id: "permissions", title: "Uygulama İzinleri", description: "macOS Sistem Ayarlarını aç; Gizlilik ve Güvenlik bölümünden izinlerini yönet.", icon: "hand.raised", category: .privacy),
         .init(id: "background-items", title: "Arka Plan Öğeleri", description: "Arka planda çalışan görev ve yardımcıları yönet.", icon: "rectangle.stack", category: .applications),
         .init(id: "browser-care", title: "Tarayıcı Bakımı", description: "Tarayıcı sekmelerini kaynak kullanımlarıyla incele.", icon: "globe", category: .online, integration: true),
         .init(id: "downloads", title: "İndirilenler", description: "İndirilmiş dosyaları boyut ve tarihe göre ayıkla.", icon: "arrow.down.circle", category: .files),
@@ -414,10 +422,10 @@ private struct HubTool: Identifiable {
         .init(id: "maintenance", title: "Bakım Görevleri", description: "Sistem raporlarını incele. Sistemi değiştiren bakım görevleri henüz hazır değil.", icon: "wrench.and.screwdriver", category: .system),
         .init(id: "malware", title: "Zararlı Yazılım Taraması", description: "Bir tespit motoruyla şüpheli dosya ve bulguları incele.", icon: "shield.lefthalf.filled", category: .privacy, integration: true),
         .init(id: "privacy", title: "Gizlilik İzleri", description: "Seçili etkinlik ve tarayıcı izlerini incele.", icon: "eye.slash", category: .privacy),
-        .init(id: "screen-cleaning", title: "Ekran Temizleme Modu", description: "Fiziksel ekran temizliği için girişi geçici olarak kilitle.", icon: "display", category: .productivity, integration: true),
-        .init(id: "similar-images", title: "Benzer Görseller", description: "Görsel benzerliği bulunan adayları yan yana karşılaştır.", icon: "photo.on.rectangle", category: .files, integration: true),
+        .init(id: "screen-cleaning", title: "Ekran Temizleme Modu", description: "Ekranları kısa süre karart; MacPocket içindeki yanlış girişleri önle. Escape veya iki saniye basılı tutarak çık.", icon: "display", category: .productivity),
+        .init(id: "similar-images", title: "Benzer Görseller", description: "Görsel benzerliği bulunan adayları yan yana karşılaştır.", icon: "photo.on.rectangle", category: .files),
         .init(id: "system-junk", title: "Sistem Gereksiz Dosyaları", description: "Önbellek ve log adaylarını kategorileriyle incele.", icon: "externaldrive.badge.minus", category: .system),
-        .init(id: "time-machine", title: "Time Machine Anlık Görüntüleri", description: "Yerel snapshot'ları ve kapladıkları alanı incele.", icon: "clock.arrow.circlepath", category: .system),
+        .init(id: "time-machine", title: "Time Machine Anlık Görüntüleri", description: "Yerel snapshot listesini ve Time Machine durumunu incele.", icon: "clock.arrow.circlepath", category: .system),
         .init(id: "trash", title: "Çöp Kutuları", description: "Erişilebilen çöp konumlarını tek yerde incele.", icon: "trash", category: .files),
         .init(id: "uninstaller", title: "Tam Uygulama Kaldırma", description: "Uygulama ve ilişkili dosyalar için kaldırma planı oluştur.", icon: "app.badge", category: .applications),
     ]

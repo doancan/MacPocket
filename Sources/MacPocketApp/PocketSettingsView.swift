@@ -15,6 +15,7 @@ struct PocketSettingsView: View {
         TabView {
             general.tabItem { Label("Genel", systemImage: "gearshape") }
             appearanceSettings.tabItem { Label("Görünüm", systemImage: "paintbrush") }
+            StatusBarPreferencesView(model: model).tabItem { Label("Menü Çubuğu", systemImage: "menubar.rectangle") }
             monitoring.tabItem { Label("İzleme", systemImage: "waveform.path.ecg") }
         }
         .frame(width: 620, height: 440)

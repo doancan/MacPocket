@@ -21,12 +21,17 @@ struct PocketMenuBarView: View {
             }
             Grid(alignment: .leading, horizontalSpacing: 20, verticalSpacing: 10) {
                 metric("CPU", value: model.cpuLabel, icon: "cpu")
-                metric("Fiziksel RAM", value: model.system.map { pocketBytes($0.physicalMemoryBytes) } ?? "—", icon: "memorychip")
+                metric("Ham boş RAM", value: model.system.map { pocketBytes($0.freeMemoryBytes) } ?? "—", icon: "memorychip")
+                metric("Wired RAM", value: model.system.map { pocketBytes($0.wiredMemoryBytes) } ?? "—", icon: "memorychip")
                 metric("Boş disk alanı", value: model.system?.volumes.first.map { pocketBytes(UInt64(max(0, $0.availableBytes))) } ?? "—", icon: "internaldrive")
                 if let power = model.system?.power, power.batteryPresent {
                     metric("Pil", value: power.chargePercent.map { String(format: "%.0f%%", $0) } ?? "—", icon: "battery.100percent")
                 }
+                if let power = model.system?.power {
+                    metric("Güç kaynağı", value: power.source == "AC Power" ? "Priz" : power.source, icon: "bolt")
+                }
             }.font(.callout).monospacedDigit()
+            Text("Ham boş RAM, kullanılabilir bellek değildir.").font(.caption2).foregroundStyle(.secondary)
             if let date = model.lastUpdate {
                 Text("Son ölçüm: \(date.formatted(date: .omitted, time: .standard))")
                     .font(.caption2).foregroundStyle(.secondary)

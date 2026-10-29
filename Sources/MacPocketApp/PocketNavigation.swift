@@ -19,6 +19,8 @@ enum PocketPage: String, CaseIterable, Identifiable, Hashable {
 }
 
 enum PocketTool: String, Identifiable {
+    case similarImages = "Benzer Görseller", screenCleaning = "Ekran Temizleme"
+    case utilities = "macOS Araçları", leftovers = "Uygulama Kalıntıları"
     case taskManager = "Görev Yöneticisi", diagnostics = "Sistem Raporları", windowSwitcher = "Pencere Geçişi"
     var id: String { rawValue }
 }

@@ -53,6 +53,8 @@ public struct FileScanOptions: Sendable {
     public var maximumRetainedFiles = 8_000
     public var maximumDuration: TimeInterval = 45
     public var includeHidden = true
+    /// Nil scans all regular files; filtering precedes retention and byte totals.
+    public var allowedExtensions: Set<String>? = nil
     public init() {}
 }
 
@@ -85,6 +87,7 @@ public actor FileScanner {
         let rootIdentity = try FileIdentity.read(root)
         guard rootIdentity.isDirectory else { throw FileServiceError.notDirectory }
         let started = Date()
+        let allowedExtensions = options.allowedExtensions.map { Set($0.map { $0.lowercased() }) }
         let maximumEntries = max(1, options.maximumEntries)
         let retainedLimit = min(50_000, max(1, options.maximumRetainedFiles))
         let deadline = started.addingTimeInterval(max(0.1, min(300, options.maximumDuration)))
@@ -111,7 +114,9 @@ public actor FileScanner {
                 let identity = try FileIdentity.read(url)
                 if identity.isSymbolicLink { skippedLinks += 1; enumerator.skipDescendants(); continue }
                 if identity.device != rootIdentity.device { enumerator.skipDescendants(); continue }
-                guard identity.isRegularFile, seen.insert(identity.objectKey).inserted else { continue }
+                guard identity.isRegularFile else { continue }
+                if let extensions = allowedExtensions, !extensions.contains(url.pathExtension.lowercased()) { continue }
+                guard seen.insert(identity.objectKey).inserted else { continue }
                 let file = ScannedFile(url: url, identity: identity)
                 files.append(file)
                 if files.count > retainedLimit * 2 {

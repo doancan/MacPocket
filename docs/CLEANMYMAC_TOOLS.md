@@ -1,6 +1,6 @@
 # CleanMyMac My Tools → MacPocket Tools
 
-Durum: **0.3.0** native Tools kataloğunda 25 kart, altı kategori, arama ve
+Durum: **0.3.0** native Tools kataloğunda macOS’a özel ek araçlar, altı kategori, arama ve
 kalıcı favoriler vardır. Dosya, uygulama ve Homebrew servisleri aşağıda belirtilen
 kapsamda çalışır. Bakım Görevleri yalnız salt okunur raporları açar. Giriş/arka plan
 öğeleri macOS ayarına yönlendirir. Hazır olmayan servisler kartlarda belirtilir.
@@ -14,13 +14,13 @@ her araç için ayrıca doğrulanacaktır. Her satırın uygulama durumu hazır 
 
 ## Araç eşlemesi
 
-Tüm satırlar istenen ürün kapsamına dahildir. "Yerel servis" MacPocket içinde
+AI Clutter kullanıcı isteğiyle kapsam dışındadır. Diğer satırlar istenen ürün kapsamına dahildir. "Yerel servis" MacPocket içinde
 geliştirilecek işlevi; "ek entegrasyon" ayrıca hesap, tarayıcı bileşeni veya
 tespit motoru gerektiren işlevi belirtir.
 
 | Referans | MacPocket karşılığı | Hedef işlev | Uygulama durumu |
 | --- | --- | --- | --- |
-| AI Clutter | AI Dosyaları | Model/cache/log adaylarını inceleme | Dahil; yerel servis planlandı |
+| AI Clutter | — | — | Kullanıcının 29 Ekim isteğiyle kapsamdan ve arayüzden kaldırıldı |
 | App Leftovers | Uygulama Kalıntıları | Kaldırılmış uygulamaların ilişkili öğelerini bulma | Dahil; yerel servis planlandı |
 | App Updater | Uygulama Güncelleme | Kanal bazlı sürüm kontrolü/güncelleme | Homebrew yerel katalog kontrolü ve ayrı onayla cask upgrade; diğer kanallar bekliyor |
 | Application Permissions | Uygulama İzinleri | İzin durumlarını inceleme ve izin yönetimine erişim | Dahil; sistem desteği doğrulanacak |
