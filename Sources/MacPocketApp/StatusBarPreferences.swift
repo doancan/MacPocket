@@ -1,157 +1,222 @@
 import AppKit
+import Combine
 import MacPocketCore
 import SwiftUI
 
-enum StatusMetric: String, CaseIterable, Identifiable {
-    case cpu, memory, disk, battery, power
-    var id: String { rawValue }
-    var title: String { switch self { case .cpu: "CPU"; case .memory: "RAM"; case .disk: "Disk"; case .battery: "Pil"; case .power: "Güç" } }
-    var symbol: String { switch self { case .cpu: "cpu"; case .memory: "memorychip"; case .disk: "internaldrive"; case .battery: "battery.100percent"; case .power: "bolt" } }
-    var key: String { self == .cpu ? "MacPocket.menuBarCPU" : "MacPocket.bar.\(rawValue)" }
-    func enabled(_ defaults: UserDefaults = .standard) -> Bool {
-        defaults.object(forKey: key) as? Bool ?? (self == .cpu)
-    }
-    static func ordered(_ defaults: UserDefaults = .standard) -> [Self] {
-        let saved = (defaults.string(forKey: "MacPocket.bar.order") ?? "").split(separator: ",").compactMap { Self(rawValue: String($0)) }
-        var seen = Set<Self>()
-        return (saved + allCases).filter { seen.insert($0).inserted }
-    }
-}
-
-struct StatusMetricValue {
-    let text: String
-    let detail: String
-    let fraction: Double?
-}
-
-@MainActor
-func statusMetricValue(_ metric: StatusMetric, snapshot: SystemSnapshot?, defaults: UserDefaults = .standard) -> StatusMetricValue {
-    guard let s = snapshot else { return .init(text: "—", detail: "İlk ölçüm bekleniyor", fraction: nil) }
-    func percent(_ value: Double) -> String { String(format: defaults.bool(forKey: "MacPocket.bar.decimals") ? "%.1f%%" : "%.0f%%", value) }
-    func bytes(_ value: UInt64) -> String {
-        let formatter = ByteCountFormatter()
-        formatter.countStyle = defaults.string(forKey: "MacPocket.bar.units") == "decimal" ? .decimal : .binary
-        return formatter.string(fromByteCount: Int64(clamping: value))
-    }
-    switch metric {
-    case .cpu:
-        guard let user = s.cpuUserPercent, let system = s.cpuSystemPercent else { return .init(text: "—", detail: "CPU intervali bekleniyor", fraction: nil) }
-        return .init(text: percent(user + system), detail: "CPU toplam · Kullanıcı \(percent(user)) · Sistem \(percent(system))", fraction: (user + system) / 100)
-    case .memory:
-        let value: UInt64
-        let name: String
-        switch defaults.string(forKey: "MacPocket.bar.memoryValue") ?? "free" {
-        case "wired": value = s.wiredMemoryBytes; name = "Wired RAM"
-        case "compressed": value = s.compressedMemoryBytes; name = "Sıkıştırıcının fiziksel RAM alanı"
-        case "physical": value = s.physicalMemoryBytes; name = "Toplam fiziksel RAM"
-        default: value = s.freeMemoryBytes; name = "Ham boş RAM (kullanılabilir bellek değildir)"
+extension MenuBarModule {
+    /// Module color identity, shared by the tab bar, detail views and settings.
+    var tint: Color {
+        switch self {
+        case .cpu: PocketTheme.accent
+        case .memory: PocketTheme.memory
+        case .disk: PocketTheme.disk
+        case .network: Color(hex: 0x00A6C8)
+        case .power: PocketTheme.power
         }
-        let fraction = s.physicalMemoryBytes > 0 ? Double(value) / Double(s.physicalMemoryBytes) : nil
-        return .init(text: defaults.bool(forKey: "MacPocket.bar.memoryPercent") ? fraction.map { percent($0 * 100) } ?? "—" : bytes(value), detail: "\(name): \(bytes(value)) / \(bytes(s.physicalMemoryBytes))", fraction: fraction)
-    case .disk:
-        let path = defaults.string(forKey: "MacPocket.bar.volume") ?? ""
-        guard let volume = (path.isEmpty ? s.volumes.first : s.volumes.first(where: { $0.path == path })) else { return .init(text: "—", detail: path.isEmpty ? "Disk ölçümü yok" : "Seçili disk bağlı değil: \(path)", fraction: nil) }
-        let free = max(0, volume.availableBytes), total = max(1, volume.totalBytes)
-        let used = max(0, total - free)
-        let fraction = min(1, Double(used) / Double(total))
-        return .init(text: defaults.bool(forKey: "MacPocket.bar.diskPercent") ? percent(fraction * 100) : bytes(UInt64(free)), detail: "\(volume.name) · \(bytes(UInt64(free))) boş / \(bytes(UInt64(total))) toplam · Gösterge: doluluk", fraction: fraction)
-    case .battery:
-        return .init(text: s.power.chargePercent.map(percent) ?? "—", detail: "Pil · \(s.power.isCharging == true ? "Şarj oluyor" : "Şarj olmuyor")", fraction: s.power.chargePercent.map { $0 / 100 })
-    case .power:
-        let source = s.power.source == "AC Power" ? "AC" : s.power.source == "Battery Power" ? "Pil" : s.power.source
-        return .init(text: source + (s.power.lowPowerMode ? " ↓" : ""), detail: "\(s.power.source) · \(s.power.lowPowerMode ? "Düşük güç" : "Standart güç") · Termal: \(s.thermalState)", fraction: nil)
+    }
+
+    /// Whether the detail view lists top processes (process sampling runs only while it is visible).
+    var showsProcesses: Bool { self == .cpu || self == .memory }
+}
+
+/// Single source of truth for menu bar preferences. Writes go to UserDefaults through
+/// `MenuBarPreferences.save` (diffed); external writes (General settings toggle) are picked up.
+@MainActor
+final class MenuBarSettingsStore: ObservableObject {
+    static let shared = MenuBarSettingsStore()
+
+    @Published var preferences: MenuBarPreferences {
+        didSet { if preferences != oldValue { preferences.save() } }
+    }
+    private var subscription: AnyCancellable?
+
+    private init() {
+        preferences = MenuBarPreferences.load()
+        subscription = NotificationCenter.default.publisher(for: UserDefaults.didChangeNotification)
+            .receive(on: RunLoop.main)
+            .sink { [weak self] _ in MainActor.assumeIsolated { self?.reload() } }
+    }
+
+    private func reload() {
+        let fresh = MenuBarPreferences.load()
+        if fresh != preferences { preferences = fresh }
+    }
+
+    func settings(_ module: MenuBarModule) -> Binding<MenuBarModuleSettings> {
+        Binding(get: { self.preferences.settings(for: module) },
+                set: { self.preferences.modules[module] = $0 })
+    }
+
+    func enabled(_ module: MenuBarModule) -> Binding<Bool> {
+        Binding(get: { self.preferences.enabled.contains(module) },
+                set: { isOn in
+                    if isOn { self.preferences.enabled.insert(module) } else { self.preferences.enabled.remove(module) }
+                })
+    }
+
+    func move(_ module: MenuBarModule, by offset: Int) {
+        var order = preferences.order
+        guard let index = order.firstIndex(of: module), order.indices.contains(index + offset) else { return }
+        order.swapAt(index, index + offset)
+        preferences.order = order
     }
 }
 
+/// Settings → Menü Çubuğu.
 struct StatusBarPreferencesView: View {
     @ObservedObject var model: PocketModel
-    @AppStorage("MacPocket.showMenuBar") private var visible = true
-    @AppStorage("MacPocket.bar.layout") private var layout = "combined"
-    @AppStorage("MacPocket.bar.style") private var style = "text"
-    @AppStorage("MacPocket.bar.labels") private var labels = true
-    @AppStorage("MacPocket.bar.icons") private var icons = true
-    @AppStorage("MacPocket.bar.compact") private var compact = false
-    @AppStorage("MacPocket.bar.decimals") private var decimals = false
-    @AppStorage("MacPocket.bar.units") private var units = "binary"
-    @AppStorage("MacPocket.bar.memoryValue") private var memory = "free"
-    @AppStorage("MacPocket.bar.memoryPercent") private var memoryPercent = false
-    @AppStorage("MacPocket.bar.diskPercent") private var diskPercent = false
-    @AppStorage("MacPocket.bar.volume") private var volume = ""
-    @AppStorage("MacPocket.bar.fontSize") private var fontSize = 12.0
-    @AppStorage("MacPocket.bar.order") private var order = "cpu,memory,disk,battery,power"
+    @ObservedObject private var store = MenuBarSettingsStore.shared
+    @ObservedObject private var history = MenuBarHistory.shared
+    @State private var expanded: MenuBarModule?
+
     var body: some View {
         Form {
-            Section("Yerleşim") {
-                Toggle("Menü çubuğunda göster", isOn: $visible)
-                Picker("Göstergeler", selection: $layout) {
-                    Text("Tek birleşik grup").tag("combined")
-                    Text("Ayrı ayrı").tag("separate")
-                }.pickerStyle(.segmented)
-                Text("Ayrı göstergeler macOS menü çubuğunda ⌘ ile sürüklenebilir. Pil göstergesi yalnız pil bulunan cihazlarda görünür.")
-                    .font(.caption).foregroundStyle(.secondary)
-                ForEach(StatusMetric.ordered()) { metric in
-                    StatusMetricToggle(metric: metric, order: $order)
+            Section {
+                Toggle("Menü çubuğunda göster", isOn: $store.preferences.visible)
+                Picker("Düzen", selection: $store.preferences.layout) {
+                    ForEach(MenuBarLayout.allCases) { Text($0.title).tag($0) }
                 }
-                Text("Hiç gösterge seçilmezse MacPocket simgesi korunur. Sığmayan göstergeleri macOS ekran alanına göre gizleyebilir.")
-                    .font(.caption).foregroundStyle(.secondary)
+                .pickerStyle(.segmented)
+                Text(store.preferences.layout == .grouped
+                     ? "Tek simge; tıklayınca her modül için bir sekme açılır. Etkin modüller simgede kompakt olarak gösterilir."
+                     : "Her etkin modül kendi menü çubuğu öğesini ve kendi ayarlarını kullanır. Öğeler ⌘ basılıyken sürüklenebilir.")
+                    .font(.subheadline).foregroundStyle(.secondary)
+                if store.preferences.layout == .grouped {
+                    Picker("Simge görünümü", selection: $store.preferences.groupedStyle) {
+                        ForEach(MenuBarGroupedStyle.allCases) { Text($0.title).tag($0) }
+                    }
+                }
+                LabeledContent("Önizleme") { preview }
+            } header: { Text("Yerleşim") }
+
+            Section {
+                ForEach(store.preferences.order) { module in
+                    moduleRow(module)
+                }
+            } header: {
+                Text("Modüller")
+            } footer: {
+                Text("Pil bilgileri yalnız pili olan Mac’lerde gösterilir. Sığmayan öğeleri macOS ekran alanına göre gizleyebilir.")
+                    .font(.subheadline).foregroundStyle(.secondary)
             }
-            Section("Gösterim") {
-                Picker("Stil", selection: $style) {
-                    Text("Değer").tag("text"); Text("Mini gösterge + değer").tag("gauge"); Text("Mini gösterge").tag("gaugeOnly")
+
+            Section {
+                Picker("Boyut birimi", selection: $store.preferences.binaryUnits) {
+                    Text("İkili (1024)").tag(true)
+                    Text("Ondalık (1000)").tag(false)
                 }
-                Toggle("Etiketleri göster", isOn: $labels)
-                Toggle("Simgeleri göster", isOn: $icons)
-                Toggle("Sıkı aralık", isOn: $compact)
-                Toggle("Yüzdelerde ondalık basamak", isOn: $decimals)
-                LabeledContent("Yazı boyutu") { Slider(value: $fontSize, in: 10...14, step: 1).frame(width: 130); Text("\(Int(fontSize)) pt").monospacedDigit() }
-                Picker("Boyut birimi", selection: $units) { Text("İkili (1024)").tag("binary"); Text("Ondalık (1000)").tag("decimal") }
-            }
-            Section("RAM ve disk") {
-                Picker("RAM değeri", selection: $memory) {
-                    Text("Ham boş").tag("free"); Text("Wired").tag("wired"); Text("Sıkıştırıcı alanı").tag("compressed"); Text("Fiziksel toplam").tag("physical")
-                }
-                Toggle("RAM’i yüzde olarak göster", isOn: $memoryPercent)
-                Text("Ham boş RAM, Activity Monitor’daki kullanılabilir bellek değildir. Yüzde seçilen alanın fiziksel RAM’e oranıdır.").font(.caption).foregroundStyle(.secondary)
-                Picker("Disk", selection: $volume) {
-                    Text("Otomatik").tag("")
-                    if !volume.isEmpty, !(model.system?.volumes.contains { $0.path == volume } ?? false) { Text(volume + " (bağlı değil)").tag(volume) }
-                    ForEach(model.system?.volumes ?? [], id: \.path) { item in Text(item.name).tag(item.path) }
-                }
-                Toggle("Disk boş alanı yerine doluluk yüzdesi", isOn: $diskPercent)
-            }
-            Section("Örnekleme") {
                 Picker("Yenileme", selection: $model.refreshSeconds) {
                     Text("1 saniye").tag(1.0); Text("2 saniye").tag(2.0); Text("5 saniye").tag(5.0); Text("10 saniye").tag(10.0)
                 }
-                Text("Göstergeler ve ana pencere aynı gerçek ölçümleri kullanır. İzleme duraklatıldığında son değer korunur.")
-                    .font(.caption).foregroundStyle(.secondary)
+                Text("Menü çubuğu ve ana pencere aynı ölçümleri kullanır. İzleme duraklatıldığında son değer korunur.")
+                    .font(.subheadline).foregroundStyle(.secondary)
+            } header: { Text("Birimler ve örnekleme") }
+        }
+        .formStyle(.grouped)
+    }
+
+    @ViewBuilder private var preview: some View {
+        let preferences = store.preferences
+        if !preferences.visible {
+            Text("Gizli").foregroundStyle(.secondary)
+        } else if preferences.layout == .grouped || preferences.enabledModules.isEmpty {
+            let readings = preferences.enabledModules.map {
+                ($0, MenuBarFormatter.reading($0, settings: preferences.settings(for: $0), snapshot: model.system,
+                                              binaryUnits: preferences.binaryUnits))
             }
-        }.formStyle(.grouped)
+            MenuBarItemPreview(image: MenuBarRenderer.grouped(style: preferences.groupedStyle, readings: readings,
+                                                              history: history, preferences: preferences))
+        } else {
+            HStack(spacing: PocketSpacing.xs) {
+                ForEach(preferences.enabledModules) { module in
+                    MenuBarItemPreview(image: moduleImage(module))
+                }
+            }
+        }
+    }
+
+    private func moduleImage(_ module: MenuBarModule) -> NSImage {
+        let settings = store.preferences.settings(for: module)
+        let reading = MenuBarFormatter.reading(module, settings: settings, snapshot: model.system,
+                                               binaryUnits: store.preferences.binaryUnits)
+        return MenuBarRenderer.module(module, settings: settings, reading: reading, snapshot: model.system, history: history)
+    }
+
+    private func moduleRow(_ module: MenuBarModule) -> some View {
+        let order = store.preferences.order
+        let index = order.firstIndex(of: module) ?? 0
+        return DisclosureGroup(isExpanded: Binding(get: { expanded == module },
+                                                   set: { expanded = $0 ? module : nil })) {
+            ModuleSettingsEditor(module: module, settings: store.settings(module), volumes: model.system?.volumes ?? [],
+                                 layout: store.preferences.layout)
+                .padding(.top, PocketSpacing.xs)
+        } label: {
+            HStack(spacing: PocketSpacing.s) {
+                Toggle(isOn: store.enabled(module)) { EmptyView() }
+                    .labelsHidden()
+                    .toggleStyle(.checkbox)
+                    .accessibilityLabel("\(module.title) modülünü menü çubuğunda göster")
+                PocketIconTile(symbol: module.symbol, tint: module.tint, size: 20)
+                Text(module.title)
+                Spacer(minLength: PocketSpacing.s)
+                if store.preferences.layout == .separate, store.preferences.enabled.contains(module) {
+                    MenuBarItemPreview(image: moduleImage(module))
+                }
+                Button { store.move(module, by: -1) } label: { Image(systemName: "chevron.up") }
+                    .disabled(index == 0)
+                    .help("Öne al")
+                    .accessibilityLabel("\(module.title) modülünü öne al")
+                Button { store.move(module, by: 1) } label: { Image(systemName: "chevron.down") }
+                    .disabled(index == order.count - 1)
+                    .help("Arkaya al")
+                    .accessibilityLabel("\(module.title) modülünü arkaya al")
+            }
+            .buttonStyle(.borderless)
+            .controlSize(.small)
+        }
     }
 }
 
-private struct StatusMetricToggle: View {
-    let metric: StatusMetric
-    @Binding var order: String
-    @AppStorage private var enabled: Bool
-    init(metric: StatusMetric, order: Binding<String>) {
-        self.metric = metric; _order = order
-        _enabled = AppStorage(wrappedValue: metric == .cpu, metric.key)
-    }
+/// Inline editor for one module's own menu bar options.
+private struct ModuleSettingsEditor: View {
+    let module: MenuBarModule
+    @Binding var settings: MenuBarModuleSettings
+    let volumes: [VolumeSnapshot]
+    let layout: MenuBarLayout
+
     var body: some View {
-        HStack {
-            Toggle(isOn: $enabled) { Label(metric.title, systemImage: metric.symbol) }
-            Spacer()
-            Button { move(-1) } label: { Image(systemName: "arrow.up") }.disabled(index == 0).help("Öne al")
-            Button { move(1) } label: { Image(systemName: "arrow.down") }.disabled(index == StatusMetric.allCases.count - 1).help("Arkaya al")
-        }.controlSize(.small)
-    }
-    private var index: Int { StatusMetric.ordered().firstIndex(of: metric) ?? 0 }
-    private func move(_ delta: Int) {
-        var list = StatusMetric.ordered()
-        let target = index + delta
-        guard list.indices.contains(target) else { return }
-        list.swapAt(index, target)
-        order = list.map(\.rawValue).joined(separator: ",")
+        VStack(alignment: .leading, spacing: PocketSpacing.s) {
+            Picker("Değer", selection: $settings.value) {
+                ForEach(module.valueOptions) { Text($0.title).tag($0) }
+            }
+            if module == .disk {
+                Picker("Disk bölümü", selection: $settings.volumePath) {
+                    Text("Başlangıç diski").tag("")
+                    if !settings.volumePath.isEmpty, !volumes.contains(where: { $0.path == settings.volumePath }) {
+                        Text("\(settings.volumePath) (bağlı değil)").tag(settings.volumePath)
+                    }
+                    ForEach(volumes, id: \.path) { Text($0.name).tag($0.path) }
+                }
+            }
+            Picker("Görünüm", selection: $settings.style) {
+                ForEach(MenuBarDisplayStyle.allCases) { Text($0.title).tag($0) }
+            }
+            .pickerStyle(.segmented)
+            HStack(spacing: PocketSpacing.l) {
+                Toggle("Etiket", isOn: $settings.showLabel)
+                Toggle("Simge", isOn: $settings.showIcon)
+                if settings.style == .graph || settings.style == .gauge {
+                    Toggle("Değer", isOn: $settings.showValue)
+                }
+                Toggle("Ondalık", isOn: $settings.decimals)
+            }
+            .disabled(settings.style == .icon)
+            .toggleStyle(.checkbox)
+            if layout == .grouped {
+                Text("Gruplu düzende bu modülün değeri ve ondalık ayarı tek simgede kullanılır; görünüm seçenekleri Ayrı düzende uygulanır.")
+                    .font(.subheadline).foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
     }
 }

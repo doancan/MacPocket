@@ -3,7 +3,7 @@ import SwiftUI
 
 @MainActor
 struct ToolsHubView: View {
-    let sleepController: SleepController
+    @ObservedObject var model: PocketModel
     var openTool: (String) -> Void = { _ in }
     @AppStorage("MacPocket.tools.favorites") private var favorites = ""
     @State private var search = ""
@@ -11,304 +11,167 @@ struct ToolsHubView: View {
     @State private var category: HubCategory = .all
     @State private var favoritesOnly = false
     @State private var showAwake = false
-    @State private var showDiagnostics = false
-    @State private var awakeSession: AwakeSession?
-    @State private var now = Date()
-    @State private var duration: HubAwakeDuration = .hour
-    @State private var customMinutes = "45"
-    @State private var keepDisplayAwake = false
-    @State private var changingAwake = false
-    @State private var failure: String?
 
     var body: some View {
+        let tools = visibleTools
+        let favoriteIDs = favoriteIDs
         ScrollView {
-            VStack(alignment: .leading, spacing: 20) {
-                heading
+            VStack(alignment: .leading, spacing: PocketSpacing.xl) {
+                PocketPageHeading(title: "Araçlar",
+                                  subtitle: "Kategorilerine göre araçlarını bul, favorilerine hızlıca ulaş.",
+                                  icon: "square.grid.2x2") {
+                    PocketStatusBadge(text: "\(HubTool.catalog.count) araç · \(HubCategory.groups.count) kategori" as LocalizedStringKey)
+                }
                 filters
-                if let session = awakeSession, session.active {
+                if let session = model.awakeSession, session.active {
                     activeAwakeBanner(session)
                 }
-                if visibleTools.isEmpty {
-                    VStack(spacing: 10) {
-                        Image(systemName: favoritesOnly ? "star" : "magnifyingglass")
-                            .font(.system(size: 28))
-                        Text(favoritesOnly && favoriteIDs.isEmpty ? "Henüz favori eklemedin" : "Araç bulunamadı")
-                            .font(.system(size: 16, weight: .medium))
-                        Text(favoritesOnly && favoriteIDs.isEmpty
-                             ? "Araç kutularındaki yıldızlarla kendi kısayollarını oluştur."
-                             : "Aramayı veya kategori seçimini değiştirin.")
-                            .font(.system(size: 12)).foregroundStyle(HubColors.secondary)
-                        Button("Tüm Araçları Göster") {
-                            search = ""
-                            category = .all
-                            favoritesOnly = false
-                        }.buttonStyle(.bordered).padding(.top, 4)
-                    }.frame(maxWidth: .infinity).padding(.vertical, 70)
+                if let error = model.awakeError, !showAwake {
+                    PocketMessage(error, error: true)
+                }
+                if tools.isEmpty {
+                    emptyState(favoriteIDs: favoriteIDs)
                 } else {
-                    LazyVGrid(columns: [GridItem(.adaptive(minimum: 420), spacing: 18, alignment: .top)],
-                              alignment: .leading, spacing: 18) {
-                        ForEach(visibleCategories) { group in
-                            categorySection(group)
+                    LazyVGrid(columns: [GridItem(.flexible(), spacing: PocketSpacing.l, alignment: .top)],
+                              alignment: .leading, spacing: PocketSpacing.l) {
+                        ForEach(HubCategory.groups) { group in
+                            let groupTools = tools.filter { $0.category == group }
+                            if !groupTools.isEmpty {
+                                categorySection(group, tools: groupTools, favoriteIDs: favoriteIDs)
+                            }
                         }
                     }
                 }
-            }.padding(24)
-        }
-        .background(HubColors.background).foregroundStyle(HubColors.text)
-        .onReceive(NotificationCenter.default.publisher(for: .pocketFind)) { _ in searchFocused = true }
-        .task {
-            while !Task.isCancelled {
-                awakeSession = await sleepController.status()
-                now = Date()
-                do { try await Task.sleep(for: .seconds(1)) }
-                catch { break }
             }
+            .padding(PocketSpacing.page)
+            .frame(maxWidth: .infinity, alignment: .topLeading)
         }
-        .sheet(isPresented: $showAwake) { awakeSheet }
-        .sheet(isPresented: $showDiagnostics) {
-            VStack(spacing: 0) {
-                HStack {
-                    Spacer()
-                    Button("Kapat") { showDiagnostics = false }.keyboardShortcut(.cancelAction)
-                }.padding(12).background(HubColors.surface)
-                SystemToolsView()
-            }.frame(width: 1000, height: 680)
-        }
-        .alert("İşlem tamamlanamadı", isPresented: Binding(
-            get: { failure != nil }, set: { if !$0 { failure = nil } }
-        )) {
-            Button("Tamam", role: .cancel) { failure = nil }
-        } message: { Text(failure ?? "") }
+        .onReceive(NotificationCenter.default.publisher(for: .pocketFind)) { _ in searchFocused = true }
+        .sheet(isPresented: $showAwake) { HubAwakeSheet(model: model) }
     }
 
-    private var heading: some View {
-        HStack(alignment: .top) {
-            VStack(alignment: .leading, spacing: 7) {
-                Text("Tools").font(.system(size: 26, weight: .semibold))
-                Text("Kategorilerine göre araçlarını bul, favorilerine hızlıca ulaş.")
-                    .font(.system(size: 12)).foregroundStyle(HubColors.secondary)
-            }
-            Spacer()
-            Text("\(HubTool.catalog.count) ARAÇ · \(HubCategory.groups.count) KATEGORİ")
-                .font(.system(size: 10, weight: .semibold, design: .monospaced))
-                .tracking(1).foregroundStyle(HubColors.secondary)
-                .padding(.horizontal, 12).padding(.vertical, 8)
-                .background(HubColors.surface, in: Capsule())
-        }
-    }
+    // MARK: - Sections
 
     private var filters: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            HStack(spacing: 12) {
-                HStack(spacing: 8) {
-                    Image(systemName: "magnifyingglass").foregroundStyle(HubColors.secondary)
-                    TextField("Araç ara…", text: $search).textFieldStyle(.plain)
-                        .accessibilityLabel("Araç ara").focused($searchFocused)
-                }
-                .padding(10).frame(maxWidth: 320)
-                .background(HubColors.surface, in: RoundedRectangle(cornerRadius: 7))
-                .overlay(RoundedRectangle(cornerRadius: 7).stroke(HubColors.border))
+        VStack(alignment: .leading, spacing: PocketSpacing.m) {
+            HStack(spacing: PocketSpacing.m) {
+                TextField("Araç ara…", text: $search)
+                    .textFieldStyle(.roundedBorder)
+                    .frame(maxWidth: 320)
+                    .focused($searchFocused)
+                    .accessibilityLabel("Araç ara")
                 Spacer(minLength: 0)
                 Toggle(isOn: $favoritesOnly) {
-                    Label("Favoriler", systemImage: "star")
+                    Label("Favoriler", systemImage: favoritesOnly ? "star.fill" : "star")
                 }
-                .toggleStyle(.button).tint(HubColors.accent)
+                .toggleStyle(.button)
+                .help("Yalnızca favori araçları göster")
             }
-            ScrollView(.horizontal) {
-                Picker("Araç kategorisi", selection: $category) {
-                    ForEach(HubCategory.allCases) { group in
-                        Text(group.rawValue).tag(group)
-                    }
-                }
-                .pickerStyle(.segmented).labelsHidden()
-                .fixedSize(horizontal: true, vertical: false)
-                .padding(.vertical, 4)
-            }.scrollIndicators(.hidden)
+            GlassTabBar(tabs: HubCategory.allCases.map { GlassTab(id: $0, title: $0.title, symbol: $0.icon, tint: $0.tint) },
+                        selection: $category, tinted: false)
+                .accessibilityLabel("Araç kategorisi")
         }
-        .font(.system(size: 11))
     }
 
-    private func categorySection(_ group: HubCategory) -> some View {
-        let tools = visibleTools.filter { $0.category == group }
-        return VStack(alignment: .leading, spacing: 12) {
-            HStack {
-                Label(group.rawValue, systemImage: group.icon)
-                    .font(.system(size: 12, weight: .semibold))
-                    .accessibilityAddTraits(.isHeader)
-                Spacer()
-                Text("\(tools.count)").font(.system(size: 10, design: .monospaced))
-                    .foregroundStyle(HubColors.secondary)
+    private func emptyState(favoriteIDs: Set<String>) -> some View {
+        let noFavorites = favoritesOnly && favoriteIDs.isEmpty
+        return ContentUnavailableView {
+            Label(noFavorites ? "Henüz favori eklemedin" : "Araç bulunamadı",
+                  systemImage: favoritesOnly ? "star" : "magnifyingglass")
+        } description: {
+            Text(noFavorites
+                 ? "Araç kutularındaki yıldızlarla kendi kısayollarını oluştur."
+                 : "Aramayı veya kategori seçimini değiştir.")
+        } actions: {
+            Button("Tüm Araçları Göster") {
+                search = ""
+                category = .all
+                favoritesOnly = false
+            }
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, PocketSpacing.xxl)
+    }
+
+    private func categorySection(_ group: HubCategory, tools: [HubTool], favoriteIDs: Set<String>) -> some View {
+        VStack(alignment: .leading, spacing: PocketSpacing.m) {
+            PocketSectionHeader(group.title, icon: group.icon) {
+                Text("\(tools.count)")
+                    .monospacedDigit()
                     .accessibilityLabel("\(tools.count) araç")
             }
-            LazyVGrid(columns: [GridItem(.adaptive(minimum: 142, maximum: 180), spacing: 10)],
-                      alignment: .leading, spacing: 10) {
-                ForEach(tools) { tool in toolCard(tool) }
-            }
-        }
-        .padding(14).frame(maxWidth: .infinity, alignment: .topLeading)
-        .background(HubColors.group, in: RoundedRectangle(cornerRadius: 10))
-        .overlay(RoundedRectangle(cornerRadius: 10).stroke(HubColors.border.opacity(0.7)))
-    }
-
-    private func toolCard(_ tool: HubTool) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HStack {
-                Image(systemName: tool.icon)
-                    .font(.system(size: 18, weight: .medium))
-                    .foregroundStyle(tool.id == "keep-awake" ? HubColors.accent : HubColors.secondary)
-                    .frame(width: 24, height: 24)
-                    .accessibilityHidden(true)
-                Spacer(minLength: 0)
-                Button { toggleFavorite(tool.id) } label: {
-                    Image(systemName: favoriteIDs.contains(tool.id) ? "star.fill" : "star")
-                        .font(.system(size: 11))
-                        .foregroundStyle(favoriteIDs.contains(tool.id) ? HubColors.accent : HubColors.secondary)
-                        .frame(width: 24, height: 24)
-                        .contentShape(Rectangle())
-                }
-                .buttonStyle(.plain)
-                .help(favoriteIDs.contains(tool.id) ? "Favorilerden çıkar" : "Favorilere ekle")
-                .accessibilityLabel("\(tool.title): favori seçimini değiştir")
-                .accessibilityValue(favoriteIDs.contains(tool.id) ? "Favori" : "Favori değil")
-            }
-            Text(tool.title).font(.system(size: 12, weight: .medium))
-                .lineLimit(3).frame(maxWidth: .infinity, minHeight: 42, alignment: .topLeading)
-                .accessibilityHint(tool.description)
-            HStack {
-                if tool.id == "keep-awake" {
-                    Label(awakeSession?.active == true ? "Etkin" : "Hazır",
-                          systemImage: awakeSession?.active == true ? "circle.fill" : "checkmark.circle")
-                        .foregroundStyle(HubColors.accent)
-                    Spacer(minLength: 4)
-                    Button(awakeSession?.active == true ? "Yönet" : "Aç") { showAwake = true }
-                        .buttonStyle(.bordered).tint(HubColors.accent)
-                        .accessibilityLabel("Mac'i Uyanık Tut: \(awakeSession?.active == true ? "Yönet" : "Aç")")
-                } else if workingTools.contains(tool.id) {
-                    Text(tool.id == "login-items" || tool.id == "background-items" ? "macOS" : "Kullanılabilir").foregroundStyle(HubColors.accent)
-                    Spacer(minLength: 4)
-                    Button("Aç") { openTool(tool.id) }.buttonStyle(.bordered)
-                } else if tool.id == "maintenance" {
-                    Text("Salt okunur").foregroundStyle(HubColors.secondary)
-                    Spacer(minLength: 4)
-                    Button("Raporlar") { showDiagnostics = true }.buttonStyle(.bordered)
-                        .help("Mevcut salt okunur sistem raporlarını aç")
-                } else {
-                    Text(tool.integration ? "Entegrasyon gerekli" : "Hazırlanıyor")
-                        .foregroundStyle(HubColors.secondary)
-                    Spacer(minLength: 0)
+            .environment(\.pocketTint, group.tint)
+            LazyVGrid(columns: [GridItem(.adaptive(minimum: 180, maximum: 260), spacing: PocketSpacing.s)],
+                      alignment: .leading, spacing: PocketSpacing.s) {
+                ForEach(tools) { tool in
+                    HubToolTile(tool: tool,
+                                isFavorite: favoriteIDs.contains(tool.id),
+                                status: status(for: tool),
+                                highlighted: tool.id == "keep-awake" && model.awakeSession?.active == true,
+                                open: { open(tool) },
+                                toggleFavorite: { toggleFavorite(tool.id) })
                 }
             }
-            .font(.system(size: 9)).controlSize(.small)
         }
-        .padding(12).frame(maxWidth: .infinity, minHeight: 126, alignment: .topLeading)
-        .background(HubColors.surface, in: RoundedRectangle(cornerRadius: 7))
-        .overlay(RoundedRectangle(cornerRadius: 7).stroke(
-            tool.id == "keep-awake" && awakeSession?.active == true ? HubColors.accent.opacity(0.7) : HubColors.border
-        ))
-        .help(tool.description)
+        .frame(maxWidth: .infinity, alignment: .topLeading)
+        .pocketCard()
     }
 
     private func activeAwakeBanner(_ session: AwakeSession) -> some View {
-        HStack(spacing: 12) {
-            Image(systemName: "cup.and.saucer.fill").font(.system(size: 22))
-            VStack(alignment: .leading, spacing: 5) {
-                Text("Mac'in uyanık tutuluyor").font(.system(size: 13, weight: .semibold))
-                Text("\(remainingTime(session)) · \(session.keepDisplayAwake ? "Ekran açık tutuluyor" : "Ekran normal davranır")")
-                    .font(.system(size: 11)).foregroundStyle(HubColors.secondary)
+        HStack(spacing: PocketSpacing.m) {
+            Image(systemName: "cup.and.saucer.fill")
+                .font(.title2)
+                .foregroundStyle(PocketTheme.accent)
+                .accessibilityHidden(true)
+            VStack(alignment: .leading, spacing: PocketSpacing.xxs) {
+                Text("Mac'in uyanık tutuluyor").font(.headline)
+                HStack(spacing: PocketSpacing.xs) {
+                    HubAwakeCountdown(session: session)
+                    Text(session.keepDisplayAwake ? "· Ekran açık tutuluyor" : "· Ekran normal davranır")
+                }
+                .font(.callout)
+                .foregroundStyle(.secondary)
             }
-            Spacer()
-            Button(changingAwake ? "Durduruluyor…" : "Durdur", action: stopAwake)
-                .buttonStyle(.bordered).disabled(changingAwake)
+            Spacer(minLength: PocketSpacing.m)
+            Button("Yönet") { showAwake = true }
+            HubAwakeStopButton(model: model, title: "Durdur")
         }
-        .foregroundStyle(HubColors.accent)
-        .padding(16).background(HubColors.accent.opacity(0.09), in: RoundedRectangle(cornerRadius: 9))
-        .overlay(RoundedRectangle(cornerRadius: 9).stroke(HubColors.accent.opacity(0.3)))
+        .padding(PocketSpacing.l)
+        .background(PocketTheme.accent.opacity(0.09), in: RoundedRectangle(cornerRadius: PocketRadius.large, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: PocketRadius.large, style: .continuous)
+                .strokeBorder(PocketTheme.accent.opacity(0.3), lineWidth: 0.5)
+        }
+        .accessibilityElement(children: .contain)
     }
 
-    private var awakeSheet: some View {
-        VStack(alignment: .leading, spacing: 22) {
-            HStack(alignment: .top) {
-                VStack(alignment: .leading, spacing: 6) {
-                    Label("Mac'i Uyanık Tut", systemImage: "cup.and.saucer.fill")
-                        .font(.system(size: 20, weight: .semibold))
-                    Text("Mac'in otomatik uyumasını geçici olarak engelle.")
-                        .font(.system(size: 12)).foregroundStyle(HubColors.secondary)
-                }
-                Spacer()
-                Button { showAwake = false } label: { Image(systemName: "xmark") }
-                    .buttonStyle(.plain).keyboardShortcut(.cancelAction)
-            }
-            Divider().overlay(HubColors.border)
-            if let session = awakeSession, session.active {
-                VStack(alignment: .leading, spacing: 8) {
-                    Label("Etkin oturum", systemImage: "circle.fill")
-                        .font(.system(size: 12, weight: .semibold)).foregroundStyle(HubColors.accent)
-                    Text(remainingTime(session)).font(.system(size: 22, weight: .medium, design: .monospaced))
-                    Text(session.keepDisplayAwake ? "Ekran da açık tutuluyor." : "Ekranın kapanması engellenmiyor.")
-                        .font(.system(size: 12)).foregroundStyle(HubColors.secondary)
-                }
-                .padding(16).frame(maxWidth: .infinity, alignment: .leading)
-                .background(HubColors.accent.opacity(0.08), in: RoundedRectangle(cornerRadius: 9))
-                Button(changingAwake ? "Durduruluyor…" : "Oturumu Durdur", action: stopAwake)
-                    .buttonStyle(.borderedProminent).tint(HubColors.accent)
-                    .disabled(changingAwake)
-            } else {
-                VStack(alignment: .leading, spacing: 12) {
-                    Text("Süre").font(.system(size: 12, weight: .semibold))
-                    Picker("Süre", selection: $duration) {
-                        ForEach(HubAwakeDuration.allCases) { Text($0.rawValue).tag($0) }
-                    }.labelsHidden().frame(maxWidth: .infinity)
-                    if duration == .custom {
-                        HStack {
-                            TextField("Dakika", text: $customMinutes).textFieldStyle(.roundedBorder)
-                                .frame(width: 90)
-                            Text("dakika · 1–1440").font(.system(size: 11)).foregroundStyle(HubColors.secondary)
-                        }
-                    }
-                    Toggle("Ekranı da açık tut", isOn: $keepDisplayAwake).toggleStyle(.checkbox)
-                        .font(.system(size: 12))
-                }
-                .disabled(changingAwake)
-                Text("Süre dolduğunda veya uygulama kapandığında uyanık tutma sona erer.")
-                    .font(.system(size: 11)).foregroundStyle(HubColors.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
-                HStack {
-                    Spacer()
-                    Button("Vazgeç") { showAwake = false }.buttonStyle(.bordered)
-                    Button(changingAwake ? "Başlatılıyor…" : "Başlat", action: startAwake)
-                        .buttonStyle(.borderedProminent).tint(HubColors.accent)
-                        .disabled(changingAwake || !validDuration)
-                }
-            }
-        }
-        .padding(26).frame(width: 480)
-        .background(HubColors.background).foregroundStyle(HubColors.text)
-        .interactiveDismissDisabled(changingAwake)
-    }
-
-    private var workingTools: Set<String> {
-        ["screen-cleaning", "similar-images", "app-leftovers", "mac-utilities", "time-machine", "launch-jobs", "listening-ports", "disk-info", "spotlight", "dns", "routes", "os-updates", "security", "permissions", "task-manager", "system-reports", "window-switcher", "uninstaller", "app-updater", "downloads", "duplicates", "large-old", "system-junk", "trash", "login-items", "background-items"]
-    }
+    // MARK: - Data
 
     private var favoriteIDs: Set<String> { Set(favorites.split(separator: ",").map(String.init)) }
 
     private var visibleTools: [HubTool] {
-        HubTool.catalog.filter { tool in
+        let favoriteIDs = favoriteIDs
+        return HubTool.catalog.filter { tool in
             (category == .all || tool.category == category)
                 && (!favoritesOnly || favoriteIDs.contains(tool.id))
-                && (search.isEmpty || "\(tool.title) \(tool.description) \(tool.category.rawValue)"
+                && (search.isEmpty || "\(tool.title) \(tool.description) \(tool.category.title)"
                     .localizedCaseInsensitiveContains(search))
         }
     }
 
-    private var visibleCategories: [HubCategory] {
-        HubCategory.groups.filter { group in visibleTools.contains { $0.category == group } }
+    private func status(for tool: HubTool) -> HubToolTile.Status? {
+        if tool.id == "keep-awake" {
+            return model.awakeSession?.active == true
+                ? .init(text: String(localized: "Etkin"), symbol: "circle.fill", tone: .accent)
+                : nil
+        }
+        return tool.opensSystemSettings
+            ? .init(text: String(localized: "Sistem Ayarları"), symbol: "arrow.up.forward.app", tone: .neutral)
+            : nil
     }
 
-    private var validDuration: Bool {
-        guard duration == .custom else { return true }
-        guard let minutes = Double(customMinutes.replacingOccurrences(of: ",", with: ".")) else { return false }
-        return minutes.isFinite && (1...1440).contains(minutes)
+    private func open(_ tool: HubTool) {
+        if tool.id == "keep-awake" { showAwake = true } else { openTool(tool.id) }
     }
 
     private func toggleFavorite(_ id: String) {
@@ -316,47 +179,261 @@ struct ToolsHubView: View {
         if !ids.insert(id).inserted { ids.remove(id) }
         favorites = ids.sorted().joined(separator: ",")
     }
+}
 
-    private func remainingTime(_ session: AwakeSession) -> String {
-        guard let end = session.endsAt else { return "Sen durdurana kadar" }
-        let total = max(0, Int(end.timeIntervalSince(now).rounded(.up)))
-        return String(format: "%02d:%02d:%02d kaldı", total / 3600, (total % 3600) / 60, total % 60)
+// MARK: - Tile
+
+/// A whole-card button with a secondary favorite control layered on top (never nested inside the button).
+private struct HubToolTile: View {
+    struct Status {
+        let text: String
+        let symbol: String
+        let tone: PocketTone
     }
 
-    private func startAwake() {
-        guard !changingAwake, validDuration else { return }
-        let seconds = duration == .custom
-            ? Double(customMinutes.replacingOccurrences(of: ",", with: ".")).map { $0 * 60 }
-            : duration.seconds
-        changingAwake = true
-        Task { @MainActor in
-            defer { changingAwake = false }
-            do {
-                awakeSession = try await sleepController.start(durationSeconds: seconds, keepDisplayAwake: keepDisplayAwake)
-                now = Date()
-            } catch { failure = error.localizedDescription }
+    let tool: HubTool
+    let isFavorite: Bool
+    let status: Status?
+    let highlighted: Bool
+    let open: () -> Void
+    let toggleFavorite: () -> Void
+    @State private var hovering = false
+
+    var body: some View {
+        ZStack(alignment: .topTrailing) {
+            Button(action: open) {
+                VStack(alignment: .leading, spacing: PocketSpacing.s) {
+                    PocketIconTile(symbol: tool.icon, tint: tool.category.tint, size: 34)
+                    Text(tool.title)
+                        .font(.headline)
+                        .lineLimit(2)
+                        .multilineTextAlignment(.leading)
+                    Text(tool.description)
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(3, reservesSpace: true)
+                        .multilineTextAlignment(.leading)
+                    Spacer(minLength: 0)
+                    if let status {
+                        PocketStatusBadge(text: status.text, systemImage: status.symbol, tone: status.tone)
+                    }
+                }
+                .padding(PocketSpacing.m)
+                .frame(maxWidth: .infinity, minHeight: 124, alignment: .topLeading)
+                .contentShape(RoundedRectangle(cornerRadius: PocketRadius.medium, style: .continuous))
+            }
+            .buttonStyle(HubTileButtonStyle(hovering: hovering, highlighted: highlighted))
+            .accessibilityLabel(tool.title)
+            .accessibilityHint(tool.description)
+            .accessibilityValue(status?.text ?? "")
+
+            Button(action: toggleFavorite) {
+                Image(systemName: isFavorite ? "star.fill" : "star")
+                    .font(.callout)
+                    .foregroundStyle(isFavorite ? Color.yellow : .secondary)
+                    .frame(width: 28, height: 28)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .opacity(isFavorite || hovering ? 1 : 0.55)
+            .padding(PocketSpacing.xs)
+            .help(isFavorite ? "Favorilerden çıkar" : "Favorilere ekle")
+            .accessibilityLabel(isFavorite ? "\(tool.title): favorilerden çıkar" : "\(tool.title): favorilere ekle")
+        }
+        .onHover { hovering = $0 }
+        .help(tool.description)
+    }
+}
+
+private struct HubTileButtonStyle: ButtonStyle {
+    let hovering: Bool
+    let highlighted: Bool
+    @PocketReduceMotion private var reduceMotion
+
+    func makeBody(configuration: Configuration) -> some View {
+        let shape = RoundedRectangle(cornerRadius: PocketRadius.medium, style: .continuous)
+        configuration.label
+            .foregroundStyle(.primary)
+            .background {
+                shape.fill(hovering || configuration.isPressed
+                           ? Color.primary.opacity(configuration.isPressed ? 0.1 : 0.05)
+                           : Color.clear)
+            }
+            .background(PocketTheme.raised, in: shape)
+            .overlay {
+                shape.strokeBorder(highlighted ? PocketTheme.accent.opacity(0.7)
+                                   : PocketTheme.line.opacity(hovering ? 1 : 0.6),
+                                   lineWidth: highlighted ? 1 : 0.5)
+            }
+            .scaleEffect(configuration.isPressed && !reduceMotion ? 0.98 : 1)
+            .animation(reduceMotion ? nil : .easeOut(duration: 0.12), value: hovering)
+    }
+}
+
+// MARK: - Keep awake
+
+/// Remaining time, re-rendered once per second without invalidating the whole page.
+private struct HubAwakeCountdown: View {
+    let session: AwakeSession
+
+    var body: some View {
+        if let end = session.endsAt {
+            TimelineView(.periodic(from: .now, by: 1)) { context in
+                Text(Self.remaining(until: end, now: context.date)).monospacedDigit()
+            }
+        } else {
+            Text("Sen durdurana kadar")
         }
     }
 
-    private func stopAwake() {
-        guard !changingAwake else { return }
-        changingAwake = true
-        Task { @MainActor in
-            defer { changingAwake = false }
-            do {
-                try await sleepController.stop()
-                awakeSession = await sleepController.status()
-                now = Date()
-            } catch { failure = error.localizedDescription }
+    static func remaining(until end: Date, now: Date) -> String {
+        let total = max(0, Int(end.timeIntervalSince(now).rounded(.up)))
+        let time = String(format: "%02d:%02d:%02d", total / 3600, (total % 3600) / 60, total % 60)
+        return String(localized: "\(time) kaldı")
+    }
+}
+
+private struct HubAwakeStopButton: View {
+    @ObservedObject var model: PocketModel
+    let title: LocalizedStringKey
+    var prominent = false
+    @State private var stopping = false
+
+    var body: some View {
+        let button = Button(stopping ? "Durduruluyor…" : title) {
+            guard !stopping else { return }
+            stopping = true
+            Task { @MainActor in
+                await model.stopAwake()
+                stopping = false
+            }
+        }
+        .disabled(stopping)
+        if prominent {
+            button.buttonStyle(.borderedProminent).keyboardShortcut(.defaultAction)
+        } else {
+            button
         }
     }
 }
 
+private struct HubAwakeSheet: View {
+    @ObservedObject var model: PocketModel
+    @Environment(\.dismiss) private var dismiss
+    @State private var duration: HubAwakeDuration = .hour
+    @State private var customMinutes = "45"
+    @State private var keepDisplayAwake = false
+    @State private var starting = false
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: PocketSpacing.l) {
+            PocketPageHeading(title: "Mac'i Uyanık Tut",
+                              subtitle: "Mac'in otomatik uyumasını geçici olarak engelle.",
+                              icon: "cup.and.saucer")
+            Divider()
+            if let session = model.awakeSession, session.active {
+                activeSession(session)
+            } else {
+                options
+            }
+            if let error = model.awakeError {
+                PocketMessage(error, error: true)
+            }
+            HStack {
+                Spacer()
+                if let session = model.awakeSession, session.active {
+                    Button("Kapat") { dismiss() }.keyboardShortcut(.cancelAction)
+                    HubAwakeStopButton(model: model, title: "Oturumu Durdur", prominent: true)
+                } else {
+                    Button("Vazgeç") { dismiss() }.keyboardShortcut(.cancelAction)
+                    Button(starting ? "Başlatılıyor…" : "Başlat", action: start)
+                        .buttonStyle(.borderedProminent)
+                        .keyboardShortcut(.defaultAction)
+                        .disabled(starting || !validDuration)
+                }
+            }
+        }
+        .padding(PocketSpacing.page)
+        .frame(width: 480)
+        .interactiveDismissDisabled(starting)
+    }
+
+    private func activeSession(_ session: AwakeSession) -> some View {
+        VStack(alignment: .leading, spacing: PocketSpacing.s) {
+            PocketStatusBadge(text: "Etkin oturum" as LocalizedStringKey, systemImage: "circle.fill", tone: .accent)
+            HubAwakeCountdown(session: session)
+                .font(.system(.title2, design: .monospaced).weight(.medium))
+            Text(session.keepDisplayAwake ? "Ekran da açık tutuluyor." : "Ekranın kapanması engellenmiyor.")
+                .font(.callout)
+                .foregroundStyle(.secondary)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .pocketCard()
+    }
+
+    private var options: some View {
+        VStack(alignment: .leading, spacing: PocketSpacing.m) {
+            Picker("Süre", selection: $duration) {
+                ForEach(HubAwakeDuration.allCases) { Text($0.title).tag($0) }
+            }
+            if duration == .custom {
+                HStack(spacing: PocketSpacing.s) {
+                    TextField("Dakika", text: $customMinutes)
+                        .textFieldStyle(.roundedBorder)
+                        .frame(width: 90)
+                        .accessibilityLabel("Özel süre, dakika")
+                    Text("dakika · 1–1440")
+                        .font(.callout)
+                        .foregroundStyle(validDuration ? Color.secondary : Color.orange)
+                }
+            }
+            Toggle("Ekranı da açık tut", isOn: $keepDisplayAwake)
+                .toggleStyle(.checkbox)
+            Text("Süre dolduğunda veya uygulama kapandığında uyanık tutma sona erer.")
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .disabled(starting)
+    }
+
+    private var customSeconds: Double? {
+        guard let minutes = Double(customMinutes.replacingOccurrences(of: ",", with: ".")),
+              minutes.isFinite, (1...1440).contains(minutes) else { return nil }
+        return minutes * 60
+    }
+
+    private var validDuration: Bool { duration != .custom || customSeconds != nil }
+
+    private func start() {
+        guard !starting, validDuration else { return }
+        let seconds = duration == .custom ? customSeconds : duration.seconds
+        let display = keepDisplayAwake
+        starting = true
+        Task { @MainActor in
+            await model.startAwake(duration: seconds, display: display)
+            starting = false
+        }
+    }
+}
+
+// MARK: - Catalog
+
 private enum HubCategory: String, CaseIterable, Identifiable {
     case all = "Tümü", productivity = "Üretkenlik", system = "Sistem ve Bakım"
     case applications = "Uygulamalar", files = "Dosyalar ve Disk"
-    case privacy = "Gizlilik ve Güvenlik", online = "Çevrimiçi"
+    case privacy = "Gizlilik ve Güvenlik"
     var id: String { rawValue }
+    var title: String {
+        switch self {
+        case .all: String(localized: "Tümü")
+        case .productivity: String(localized: "Üretkenlik")
+        case .system: String(localized: "Sistem ve Bakım")
+        case .applications: String(localized: "Uygulamalar")
+        case .files: String(localized: "Dosyalar ve Disk")
+        case .privacy: String(localized: "Gizlilik ve Güvenlik")
+        }
+    }
     static var groups: [HubCategory] { allCases.filter { $0 != .all } }
     var icon: String {
         switch self {
@@ -366,7 +443,17 @@ private enum HubCategory: String, CaseIterable, Identifiable {
         case .applications: "app.dashed"
         case .files: "internaldrive"
         case .privacy: "lock.shield"
-        case .online: "globe"
+        }
+    }
+    /// Category color shared by its section header and tool icons.
+    var tint: Color {
+        switch self {
+        case .all: PocketTheme.brand
+        case .productivity: PocketTheme.brand
+        case .system: Color(hex: 0x00A6C8)
+        case .applications: Color(hex: 0x7B5CFF)
+        case .files: PocketTheme.disk
+        case .privacy: Color(hex: 0xF0544F)
         }
     }
 }
@@ -375,6 +462,16 @@ private enum HubAwakeDuration: String, CaseIterable, Identifiable {
     case quarter = "15 dakika", half = "30 dakika", hour = "1 saat", twoHours = "2 saat"
     case custom = "Özel süre", manual = "Ben durdurana kadar"
     var id: String { rawValue }
+    var title: LocalizedStringKey {
+        switch self {
+        case .quarter: "15 dakika"
+        case .half: "30 dakika"
+        case .hour: "1 saat"
+        case .twoHours: "2 saat"
+        case .custom: "Özel süre"
+        case .manual: "Ben durdurana kadar"
+        }
+    }
     var seconds: Double? {
         switch self {
         case .quarter: return 900
@@ -386,57 +483,44 @@ private enum HubAwakeDuration: String, CaseIterable, Identifiable {
     }
 }
 
+/// Every catalog entry opens a working tool; ids are routed by `PocketRootView.openCatalogTool`,
+/// except "keep-awake", which this view presents itself.
 private struct HubTool: Identifiable {
     let id: String
     let title: String
     let description: String
     let icon: String
     let category: HubCategory
-    var integration = false
+    /// The tool hands off to macOS System Settings instead of a MacPocket page.
+    var opensSystemSettings = false
 
     static let catalog: [HubTool] = [
-        .init(id: "mac-utilities", title: "macOS Araçları", description: "Sistem raporları ve macOS ayarlarına hızlı erişim.", icon: "hammer", category: .system),
-        .init(id: "launch-jobs", title: "Başlatma Görevleri", description: "Kullanıcı oturumunun launchd görevlerini incele.", icon: "list.bullet", category: .system),
-        .init(id: "listening-ports", title: "Dinleyen Portlar", description: "Yerel sunucuları ve dinleyen ağ portlarını incele.", icon: "network", category: .system),
-        .init(id: "disk-info", title: "Disk Bilgileri", description: "Dosya sistemi, disk özellikleri ve desteklenen sağlık verilerini oku.", icon: "internaldrive", category: .files),
-        .init(id: "spotlight", title: "Spotlight Durumu", description: "Arama indekslemesinin sistemdeki durumunu incele.", icon: "magnifyingglass", category: .system),
-        .init(id: "dns", title: "DNS Yapılandırması", description: "Sistemin etkin DNS çözümleyici yapılandırmasını incele.", icon: "globe", category: .system),
-        .init(id: "routes", title: "Ağ Rotaları", description: "Etkin yönlendirme tablosunu incele.", icon: "arrow.triangle.branch", category: .system),
-        .init(id: "os-updates", title: "macOS Güncellemeleri", description: "Yüklü sistem güncellemelerini incele ve sistem ayarlarına git.", icon: "arrow.down.circle", category: .system),
-        .init(id: "security", title: "Sistem Güvenliği", description: "SIP ve Gatekeeper durumunu salt okunur olarak incele.", icon: "lock.shield", category: .privacy),
-        .init(id: "task-manager", title: "Görev Yöneticisi", description: "Süreçleri ve kaynak kullanımını incele, seçtiğin uygulamayı sonlandır.", icon: "list.bullet.rectangle", category: .system),
-        .init(id: "system-reports", title: "Sistem Raporları", description: "Bellek, ağ, açık dosyalar ve güç için salt okunur tanılar.", icon: "terminal", category: .system),
-        .init(id: "keep-awake", title: "Mac'i Uyanık Tut", description: "Süreli veya sen durdurana kadar uyanık tut. Ekranı ayrıca açık tutabilirsin.", icon: "cup.and.saucer", category: .productivity),
-        .init(id: "window-switcher", title: "Pencere Geçişi", description: "Açık pencereler arasında klavyeyle geçiş yap.", icon: "macwindow.on.rectangle", category: .productivity),
-        .init(id: "app-leftovers", title: "Uygulama Kalıntıları", description: "Kaldırılan uygulamaların geride bıraktığı öğeleri bul.", icon: "square.dashed", category: .applications),
-        .init(id: "app-updater", title: "Uygulama Güncelleme", description: "Kurulum kanalına göre uygulama güncellemelerini incele.", icon: "arrow.triangle.2.circlepath", category: .applications),
-        .init(id: "permissions", title: "Uygulama İzinleri", description: "macOS Sistem Ayarlarını aç; Gizlilik ve Güvenlik bölümünden izinlerini yönet.", icon: "hand.raised", category: .privacy),
-        .init(id: "background-items", title: "Arka Plan Öğeleri", description: "Arka planda çalışan görev ve yardımcıları yönet.", icon: "rectangle.stack", category: .applications),
-        .init(id: "browser-care", title: "Tarayıcı Bakımı", description: "Tarayıcı sekmelerini kaynak kullanımlarıyla incele.", icon: "globe", category: .online, integration: true),
-        .init(id: "downloads", title: "İndirilenler", description: "İndirilmiş dosyaları boyut ve tarihe göre ayıkla.", icon: "arrow.down.circle", category: .files),
-        .init(id: "duplicates", title: "Yinelenen Dosyalar", description: "İçeriği aynı dosyaları karşılaştırarak alan kazan.", icon: "doc.on.doc", category: .files),
-        .init(id: "email-cleanup", title: "E-posta Temizliği", description: "Bağlı e-posta hesabındaki gereksiz öğeleri düzenle.", icon: "envelope", category: .online, integration: true),
-        .init(id: "large-old", title: "Büyük ve Eski Dosyalar", description: "Diskte yer kaplayan büyük ve eski dosyaları bul.", icon: "doc.badge.clock", category: .files),
-        .init(id: "login-items", title: "Giriş Öğeleri", description: "Oturum açılışında başlayan uygulamaları incele.", icon: "power", category: .applications),
-        .init(id: "mail-attachments", title: "Mail Ekleri", description: "Yerel e-posta eklerinin kapladığı alanı incele.", icon: "paperclip", category: .files),
-        .init(id: "maintenance", title: "Bakım Görevleri", description: "Sistem raporlarını incele. Sistemi değiştiren bakım görevleri henüz hazır değil.", icon: "wrench.and.screwdriver", category: .system),
-        .init(id: "malware", title: "Zararlı Yazılım Taraması", description: "Bir tespit motoruyla şüpheli dosya ve bulguları incele.", icon: "shield.lefthalf.filled", category: .privacy, integration: true),
-        .init(id: "privacy", title: "Gizlilik İzleri", description: "Seçili etkinlik ve tarayıcı izlerini incele.", icon: "eye.slash", category: .privacy),
-        .init(id: "screen-cleaning", title: "Ekran Temizleme Modu", description: "Ekranları kısa süre karart; MacPocket içindeki yanlış girişleri önle. Escape veya iki saniye basılı tutarak çık.", icon: "display", category: .productivity),
-        .init(id: "similar-images", title: "Benzer Görseller", description: "Görsel benzerliği bulunan adayları yan yana karşılaştır.", icon: "photo.on.rectangle", category: .files),
-        .init(id: "system-junk", title: "Sistem Gereksiz Dosyaları", description: "Önbellek ve log adaylarını kategorileriyle incele.", icon: "externaldrive.badge.minus", category: .system),
-        .init(id: "time-machine", title: "Time Machine Anlık Görüntüleri", description: "Yerel snapshot listesini ve Time Machine durumunu incele.", icon: "clock.arrow.circlepath", category: .system),
-        .init(id: "trash", title: "Çöp Kutuları", description: "Erişilebilen çöp konumlarını tek yerde incele.", icon: "trash", category: .files),
-        .init(id: "uninstaller", title: "Tam Uygulama Kaldırma", description: "Uygulama ve ilişkili dosyalar için kaldırma planı oluştur.", icon: "app.badge", category: .applications),
+        .init(id: "mac-utilities", title: String(localized: "macOS Araçları"), description: String(localized: "Sistem raporları ve macOS ayarlarına hızlı erişim."), icon: "hammer", category: .system),
+        .init(id: "launch-jobs", title: String(localized: "Başlatma Görevleri"), description: String(localized: "Kullanıcı oturumunun launchd görevlerini incele."), icon: "list.bullet", category: .system),
+        .init(id: "listening-ports", title: String(localized: "Dinleyen Portlar"), description: String(localized: "Yerel sunucuları ve dinleyen ağ portlarını incele."), icon: "network", category: .system),
+        .init(id: "disk-info", title: String(localized: "Disk Bilgileri"), description: String(localized: "Dosya sistemi, disk özellikleri ve desteklenen sağlık verilerini oku."), icon: "internaldrive", category: .files),
+        .init(id: "spotlight", title: String(localized: "Spotlight Durumu"), description: String(localized: "Arama indekslemesinin sistemdeki durumunu incele."), icon: "magnifyingglass", category: .system),
+        .init(id: "dns", title: String(localized: "DNS Yapılandırması"), description: String(localized: "Sistemin etkin DNS çözümleyici yapılandırmasını incele."), icon: "globe", category: .system),
+        .init(id: "routes", title: String(localized: "Ağ Rotaları"), description: String(localized: "Etkin yönlendirme tablosunu incele."), icon: "arrow.triangle.branch", category: .system),
+        .init(id: "os-updates", title: String(localized: "macOS Güncellemeleri"), description: String(localized: "Yüklü sistem güncellemelerini incele ve sistem ayarlarına git."), icon: "arrow.down.circle", category: .system),
+        .init(id: "security", title: String(localized: "Sistem Güvenliği"), description: String(localized: "SIP ve Gatekeeper durumunu salt okunur olarak incele."), icon: "lock.shield", category: .privacy),
+        .init(id: "task-manager", title: String(localized: "Görev Yöneticisi"), description: String(localized: "Süreçleri ve kaynak kullanımını incele, seçtiğin uygulamayı sonlandır."), icon: "list.bullet.rectangle", category: .system),
+        .init(id: "system-reports", title: String(localized: "Sistem Raporları"), description: String(localized: "Bellek, ağ, açık dosyalar ve güç için salt okunur tanılar."), icon: "terminal", category: .system),
+        .init(id: "keep-awake", title: String(localized: "Mac'i Uyanık Tut"), description: String(localized: "Süreli veya sen durdurana kadar uyanık tut. Ekranı ayrıca açık tutabilirsin."), icon: "cup.and.saucer", category: .productivity),
+        .init(id: "window-switcher", title: String(localized: "Pencere Geçişi"), description: String(localized: "Açık pencereler arasında klavyeyle geçiş yap."), icon: "macwindow.on.rectangle", category: .productivity),
+        .init(id: "app-leftovers", title: String(localized: "Uygulama Kalıntıları"), description: String(localized: "Kaldırılan uygulamaların geride bıraktığı öğeleri bul."), icon: "square.dashed", category: .applications),
+        .init(id: "app-updater", title: String(localized: "Uygulama Güncelleme"), description: String(localized: "Kurulum kanalına göre uygulama güncellemelerini incele."), icon: "arrow.triangle.2.circlepath", category: .applications),
+        .init(id: "permissions", title: String(localized: "Uygulama İzinleri"), description: String(localized: "macOS Sistem Ayarlarını aç; Gizlilik ve Güvenlik bölümünden izinlerini yönet."), icon: "hand.raised", category: .privacy, opensSystemSettings: true),
+        .init(id: "background-items", title: String(localized: "Arka Plan Öğeleri"), description: String(localized: "Arka planda çalışan görev ve yardımcıları Sistem Ayarları'nda yönet."), icon: "rectangle.stack", category: .applications, opensSystemSettings: true),
+        .init(id: "downloads", title: String(localized: "İndirilenler"), description: String(localized: "İndirilmiş dosyaları boyut ve tarihe göre ayıkla."), icon: "arrow.down.circle", category: .files),
+        .init(id: "duplicates", title: String(localized: "Yinelenen Dosyalar"), description: String(localized: "İçeriği aynı dosyaları karşılaştırarak alan kazan."), icon: "doc.on.doc", category: .files),
+        .init(id: "large-old", title: String(localized: "Büyük ve Eski Dosyalar"), description: String(localized: "Diskte yer kaplayan büyük ve eski dosyaları bul."), icon: "doc.badge.clock", category: .files),
+        .init(id: "login-items", title: String(localized: "Giriş Öğeleri"), description: String(localized: "Oturum açılışında başlayan uygulamaları Sistem Ayarları'nda incele."), icon: "power", category: .applications, opensSystemSettings: true),
+        .init(id: "screen-cleaning", title: String(localized: "Ekran Temizleme Modu"), description: String(localized: "Ekranları kısa süre karart; MacPocket içindeki yanlış girişleri önle. Escape veya iki saniye basılı tutarak çık."), icon: "display", category: .productivity),
+        .init(id: "similar-images", title: String(localized: "Benzer Görseller"), description: String(localized: "Görsel benzerliği bulunan adayları yan yana karşılaştır."), icon: "photo.on.rectangle", category: .files),
+        .init(id: "system-junk", title: String(localized: "Sistem Gereksiz Dosyaları"), description: String(localized: "Önbellek ve log adaylarını kategorileriyle incele."), icon: "externaldrive.badge.minus", category: .system),
+        .init(id: "time-machine", title: String(localized: "Time Machine Anlık Görüntüleri"), description: String(localized: "Yerel snapshot listesini ve Time Machine durumunu incele."), icon: "clock.arrow.circlepath", category: .system),
+        .init(id: "trash", title: String(localized: "Çöp Kutuları"), description: String(localized: "Erişilebilen çöp konumlarını tek yerde incele."), icon: "trash", category: .files),
+        .init(id: "uninstaller", title: String(localized: "Tam Uygulama Kaldırma"), description: String(localized: "Uygulama ve ilişkili dosyalar için kaldırma planı oluştur."), icon: "app.badge", category: .applications),
     ]
-}
-
-private enum HubColors {
-    static let background = PocketTheme.background
-    static let group = PocketTheme.group
-    static let surface = PocketTheme.panel
-    static let border = PocketTheme.line
-    static let text = Color.primary
-    static let secondary = Color.secondary
-    static let accent = PocketTheme.accent
 }

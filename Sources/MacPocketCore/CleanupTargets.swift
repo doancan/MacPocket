@@ -1,0 +1,453 @@
+import Foundation
+
+// MARK: - Catalog
+
+public enum CleanupSafety: String, Codable, Sendable {
+    /// Rebuilt automatically by the owning app; selected by default.
+    case safe
+    /// Might hold something the user wants; listed but never preselected.
+    case review
+
+    public var title: String { self == .safe ? String(localized: "Güvenli") : String(localized: "İncele") }
+}
+
+public enum CleanupGroup: String, Sendable, CaseIterable, Identifiable {
+    case system, developer, packages, user, trash
+    public var id: String { rawValue }
+    public var title: String {
+        switch self {
+        case .system: String(localized: "Sistem Çöpü")
+        case .developer: String(localized: "Xcode ve Geliştirici")
+        case .packages: String(localized: "Paket Yöneticileri")
+        case .user: String(localized: "Kullanıcı Dosyaları")
+        case .trash: String(localized: "Çöp Kutusu")
+        }
+    }
+}
+
+public enum CleanupTargetID: String, Sendable, CaseIterable, Codable {
+    case userCaches, userLogs, derivedData, xcodeArchives, deviceSupport, simulatorCaches
+    case homebrew, npm, pip, yarn, cocoapods, gradle, mailDownloads, oldDownloads, trash
+}
+
+public struct CleanupTarget: Sendable, Identifiable {
+    public enum Selection: Sendable, Equatable {
+        /// Every direct child of each root is an item.
+        case children
+        /// Only these direct children of each root are items.
+        case named([String])
+    }
+
+    public var id: CleanupTargetID
+    public let title: String
+    public let detail: String
+    public let symbol: String
+    public let group: CleanupGroup
+    public let roots: [URL]
+    public let selection: Selection
+    public let safety: CleanupSafety
+    public let preselected: Bool
+    /// Children skipped because another target owns them or they are bookkeeping files.
+    public let excludedNames: Set<String>
+    /// Items newer than this many days are not listed (Downloads).
+    public let minimumAgeDays: Int?
+    /// Apps whose running state makes every item of the target unsafe to clean now.
+    public let relatedBundleIDs: [String]
+    public var isTrash: Bool { id == .trash }
+}
+
+public enum CleanupCatalog {
+    /// Bookkeeping files never offered for removal.
+    static let ignoredNames: Set<String> = [".DS_Store", ".localized", ".com.apple.timemachine.supported"]
+
+    /// Cache folders under ~/Library/Caches that belong to macOS components even without a com.apple prefix.
+    static let systemCacheNames: Set<String> = [
+        "CloudKit", "GeoServices", "FamilyCircle", "PassKit", "Metal", "SiriTTS", "TemporaryItems",
+        "familycircled", "storeassetd", "storedownloadd", "nsurlsessiond", "akd", "ColorSync", "Microsoft Edge Updater",
+    ]
+
+    public static func targets(home: URL, downloadsAgeDays: Int = 90) -> [CleanupTarget] {
+        let home = URL(fileURLWithPath: existingCanonicalPath(home) ?? home.standardizedFileURL.path, isDirectory: true)
+        func h(_ path: String) -> URL { home.appendingPathComponent(path, isDirectory: true) }
+        let xcode = ["com.apple.dt.Xcode"]
+        return [
+            CleanupTarget(id: .userCaches, title: String(localized: "Kullanıcı Önbellekleri"),
+                          detail: String(localized: "Uygulamaların gerektiğinde yeniden oluşturduğu önbellek klasörleri."),
+                          symbol: "shippingbox.fill", group: .system, roots: [h("Library/Caches")], selection: .children,
+                          safety: .safe, preselected: true,
+                          excludedNames: ignoredNames.union(["Homebrew", "pip", "Yarn", "CocoaPods"]),
+                          minimumAgeDays: nil, relatedBundleIDs: []),
+            CleanupTarget(id: .userLogs, title: String(localized: "Kullanıcı Günlükleri"),
+                          detail: String(localized: "Uygulama günlükleri ve çökme raporları. Sorun gidermiyorsan gerekmez."),
+                          symbol: "list.bullet.rectangle.fill", group: .system, roots: [h("Library/Logs")], selection: .children,
+                          safety: .safe, preselected: true, excludedNames: ignoredNames, minimumAgeDays: nil, relatedBundleIDs: []),
+            CleanupTarget(id: .mailDownloads, title: String(localized: "Mail Ekleri"),
+                          detail: String(localized: "Mail’in açtığın ekler için tuttuğu kopyalar. Asılları Mail’de kalır."),
+                          symbol: "paperclip", group: .system,
+                          roots: [h("Library/Containers/com.apple.mail/Data/Library/Mail Downloads")], selection: .children,
+                          safety: .safe, preselected: true, excludedNames: ignoredNames, minimumAgeDays: nil,
+                          relatedBundleIDs: ["com.apple.mail"]),
+            CleanupTarget(id: .derivedData, title: "Xcode DerivedData",
+                          detail: String(localized: "Derleme ara ürünleri ve dizinler. Xcode bir sonraki derlemede yeniden oluşturur."),
+                          symbol: "hammer.fill", group: .developer, roots: [h("Library/Developer/Xcode/DerivedData")],
+                          selection: .children, safety: .safe, preselected: true, excludedNames: ignoredNames,
+                          minimumAgeDays: nil, relatedBundleIDs: xcode),
+            CleanupTarget(id: .deviceSupport, title: String(localized: "Cihaz Destek Dosyaları"),
+                          detail: String(localized: "Bağladığın cihazlar için indirilen sembol dosyaları. Cihazı yeniden bağlayınca indirilir."),
+                          symbol: "iphone", group: .developer,
+                          roots: ["iOS DeviceSupport", "watchOS DeviceSupport", "tvOS DeviceSupport", "visionOS DeviceSupport",
+                                  "macOS DeviceSupport"].map { h("Library/Developer/Xcode/" + $0) },
+                          selection: .children, safety: .safe, preselected: true, excludedNames: ignoredNames,
+                          minimumAgeDays: nil, relatedBundleIDs: xcode),
+            CleanupTarget(id: .simulatorCaches, title: String(localized: "Simülatör Önbellekleri"),
+                          detail: String(localized: "CoreSimulator’ın dyld ve görüntü önbellekleri. Simülatörler yeniden oluşturur."),
+                          symbol: "ipad.and.iphone", group: .developer, roots: [h("Library/Developer/CoreSimulator/Caches")],
+                          selection: .children, safety: .safe, preselected: true, excludedNames: ignoredNames,
+                          minimumAgeDays: nil, relatedBundleIDs: xcode + ["com.apple.iphonesimulator"]),
+            CleanupTarget(id: .xcodeArchives, title: String(localized: "Xcode Arşivleri"),
+                          detail: String(localized: "Yayımladığın sürümlerin arşivleri ve dSYM’leri. Çökme raporlarını çözmek için gerekebilir."),
+                          symbol: "archivebox.fill", group: .developer, roots: [h("Library/Developer/Xcode/Archives")],
+                          selection: .children, safety: .review, preselected: false, excludedNames: ignoredNames,
+                          minimumAgeDays: nil, relatedBundleIDs: xcode),
+            CleanupTarget(id: .homebrew, title: String(localized: "Homebrew İndirmeleri"),
+                          detail: String(localized: "Kurulumdan sonra tutulan paket arşivleri. brew gerektiğinde yeniden indirir."),
+                          symbol: "mug.fill", group: .packages, roots: [h("Library/Caches/Homebrew")], selection: .children,
+                          safety: .safe, preselected: true, excludedNames: ignoredNames, minimumAgeDays: nil, relatedBundleIDs: []),
+            CleanupTarget(id: .npm, title: String(localized: "npm Önbelleği"), detail: String(localized: "npm’in indirdiği paket önbelleği (_cacache)."),
+                          symbol: "shippingbox", group: .packages, roots: [h(".npm")], selection: .named(["_cacache"]),
+                          safety: .safe, preselected: true, excludedNames: ignoredNames, minimumAgeDays: nil, relatedBundleIDs: []),
+            CleanupTarget(id: .pip, title: String(localized: "pip Önbelleği"), detail: String(localized: "Python paketlerinin indirme ve wheel önbelleği."),
+                          symbol: "shippingbox", group: .packages, roots: [h("Library/Caches/pip")], selection: .children,
+                          safety: .safe, preselected: true, excludedNames: ignoredNames, minimumAgeDays: nil, relatedBundleIDs: []),
+            CleanupTarget(id: .yarn, title: String(localized: "Yarn Önbelleği"), detail: String(localized: "Yarn’ın paket önbelleği."),
+                          symbol: "shippingbox", group: .packages, roots: [h("Library/Caches/Yarn")], selection: .children,
+                          safety: .safe, preselected: true, excludedNames: ignoredNames, minimumAgeDays: nil, relatedBundleIDs: []),
+            CleanupTarget(id: .cocoapods, title: String(localized: "CocoaPods Önbelleği"), detail: String(localized: "Pod kaynaklarının yerel önbelleği."),
+                          symbol: "shippingbox", group: .packages, roots: [h("Library/Caches/CocoaPods")], selection: .children,
+                          safety: .safe, preselected: true, excludedNames: ignoredNames, minimumAgeDays: nil, relatedBundleIDs: []),
+            CleanupTarget(id: .gradle, title: String(localized: "Gradle Önbelleği"), detail: String(localized: "Gradle bağımlılık ve derleme önbellekleri."),
+                          symbol: "shippingbox", group: .packages, roots: [h(".gradle/caches")], selection: .children,
+                          safety: .safe, preselected: true, excludedNames: ignoredNames, minimumAgeDays: nil,
+                          relatedBundleIDs: ["com.google.android.studio"]),
+            CleanupTarget(id: .oldDownloads, title: String(localized: "Eski İndirilenler"),
+                          detail: String(localized: "\(downloadsAgeDays) günden uzun süredir dokunulmamış indirilen öğeler. Seçmeden önce incele."),
+                          symbol: "arrow.down.circle.fill", group: .user, roots: [h("Downloads")], selection: .children,
+                          safety: .review, preselected: false, excludedNames: ignoredNames, minimumAgeDays: downloadsAgeDays,
+                          relatedBundleIDs: []),
+            CleanupTarget(id: .trash, title: String(localized: "Çöp Kutusu"),
+                          detail: String(localized: "Çöp’teki öğeler boşaltılana kadar yer kaplar. Boşaltma geri alınamaz."),
+                          symbol: "trash.fill", group: .trash, roots: [h(".Trash")], selection: .children,
+                          safety: .review, preselected: false, excludedNames: ignoredNames, minimumAgeDays: nil, relatedBundleIDs: []),
+        ]
+    }
+}
+
+// MARK: - Safety rules
+
+public struct RunningApplicationInfo: Sendable, Equatable {
+    public let bundleID: String?
+    public let name: String?
+    public init(bundleID: String?, name: String?) { self.bundleID = bundleID; self.name = name }
+}
+
+public enum CleanupRules {
+    public static var runningWarning: String { String(localized: "Uygulama açıkken önbelleği yeniden oluşabilir; önce uygulamayı kapat.") }
+    public static var systemWarning: String { String(localized: "macOS bileşenine ait. Yalnız ne olduğunu biliyorsan seç.") }
+
+    /// The running app that owns a cache folder named `name`, if any. Matches the bundle identifier
+    /// (exactly or as a prefix such as `com.example.app.helper`) or the app's name, case-insensitively.
+    public static func runningOwner(of name: String, running: [RunningApplicationInfo]) -> RunningApplicationInfo? {
+        let lowered = name.lowercased()
+        return running.first { app in
+            if let id = app.bundleID?.lowercased(), !id.isEmpty, lowered == id || lowered.hasPrefix(id + ".") { return true }
+            if let appName = app.name?.lowercased(), !appName.isEmpty, lowered == appName { return true }
+            return false
+        }
+    }
+
+    public static func isSystemCache(_ name: String) -> Bool {
+        name.hasPrefix("com.apple.") || CleanupCatalog.systemCacheNames.contains(name)
+    }
+
+    public struct Assessment: Sendable, Equatable {
+        public let safety: CleanupSafety
+        public let preselected: Bool
+        public let warning: String?
+    }
+
+    public static func assess(target: CleanupTarget, name: String, running: [RunningApplicationInfo]) -> Assessment {
+        var safety = target.safety
+        var preselected = target.preselected
+        var warning: String?
+        if target.id == .userCaches || target.id == .userLogs, isSystemCache(name) {
+            safety = .review; preselected = false; warning = systemWarning
+        }
+        let runningIDs = Set(running.compactMap { $0.bundleID?.lowercased() })
+        if let related = target.relatedBundleIDs.first(where: { runningIDs.contains($0.lowercased()) }) {
+            let owner = running.first { $0.bundleID?.lowercased() == related.lowercased() }?.name ?? related
+            preselected = false; warning = String(localized: "\(owner) açık. Temizlemeden önce kapatman önerilir.")
+        } else if target.id == .userCaches, runningOwner(of: name, running: running) != nil {
+            preselected = false; warning = runningWarning
+        }
+        return Assessment(safety: safety, preselected: preselected && safety == .safe, warning: warning)
+    }
+}
+
+// MARK: - Scan results
+
+public struct CleanupItem: Identifiable, Sendable, Equatable {
+    public var id: String { url.path }
+    public let targetID: CleanupTargetID
+    public let url: URL
+    /// Canonical root the item is a direct child of.
+    public let root: URL
+    public let identity: FileIdentity
+    public let measurement: StorageMeasurement
+    public let safety: CleanupSafety
+    public let preselected: Bool
+    public let warning: String?
+    public let isPackage: Bool
+    /// Most recent of the item's own date, its date added and its newest file.
+    public let lastUsed: Date
+    public var name: String { url.lastPathComponent }
+    public var bytes: Int64 { measurement.allocatedBytes }
+}
+
+public struct CleanupTargetReport: Identifiable, Sendable {
+    public enum State: Sendable, Equatable {
+        case ready
+        /// No root exists on this Mac.
+        case missing
+        /// A root exists but cannot be listed (usually Full Disk Access).
+        case inaccessible(String)
+        /// A root is a symbolic link; it is reported and never followed.
+        case symbolicLink
+    }
+
+    public var id: CleanupTargetID { target.id }
+    public let target: CleanupTarget
+    public var items: [CleanupItem]
+    public let state: State
+    public let complete: Bool
+    public var bytes: Int64 { items.reduce(0) { $0 + $1.bytes } }
+    public var fileCount: Int { items.reduce(0) { $0 + $1.measurement.fileCount } }
+}
+
+public struct CleanupReport: Sendable {
+    public let scannedAt: Date
+    public let duration: TimeInterval
+    public var targets: [CleanupTargetReport]
+    public let limitReached: Bool
+    public var bytes: Int64 { targets.reduce(0) { $0 + $1.bytes } }
+    public var itemCount: Int { targets.reduce(0) { $0 + $1.items.count } }
+}
+
+// MARK: - Scanner
+
+public struct CleanupScanner: Sendable {
+    public init() {}
+
+    public func scan(_ targets: [CleanupTarget], running: [RunningApplicationInfo] = [], now: Date = Date(),
+                     control: StorageScanControl, concurrency: Int = 4) async throws -> CleanupReport {
+        let started = Date()
+        let links = HardLinkRegistry()
+        var reports: [CleanupTargetReport] = []
+        try await withThrowingTaskGroup(of: CleanupTargetReport.self) { group in
+            var pending = targets[...]
+            func launch() {
+                guard let target = pending.popFirst() else { return }
+                group.addTask {
+                    await StorageWork.run(control) { Self.scan(target, running: running, now: now, control: control, links: links) }
+                }
+            }
+            for _ in 0..<max(1, concurrency) { launch() }
+            while let report = try await group.next() {
+                reports.append(report)
+                launch()
+            }
+        }
+        if control.isCancelled { throw CancellationError() }
+        let order = Dictionary(uniqueKeysWithValues: targets.enumerated().map { ($1.id, $0) })
+        reports.sort { order[$0.id, default: 0] < order[$1.id, default: 0] }
+        return CleanupReport(scannedAt: started, duration: Date().timeIntervalSince(started), targets: reports,
+                             limitReached: control.limitReached)
+    }
+
+    static func scan(_ target: CleanupTarget, running: [RunningApplicationInfo], now: Date,
+                     control: StorageScanControl, links: HardLinkRegistry) -> CleanupTargetReport {
+        var items: [CleanupItem] = []
+        var existing = 0
+        var inaccessible: String?
+        var symlinked = false
+        var complete = true
+        let cutoff = target.minimumAgeDays.map { now.addingTimeInterval(-Double($0) * 86_400) }
+        control.setCurrent(target.title)
+        for root in target.roots {
+            guard let rootIdentity = lstatIdentity(root.path) else { continue }
+            existing += 1
+            if rootIdentity.isSymbolicLink || existingCanonicalPath(root) != root.path { symlinked = true; continue }
+            guard rootIdentity.isDirectory else { continue }
+            let names: [String]
+            do {
+                names = try FileManager.default.contentsOfDirectory(atPath: root.path)
+            } catch {
+                inaccessible = (error as NSError).code == NSFileReadNoPermissionError
+                    ? String(localized: "Erişim izni gerekiyor. Sistem Ayarları > Gizlilik ve Güvenlik > Tam Disk Erişimi’nden izin verebilirsin.")
+                    : error.localizedDescription
+                complete = false
+                continue
+            }
+            let wanted: Set<String>? = if case .named(let list) = target.selection { Set(list) } else { nil }
+            for name in names.sorted() {
+                if control.isCancelled || control.limitReached { complete = false; break }
+                if target.excludedNames.contains(name) { continue }
+                if let wanted, !wanted.contains(name) { continue }
+                let url = root.appendingPathComponent(name)
+                // Symlinks are never followed, measured or offered.
+                guard let identity = lstatIdentity(url.path), !identity.isSymbolicLink else { continue }
+                let measurement = DirectorySizer.measure(url.path, control: control, links: links)
+                if !measurement.complete { complete = false }
+                guard measurement.allocatedBytes > 0 || target.isTrash else { continue }
+                let added = (try? url.resourceValues(forKeys: [.addedToDirectoryDateKey]))?.addedToDirectoryDate
+                let lastUsedSeconds = max(identity.modifiedSeconds, measurement.newestModification,
+                                          Int64(added?.timeIntervalSince1970 ?? 0))
+                let lastUsed = Date(timeIntervalSince1970: Double(lastUsedSeconds))
+                if let cutoff, lastUsed >= cutoff { continue }
+                let assessment = CleanupRules.assess(target: target, name: name, running: running)
+                items.append(CleanupItem(targetID: target.id, url: url, root: root, identity: identity, measurement: measurement,
+                                         safety: assessment.safety, preselected: assessment.preselected,
+                                         warning: assessment.warning, isPackage: identity.isDirectory && FileScanner.isPackage(url),
+                                         lastUsed: lastUsed))
+            }
+        }
+        items.sort { $0.bytes == $1.bytes ? $0.name < $1.name : $0.bytes > $1.bytes }
+        let state: CleanupTargetReport.State
+        if let inaccessible, items.isEmpty { state = .inaccessible(inaccessible) }
+        else if symlinked, items.isEmpty { state = .symbolicLink }
+        else if existing == 0 { state = .missing }
+        else { state = .ready }
+        return CleanupTargetReport(target: target, items: items, state: state, complete: complete)
+    }
+}
+
+// MARK: - Removal
+
+public enum CleanupError: Error, LocalizedError, Equatable {
+    case trashItem, unknownTarget, notDirectChild, excluded
+    public var errorDescription: String? {
+        switch self {
+        case .trashItem: String(localized: "Çöp’teki öğeler yalnız Çöp boşaltılarak silinir.")
+        case .unknownTarget: String(localized: "Öğe bilinen bir temizlik konumuna ait değil.")
+        case .notDirectChild: String(localized: "Yalnız temizlik konumunun doğrudan içindeki öğeler taşınabilir.")
+        case .excluded: String(localized: "Bu öğe temizlik kapsamı dışında tutuluyor.")
+        }
+    }
+}
+
+public enum CleanupRemovalPolicy {
+    /// Checks that an item still is exactly what was scanned, sits directly inside one of its target's
+    /// roots, has no symlink anywhere in its path and passes the general Trash validation.
+    public static func validate(_ item: CleanupItem, targets: [CleanupTarget]) throws {
+        guard let target = targets.first(where: { $0.id == item.targetID }) else { throw CleanupError.unknownTarget }
+        if target.isTrash { throw CleanupError.trashItem }
+        guard target.roots.contains(where: { $0.path == item.root.path }) else { throw CleanupError.unknownTarget }
+        guard let rootIdentity = lstatIdentity(item.root.path), rootIdentity.isDirectory,
+              existingCanonicalPath(item.root) == item.root.path else { throw FileServiceError.symbolicLink }
+        guard item.url.deletingLastPathComponent().path == item.root.path else { throw CleanupError.notDirectChild }
+        let name = item.url.lastPathComponent
+        if target.excludedNames.contains(name) { throw CleanupError.excluded }
+        if case .named(let names) = target.selection, !names.contains(name) { throw CleanupError.excluded }
+        guard !item.identity.isSymbolicLink, existingCanonicalPath(item.url) == item.url.path else {
+            throw FileServiceError.symbolicLink
+        }
+        try FileTrashRequest(url: item.url, identity: item.identity, root: item.root).validate()
+    }
+}
+
+/// Moves validated cleanup items to the Trash (recoverable).
+public actor CleanupService {
+    private let trash: FileTrashService
+    public init() { trash = FileTrashService() }
+    init(move: @escaping @Sendable (URL) throws -> URL) { trash = FileTrashService(move: move) }
+
+    public func moveToTrash(_ items: [CleanupItem], targets: [CleanupTarget]) async -> [FileTrashResult] {
+        var results: [FileTrashResult] = []
+        for item in items {
+            if Task.isCancelled { break }
+            do {
+                try CleanupRemovalPolicy.validate(item, targets: targets)
+            } catch {
+                results.append(.init(source: item.url, trashURL: nil, error: error.localizedDescription))
+                continue
+            }
+            // FileTrashService revalidates immediately before moving.
+            results += await trash.trash([FileTrashRequest(url: item.url, identity: item.identity, root: item.root)])
+        }
+        return results
+    }
+}
+
+// MARK: - Emptying the Trash
+
+/// Permanently deletes items that sit directly inside the user's `~/.Trash`.
+///
+/// Chosen over asking Finder to `empty trash` via AppleScript: that needs an Automation permission,
+/// empties the Trash of every volume and deletes items this app never showed or validated. Here only
+/// the exact items listed to the user are removed, each revalidated (same inode, same parent, no
+/// symlinked path) right before removal; symlinks are unlinked, never followed.
+public struct TrashEmptier: Sendable {
+    public let home: URL
+    public let trashRoot: URL
+    private let remove: @Sendable (URL) throws -> Void
+
+    public init(home: URL = URL(fileURLWithPath: NSHomeDirectory(), isDirectory: true)) {
+        self.init(home: home) { try FileManager.default.removeItem(at: $0) }
+    }
+
+    init(home: URL, remove: @escaping @Sendable (URL) throws -> Void) {
+        let canonicalHome = URL(fileURLWithPath: existingCanonicalPath(home) ?? home.standardizedFileURL.path, isDirectory: true)
+        self.home = canonicalHome
+        trashRoot = canonicalHome.appendingPathComponent(".Trash", isDirectory: true)
+        self.remove = remove
+    }
+
+    public func validate(_ url: URL, identity: FileIdentity) throws {
+        guard let rootIdentity = lstatIdentity(trashRoot.path), rootIdentity.isDirectory, !rootIdentity.isSymbolicLink,
+              existingCanonicalPath(trashRoot) == trashRoot.path else { throw FileServiceError.symbolicLink }
+        let parent = url.deletingLastPathComponent()
+        let name = url.lastPathComponent
+        guard parent.path == trashRoot.path, !name.isEmpty, name != ".", name != "..", !name.contains("/") else {
+            throw FileServiceError.outsideScope
+        }
+        // The parent must resolve to the Trash itself; the item may be a symlink (it is unlinked, not followed).
+        guard existingCanonicalPath(parent) == trashRoot.path else { throw FileServiceError.symbolicLink }
+        guard let current = lstatIdentity(url.path), current == identity else { throw FileServiceError.changed }
+        if !identity.isSymbolicLink, existingCanonicalPath(url) != url.path { throw FileServiceError.symbolicLink }
+    }
+
+    public struct Result: Sendable {
+        public let removed: [URL]
+        public let failures: [(url: URL, message: String)]
+        public let removedBytes: Int64
+    }
+
+    public func empty(_ items: [CleanupItem]) async -> Result {
+        var removed: [URL] = []
+        var failures: [(URL, String)] = []
+        var bytes: Int64 = 0
+        for item in items {
+            if Task.isCancelled { break }
+            do {
+                guard item.targetID == .trash else { throw CleanupError.unknownTarget }
+                try validate(item.url, identity: item.identity)
+                try remove(item.url)
+                removed.append(item.url)
+                bytes += item.bytes
+            } catch {
+                failures.append((item.url, error.localizedDescription))
+            }
+            await Task.yield()
+        }
+        return Result(removed: removed, failures: failures, removedBytes: bytes)
+    }
+}

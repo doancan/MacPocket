@@ -1,6 +1,9 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "https://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0"><dict>
+  <key>CFBundleDevelopmentRegion</key><string>tr</string>
+  <key>CFBundleLocalizations</key><array><string>tr</string><string>en</string></array>
+  <key>CFBundleInfoDictionaryVersion</key><string>6.0</string>
   <key>CFBundleExecutable</key><string>MacPocket</string>
   <key>CFBundleIdentifier</key><string>com.doancan.MacPocket</string>
   <key>CFBundleName</key><string>MacPocket</string>
@@ -12,4 +15,8 @@
   <key>LSMinimumSystemVersion</key><string>14.0</string>
   <key>NSHighResolutionCapable</key><true/>
   <key>NSPrincipalClass</key><string>NSApplication</string>
+  <key>LSApplicationCategoryType</key><string>public.app-category.utilities</string>
+  <key>NSHumanReadableCopyright</key><string>© 2026 Doğancan</string>
+  <key>NSSupportsAutomaticTermination</key><false/>
+  <key>NSSupportsSuddenTermination</key><false/>
 </dict></plist>

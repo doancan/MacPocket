@@ -8,25 +8,25 @@ public enum MacUtility: String, CaseIterable, Identifiable, Sendable {
     public var id: String { rawValue }
     public var title: String {
         switch self {
-        case .timeMachine: "Time Machine Anlık Görüntüleri"
-        case .launchJobs: "Oturum Görevleri"
-        case .listeningPorts: "Dinleyen Bağlantı Noktaları"
-        case .diskInfo: "Başlangıç Diski Bilgisi"
-        case .diskLayout: "Disk ve Bölüm Haritası"
-        case .spotlight: "Spotlight Durumu"
-        case .dns: "DNS Çözümleyicileri"
-        case .routes: "Ağ Yolları"
-        case .updateHistory: "macOS Güncelleme Geçmişi"
-        case .systemIntegrity: "Sistem Bütünlüğü"
-        case .gatekeeper: "Gatekeeper Durumu"
+        case .timeMachine: String(localized: "Time Machine Anlık Görüntüleri")
+        case .launchJobs: String(localized: "Oturum Görevleri")
+        case .listeningPorts: String(localized: "Dinleyen Bağlantı Noktaları")
+        case .diskInfo: String(localized: "Başlangıç Diski Bilgisi")
+        case .diskLayout: String(localized: "Disk ve Bölüm Haritası")
+        case .spotlight: String(localized: "Spotlight Durumu")
+        case .dns: String(localized: "DNS Çözümleyicileri")
+        case .routes: String(localized: "Ağ Yolları")
+        case .updateHistory: String(localized: "macOS Güncelleme Geçmişi")
+        case .systemIntegrity: String(localized: "Sistem Bütünlüğü")
+        case .gatekeeper: String(localized: "Gatekeeper Durumu")
         }
     }
     public var category: String {
         switch self {
-        case .timeMachine, .diskInfo, .diskLayout, .spotlight: "Disk ve Arama"
-        case .listeningPorts, .dns, .routes: "Ağ"
-        case .systemIntegrity, .gatekeeper: "Güvenlik"
-        case .launchJobs, .updateHistory: "Sistem"
+        case .timeMachine, .diskInfo, .diskLayout, .spotlight: String(localized: "Disk ve Arama")
+        case .listeningPorts, .dns, .routes: String(localized: "Ağ")
+        case .systemIntegrity, .gatekeeper: String(localized: "Güvenlik")
+        case .launchJobs, .updateHistory: String(localized: "Sistem")
         }
     }
     public var symbol: String {
@@ -44,17 +44,17 @@ public enum MacUtility: String, CaseIterable, Identifiable, Sendable {
     }
     public var detail: String {
         switch self {
-        case .timeMachine: "Başlangıç diskindeki yerel Time Machine anlık görüntülerini listeler. Liste boş olabilir; yedekleme başlatılmaz ve görüntü silinmez."
-        case .launchJobs: "Kendi kullanıcı oturumundaki launchd görevlerini PID ve son çıkış koduyla listeler. Tüm sistem servislerini kapsamaz."
-        case .listeningPorts: "Kendi kullanıcının TCP dinleme soketlerini süreç ve adresleriyle gösterir. Diğer kullanıcıların süreçleri bu kapsamın dışındadır."
-        case .diskInfo: "Başlangıç biriminin türünü, kapasitesini, APFS ve aygıt bilgilerini sorgular. SMART bilgisi yalnız macOS raporlarsa gösterilir."
-        case .diskLayout: "macOS’un gördüğü fiziksel ve mantıksal diskleri, bölümleri ve kapsayıcıları listeler. Disk onarımı veya biçimlendirme yapılmaz."
-        case .spotlight: "Başlangıç biriminde Spotlight indekslemesinin etkinlik durumunu sorgular. İndeks yeniden oluşturulmaz."
-        case .dns: "Sistem DNS çözümleyicilerini ve arayüz kapsamlarını gösterir. DNS ayarı veya önbelleği değiştirilmez."
-        case .routes: "IPv4 ve IPv6 yönlendirme tablolarını sayısal adreslerle gösterir. Ağ yapılandırması değiştirilmez."
-        case .updateHistory: "macOS yazılım güncelleme geçmişini okur. Yeni sürüm aramaz veya güncelleme kurmaz; bunun için sistem ayarlarını açabilirsin."
-        case .systemIntegrity: "Sistem Bütünlüğü Koruması’nın macOS tarafından bildirilen durumunu okur. Güvenlik politikası değiştirilmez."
-        case .gatekeeper: "Gatekeeper değerlendirme durumunu sorgular. Tek başına zararlı yazılım taraması veya güvenlik garantisi değildir."
+        case .timeMachine: String(localized: "Başlangıç diskindeki yerel Time Machine anlık görüntülerini listeler. Liste boş olabilir; yedekleme başlatılmaz ve görüntü silinmez.")
+        case .launchJobs: String(localized: "Kendi kullanıcı oturumundaki launchd görevlerini PID ve son çıkış koduyla listeler. Tüm sistem servislerini kapsamaz.")
+        case .listeningPorts: String(localized: "Kendi kullanıcının TCP dinleme soketlerini süreç ve adresleriyle gösterir. Diğer kullanıcıların süreçleri bu kapsamın dışındadır.")
+        case .diskInfo: String(localized: "Başlangıç biriminin türünü, kapasitesini, APFS ve aygıt bilgilerini sorgular. SMART bilgisi yalnız macOS raporlarsa gösterilir.")
+        case .diskLayout: String(localized: "macOS’un gördüğü fiziksel ve mantıksal diskleri, bölümleri ve kapsayıcıları listeler. Disk onarımı veya biçimlendirme yapılmaz.")
+        case .spotlight: String(localized: "Başlangıç biriminde Spotlight indekslemesinin etkinlik durumunu sorgular. İndeks yeniden oluşturulmaz.")
+        case .dns: String(localized: "Sistem DNS çözümleyicilerini ve arayüz kapsamlarını gösterir. DNS ayarı veya önbelleği değiştirilmez.")
+        case .routes: String(localized: "IPv4 ve IPv6 yönlendirme tablolarını sayısal adreslerle gösterir. Ağ yapılandırması değiştirilmez.")
+        case .updateHistory: String(localized: "macOS yazılım güncelleme geçmişini okur. Yeni sürüm aramaz veya güncelleme kurmaz; bunun için sistem ayarlarını açabilirsin.")
+        case .systemIntegrity: String(localized: "Sistem Bütünlüğü Koruması’nın macOS tarafından bildirilen durumunu okur. Güvenlik politikası değiştirilmez.")
+        case .gatekeeper: String(localized: "Gatekeeper değerlendirme durumunu sorgular. Tek başına zararlı yazılım taraması veya güvenlik garantisi değildir.")
         }
     }
     var command: (String, [String]) {

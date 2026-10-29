@@ -7,46 +7,42 @@ struct ApplicationsView: View {
     @State private var uninstallPlan: UninstallPlan?
     @State private var pendingUpdate: HomebrewCask?
     @State private var confirmUpdate = false
+    @State private var showUpdatesInfo = false
     @FocusState private var searchFocused: Bool
 
-    var body: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            PocketPageHeading(title: "Uygulamalar", subtitle: "Kurulu uygulamalar, güncellemeler ve ilişkili dosyalar.", icon: "app.badge")
-            HStack {
-                Picker("Bölüm", selection: $model.showUpdates) {
-                    Text("Kurulu Uygulamalar").tag(false)
-                    Text("Güncellemeler").tag(true)
-                }.pickerStyle(.segmented).frame(width: 360)
-                Spacer()
-                if model.showUpdates {
-                    Button("Güncellemeleri Kontrol Et") { Task { await model.checkUpdates() } }
-                        .disabled(model.checkingUpdates || model.updatingToken != nil)
-                } else {
-                    Button("Klasör Ekle…") { model.chooseApplicationFolder() }.disabled(model.busy)
-                    Button("Yenile") { Task { await model.load() } }.disabled(model.busy)
-                }
-            }
-            if let error = model.failure { PocketMessage(error, error: true) }
-            if let result = model.resultMessage {
-                DisclosureGroup("Son İşlem") {
-                    Text(String(result.prefix(5000))).font(.caption.monospaced()).textSelection(.enabled)
-                        .frame(maxWidth: .infinity, alignment: .leading).lineLimit(16)
-                }.font(.callout)
-            }
-            if model.busy || model.checkingUpdates || model.updatingToken != nil {
-                HStack {
-                    ProgressView().controlSize(.small)
-                    Text(model.updatingToken.map { "\($0) Homebrew ile \(model.packageAction)…" }
-                         ?? (model.checkingUpdates ? "Güncellemeler kontrol ediliyor…" : "Uygulamalar inceleniyor…"))
-                        .font(.callout).foregroundStyle(.secondary)
-                }
-            }
-            if model.showUpdates { updateList }
-            else { installedList }
+    private var working: Bool { model.busy || model.checkingUpdates || model.updatingToken != nil }
+    private var progressMessage: String {
+        if let token = model.updatingToken {
+            // `packageAction` names the running Homebrew command; compared in both raw and localized form.
+            let removing = ["kaldırılıyor", String(localized: "kaldırılıyor")].contains(model.packageAction)
+            return removing ? String(localized: "\(token) Homebrew ile kaldırılıyor…") : String(localized: "\(token) Homebrew ile güncelleniyor…")
         }
-        .padding(24).frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        return model.checkingUpdates ? String(localized: "Güncellemeler kontrol ediliyor…") : String(localized: "Uygulamalar inceleniyor…")
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: PocketSpacing.l) {
+            PocketPageHeading(title: "Uygulamalar", subtitle: "Kurulu uygulamalar, güncellemeler ve ilişkili dosyalar.", icon: "app.badge") {
+                headingActions
+            }
+            Picker("Bölüm", selection: $model.showUpdates) {
+                Text("Kurulu Uygulamalar").tag(false)
+                Text("Güncellemeler").tag(true)
+            }
+            .pickerStyle(.segmented)
+            .labelsHidden()
+            .frame(maxWidth: 360)
+            if working { PocketProgressRow(message: progressMessage) }
+            if let error = model.failure { PocketMessage(error, tone: .warning) }
+            if let result = model.resultMessage { lastOperation(result) }
+            if model.showUpdates { updateList } else { installedList }
+        }
+        .pocketPage()
         .task { if !model.loaded { await model.load() } }
-        .onReceive(NotificationCenter.default.publisher(for: .pocketFind)) { _ in searchFocused = true }
+        .onReceive(NotificationCenter.default.publisher(for: .pocketFind)) { _ in
+            model.showUpdates = false
+            searchFocused = true
+        }
         .sheet(item: $uninstallPlan) { plan in
             UninstallPlanView(plan: plan, model: model)
         }
@@ -63,82 +59,249 @@ struct ApplicationsView: View {
         }
     }
 
+    @ViewBuilder
+    private var headingActions: some View {
+        HStack(spacing: PocketSpacing.s) {
+            if model.showUpdates {
+                Button("Güncellemeleri Kontrol Et") { Task { await model.checkUpdates() } }
+                    .buttonStyle(.borderedProminent)
+                    .disabled(model.busy || model.checkingUpdates || model.updatingToken != nil)
+                    .help("Homebrew kataloğunda yeni sürümleri ara")
+            } else {
+                Button("Klasör Ekle…") { model.chooseApplicationFolder() }
+                    .disabled(model.busy)
+                    .help("Standart konumlar dışındaki bir uygulama klasörünü envantere ekle")
+                Button("Yenile") { Task { await model.load() } }
+                    .disabled(model.busy)
+                    .help("Uygulama envanterini yeniden oku")
+            }
+        }
+    }
+
+    private func lastOperation(_ result: String) -> some View {
+        DisclosureGroup {
+            ScrollView {
+                Text(String(result.prefix(5000)))
+                    .font(.system(.callout, design: .monospaced))
+                    .textSelection(.enabled)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
+            .frame(maxHeight: 160)
+        } label: {
+            Label("Son işlem tamamlandı", systemImage: PocketTone.success.symbol)
+                .foregroundStyle(PocketTone.success.color)
+        }
+        .font(.callout)
+        .pocketCard(padding: PocketSpacing.m, radius: PocketRadius.medium)
+    }
+
+    // MARK: Installed
+
     private var installedList: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            HStack {
+        VStack(alignment: .leading, spacing: PocketSpacing.m) {
+            HStack(spacing: PocketSpacing.m) {
                 TextField("Uygulama veya bundle kimliği ara…", text: $model.search)
-                    .textFieldStyle(.roundedBorder).focused($searchFocused).frame(maxWidth: 380)
-                Spacer()
-                Text("\(model.filtered.count) uygulama").font(.callout).foregroundStyle(.secondary)
+                    .textFieldStyle(.roundedBorder)
+                    .focused($searchFocused)
+                    .frame(maxWidth: 380)
+                    .accessibilityLabel("Uygulama ara")
+                Spacer(minLength: PocketSpacing.s)
+                Text("\(model.filtered.count) uygulama")
+                    .font(.callout).foregroundStyle(.secondary).monospacedDigit()
             }
             HStack(spacing: 0) {
                 InstalledApplicationsTable(model: model)
+                    .overlay { installedEmptyState }
                 if let app = model.selectedApplication {
                     Divider()
-                    inspector(app).frame(width: 250)
+                    ApplicationInspector(app: app, model: model) { plan in uninstallPlan = plan }
+                        .frame(width: 280)
                 }
-            }.background(PocketTheme.panel, in: RoundedRectangle(cornerRadius: 10))
+            }
+            .overlay {
+                RoundedRectangle(cornerRadius: PocketRadius.medium, style: .continuous)
+                    .strokeBorder(PocketTheme.line.opacity(0.6), lineWidth: 0.5)
+            }
         }
     }
 
-    private func inspector(_ app: InstalledApplication) -> some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 16) {
-                Image(nsImage: NSWorkspace.shared.icon(forFile: app.url.path)).resizable().frame(width: 64, height: 64)
-                Text(app.name).font(.title3.weight(.semibold))
-                Text("Sürüm \(app.version) · \(app.build)").font(.callout).foregroundStyle(.secondary)
-                Text(app.bundleID).font(.caption.monospaced()).textSelection(.enabled)
-                Text(app.url.path).font(.caption).foregroundStyle(.secondary).textSelection(.enabled)
-                LabeledContent("Kanal", value: model.cask(for: app) != nil ? "Homebrew" : app.channel.rawValue).font(.callout)
-                Button("Uygulamayı Aç") { NSWorkspace.shared.open(app.url) }
-                Button("Finder’da Göster") { NSWorkspace.shared.activateFileViewerSelecting([app.url]) }
-                Divider()
-                Button("Kaldırma Planını İncele", role: .destructive) {
-                    do { uninstallPlan = try UninstallPlanner.plan(app) }
-                    catch { model.failure = error.localizedDescription }
-                }.disabled(app.protected || model.busy || model.updatingToken != nil)
-                if app.protected {
-                    Text("Sistem uygulamaları ve MacPocket korunuyor.").font(.caption).foregroundStyle(.secondary)
-                } else {
-                    Text("Uygulama ve tam bundle kimliğiyle eşleşen dosyalar ayrı ayrı listelenir.")
-                        .font(.caption).foregroundStyle(.secondary)
-                }
-            }.padding(18).frame(maxWidth: .infinity, alignment: .leading)
+    @ViewBuilder
+    private var installedEmptyState: some View {
+        if model.filtered.isEmpty && !model.busy {
+            if !model.search.isEmpty {
+                ContentUnavailableView.search(text: model.search)
+            } else if model.loaded {
+                ContentUnavailableView("Uygulama bulunamadı", systemImage: "app.dashed",
+                                       description: Text("Standart Applications konumlarında uygulama yok. Klasör Ekle… ile başka bir konum ekleyebilirsin."))
+            }
         }
     }
+
+    // MARK: Updates
 
     private var updateList: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text("Homebrew’ün yerel kataloğunda yeni sürümü bulunan uygulamalar. App Store, Setapp ve üretici güncellemeleri kendi kanallarından yönetilir.")
+        VStack(alignment: .leading, spacing: PocketSpacing.m) {
+            HStack(spacing: PocketSpacing.s) {
+                Group {
+                    if let checked = model.updatesCheckedAt {
+                        Text("Son kontrol \(checked.formatted(date: .abbreviated, time: .shortened))")
+                    } else {
+                        Text("Henüz kontrol edilmedi")
+                    }
+                }
                 .font(.callout).foregroundStyle(.secondary)
-            if let date = model.updatesCheckedAt {
-                Text("Son kontrol \(date.formatted(date: .abbreviated, time: .shortened))")
-                    .font(.caption).foregroundStyle(.secondary)
+                Button { showUpdatesInfo.toggle() } label: { Image(systemName: "info.circle") }
+                    .buttonStyle(.borderless)
+                    .accessibilityLabel("Güncellemeler hakkında")
+                    .help("Hangi uygulamalar kapsanır?")
+                    .popover(isPresented: $showUpdatesInfo, arrowEdge: .bottom) {
+                        Text("Yalnız Homebrew’ün yerel kataloğunda yeni sürümü bulunan uygulamalar listelenir. App Store, Setapp ve üretici güncellemeleri kendi kanallarından yönetilir.")
+                            .font(.callout)
+                            .fixedSize(horizontal: false, vertical: true)
+                            .frame(width: 300)
+                            .padding(PocketSpacing.l)
+                    }
+                Spacer(minLength: 0)
+                if !model.updates.isEmpty {
+                    Text("\(model.updates.count) güncelleme").font(.callout).foregroundStyle(.secondary)
+                }
             }
             if model.updates.isEmpty {
-                ContentUnavailableView(model.updatesCheckedAt == nil ? "Güncellemeleri kontrol et" : "Bu katalogda güncelleme bulunamadı",
-                                       systemImage: "arrow.triangle.2.circlepath",
-                                       description: Text("Bu sonuç yalnız Homebrew tarafından yönetilen uygulamaları kapsar."))
+                if !model.checkingUpdates {
+                    ContentUnavailableView {
+                        Label(model.updatesCheckedAt == nil ? "Güncellemeleri kontrol et" : "Güncelleme bulunamadı",
+                              systemImage: "arrow.triangle.2.circlepath")
+                    } description: {
+                        Text("Bu sonuç yalnız Homebrew tarafından yönetilen uygulamaları kapsar.")
+                    } actions: {
+                        if model.updatesCheckedAt == nil {
+                            Button("Güncellemeleri Kontrol Et") { Task { await model.checkUpdates() } }
+                                .disabled(working)
+                        }
+                    }
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                }
             } else {
                 ScrollView {
-                    LazyVStack(spacing: 10) {
-                        ForEach(model.updates) { update in
-                            HStack(spacing: 14) {
-                                Image(systemName: "app.badge").font(.title2).foregroundStyle(PocketTheme.accent)
-                                VStack(alignment: .leading, spacing: 5) {
-                                    Text(model.casks.first { $0.token == update.token }?.name ?? update.name).font(.headline)
-                                    Text("\(update.installedVersion) → \(update.currentVersion)").font(.callout).foregroundStyle(.secondary)
-                                }
-                                Spacer()
-                                if update.pinned { Text("Sürüm sabitlenmiş").font(.caption).foregroundStyle(.secondary) }
-                                Button("Güncelle") { pendingUpdate = update; confirmUpdate = true }
-                                    .disabled(update.pinned || model.updatingToken != nil || model.checkingUpdates)
-                            }.padding(16).background(PocketTheme.panel, in: RoundedRectangle(cornerRadius: 10))
-                        }
+                    LazyVStack(spacing: PocketSpacing.s) {
+                        ForEach(model.updates) { update in updateRow(update) }
                     }
                 }
             }
         }
+    }
+
+    private func updateRow(_ update: HomebrewCask) -> some View {
+        let app = model.application(for: update)
+        let name = app?.name ?? model.casks.first { $0.token == update.token }?.name ?? update.name
+        let updating = model.updatingToken == update.token
+        return HStack(spacing: PocketSpacing.m) {
+            if let app {
+                PocketAppIcon(url: app.url, size: 36)
+            } else {
+                Image(systemName: "shippingbox")
+                    .font(.title2)
+                    .foregroundStyle(PocketTheme.accent)
+                    .frame(width: 36, height: 36)
+                    .accessibilityHidden(true)
+            }
+            VStack(alignment: .leading, spacing: PocketSpacing.xxs) {
+                Text(name).font(.headline).lineLimit(1)
+                Text("\(update.installedVersion) → \(update.currentVersion)")
+                    .font(.callout).foregroundStyle(.secondary).monospacedDigit()
+            }
+            Spacer(minLength: PocketSpacing.s)
+            if update.pinned {
+                PocketStatusBadge(text: "Sürüm sabitlenmiş" as LocalizedStringKey, systemImage: "pin", tone: .neutral)
+                    .help("brew unpin ile sabitlemeyi kaldırmadan güncellenemez")
+            }
+            if updating {
+                ProgressView().controlSize(.small)
+                    .accessibilityLabel("Güncelleniyor")
+            }
+            Button("Güncelle…") { pendingUpdate = update; confirmUpdate = true }
+                .disabled(update.pinned || model.updatingToken != nil || model.checkingUpdates)
+                .help("\(name) uygulamasını Homebrew ile güncelle")
+        }
+        .pocketCard(padding: PocketSpacing.m, radius: PocketRadius.medium)
+        .accessibilityElement(children: .contain)
+    }
+}
+
+private struct ApplicationInspector: View {
+    let app: InstalledApplication
+    @ObservedObject var model: ApplicationWorkspaceModel
+    let reviewUninstall: (UninstallPlan) -> Void
+
+    private var channel: String { model.cask(for: app) != nil ? "Homebrew" : app.channel.title }
+    private var version: String { app.build.isEmpty || app.build == app.version ? app.version : "\(app.version) (\(app.build))" }
+
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: PocketSpacing.l) {
+                VStack(spacing: PocketSpacing.s) {
+                    PocketAppIcon(url: app.url, size: 64)
+                    Text(app.name).font(.headline).multilineTextAlignment(.center).lineLimit(2)
+                    Text("Sürüm \(version)").font(.callout).foregroundStyle(.secondary).monospacedDigit()
+                    if app.protected {
+                        PocketStatusBadge(text: "Korunuyor" as LocalizedStringKey, systemImage: "lock", tone: .neutral)
+                    }
+                }
+                .frame(maxWidth: .infinity)
+
+                Divider()
+
+                VStack(alignment: .leading, spacing: PocketSpacing.s) {
+                    inspectorRow("Kanal", value: channel)
+                    inspectorRow("Bundle kimliği", value: app.bundleID, monospaced: true)
+                    inspectorRow("Konum", value: app.url.deletingLastPathComponent().path)
+                }
+
+                Divider()
+
+                VStack(alignment: .leading, spacing: PocketSpacing.s) {
+                    Button { NSWorkspace.shared.open(app.url) } label: {
+                        Label("Uygulamayı Aç", systemImage: "arrow.up.forward.app").frame(maxWidth: .infinity)
+                    }
+                    Button { NSWorkspace.shared.activateFileViewerSelecting([app.url]) } label: {
+                        Label("Finder’da Göster", systemImage: "folder").frame(maxWidth: .infinity)
+                    }
+                }
+
+                Divider()
+
+                VStack(alignment: .leading, spacing: PocketSpacing.s) {
+                    Button(role: .destructive) {
+                        do { reviewUninstall(try UninstallPlanner.plan(app)) }
+                        catch { model.failure = error.localizedDescription }
+                    } label: {
+                        Label("Kaldırma Planını İncele…", systemImage: "trash").frame(maxWidth: .infinity)
+                    }
+                    .disabled(app.protected || model.busy || model.updatingToken != nil)
+                    .help("Hiçbir şey hemen silinmez; önce kaldırılacak öğeleri seçersin")
+                    Text(app.protected ? "Sistem uygulamaları ve MacPocket korunuyor."
+                         : "Uygulama ve tam bundle kimliğiyle eşleşen dosyalar ayrı ayrı listelenir.")
+                        .font(.subheadline).foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+            .padding(PocketSpacing.l)
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+        .background(PocketTheme.panel)
+    }
+
+    private func inspectorRow(_ title: LocalizedStringKey, value: String, monospaced: Bool = false) -> some View {
+        VStack(alignment: .leading, spacing: PocketSpacing.xxs) {
+            Text(title).font(.subheadline).foregroundStyle(.secondary)
+            Text(value)
+                .font(monospaced ? .system(.callout, design: .monospaced) : .callout)
+                .lineLimit(3)
+                .truncationMode(.middle)
+                .textSelection(.enabled)
+                .help(value)
+        }
+        .accessibilityElement(children: .combine)
     }
 }
 
@@ -147,14 +310,32 @@ private struct InstalledApplicationsTable: View {
     var body: some View {
         Table(model.filtered, selection: $model.selection) {
             TableColumn("Uygulama") { app in
-                HStack(spacing: 10) {
-                    Image(nsImage: NSWorkspace.shared.icon(forFile: app.url.path)).resizable().frame(width: 28, height: 28)
+                HStack(spacing: PocketSpacing.s) {
+                    PocketAppIcon(url: app.url, size: 24)
                     Text(app.name).lineLimit(1)
-                }.padding(.vertical, 3)
-            }.width(min: 180, ideal: 320)
-            TableColumn("Sürüm") { app in Text(app.version).lineLimit(1).monospacedDigit() }.width(120)
-            TableColumn("Kanal") { app in Text(model.cask(for: app) != nil ? "Homebrew" : app.channel.rawValue).foregroundStyle(.secondary) }.width(105)
-        }.tableStyle(.inset)
+                    if app.protected {
+                        Image(systemName: "lock.fill").font(.subheadline).foregroundStyle(.tertiary)
+                            .help("Korunan uygulama")
+                            .accessibilityLabel("Korunan uygulama")
+                    }
+                }
+                .padding(.vertical, PocketSpacing.xxs)
+            }
+            .width(min: 180, ideal: 320)
+            TableColumn("Sürüm") { app in Text(app.version).lineLimit(1).monospacedDigit() }
+                .width(min: 70, ideal: 120)
+            TableColumn("Kanal") { app in
+                Text(verbatim: model.cask(for: app) != nil ? "Homebrew" : app.channel.title).foregroundStyle(.secondary)
+            }
+            .width(min: 80, ideal: 105)
+        }
+        .tableStyle(.inset)
+        .contextMenu(forSelectionType: String.self) { ids in
+            if let app = model.applications.first(where: { ids.contains($0.id) }) {
+                Button("Uygulamayı Aç") { NSWorkspace.shared.open(app.url) }
+                Button("Finder’da Göster") { NSWorkspace.shared.activateFileViewerSelecting([app.url]) }
+            }
+        }
     }
 }
 
@@ -172,9 +353,13 @@ private struct UninstallPlanView: View {
         _selected = State(initialValue: [plan.application.url.path])
     }
     var body: some View {
-        VStack(alignment: .leading, spacing: 18) {
-            HStack {
-                Text("\(plan.application.name) · Kaldırma Planı").font(.title2.weight(.semibold))
+        VStack(alignment: .leading, spacing: PocketSpacing.l) {
+            HStack(spacing: PocketSpacing.m) {
+                PocketAppIcon(url: plan.application.url, size: 40)
+                VStack(alignment: .leading, spacing: PocketSpacing.xxs) {
+                    Text("Kaldırma Planı").font(.title2.weight(.semibold))
+                    Text(plan.application.name).font(.callout).foregroundStyle(.secondary)
+                }
                 Spacer()
                 Button("Kapat") { dismiss() }.keyboardShortcut(.cancelAction)
             }
@@ -188,27 +373,32 @@ private struct UninstallPlanView: View {
                         Toggle(isOn: Binding(get: { selected.contains(candidate.id) }, set: { value in
                             if value { selected.insert(candidate.id) } else { selected.remove(candidate.id) }
                         })) {
-                            VStack(alignment: .leading, spacing: 5) {
-                                HStack {
+                            VStack(alignment: .leading, spacing: PocketSpacing.xs) {
+                                HStack(spacing: PocketSpacing.s) {
                                     Text(candidate.title).font(.headline)
-                                    if candidate.containsUserData { Text("Kullanıcı verisi").font(.caption).foregroundStyle(.orange) }
+                                    if candidate.containsUserData {
+                                        PocketStatusBadge(text: "Kullanıcı verisi" as LocalizedStringKey, systemImage: "person.crop.circle", tone: .warning)
+                                    }
                                 }
-                                Text(candidate.request.url.path).font(.caption).foregroundStyle(.secondary).textSelection(.enabled)
-                            }.padding(.vertical, 8)
-                        }.toggleStyle(.checkbox).padding(.horizontal, 8)
+                                Text(candidate.request.url.path).font(.subheadline).foregroundStyle(.secondary)
+                                    .lineLimit(2).truncationMode(.middle).textSelection(.enabled)
+                            }.padding(.vertical, PocketSpacing.s)
+                        }.toggleStyle(.checkbox).padding(.horizontal, PocketSpacing.m)
                         Divider()
                     }
                 }
             }
-            Text("Paylaşılan üretici/App Group klasörleri ve doğrulanamayan yardımcılar bu plana otomatik eklenmez. Çalışan uygulama önce kapatılmalıdır.")
-                .font(.caption).foregroundStyle(.secondary)
+            .pocketCard(padding: 0, radius: PocketRadius.medium)
+            Label("Paylaşılan üretici/App Group klasörleri ve doğrulanamayan yardımcılar plana eklenmez. Çalışan uygulama önce kapatılmalıdır.",
+                  systemImage: "info.circle")
+                .font(.subheadline).foregroundStyle(.secondary)
             HStack {
                 Text("\(selected.count) öğe seçili").font(.callout).foregroundStyle(.secondary)
                 Spacer()
                 Button(removesHomebrewApplication ? "Homebrew ile Kaldır…" : "Seçilenleri Çöp’e Taşı", role: .destructive) { confirm = true }
                     .disabled(selected.isEmpty || model.busy || model.updatingToken != nil)
             }
-        }.padding(24).frame(width: 730, height: 540)
+        }.padding(PocketSpacing.xl).frame(width: 730, height: 540)
         .alert(removesHomebrewApplication ? "Homebrew uygulaması kaldırılsın mı?" : "Seçilen öğeler Çöp’e taşınsın mı?", isPresented: $confirm) {
             Button("Vazgeç", role: .cancel) {}
             Button(removesHomebrewApplication ? "Homebrew ile Kaldır" : "Çöp’e Taşı", role: .destructive) {

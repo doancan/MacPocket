@@ -8,3 +8,4 @@ DerivedData/
 *.xcuserstate
 xcuserdata/
 .superdesign/tmp/
+*.swp

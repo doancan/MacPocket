@@ -75,7 +75,9 @@ public struct FileScanReport: Sendable {
     public let inaccessibleCount: Int
     public let issues: [String]
     public let limitReached: Bool
-    public var retainedAllFiles: Bool { files.count == fileCount }
+    /// Files inside packages; counted in totals but intentionally not listed.
+    public var packagedFileCount = 0
+    public var retainedAllFiles: Bool { files.count + packagedFileCount == fileCount }
 }
 
 /// Metadata-only traversal. Symlinks are not followed and hard links count once.
@@ -97,6 +99,7 @@ public actor FileScanner {
         var visited = 0, fileCount = 0, skippedLinks = 0
         var bytes: Int64 = 0
         var limited = false
+        var packagedFileCount = 0
         // DirectoryEnumerator's error callback is synchronous on this traversal.
         let errors = ScanErrors()
         let enumerationOptions: FileManager.DirectoryEnumerationOptions = options.includeHidden ? [] : [.skipsHiddenFiles]
@@ -106,29 +109,42 @@ public actor FileScanner {
             if errors.messages.count < 24 { errors.messages.append("\(url.lastPathComponent): \(error.localizedDescription)") }
             return true
         }) else { throw FileServiceError.unreadable }
+        // Enumeration is depth-first, so the innermost open package is a single prefix.
+        var packagePrefix: String?
         while let url = enumerator.nextObject() as? URL {
             try Task.checkCancellation()
             if visited >= maximumEntries || Date() >= deadline { limited = true; break }
             visited += 1
+            // Reported before any `continue`, so filtered scans still show progress.
+            if visited.isMultiple(of: 128) {
+                await progress(.init(visitedEntries: visited, fileCount: fileCount, bytes: bytes))
+                await Task.yield()
+            }
+            if let prefix = packagePrefix, !url.path.hasPrefix(prefix) { packagePrefix = nil }
             do {
                 let identity = try FileIdentity.read(url)
                 if identity.isSymbolicLink { skippedLinks += 1; enumerator.skipDescendants(); continue }
                 if identity.device != rootIdentity.device { enumerator.skipDescendants(); continue }
+                if identity.isDirectory, packagePrefix == nil, Self.isPackage(url) { packagePrefix = url.path + "/" }
                 guard identity.isRegularFile else { continue }
                 if let extensions = allowedExtensions, !extensions.contains(url.pathExtension.lowercased()) { continue }
                 guard seen.insert(identity.objectKey).inserted else { continue }
                 let file = ScannedFile(url: url, identity: identity)
-                files.append(file)
-                if files.count > retainedLimit * 2 {
-                    files.sort { $0.bytes > $1.bytes }
-                    files.removeLast(files.count - retainedLimit)
-                }
+                // Package contents (.app, .photoslibrary, ...) count toward totals but are never offered
+                // individually: trashing one resource inside a bundle corrupts the whole package.
+                if packagePrefix == nil {
+                    files.append(file)
+                    if files.count > retainedLimit * 2 {
+                        files.sort { $0.bytes > $1.bytes }
+                        files.removeLast(files.count - retainedLimit)
+                    }
+                } else { packagedFileCount += 1 }
                 fileCount += 1
                 bytes = bytes.addingReportingOverflow(file.bytes).overflow ? Int64.max : bytes + file.bytes
                 let relative = Array(url.pathComponents.dropFirst(root.pathComponents.count))
                 if relative.count > 1, let first = relative.first {
-                    let folderURL = root.appendingPathComponent(first, isDirectory: true)
                     if folders[first] == nil {
+                        let folderURL = root.appendingPathComponent(first, isDirectory: true)
                         folders[first] = FolderUsage(url: folderURL, identity: try FileIdentity.read(folderURL), bytes: 0, fileCount: 0)
                     }
                     folders[first]?.bytes += file.bytes
@@ -138,10 +154,6 @@ public actor FileScanner {
                 errors.count += 1
                 if errors.messages.count < 24 { errors.messages.append("\(url.lastPathComponent): \(error.localizedDescription)") }
             }
-            if visited.isMultiple(of: 128) {
-                await progress(.init(visitedEntries: visited, fileCount: fileCount, bytes: bytes))
-                await Task.yield()
-            }
         }
         try Task.checkCancellation()
         files.sort { $0.bytes > $1.bytes }
@@ -150,7 +162,12 @@ public actor FileScanner {
         return FileScanReport(root: root, scannedAt: started, files: files,
                               folders: folders.values.sorted { $0.bytes > $1.bytes },
                               fileCount: fileCount, bytes: bytes, skippedLinks: skippedLinks,
-                              inaccessibleCount: errors.count, issues: errors.messages, limitReached: limited)
+                              inaccessibleCount: errors.count, issues: errors.messages, limitReached: limited,
+                              packagedFileCount: packagedFileCount)
+    }
+
+    static func isPackage(_ url: URL) -> Bool {
+        (try? url.resourceValues(forKeys: [.isPackageKey]))?.isPackage == true
     }
 }
 
@@ -160,15 +177,16 @@ private final class ScanErrors {
 }
 
 public enum FileServiceError: Error, LocalizedError {
-    case notDirectory, unreadable, changed, outsideScope, protectedItem, symbolicLink
+    case notDirectory, unreadable, changed, outsideScope, protectedItem, symbolicLink, insidePackage
     public var errorDescription: String? {
         switch self {
-        case .notDirectory: "Bir klasör seçmelisin."
-        case .unreadable: "Klasör okunamadı. Erişim iznini kontrol et."
-        case .changed: "Öğe taramadan sonra değişti. Yeniden tarayıp seçmelisin."
-        case .outsideScope: "Öğe seçilen tarama kapsamının dışında."
-        case .protectedItem: "Bu sistem veya kullanıcı kök klasörü korunuyor."
-        case .symbolicLink: "Bağlantı ya da bağlantı üzerinden erişilen öğe taşınmaz."
+        case .notDirectory: String(localized: "Bir klasör seçmelisin.")
+        case .unreadable: String(localized: "Klasör okunamadı. Erişim iznini kontrol et.")
+        case .changed: String(localized: "Öğe taramadan sonra değişti. Yeniden tarayıp seçmelisin.")
+        case .outsideScope: String(localized: "Öğe seçilen tarama kapsamının dışında.")
+        case .protectedItem: String(localized: "Bu sistem veya kullanıcı kök klasörü korunuyor.")
+        case .symbolicLink: String(localized: "Bağlantı ya da bağlantı üzerinden erişilen öğe taşınmaz.")
+        case .insidePackage: String(localized: "Paket içindeki tek bir öğe taşınmaz; paketin bütünlüğü bozulur.")
         }
     }
 }
@@ -203,6 +221,13 @@ public struct FileTrashRequest: Sendable {
         let appRoot = applicationBundle && url == root && url.pathExtension == "app"
             && Bundle(url: url)?.bundleIdentifier != nil
         guard descendant || appRoot else { throw FileServiceError.outsideScope }
+        if descendant {
+            var ancestor = url.deletingLastPathComponent()
+            while ancestor.path.count > root.path.count, ancestor.path.hasPrefix(root.path) {
+                if FileScanner.isPackage(ancestor) { throw FileServiceError.insidePackage }
+                ancestor = ancestor.deletingLastPathComponent()
+            }
+        }
         guard try FileIdentity.read(url) == identity else { throw FileServiceError.changed }
     }
 }
@@ -254,24 +279,35 @@ public actor DuplicateFinder {
         var hashes: [String: [ScannedFile]] = [:]
         for (index, file) in candidates.enumerated() {
             try Task.checkCancellation()
-            guard try FileIdentity.read(file.url) == file.identity else { continue }
-            let handle = try FileHandle(forReadingFrom: file.url)
-            var hasher = SHA256()
-            do {
-                while let data = try handle.read(upToCount: 1_048_576), !data.isEmpty {
-                    try Task.checkCancellation()
-                    hasher.update(data: data)
-                    await Task.yield()
-                }
-                try handle.close()
-            } catch { try? handle.close(); throw error }
-            guard try FileIdentity.read(file.url) == file.identity else { continue }
-            let hash = hasher.finalize().map { String(format: "%02x", $0) }.joined()
-            hashes[hash, default: []].append(file)
+            // One unreadable, vanished or cloud-only file must not discard the whole comparison.
+            if let hash = try await Self.hash(file) { hashes[hash, default: []].append(file) }
             await progress(index + 1, candidates.count)
         }
         return hashes.compactMap { hash, group in
             group.count > 1 ? DuplicateFileGroup(id: hash, files: group.sorted { $0.url.path < $1.url.path }) : nil
         }.sorted { $0.duplicateBytes > $1.duplicateBytes }
     }
+
+    /// Nil when the file changed, is unreadable, or is an iCloud placeholder (reading would download it).
+    private static func hash(_ file: ScannedFile) async throws -> String? {
+        var info = stat()
+        guard lstat(file.url.path, &info) == 0, info.st_flags & datalessFlag == 0,
+              (try? FileIdentity.read(file.url)) == file.identity,
+              let handle = try? FileHandle(forReadingFrom: file.url) else { return nil }
+        defer { try? handle.close() }
+        var hasher = SHA256()
+        do {
+            while let data = try handle.read(upToCount: 1_048_576), !data.isEmpty {
+                try Task.checkCancellation()
+                hasher.update(data: data)
+                await Task.yield()
+            }
+        } catch is CancellationError { throw CancellationError() }
+        catch { return nil }
+        guard (try? FileIdentity.read(file.url)) == file.identity else { return nil }
+        return hasher.finalize().map { String(format: "%02x", $0) }.joined()
+    }
+
+    /// SF_DATALESS from <sys/stat.h>; not exported to Swift.
+    private static let datalessFlag: UInt32 = 0x4000_0000
 }

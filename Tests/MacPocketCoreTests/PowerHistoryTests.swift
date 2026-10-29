@@ -32,13 +32,32 @@ final class PowerHistoryTests: XCTestCase {
         let reloaded = try await PowerHistoryStore(url: url, maximumEntries: 2).entries()
         XCTAssertEqual(reloaded.map { $0.date.timeIntervalSince1970 }, [200, 300])
     }
-    func testCorruptHistoryIsNotSilentlyOverwritten() async throws {
+    func testCorruptHistoryIsPreservedAndRecordingRecovers() async throws {
         let url = url()
         try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
         let original = Data("invalid history".utf8)
         try original.write(to: url)
-        do { _ = try await PowerHistoryStore(url: url).record(snapshot(100)); XCTFail("Accepted corrupt history") }
-        catch { }
-        XCTAssertEqual(try Data(contentsOf: url), original)
+        let store = PowerHistoryStore(url: url)
+        let recorded = try await store.record(snapshot(100))
+        XCTAssertEqual(recorded?.count, 1)
+        XCTAssertEqual(try Data(contentsOf: store.corruptBackupURL), original)
+        let reloaded = try await PowerHistoryStore(url: url).entries()
+        XCTAssertEqual(reloaded.count, 1)
+    }
+    func testLegacyDocumentMigratesAndTornLineIsSkipped() async throws {
+        let url = url()
+        try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
+        let legacyStore = PowerHistoryStore(url: url)
+        _ = try await legacyStore.record(snapshot(100))
+        let entry = try await legacyStore.entries()[0]
+        let legacy = try JSONSerialization.data(withJSONObject: [
+            "version": 1, "entries": [try JSONSerialization.jsonObject(with: JSONEncoder().encode(entry))]])
+        try legacy.write(to: url)
+        let migrated = PowerHistoryStore(url: url)
+        _ = try await migrated.record(snapshot(200))
+        let handle = try FileHandle(forWritingTo: url)
+        try handle.seekToEnd(); try handle.write(contentsOf: Data("{\"torn".utf8)); try handle.close()
+        let reloaded = try await PowerHistoryStore(url: url).entries()
+        XCTAssertEqual(reloaded.map { $0.date.timeIntervalSince1970 }, [100, 200])
     }
 }

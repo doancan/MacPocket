@@ -1,0 +1,184 @@
+import XCTest
+@testable import MacPocketCore
+
+final class AppPreferencesTests: XCTestCase {
+    private func defaults() -> (UserDefaults, String) {
+        let name = "MacPocketTests-" + UUID().uuidString
+        let defaults = UserDefaults(suiteName: name)!
+        addTeardownBlock { UserDefaults(suiteName: name)?.removePersistentDomain(forName: name) }
+        return (defaults, name)
+    }
+
+    // MARK: Language
+
+    func testLanguageMapsAppleLanguages() {
+        XCTAssertEqual(AppLanguage(appleLanguages: nil), .system)
+        XCTAssertEqual(AppLanguage(appleLanguages: []), .system)
+        XCTAssertEqual(AppLanguage(appleLanguages: ["tr"]), .turkish)
+        XCTAssertEqual(AppLanguage(appleLanguages: ["tr-TR", "en"]), .turkish)
+        XCTAssertEqual(AppLanguage(appleLanguages: ["en-GB"]), .english)
+        XCTAssertEqual(AppLanguage(appleLanguages: ["de"]), .system)
+        XCTAssertNil(AppLanguage.system.appleLanguages)
+        XCTAssertEqual(AppLanguage.turkish.appleLanguages, ["tr"])
+        XCTAssertEqual(AppLanguage.english.appleLanguages, ["en"])
+    }
+
+    func testLanguageRoundTripsThroughAppDomain() {
+        let (defaults, domain) = defaults()
+        XCTAssertEqual(AppLanguage.load(from: defaults, domain: domain), .system)
+        AppLanguage.english.save(to: defaults)
+        XCTAssertEqual(AppLanguage.load(from: defaults, domain: domain), .english)
+        AppLanguage.turkish.save(to: defaults)
+        XCTAssertEqual(AppLanguage.load(from: defaults, domain: domain), .turkish)
+        AppLanguage.system.save(to: defaults)
+        XCTAssertNil(defaults.persistentDomain(forName: domain)?[AppLanguage.defaultsKey])
+        XCTAssertEqual(AppLanguage.load(from: defaults, domain: domain), .system)
+    }
+
+    // MARK: Settings transfer
+
+    func testTransferableKeys() {
+        XCTAssertTrue(SettingsTransfer.isTransferable("MacPocket.appearance"))
+        XCTAssertTrue(SettingsTransfer.isTransferable("switcher.style"))
+        XCTAssertFalse(SettingsTransfer.isTransferable("MacPocket."))
+        XCTAssertFalse(SettingsTransfer.isTransferable("AppleLanguages"))
+        XCTAssertFalse(SettingsTransfer.isTransferable("manager.showUser"))
+        XCTAssertFalse(SettingsTransfer.isTransferable("NSWindow Frame main"))
+    }
+
+    func testExportImportRoundTripFiltersKeys() throws {
+        let (source, sourceDomain) = defaults()
+        source.set("dark", forKey: "MacPocket.appearance")
+        source.set(5.0, forKey: "MacPocket.refreshSeconds")
+        source.set(true, forKey: "switcher.globalEnabled")
+        source.set(["/Applications/A.app"], forKey: "switcher.excludedPaths")
+        source.set(Data([1, 2, 3]), forKey: "switcher.shortcut")
+        source.set(["en"], forKey: "AppleLanguages")
+        source.set("x", forKey: "OtherApp.key")
+
+        let data = try SettingsTransfer.exportData(from: SettingsTransfer.currentValues(source, domain: sourceDomain))
+        let text = String(decoding: data, as: UTF8.self)
+        XCTAssertFalse(text.contains("AppleLanguages"))
+        XCTAssertFalse(text.contains("OtherApp"))
+
+        let (target, targetDomain) = defaults()
+        target.set("light", forKey: "MacPocket.appearance")
+        target.set(true, forKey: "MacPocket.stale")
+        target.set("keep", forKey: "Unrelated.key")
+        SettingsTransfer.apply(try SettingsTransfer.importValues(from: data), to: target, domain: targetDomain)
+
+        XCTAssertEqual(target.string(forKey: "MacPocket.appearance"), "dark")
+        XCTAssertEqual(target.double(forKey: "MacPocket.refreshSeconds"), 5)
+        XCTAssertTrue(target.bool(forKey: "switcher.globalEnabled"))
+        XCTAssertEqual(target.stringArray(forKey: "switcher.excludedPaths"), ["/Applications/A.app"])
+        XCTAssertEqual(target.data(forKey: "switcher.shortcut"), Data([1, 2, 3]))
+        XCTAssertNil(target.object(forKey: "MacPocket.stale"), "keys missing from the file reset to defaults")
+        XCTAssertEqual(target.string(forKey: "Unrelated.key"), "keep")
+        XCTAssertNil(target.persistentDomain(forName: targetDomain)?["OtherApp.key"])
+    }
+
+    func testImportIgnoresForeignKeysAndRejectsOtherFiles() throws {
+        let json = #"{"format":"MacPocket.settings","version":1,"values":{"MacPocket.a":1,"AppleLanguages":["en"],"evil":"x"}}"#
+        let values = try SettingsTransfer.importValues(from: Data(json.utf8))
+        XCTAssertEqual(Set(values.keys), ["MacPocket.a"])
+        XCTAssertThrowsError(try SettingsTransfer.importValues(from: Data("nope".utf8))) {
+            XCTAssertEqual($0 as? SettingsTransferError, .unreadable)
+        }
+        XCTAssertThrowsError(try SettingsTransfer.importValues(from: Data(#"{"values":{}}"#.utf8))) {
+            XCTAssertEqual($0 as? SettingsTransferError, .wrongFormat)
+        }
+        XCTAssertThrowsError(try SettingsTransfer.importValues(from: Data(#"{"format":"MacPocket.settings","version":9,"values":{}}"#.utf8))) {
+            XCTAssertEqual($0 as? SettingsTransferError, .unsupportedVersion(9))
+        }
+    }
+
+    func testResetRemovesOnlyMacPocketKeys() {
+        let (defaults, domain) = defaults()
+        defaults.set(1, forKey: "MacPocket.a")
+        defaults.set(2, forKey: "switcher.b")
+        defaults.set(3, forKey: "manager.c")
+        SettingsTransfer.reset(defaults, domain: domain)
+        XCTAssertNil(defaults.object(forKey: "MacPocket.a"))
+        XCTAssertNil(defaults.object(forKey: "switcher.b"))
+        XCTAssertEqual(defaults.integer(forKey: "manager.c"), 3)
+    }
+
+    // MARK: Alerts
+
+    func testAlertThresholds() {
+        let all = ResourceAlertSettings(enabled: Set(ResourceAlertKind.allCases), diskFreePercent: 10)
+        XCTAssertEqual(ResourceAlertReading(diskFreePercent: 9.9, thermalState: "nominal", memoryPressureLevel: 1).triggered(all), [.lowDisk])
+        XCTAssertEqual(ResourceAlertReading(diskFreePercent: 10, thermalState: "fair", memoryPressureLevel: 2).triggered(all), [])
+        XCTAssertEqual(ResourceAlertReading(diskFreePercent: nil, thermalState: "serious", memoryPressureLevel: 4).triggered(all),
+                       [.thermal, .memoryPressure])
+        XCTAssertEqual(ResourceAlertReading(diskFreePercent: 50, thermalState: "critical", memoryPressureLevel: nil).triggered(all), [.thermal])
+        let diskOnly = ResourceAlertSettings(enabled: [.lowDisk], diskFreePercent: 20)
+        XCTAssertEqual(ResourceAlertReading(diskFreePercent: 15, thermalState: "critical", memoryPressureLevel: 4).triggered(diskOnly), [.lowDisk])
+        XCTAssertEqual(ResourceAlertReading(diskFreePercent: 1, thermalState: "critical", memoryPressureLevel: 4).triggered(.init()), [])
+    }
+
+    func testAlertReadingUsesStartupVolume() {
+        let snapshot = SystemSnapshot(capturedAt: Date(), hardwareModel: "fixture", logicalCPUCount: 1, cpuUserPercent: nil,
+                                      cpuSystemPercent: nil, cpuIdlePercent: nil, physicalMemoryBytes: 1, freeMemoryBytes: 1,
+                                      wiredMemoryBytes: 0, compressedMemoryBytes: 0, uptimeSeconds: 1, thermalState: "nominal",
+                                      volumes: [.init(name: "Ext", path: "/Volumes/Ext", totalBytes: 100, availableBytes: 90),
+                                                .init(name: "Mac", path: "/", totalBytes: 200, availableBytes: 10)],
+                                      power: .init(source: "AC Power", batteryPresent: false, chargePercent: nil, isCharging: nil, lowPowerMode: false))
+        XCTAssertEqual(ResourceAlertReading(snapshot).diskFreePercent ?? -1, 5, accuracy: 0.001)
+    }
+
+    func testAlertLimiterSendsAtMostOncePerHour() {
+        var limiter = ResourceAlertLimiter()
+        let start = Date(timeIntervalSince1970: 1_000_000)
+        XCTAssertEqual(limiter.admit([.lowDisk], now: start), [.lowDisk])
+        XCTAssertEqual(limiter.admit([.lowDisk], now: start.addingTimeInterval(60)), [])
+        XCTAssertEqual(limiter.admit([.lowDisk, .thermal], now: start.addingTimeInterval(120)), [.thermal])
+        XCTAssertEqual(limiter.admit([.lowDisk, .thermal], now: start.addingTimeInterval(3599)), [])
+        XCTAssertEqual(limiter.admit([.lowDisk, .thermal], now: start.addingTimeInterval(3600)), [.lowDisk])
+        XCTAssertEqual(limiter.admit([], now: start.addingTimeInterval(10_000)), [])
+        XCTAssertEqual(limiter.admit([.thermal], now: start.addingTimeInterval(10_000)), [.thermal])
+        // A clock moved backwards must not block alerts for the rest of the hour.
+        XCTAssertEqual(limiter.admit([.memoryPressure], now: start), [.memoryPressure])
+        XCTAssertEqual(limiter.admit([.memoryPressure], now: start.addingTimeInterval(-10)), [.memoryPressure])
+    }
+
+    func testAlertSettingsLoad() {
+        let (defaults, _) = defaults()
+        XCTAssertEqual(ResourceAlertSettings.load(from: defaults), ResourceAlertSettings())
+        defaults.set(true, forKey: ResourceAlertSettings.enabledKey(.thermal))
+        defaults.set(15.0, forKey: ResourceAlertSettings.diskThresholdKey)
+        XCTAssertEqual(ResourceAlertSettings.load(from: defaults), ResourceAlertSettings(enabled: [.thermal], diskFreePercent: 15))
+    }
+
+    // MARK: History
+
+    func testHistoryRetention() {
+        let (defaults, _) = defaults()
+        XCTAssertEqual(PowerHistoryRetention.days(from: defaults), 14)
+        XCTAssertEqual(PowerHistoryRetention.maximumEntries(days: 14), 20_160)
+        defaults.set(30, forKey: PowerHistoryRetention.key)
+        XCTAssertEqual(PowerHistoryRetention.days(from: defaults), 30)
+        defaults.set(3, forKey: PowerHistoryRetention.key)
+        XCTAssertEqual(PowerHistoryRetention.days(from: defaults), 14)
+    }
+
+    func testClearingPowerHistory() async throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent("MacPocket-clear-" + UUID().uuidString)
+        addTeardownBlock { try? FileManager.default.removeItem(at: root) }
+        let url = root.appendingPathComponent("history.json")
+        let store = PowerHistoryStore(url: url)
+        let snapshot = SystemSnapshot(capturedAt: Date(), hardwareModel: "fixture", logicalCPUCount: 1, cpuUserPercent: nil,
+                                      cpuSystemPercent: nil, cpuIdlePercent: nil, physicalMemoryBytes: 1, freeMemoryBytes: 1,
+                                      wiredMemoryBytes: 0, compressedMemoryBytes: 0, uptimeSeconds: 1, thermalState: "nominal",
+                                      volumes: [], power: .init(source: "AC Power", batteryPresent: false, chargePercent: nil,
+                                                                isCharging: nil, lowPowerMode: false))
+        _ = try await store.record(snapshot)
+        XCTAssertTrue(FileManager.default.fileExists(atPath: url.path))
+        try await store.clear()
+        XCTAssertFalse(FileManager.default.fileExists(atPath: url.path))
+        let entries = try await store.entries()
+        XCTAssertTrue(entries.isEmpty)
+        let reloaded = try await PowerHistoryStore(url: url).entries()
+        XCTAssertTrue(reloaded.isEmpty)
+    }
+}

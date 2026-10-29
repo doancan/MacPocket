@@ -1,7 +1,7 @@
 import Foundation
 import IOKit.pwr_mgt
 
-public struct AwakeSession: Codable, Sendable {
+public struct AwakeSession: Codable, Equatable, Sendable {
     public let id: UUID
     public let startedAt: Date
     public let endsAt: Date?
@@ -16,9 +16,9 @@ public enum SleepControllerError: Error, LocalizedError, Sendable {
     public var errorDescription: String? {
         switch self {
         case .invalidDuration:
-            return "Uyanık tutma süresi sıfırdan büyük, sonlu ve en fazla 7 gün olmalıdır."
+            return String(localized: "Uyanık tutma süresi sıfırdan büyük, sonlu ve en fazla 7 gün olmalıdır.")
         case let .nativeCall(operation, code):
-            return "Uyku kontrolü başarısız: \(operation) (\(code))."
+            return String(localized: "Uyku kontrolü başarısız: \(operation) (\(code)).")
         }
     }
 }

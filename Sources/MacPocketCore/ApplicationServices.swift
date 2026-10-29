@@ -2,6 +2,15 @@ import Foundation
 
 public enum ApplicationChannel: String, Codable, Sendable {
     case system = "macOS", appStore = "App Store", setapp = "Setapp", sparkle = "Uygulama içi", unknown = "Üretici"
+
+    /// Display name; the raw value is the stable identifier.
+    public var title: String {
+        switch self {
+        case .system, .appStore, .setapp: rawValue
+        case .sparkle: String(localized: "Uygulama içi")
+        case .unknown: String(localized: "Üretici")
+        }
+    }
 }
 
 public struct InstalledApplication: Identifiable, Sendable, Equatable {
@@ -89,18 +98,18 @@ public enum UninstallPlanner {
         let id = application.bundleID
         guard id.range(of: #"^[A-Za-z0-9][A-Za-z0-9._-]+$"#, options: .regularExpression) != nil,
               !id.contains("..") else { throw FileServiceError.outsideScope }
-        var candidates = [UninstallCandidate(title: "Uygulama", containsUserData: false,
+        var candidates = [UninstallCandidate(title: String(localized: "Uygulama"), containsUserData: false,
             request: .init(url: application.url, identity: application.identity, root: application.url, applicationBundle: true))]
         let library = try canonicalFileURL(home).appendingPathComponent("Library", isDirectory: true)
         let locations: [(String, String, Bool)] = [
-            ("Caches/" + id, "Önbellek", false),
-            ("Logs/" + id, "Günlükler", false),
-            ("Preferences/" + id + ".plist", "Tercihler", true),
-            ("Application Support/" + id, "Uygulama verileri", true),
-            ("Saved Application State/" + id + ".savedState", "Kaydedilmiş durum", true),
-            ("WebKit/" + id, "Web verileri", true),
-            ("HTTPStorages/" + id, "HTTP verileri", true),
-            ("Containers/" + id, "Uygulama kapsayıcısı", true),
+            ("Caches/" + id, String(localized: "Önbellek"), false),
+            ("Logs/" + id, String(localized: "Günlükler"), false),
+            ("Preferences/" + id + ".plist", String(localized: "Tercihler"), true),
+            ("Application Support/" + id, String(localized: "Uygulama verileri"), true),
+            ("Saved Application State/" + id + ".savedState", String(localized: "Kaydedilmiş durum"), true),
+            ("WebKit/" + id, String(localized: "Web verileri"), true),
+            ("HTTPStorages/" + id, String(localized: "HTTP verileri"), true),
+            ("Containers/" + id, String(localized: "Uygulama kapsayıcısı"), true),
         ]
         for (path, title, userData) in locations {
             let url = library.appendingPathComponent(path)
@@ -127,11 +136,11 @@ public enum HomebrewError: Error, LocalizedError {
     case unavailable, failed(String), malformed, invalidToken, notInstalled
     public var errorDescription: String? {
         switch self {
-        case .unavailable: "Homebrew bulunamadı. Homebrew güncellemeleri bu Mac'te kullanılamıyor."
-        case .failed(let output): "Homebrew işlemi tamamlanamadı: \(output.suffix(2000))"
-        case .malformed: "Homebrew yanıtı okunamadı."
-        case .invalidToken: "Geçersiz uygulama kimliği."
-        case .notInstalled: "Bu uygulama Homebrew'ün kurulu listesinde bulunmuyor."
+        case .unavailable: String(localized: "Homebrew bulunamadı. Homebrew güncellemeleri bu Mac'te kullanılamıyor.")
+        case .failed(let output): String(localized: "Homebrew işlemi tamamlanamadı: \(output.suffix(2000))")
+        case .malformed: String(localized: "Homebrew yanıtı okunamadı.")
+        case .invalidToken: String(localized: "Geçersiz uygulama kimliği.")
+        case .notInstalled: String(localized: "Bu uygulama Homebrew'ün kurulu listesinde bulunmuyor.")
         }
     }
 }
@@ -196,16 +205,21 @@ public actor HomebrewApplications {
 
     private func command(_ arguments: [String], timeout: TimeInterval) async throws -> String {
         guard let executable = ["/opt/homebrew/bin/brew", "/usr/local/bin/brew"].first(where: { FileManager.default.isExecutableFile(atPath: $0) }) else { throw HomebrewError.unavailable }
+        // stderr stays separate so JSON on stdout parses; a long upgrade is never killed for being chatty,
+        // and cancellation interrupts brew first so it can stop its own child processes.
         let runner = SystemDiagnosticCommandRunner(executable: executable, arguments: arguments, timeout: timeout, outputLimit: 4_194_304,
             environment: ["PATH": "/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin",
                           "HOME": FileManager.default.homeDirectoryForCurrentUser.path,
                           "TMPDIR": FileManager.default.temporaryDirectory.path,
                           "LANG": "en_US.UTF-8", "LC_ALL": "en_US.UTF-8",
-                          "HOMEBREW_NO_AUTO_UPDATE": "1", "HOMEBREW_NO_ANALYTICS": "1", "HOMEBREW_NO_ENV_HINTS": "1"])
+                          "HOMEBREW_NO_AUTO_UPDATE": "1", "HOMEBREW_NO_ANALYTICS": "1", "HOMEBREW_NO_ENV_HINTS": "1"],
+            separateErrorOutput: true, stopOnOutputLimit: false, interruptGracePeriod: 10)
         let result = try await withTaskCancellationHandler {
             try await Task.detached(priority: .utility) { try runner.execute() }.value
         } onCancel: { runner.cancel() }
-        guard result.exitCode == 0 else { throw HomebrewError.failed(result.output) }
+        guard result.exitCode == 0 else {
+            throw HomebrewError.failed([result.errorOutput, result.output].filter { !$0.isEmpty }.joined(separator: "\n"))
+        }
         return result.output
     }
 }

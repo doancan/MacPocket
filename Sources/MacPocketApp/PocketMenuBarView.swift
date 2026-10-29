@@ -2,79 +2,136 @@ import AppKit
 import MacPocketCore
 import SwiftUI
 
+/// What a popover shows: the grouped item's tabbed view, or one separate module.
+enum MenuBarPopoverContent: Equatable {
+    case grouped
+    case module(MenuBarModule)
+}
+
+/// Popover root. Created when the popover opens and released when it closes, so nothing here
+/// re-renders while the popover is hidden.
 struct PocketMenuBarView: View {
     @ObservedObject var model: PocketModel
-    @AppStorage("MacPocket.appearance") private var appearance = PocketAppearance.dark
+    @ObservedObject var history: MenuBarHistory
+    @ObservedObject private var store = MenuBarSettingsStore.shared
+    let content: MenuBarPopoverContent
 
-    var body: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            HStack {
-                Image(systemName: "gauge.with.dots.needle.50percent").font(.title2)
-                    .foregroundStyle(PocketTheme.accent)
-                VStack(alignment: .leading, spacing: 3) {
-                    Text("MacPocket").font(.headline)
-                    Text(model.system?.hardwareModel ?? "Mac").font(.caption).foregroundStyle(.secondary)
-                }
-                Spacer()
-                Text(model.paused ? "Duraklatıldı" : "Canlı")
-                    .font(.caption).foregroundStyle(model.paused ? Color.orange : PocketTheme.disk)
-            }
-            Grid(alignment: .leading, horizontalSpacing: 20, verticalSpacing: 10) {
-                metric("CPU", value: model.cpuLabel, icon: "cpu")
-                metric("Ham boş RAM", value: model.system.map { pocketBytes($0.freeMemoryBytes) } ?? "—", icon: "memorychip")
-                metric("Wired RAM", value: model.system.map { pocketBytes($0.wiredMemoryBytes) } ?? "—", icon: "memorychip")
-                metric("Boş disk alanı", value: model.system?.volumes.first.map { pocketBytes(UInt64(max(0, $0.availableBytes))) } ?? "—", icon: "internaldrive")
-                if let power = model.system?.power, power.batteryPresent {
-                    metric("Pil", value: power.chargePercent.map { String(format: "%.0f%%", $0) } ?? "—", icon: "battery.100percent")
-                }
-                if let power = model.system?.power {
-                    metric("Güç kaynağı", value: power.source == "AC Power" ? "Priz" : power.source, icon: "bolt")
-                }
-            }.font(.callout).monospacedDigit()
-            Text("Ham boş RAM, kullanılabilir bellek değildir.").font(.caption2).foregroundStyle(.secondary)
-            if let date = model.lastUpdate {
-                Text("Son ölçüm: \(date.formatted(date: .omitted, time: .standard))")
-                    .font(.caption2).foregroundStyle(.secondary)
-            }
-            Divider()
-            if model.awakeSession?.active == true {
-                Label("Mac uyanık tutuluyor", systemImage: "cup.and.saucer.fill").font(.callout)
-                Button("Uyanık Tutmayı Durdur") { Task { await model.stopAwake() } }
-            } else {
-                Button { Task { await model.startAwake() } } label: {
-                    Label("30 Dakika Uyanık Tut", systemImage: "cup.and.saucer")
-                }
-            }
-            HStack {
-                Button { model.paused.toggle() } label: {
-                    Label(model.paused ? "Sürdür" : "Duraklat", systemImage: model.paused ? "play" : "pause")
-                }
-                Button { Task { await model.refresh() } } label: {
-                    Label("Yenile", systemImage: "arrow.clockwise")
-                }
-            }
-            if let error = model.awakeError {
-                Text(error).font(.caption).foregroundStyle(.red)
-            }
-            Divider()
-            Button { model.openMainWindow?() } label: {
-                Label("MacPocket’ı Aç", systemImage: "macwindow")
-            }.keyboardShortcut("0", modifiers: .command)
-            HStack {
-                Button { model.openSettingsWindow?() } label: { Label("Ayarlar…", systemImage: "gearshape") }
-                Spacer()
-                Button("Çık") { NSApp.terminate(nil) }.keyboardShortcut("q", modifiers: .command)
-            }
-        }
-        .padding(18).frame(width: 330)
-        .buttonStyle(.bordered).controlSize(.regular)
-        .preferredColorScheme(appearance.colorScheme)
+    @AppStorage("MacPocket.appearance") private var appearance = PocketAppearance.defaultValue
+    @AppStorage("MacPocket.menubar.selectedTab") private var storedTab = MenuBarModule.cpu.rawValue
+    @State private var selection: MenuBarModule
+    @PocketReduceMotion private var reduceMotion
+
+    init(model: PocketModel, history: MenuBarHistory, content: MenuBarPopoverContent) {
+        self.model = model
+        self.history = history
+        self.content = content
+        // Reopen on the last tab without a first frame on the default tab.
+        let stored = UserDefaults.standard.string(forKey: "MacPocket.menubar.selectedTab") ?? ""
+        _selection = State(initialValue: MenuBarModule(rawValue: stored) ?? .cpu)
     }
 
-    private func metric(_ title: String, value: String, icon: String) -> some View {
-        GridRow {
-            Label(title, systemImage: icon).foregroundStyle(.secondary)
-            Text(value).frame(maxWidth: .infinity, alignment: .trailing)
+    static let width: CGFloat = 368
+
+    private var module: MenuBarModule {
+        if case let .module(module) = content { return module }
+        return selection
+    }
+
+    private var tabs: [GlassTab<MenuBarModule>] {
+        store.preferences.order.map { GlassTab(id: $0, title: $0.title, symbol: $0.symbol, tint: $0.tint) }
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: PocketSpacing.m) {
+            if content == .grouped {
+                GlassTabBar(tabs: tabs, selection: $selection)
+                    .background { GlassTabKeyboardShortcuts(tabs: tabs, selection: $selection) }
+            }
+            MenuBarModuleDetail(module: module, model: model, history: history, binaryUnits: store.preferences.binaryUnits)
+                .id(module)
+                .transition(reduceMotion ? .identity : .opacity.combined(with: .offset(y: 4)))
+            footer
+        }
+        .padding(PocketSpacing.m)
+        .frame(width: Self.width)
+        .preferredColorScheme(appearance.colorScheme)
+        .onAppear { updateProcessSampling() }
+        .onChange(of: selection) { _, value in
+            storedTab = value.rawValue
+            updateProcessSampling()
+        }
+        .onDisappear { model.menuBarProcessesWanted = false }
+    }
+
+    /// Process sampling is costly; it runs only while a process list is on screen.
+    private func updateProcessSampling() {
+        let wanted = module.showsProcesses
+        let wasWanted = model.menuBarProcessesWanted
+        model.menuBarProcessesWanted = wanted
+        if wanted && !wasWanted && !model.paused {
+            Task { await model.refresh(includeProcesses: true) }
+        }
+    }
+
+    private var footer: some View {
+        HStack(spacing: PocketSpacing.s) {
+            Circle()
+                .fill(model.paused ? Color.orange : PocketTheme.disk)
+                .frame(width: 6, height: 6)
+                .accessibilityHidden(true)
+            Group {
+                if model.paused {
+                    Text("İzleme duraklatıldı")
+                } else if let date = model.lastUpdate {
+                    Text("Son ölçüm \(date.formatted(date: .omitted, time: .standard))")
+                } else {
+                    Text("İlk ölçüm bekleniyor")
+                }
+            }
+            .font(.caption).foregroundStyle(.secondary).monospacedDigit()
+            Spacer(minLength: PocketSpacing.s)
+            footerButton("MacPocket’ı aç", symbol: "macwindow") { model.openMainWindow?() }
+                .keyboardShortcut("0", modifiers: .command)
+            footerButton("Ayarlar", symbol: "gearshape") { model.openSettingsWindow?() }
+                .keyboardShortcut(",", modifiers: .command)
+            footerButton(model.paused ? "İzlemeyi sürdür" : "İzlemeyi duraklat",
+                         symbol: model.paused ? "play.fill" : "pause.fill") { model.paused.toggle() }
+            footerButton("MacPocket’tan çık", symbol: "power") { NSApp.terminate(nil) }
+                .keyboardShortcut("q", modifiers: .command)
+        }
+        .padding(.top, PocketSpacing.xxs)
+    }
+
+    private func footerButton(_ title: LocalizedStringKey, symbol: String, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Image(systemName: symbol)
+                .font(.system(size: 12, weight: .medium))
+                .frame(width: 26, height: 22)
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(MenuBarFooterButtonStyle())
+        .help(title)
+        .accessibilityLabel(title)
+    }
+}
+
+/// Borderless icon button with a hover/press highlight, like Control Center's small buttons.
+private struct MenuBarFooterButtonStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        HoverHighlight(pressed: configuration.isPressed) { configuration.label }
+    }
+
+    private struct HoverHighlight<Label: View>: View {
+        let pressed: Bool
+        @ViewBuilder var label: () -> Label
+        @State private var hovering = false
+
+        var body: some View {
+            label()
+                .foregroundStyle(hovering ? .primary : .secondary)
+                .background(Color.primary.opacity(pressed ? 0.14 : hovering ? 0.08 : 0),
+                            in: RoundedRectangle(cornerRadius: PocketRadius.small, style: .continuous))
+                .onHover { hovering = $0 }
         }
     }
 }

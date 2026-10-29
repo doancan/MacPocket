@@ -15,91 +15,78 @@ struct SystemToolsView: View {
     @State private var cancelling = false
     @State private var failure: String?
     @State private var operation: Task<Void, Never>?
+    @FocusState private var searchFocused: Bool
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            heading
-            Divider().overlay(DiagnosticColors.border)
-            HStack(alignment: .top, spacing: 0) {
+        VStack(alignment: .leading, spacing: PocketSpacing.l) {
+            PocketPageHeading(title: "Sistem Raporları",
+                              subtitle: "Sistem durumunu incelemek için \(SystemDiagnostic.allCases.count) salt okunur rapor.",
+                              icon: "terminal") {
+                PocketStatusBadge(text: "Salt okunur", systemImage: "eye", tone: .accent)
+                    .help("Raporlar yalnızca okur; sistemde ayar değiştirmez veya bellek boşaltmaz.")
+            }
+            HStack(spacing: 0) {
                 diagnosticList
-                Divider().overlay(DiagnosticColors.border)
+                Divider()
                 detail
             }
+            .pocketCard(padding: 0, radius: PocketRadius.medium)
         }
-        .background(DiagnosticColors.background)
-        .foregroundStyle(DiagnosticColors.text)
+        .pocketPage()
         .onDisappear { operation?.cancel() }
+        .onReceive(NotificationCenter.default.publisher(for: .pocketFind)) { _ in
+            if report != nil { showRawOutput = true; searchFocused = true }
+        }
         .alert("Rapor işlemi tamamlanamadı", isPresented: Binding(
             get: { failure != nil }, set: { if !$0 { failure = nil } }
         )) {
             Button("Tamam", role: .cancel) { failure = nil }
         } message: {
-            Text(failure ?? "")
+            Text(verbatim: failure ?? "")
         }
-    }
-
-    private var heading: some View {
-        HStack(alignment: .center) {
-            VStack(alignment: .leading, spacing: 6) {
-                Text("Sistem Araçları").font(.system(size: 25, weight: .semibold))
-                Text("Sistem durumunu incelemek için 8 salt okunur rapor")
-                    .font(.system(size: 12)).foregroundStyle(DiagnosticColors.secondary)
-            }
-            Spacer()
-            Label("Salt okunur", systemImage: "eye")
-                .font(.system(size: 11, weight: .medium))
-                .foregroundStyle(DiagnosticColors.accent)
-                .padding(.horizontal, 10).padding(.vertical, 7)
-                .background(DiagnosticColors.accent.opacity(0.1), in: Capsule())
-        }
-        .padding(24)
     }
 
     private var diagnosticList: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 5) {
-                ForEach(SystemDiagnostic.allCases, id: \.rawValue) { diagnostic in
-                    Button {
-                        selected = diagnostic
-                        report = nil
-                        outputSearch = ""
-                    } label: {
-                        HStack(alignment: .top, spacing: 10) {
-                            Image(systemName: icon(for: diagnostic))
-                                .font(.system(size: 15))
-                                .frame(width: 20).padding(.top, 2)
-                            VStack(alignment: .leading, spacing: 5) {
-                                Text(diagnostic.title).font(.system(size: 12, weight: .semibold))
-                                Text(shortDescription(for: diagnostic))
-                                    .font(.system(size: 10))
-                                    .foregroundStyle(DiagnosticColors.secondary)
-                                    .fixedSize(horizontal: false, vertical: true)
-                            }
-                            Spacer(minLength: 0)
+        List(selection: Binding<SystemDiagnostic?>(get: { selected }, set: { value in
+            guard let value, !running, value != selected else { return }
+            selected = value
+            report = nil
+            outputSearch = ""
+        })) {
+            Section("Raporlar") {
+                ForEach(SystemDiagnostic.allCases, id: \.self) { diagnostic in
+                    Label {
+                        VStack(alignment: .leading, spacing: PocketSpacing.xxs) {
+                            Text(diagnostic.title)
+                            Text(shortDescription(for: diagnostic))
+                                .font(.subheadline)
+                                .foregroundStyle(.secondary)
+                                .lineLimit(1)
                         }
-                        .padding(12).frame(maxWidth: .infinity, alignment: .leading)
-                        .foregroundStyle(selected == diagnostic ? DiagnosticColors.accent : DiagnosticColors.text)
-                        .background(selected == diagnostic ? DiagnosticColors.accent.opacity(0.12) : .clear,
-                                    in: RoundedRectangle(cornerRadius: 8))
+                    } icon: {
+                        Image(systemName: icon(for: diagnostic))
                     }
-                    .buttonStyle(.plain)
-                    .disabled(running)
+                    .padding(.vertical, PocketSpacing.xxs)
+                    .tag(diagnostic)
                 }
-            }.padding(12)
+            }
         }
-        .frame(width: 230)
+        .listStyle(.sidebar)
+        .frame(width: 250)
+        .disabled(running)
     }
 
     private var detail: some View {
-        VStack(alignment: .leading, spacing: 18) {
-            HStack(alignment: .top) {
-                VStack(alignment: .leading, spacing: 7) {
-                    Text(selected.title).font(.system(size: 20, weight: .semibold))
+        VStack(alignment: .leading, spacing: PocketSpacing.l) {
+            HStack(alignment: .top, spacing: PocketSpacing.m) {
+                VStack(alignment: .leading, spacing: PocketSpacing.xs) {
+                    Label(selected.title, systemImage: icon(for: selected))
+                        .font(.title3.weight(.semibold))
                     Text(description(for: selected))
-                        .font(.system(size: 12)).foregroundStyle(DiagnosticColors.secondary)
+                        .font(.callout).foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)
                 }
-                Spacer(minLength: 12)
+                Spacer(minLength: PocketSpacing.m)
                 if running {
                     Button(cancelling ? "İptal ediliyor…" : "İptal Et", role: .cancel) {
                         cancelling = true
@@ -111,105 +98,105 @@ struct SystemToolsView: View {
                         Label(report == nil ? "Raporu Oluştur" : "Raporu Yenile",
                               systemImage: "arrow.clockwise")
                     }
-                    .buttonStyle(.borderedProminent).tint(DiagnosticColors.accent)
-
+                    .buttonStyle(.borderedProminent)
                     .disabled(!validProcessID)
                 }
             }
             if selected == .openFiles {
-                HStack(spacing: 10) {
-                    Text("Süreç PID").font(.system(size: 12, weight: .medium))
+                HStack(spacing: PocketSpacing.s) {
+                    Text("Süreç PID").font(.callout.weight(.medium))
                     TextField("Boş bırak: kendi kullanıcının süreçleri", text: $processID)
                         .textFieldStyle(.roundedBorder).frame(maxWidth: 300)
                         .disabled(running)
                         .onChange(of: processID) { _, _ in report = nil }
                     if !validProcessID {
-                        Text("Pozitif bir PID girin.").font(.system(size: 11)).foregroundStyle(.orange)
+                        Label("Pozitif bir PID gir.", systemImage: "exclamationmark.triangle")
+                            .font(.callout).foregroundStyle(.orange)
                     }
                 }
             }
             if running {
-                HStack(spacing: 10) {
-                    ProgressView().controlSize(.small)
-                    Text(cancelling ? "Tanılama süreci durduruluyor…" : "Güncel sistem raporu alınıyor…")
-                        .font(.system(size: 12)).foregroundStyle(DiagnosticColors.secondary)
-                }
-                .padding(14).frame(maxWidth: .infinity, alignment: .leading)
-                .background(DiagnosticColors.surface, in: RoundedRectangle(cornerRadius: 8))
+                PocketProgressRow(message: cancelling ? "Tanılama süreci durduruluyor…" : "Güncel sistem raporu alınıyor…")
             }
             if let report {
                 reportSummary(report)
-                HStack {
+                HStack(spacing: PocketSpacing.s) {
                     Toggle("Ham çıktı", isOn: $showRawOutput).toggleStyle(.checkbox)
-                        .font(.system(size: 12))
+                    if showRawOutput {
+                        TextField("Çıktıda ara…", text: $outputSearch)
+                            .textFieldStyle(.roundedBorder)
+                            .frame(maxWidth: 280)
+                            .focused($searchFocused)
+                            .accessibilityLabel("Rapor çıktısında ara")
+                    }
                     Spacer()
                     Button { copyReport(report) } label: { Label("Kopyala", systemImage: "doc.on.doc") }
-                    Button { exportReport(report) } label: { Label("Dışa Aktar", systemImage: "square.and.arrow.up") }
+                        .help("Raporu panoya kopyala")
+                    Button { exportReport(report) } label: { Label("Dışa Aktar…", systemImage: "square.and.arrow.up") }
+                        .help("Raporu metin dosyası olarak kaydet")
                 }
-                .buttonStyle(.bordered).controlSize(.small)
+                .controlSize(.small)
                 if showRawOutput {
-                    TextField("Çıktıda ara…", text: $outputSearch)
-                        .textFieldStyle(.roundedBorder).font(.system(size: 12))
                     ScrollView([.horizontal, .vertical]) {
                         Text(filteredOutput(report))
-                            .font(.system(size: 11, design: .monospaced))
+                            .font(.system(.callout, design: .monospaced))
                             .textSelection(.enabled)
                             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-                            .padding(14)
+                            .padding(PocketSpacing.m)
                     }
-                    .background(PocketTheme.sidebar, in: RoundedRectangle(cornerRadius: 8))
-                    .overlay(RoundedRectangle(cornerRadius: 8).stroke(DiagnosticColors.border))
+                    .background(PocketTheme.sidebar, in: RoundedRectangle(cornerRadius: PocketRadius.small, style: .continuous))
+                    .overlay {
+                        RoundedRectangle(cornerRadius: PocketRadius.small, style: .continuous)
+                            .strokeBorder(PocketTheme.line.opacity(0.6), lineWidth: 0.5)
+                    }
                 } else {
                     Spacer(minLength: 0)
                 }
             } else if !running {
-                VStack(spacing: 12) {
-                    Image(systemName: icon(for: selected)).font(.system(size: 34, weight: .light))
-                        .foregroundStyle(DiagnosticColors.accent.opacity(0.8))
-                    Text("Güncel rapor henüz alınmadı").font(.system(size: 15, weight: .medium))
-                    Text("Raporu Oluştur ile mevcut sistem durumunu okuyun.")
-                        .font(.system(size: 12)).foregroundStyle(DiagnosticColors.secondary)
-                }
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                ContentUnavailableView("Güncel rapor henüz alınmadı", systemImage: icon(for: selected),
+                                       description: Text("Raporu Oluştur ile mevcut sistem durumunu oku."))
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+            } else {
+                Spacer(minLength: 0)
             }
         }
-        .padding(24).frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        .padding(PocketSpacing.xl)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
     }
 
     private func reportSummary(_ report: DiagnosticReport) -> some View {
-        VStack(alignment: .leading, spacing: 12) {
+        let warning = report.partial || report.exitCode != 0
+        return VStack(alignment: .leading, spacing: PocketSpacing.m) {
             HStack {
                 Label(statusTitle(report), systemImage: report.partial ? "exclamationmark.circle" : "doc.text")
-                    .font(.system(size: 12, weight: .semibold))
-                    .foregroundStyle(report.partial || report.exitCode != 0 ? Color.orange : DiagnosticColors.accent)
+                    .font(.headline)
+                    .foregroundStyle(warning ? Color.orange : PocketTheme.accent)
                 Spacer()
                 Text(report.capturedAt.formatted(date: .abbreviated, time: .standard))
-                    .font(.system(size: 10)).foregroundStyle(DiagnosticColors.secondary)
+                    .font(.subheadline).foregroundStyle(.secondary)
             }
-            HStack(spacing: 24) {
+            HStack(spacing: PocketSpacing.xl) {
                 summaryValue("Kapsam", value: reportScope)
-                summaryValue("Çıktı", value: "\(report.output.utf8.count.formatted()) bayt")
-                summaryValue("Çıkış kodu", value: report.exitCode.map(String.init) ?? "Alınamadı")
+                summaryValue("Çıktı", value: String(localized: "\(report.output.utf8.count.formatted()) bayt"))
+                summaryValue("Çıkış kodu", value: report.exitCode.map(String.init) ?? String(localized: "Alınamadı"))
             }
             if report.partial {
                 Text(report.truncated
                      ? "Çıktı boyut sınırına ulaştı. Gösterilen kayıt kısmi ve kesilmiştir."
                      : "Tanılama süre sınırına ulaştı. Gösterilen kayıt kısmi olabilir.")
-                    .font(.system(size: 11)).foregroundStyle(.orange)
+                    .font(.callout).foregroundStyle(.orange)
             } else if report.exitCode != 0 {
                 Text("Komut sıfır dışında bir çıkış kodu döndürdü. Ayrıntılar ham çıktıda bulunur.")
-                    .font(.system(size: 11)).foregroundStyle(.orange)
+                    .font(.callout).foregroundStyle(.orange)
             }
         }
-        .padding(15).background(DiagnosticColors.surface, in: RoundedRectangle(cornerRadius: 8))
-        .overlay(RoundedRectangle(cornerRadius: 8).stroke(DiagnosticColors.border))
+        .pocketCard(padding: PocketSpacing.m, radius: PocketRadius.medium)
     }
 
-    private func summaryValue(_ title: String, value: String) -> some View {
-        VStack(alignment: .leading, spacing: 5) {
-            Text(title.uppercased()).font(.system(size: 9, weight: .semibold))
-                .foregroundStyle(DiagnosticColors.secondary)
-            Text(value).font(.system(size: 11, weight: .medium)).textSelection(.enabled)
+    private func summaryValue(_ title: LocalizedStringKey, value: String) -> some View {
+        VStack(alignment: .leading, spacing: PocketSpacing.xxs) {
+            Text(title).font(.subheadline).foregroundStyle(.secondary)
+            Text(value).font(.callout.weight(.medium)).monospacedDigit().textSelection(.enabled)
         }
     }
 
@@ -222,7 +209,7 @@ struct SystemToolsView: View {
         guard !running, validProcessID else { return }
         let choice = selected
         let pid = choice == .openFiles ? Int32(processID.trimmingCharacters(in: .whitespaces)) : nil
-        reportScope = pid.map { "PID \($0)" } ?? (choice == .openFiles ? "Kendi kullanıcım" : "Bu Mac")
+        reportScope = pid.map { "PID \($0)" } ?? (choice == .openFiles ? String(localized: "Kendi kullanıcım") : String(localized: "Bu Mac"))
         running = true
         cancelling = false
         report = nil
@@ -246,21 +233,24 @@ struct SystemToolsView: View {
 
     private func statusTitle(_ report: DiagnosticReport) -> String {
         switch report.completion {
-        case .complete: return report.exitCode == 0 ? "Rapor alındı" : "Komut tamamlanamadı"
-        case .outputLimit: return "Kısmi rapor · boyut sınırı"
-        case .timedOut: return "Kısmi rapor · süre sınırı"
+        case .complete: return report.exitCode == 0 ? String(localized: "Rapor alındı") : String(localized: "Komut tamamlanamadı")
+        case .outputLimit: return String(localized: "Kısmi rapor · boyut sınırı")
+        case .timedOut: return String(localized: "Kısmi rapor · süre sınırı")
         }
     }
 
     private func filteredOutput(_ report: DiagnosticReport) -> String {
-        guard !outputSearch.isEmpty else { return report.output.isEmpty ? "Çıktı yok." : report.output }
+        guard !outputSearch.isEmpty else { return report.output.isEmpty ? String(localized: "Çıktı yok.") : report.output }
         let lines = report.output.components(separatedBy: .newlines)
             .filter { $0.localizedCaseInsensitiveContains(outputSearch) }
-        return lines.isEmpty ? "Eşleşen satır yok." : lines.joined(separator: "\n")
+        return lines.isEmpty ? String(localized: "Eşleşen satır yok.") : lines.joined(separator: "\n")
     }
 
     private func reportText(_ report: DiagnosticReport) -> String {
-        "MacPocket — \(report.title)\nTarih: \(report.capturedAt.formatted())\nKapsam: \(reportScope)\nDurum: \(statusTitle(report))\nÇıkış kodu: \(report.exitCode.map(String.init) ?? "alınamadı")\n\n\(report.output)"
+        let exitCode = report.exitCode.map(String.init) ?? String(localized: "alınamadı")
+        let date = report.capturedAt.formatted()
+        let header = String(localized: "MacPocket — \(report.title)\nTarih: \(date)\nKapsam: \(reportScope)\nDurum: \(statusTitle(report))\nÇıkış kodu: \(exitCode)")
+        return header + "\n\n" + report.output
     }
 
     private func copyReport(_ report: DiagnosticReport) {
@@ -270,7 +260,7 @@ struct SystemToolsView: View {
 
     private func exportReport(_ report: DiagnosticReport) {
         let panel = NSSavePanel()
-        panel.title = "Sistem raporunu dışa aktar"
+        panel.title = String(localized: "Sistem raporunu dışa aktar")
         panel.allowedContentTypes = [.plainText]
         panel.nameFieldStringValue = "MacPocket-\(report.id).txt"
         guard panel.runModal() == .OK, let destination = panel.url else { return }
@@ -280,27 +270,27 @@ struct SystemToolsView: View {
 
     private func shortDescription(for diagnostic: SystemDiagnostic) -> String {
         switch diagnostic {
-        case .memoryPressure: return "Belleğin güncel baskı durumu"
-        case .swap: return "Disk üzerindeki sanal bellek"
-        case .powerAssertions: return "Uykuyu engelleyen süreçler"
-        case .powerSettings: return "Etkin güç ve uyku tercihleri"
-        case .thermal: return "Sistemin bildirdiği termal koşullar"
-        case .disks: return "Mount ve alan kullanımı"
-        case .network: return "Arayüz sayaçları ve hatalar"
-        case .openFiles: return "Süreçlerin açık kaynakları"
+        case .memoryPressure: return String(localized: "Belleğin güncel baskı durumu")
+        case .swap: return String(localized: "Disk üzerindeki sanal bellek")
+        case .powerAssertions: return String(localized: "Uykuyu engelleyen süreçler")
+        case .powerSettings: return String(localized: "Etkin güç ve uyku tercihleri")
+        case .thermal: return String(localized: "Sistemin bildirdiği termal koşullar")
+        case .disks: return String(localized: "Mount ve alan kullanımı")
+        case .network: return String(localized: "Arayüz sayaçları ve hatalar")
+        case .openFiles: return String(localized: "Süreçlerin açık kaynakları")
         }
     }
 
     private func description(for diagnostic: SystemDiagnostic) -> String {
         switch diagnostic {
-        case .memoryPressure: return "Sistemin bildirdiği bellek baskısını sorgular. Bellek boşaltma işlemi yapmaz."
-        case .swap: return "macOS'un disk üzerindeki swap alanı kullanımını gösterir."
-        case .powerAssertions: return "Mac'in otomatik uyumasını engelleyen mevcut assertion ve kaynak süreçleri listeler."
-        case .powerSettings: return "Bu Mac'in mevcut güç kaynağına ait güç ve uyku ayarlarını okur."
-        case .thermal: return "macOS'un sunduğu termal uyarı ve performans sınırı bilgisini okur; sensör sıcaklığı ölçmez."
-        case .disks: return "Bağlı dosya sistemleri için kapasite ve kullanılabilir alan raporu alır. APFS volume alanları paylaşılabilir."
-        case .network: return "Ağ arayüzlerinin aktarım, paket ve hata sayaçlarını listeler; yeni ağ bağlantısı başlatmaz."
-        case .openFiles: return "Seçilen PID'nin veya kendi kullanıcınızın süreçlerinin açık dosya ve bağlantılarını listeler. Erişim ve çıktı sınırları sonucu etkileyebilir."
+        case .memoryPressure: return String(localized: "Sistemin bildirdiği bellek baskısını sorgular. Bellek boşaltma işlemi yapmaz.")
+        case .swap: return String(localized: "macOS'un disk üzerindeki swap alanı kullanımını gösterir.")
+        case .powerAssertions: return String(localized: "Mac'in otomatik uyumasını engelleyen mevcut assertion ve kaynak süreçleri listeler.")
+        case .powerSettings: return String(localized: "Bu Mac'in mevcut güç kaynağına ait güç ve uyku ayarlarını okur.")
+        case .thermal: return String(localized: "macOS'un sunduğu termal uyarı ve performans sınırı bilgisini okur; sensör sıcaklığı ölçmez.")
+        case .disks: return String(localized: "Bağlı dosya sistemleri için kapasite ve kullanılabilir alan raporu alır. APFS volume alanları paylaşılabilir.")
+        case .network: return String(localized: "Ağ arayüzlerinin aktarım, paket ve hata sayaçlarını listeler; yeni ağ bağlantısı başlatmaz.")
+        case .openFiles: return String(localized: "Seçilen PID'nin veya kendi kullanıcınızın süreçlerinin açık dosya ve bağlantılarını listeler. Erişim ve çıktı sınırları sonucu etkileyebilir.")
         }
     }
 
@@ -316,13 +306,4 @@ struct SystemToolsView: View {
         case .openFiles: return "doc.text.magnifyingglass"
         }
     }
-}
-
-private enum DiagnosticColors {
-    static let background = PocketTheme.background
-    static let surface = PocketTheme.panel
-    static let border = PocketTheme.line
-    static let text = Color.primary
-    static let secondary = Color.secondary
-    static let accent = PocketTheme.accent
 }

@@ -7,22 +7,20 @@ import MacPocketCore
 @MainActor
 struct MacPocketApplication: App {
     @NSApplicationDelegateAdaptor(PocketAppDelegate.self) var delegate
-    @StateObject private var state = PocketApplicationState()
-    @AppStorage("MacPocket.appearance") private var appearance = PocketAppearance.dark
+    @StateObject private var state = PocketApplicationState.shared
 
     var body: some Scene {
         Window("MacPocket", id: "main") {
             PocketRootView(model: state.model)
-                .preferredColorScheme(appearance.colorScheme)
-                .tint(PocketTheme.accent)
+                .pocketAppearanceRoot()
         }
-        .defaultSize(width: 1440, height: 900)
+        .defaultSize(width: 1280, height: 820)
         .windowToolbarStyle(.unified)
         .commands { PocketCommands(model: state.model) }
 
         Settings {
             PocketSettingsView(model: state.model, loginItem: state.loginItem)
-                .preferredColorScheme(appearance.colorScheme)
+                .pocketAppearanceRoot(rebuildsOnTokenChange: false)
         }
 
     }
@@ -30,22 +28,63 @@ struct MacPocketApplication: App {
 
 @MainActor
 final class PocketAppDelegate: NSObject, NSApplicationDelegate {
+    private var defaultsObserver: NSObjectProtocol?
+
     func applicationDidFinishLaunching(_ notification: Notification) {
-        NSApp.setActivationPolicy(.regular)
-        NSApp.activate(ignoringOtherApps: true)
+        _ = PocketRelaunch.languageAtLaunch
+        PocketDock.apply()
+        // The Dock icon must come back if the menu bar item is hidden from anywhere (Settings, menu, import).
+        defaultsObserver = NotificationCenter.default.addObserver(forName: UserDefaults.didChangeNotification, object: nil,
+                                                                  queue: .main) { _ in
+            MainActor.assumeIsolated { PocketDock.apply() }
+        }
+        if PocketLaunch.showsWindow { NSApp.activate(ignoringOtherApps: true) }
     }
+
+    /// Dock icon click with no window open (for example after "show window at launch" was turned off).
+    func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
+        guard !flag, let open = PocketApplicationState.shared.model.openMainWindow else { return true }
+        open()
+        return false
+    }
+
     func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
         if PocketOperationState.shared.preventTermination {
             let alert = NSAlert()
-            alert.messageText = "Uygulama işlemi sürüyor"
-            alert.informativeText = "Homebrew işleminin tamamlanmasını beklemelisin. Sonucu Uygulamalar bölümünde görebilirsin."
-            alert.addButton(withTitle: "Bekle")
+            alert.messageText = String(localized: "Uygulama işlemi sürüyor")
+            alert.informativeText = String(localized: "Homebrew işleminin tamamlanmasını beklemelisin. Sonucu Uygulamalar bölümünde görebilirsin.")
+            alert.addButton(withTitle: String(localized: "Bekle"))
             alert.runModal()
             return .terminateCancel
         }
+        let defaults = UserDefaults.standard
+        if PocketApplicationState.shared.model.awakeSession?.active == true,
+           defaults.object(forKey: PocketPreferenceKey.confirmQuitWhileAwake) as? Bool ?? true {
+            let alert = NSAlert()
+            alert.messageText = String(localized: "Mac’i uyanık tutma etkin")
+            alert.informativeText = String(localized: "MacPocket’tan çıkarsan uyanık tutma sona erer ve Mac yeniden normal şekilde uyuyabilir.")
+            alert.addButton(withTitle: String(localized: "Çık"))
+            alert.addButton(withTitle: String(localized: "Vazgeç"))
+            alert.showsSuppressionButton = true
+            alert.suppressionButton?.title = String(localized: "Bir daha sorma")
+            NSApp.activate(ignoringOtherApps: true)
+            let response = alert.runModal()
+            if alert.suppressionButton?.state == .on { defaults.set(false, forKey: PocketPreferenceKey.confirmQuitWhileAwake) }
+            if response != .alertFirstButtonReturn { return .terminateCancel }
+        }
         return .terminateNow
     }
+
+    func applicationWillTerminate(_ notification: Notification) {
+        PocketRelaunch.spawnIfPending()
+    }
+
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { false }
+}
+
+extension PocketApplicationState {
+    /// One per process; the app delegate reaches the model through it.
+    static let shared = PocketApplicationState()
 }
 
 @MainActor
@@ -66,7 +105,7 @@ final class PocketModel: ObservableObject {
     @Published var error: String?
     @Published var lastUpdate: Date?
     @Published var unreadableCount = 0
-    @Published var cpuHistory: [Double] = []
+    @Published private(set) var samples: [PocketSample] = []
     @Published var signalStatus: String?
     @Published var terminatingPID: Int32?
     @Published var awakeSession: AwakeSession?
@@ -74,13 +113,18 @@ final class PocketModel: ObservableObject {
     @Published var powerHistory: [PowerHistoryEntry] = []
     @Published var powerHistoryError: String?
     var mainWindowVisible = false
+    /// Set by the menu bar while a popover showing top processes is open; process sampling is
+    /// otherwise limited to the visible Task Manager.
+    var menuBarProcessesWanted = false
     var openMainWindow: (() -> Void)?
     var openSettingsWindow: (() -> Void)?
     let processMonitor = ProcessMonitor()
     let systemMonitor = SystemMonitor()
     let sleepController = SleepController()
-    private let historyStore = PowerHistoryStore()
+    private var historyDays = PowerHistoryRetention.days(from: .standard)
+    private lazy var historyStore = PowerHistoryStore(maximumEntries: PowerHistoryRetention.maximumEntries(days: historyDays))
     private var historyLoaded = false
+    private let alerts = PocketAlertNotifier()
     private var subscriptions = Set<AnyCancellable>()
     private var refreshing = false
     private var pollingTask: Task<Void, Never>?
@@ -104,18 +148,28 @@ final class PocketModel: ObservableObject {
 
     deinit { pollingTask?.cancel() }
 
-    var cpuLabel: String {
-        guard let user = system?.cpuUserPercent, let kernel = system?.cpuSystemPercent else { return "—" }
-        return String(format: "%.0f%%", user + kernel)
-    }
+    static let sampleCapacity = 150
+
+    var cpuLabel: String { system?.cpuTotalPercent.map { pocketPercent($0) } ?? "—" }
 
     private func monitoringTick() async -> Double {
+        let days = PowerHistoryRetention.days(from: .standard)
+        if days != historyDays {
+            // History length changed in Settings: reopen the log with the new bound.
+            historyDays = days
+            historyStore = PowerHistoryStore(maximumEntries: PowerHistoryRetention.maximumEntries(days: days))
+            historyLoaded = false
+        }
         if !historyLoaded {
             do { powerHistory = try await historyStore.entries(); historyLoaded = true }
             catch { powerHistoryError = error.localizedDescription; historyLoaded = true }
         }
-        awakeSession = await sleepController.status()
-        if !paused { await refresh(includeProcesses: mainWindowVisible && navigation.tool == .taskManager) }
+        // Every @Published write notifies all observers, even with an equal value; publish only changes.
+        let session = await sleepController.status()
+        if session != awakeSession { awakeSession = session }
+        if !paused {
+            await refresh(includeProcesses: (mainWindowVisible && navigation.tool == .taskManager) || menuBarProcessesWanted)
+        }
         return refreshSeconds
     }
 
@@ -129,22 +183,35 @@ final class PocketModel: ObservableObject {
             if includeProcesses {
                 let snapshot = try await processMonitor.snapshot()
                 processes = snapshot.processes
-                unreadableCount = snapshot.unreadableProcessCount
-                appPIDs = Set(NSWorkspace.shared.runningApplications.filter { $0.activationPolicy == .regular }.map(\.processIdentifier))
+                if unreadableCount != snapshot.unreadableProcessCount { unreadableCount = snapshot.unreadableProcessCount }
+                let pids = Set(NSWorkspace.shared.runningApplications.filter { $0.activationPolicy == .regular }.map(\.processIdentifier))
+                if pids != appPIDs { appPIDs = pids }
             }
             lastUpdate = system.capturedAt
+            alerts.evaluate(system)
             do {
                 if let entries = try await historyStore.record(system) { powerHistory = entries }
-                powerHistoryError = nil
+                if powerHistoryError != nil { powerHistoryError = nil }
             } catch { powerHistoryError = error.localizedDescription }
             if let user = system.cpuUserPercent, let kernel = system.cpuSystemPercent {
-                cpuHistory.append(user + kernel)
-                if cpuHistory.count > 90 { cpuHistory.removeFirst(cpuHistory.count - 90) }
+                let memory = system.usedMemoryBytes.map { Double($0) / Double(max(1, system.physicalMemoryBytes)) }
+                samples.append(PocketSample(date: system.capturedAt, cpuUser: user, cpuSystem: kernel, memoryUsedFraction: memory))
+                if samples.count > Self.sampleCapacity { samples.removeFirst(samples.count - Self.sampleCapacity) }
             }
-            error = nil
+            if error != nil { error = nil }
         } catch { self.error = error.localizedDescription }
     }
 
+    /// Deletes the stored power history (Settings → Advanced).
+    func clearPowerHistory() async {
+        do {
+            try await historyStore.clear()
+            powerHistory = []
+            powerHistoryError = nil
+        } catch { powerHistoryError = error.localizedDescription }
+    }
+
+    /// `event` is stored as-is ("Uyku"/"Uyanma" are persisted identifiers, localized when shown).
     private func recordPowerEvent(_ event: String) async {
         do {
             let snapshot = try await systemMonitor.snapshot()
@@ -152,7 +219,8 @@ final class PocketModel: ObservableObject {
         } catch { powerHistoryError = error.localizedDescription }
     }
 
-    func startAwake(duration: Double = 1800, display: Bool = false) async {
+    /// `duration` nil keeps the Mac awake until stopped.
+    func startAwake(duration: Double? = 1800, display: Bool = false) async {
         do {
             awakeSession = try await sleepController.start(durationSeconds: duration, keepDisplayAwake: display)
             awakeError = nil
@@ -173,95 +241,69 @@ final class PocketModel: ObservableObject {
         defer { terminatingPID = nil }
         do {
             try await processMonitor.terminate(entry: entry, force: force)
-            signalStatus = "PID \(entry.pid): istek gönderildi; çıkış bekleniyor."
+            signalStatus = String(localized: "PID \(entry.pid): istek gönderildi; çıkış bekleniyor.")
             for _ in 0..<8 {
                 try await Task.sleep(for: .milliseconds(250))
                 await refresh()
                 if !processes.contains(where: { $0.identity == entry.identity }) {
-                    signalStatus = "\(entry.name) · PID \(entry.pid) sonlandı."
+                    signalStatus = String(localized: "\(entry.name) · PID \(entry.pid) sonlandı.")
                     return
                 }
             }
-            signalStatus = "PID \(entry.pid) hâlâ çalışıyor. Listeyi yeniden kontrol et."
+            signalStatus = String(localized: "PID \(entry.pid) hâlâ çalışıyor. Listeyi yeniden kontrol et.")
         } catch { signalStatus = error.localizedDescription }
     }
 }
 
-func pocketBytes(_ value: UInt64) -> String {
-    ByteCountFormatter.string(fromByteCount: Int64(clamping: value), countStyle: .binary)
+/// Chart-only ring buffer: ResourceStrip and the menu bar read the same live samples as the main window.
+struct PocketSample: Identifiable, Sendable {
+    let date: Date
+    let cpuUser: Double
+    let cpuSystem: Double
+    let memoryUsedFraction: Double?
+    var id: Date { date }
+    var cpuTotal: Double { min(100, cpuUser + cpuSystem) }
 }
 
 struct ResourceStrip: View {
     @ObservedObject var model: PocketModel
     var body: some View {
-        HStack(spacing: 10) {
-            ResourceTile(title: "CPU", value: model.system?.cpuUserPercent.map { String(format: "%.1f%%", $0 + (model.system?.cpuSystemPercent ?? 0)) } ?? "—",
-                         detail: "\(model.system?.logicalCPUCount ?? 0) mantıksal çekirdek", color: PocketTheme.accent, history: model.cpuHistory)
-            ResourceTile(title: "Fiziksel RAM", value: model.system.map { pocketBytes($0.physicalMemoryBytes) } ?? "—",
-                         detail: model.system.map { "Wired \(pocketBytes($0.wiredMemoryBytes)) · Sıkıştırılmış \(pocketBytes($0.compressedMemoryBytes))" } ?? "Örnek bekleniyor", color: PocketTheme.memory)
-            ResourceTile(title: "Disk · Boş alan", value: model.system?.volumes.first.map { pocketBytes(UInt64(max(0, $0.availableBytes))) } ?? "—",
-                         detail: model.system?.volumes.first.map { "\($0.name) · \(pocketBytes(UInt64(max(0, $0.totalBytes))))" } ?? "—", color: PocketTheme.disk)
-            ResourceTile(title: "Termal durum", value: model.system?.thermalState == "nominal" ? "Normal" : (model.system?.thermalState ?? "—"),
-                         detail: model.system?.power.source ?? "Güç kaynağı bekleniyor", color: .orange)
-        }
-    }
-}
-
-struct ResourceTile: View {
-    let title: String
-    let value: String
-    let detail: String
-    let color: Color
-    var history: [Double] = []
-    var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            Text(title).font(.system(size: 11)).foregroundStyle(.secondary)
-            Text(value).font(.system(size: 23, weight: .semibold)).foregroundStyle(color).monospacedDigit()
-            Text(detail).font(.system(size: 9)).foregroundStyle(.secondary).lineLimit(2)
-            if !history.isEmpty { PocketGraph(values: history, color: color).frame(height: 18) }
-        }.padding(12).frame(maxWidth: .infinity, minHeight: 95, alignment: .topLeading)
-            .background(PocketTheme.panel).clipShape(RoundedRectangle(cornerRadius: 6))
-            .overlay { RoundedRectangle(cornerRadius: 6).stroke(PocketTheme.line) }
-    }
-}
-
-struct PocketGraph: View {
-    let values: [Double]
-    let color: Color
-    var body: some View {
-        GeometryReader { geo in
-            Path { path in
-                for (index, value) in values.enumerated() {
-                    let point = CGPoint(x: geo.size.width * Double(index) / Double(max(1, values.count - 1)),
-                                        y: geo.size.height * (1 - min(100, max(0, value)) / 100))
-                    if index == 0 { path.move(to: point) } else { path.addLine(to: point) }
-                }
-            }.stroke(color, lineWidth: 1.5)
-        }
-    }
-}
-
-struct PerformanceView: View {
-    @ObservedObject var model: PocketModel
-    var body: some View {
-        VStack(alignment: .leading, spacing: 18) {
-            Text("Performans").font(.system(size: 23, weight: .semibold))
-            ResourceStrip(model: model)
-            Text("CPU · Toplam kullanım").font(.headline)
-            PocketGraph(values: model.cpuHistory, color: PocketTheme.accent)
-                .frame(height: 230).padding(16).background(PocketTheme.panel)
-            if let s = model.system {
-                Grid(alignment: .leading, horizontalSpacing: 35, verticalSpacing: 12) {
-                    GridRow { Text("Kullanıcı / Sistem"); Text(String(format: "%.1f%% / %.1f%%", s.cpuUserPercent ?? 0, s.cpuSystemPercent ?? 0)) }
-                    GridRow { Text("Ham boş RAM"); Text(pocketBytes(s.freeMemoryBytes)) }
-                    GridRow { Text("Wired RAM"); Text(pocketBytes(s.wiredMemoryBytes)) }
-                    GridRow { Text("Sıkıştırıcı fiziksel alanı"); Text(pocketBytes(s.compressedMemoryBytes)) }
-                    GridRow { Text("Çalışma süresi"); Text(String(format: "%.1f gün", s.uptimeSeconds / 86400)) }
-                }.font(.system(size: 12)).monospacedDigit()
+        let system = model.system
+        let volume = system?.volumes.first
+        let usedMemory = system?.usedMemoryBytes
+        ViewThatFits(in: .horizontal) {
+            HStack(spacing: PocketSpacing.m) { tiles(system, volume, usedMemory) }
+            Grid(horizontalSpacing: PocketSpacing.m, verticalSpacing: PocketSpacing.m) {
+                let views = Array(0..<4)
+                GridRow { tile(views[0], system, volume, usedMemory); tile(views[1], system, volume, usedMemory) }
+                GridRow { tile(views[2], system, volume, usedMemory); tile(views[3], system, volume, usedMemory) }
             }
-            Text("Ham boş RAM, Activity Monitor’daki kullanılabilir bellek değildir. Grafik yalnız bu oturumda toplanan örnekleri gösterir.")
-                .font(.caption).foregroundStyle(.secondary)
-            Spacer()
-        }.padding(22)
+        }
+    }
+
+    @ViewBuilder private func tiles(_ system: SystemSnapshot?, _ volume: VolumeSnapshot?, _ usedMemory: UInt64?) -> some View {
+        ForEach(0..<4, id: \.self) { tile($0, system, volume, usedMemory) }
+    }
+
+    @ViewBuilder private func tile(_ index: Int, _ system: SystemSnapshot?, _ volume: VolumeSnapshot?, _ usedMemory: UInt64?) -> some View {
+        switch index {
+        case 0:
+            PocketMetricTile(title: "CPU", value: "\(system?.cpuTotalPercent.map { pocketPercent($0, decimals: true) } ?? "—")",
+                             detail: system.map { "\($0.logicalCPUCount) mantıksal çekirdek" } ?? "Örnek bekleniyor",
+                             icon: "cpu", color: PocketTheme.accent, history: model.samples.map(\.cpuTotal))
+        case 1:
+            PocketMetricTile(title: "Bellek", value: "\(usedMemory.map(pocketBytes) ?? "—")",
+                             detail: system.map { "\(pocketBytes($0.physicalMemoryBytes)) fiziksel · Sıkıştırılmış \(pocketBytes($0.compressedMemoryBytes))" } ?? "Örnek bekleniyor",
+                             icon: "memorychip", color: PocketTheme.memory,
+                             history: model.samples.compactMap(\.memoryUsedFraction).map { $0 * 100 })
+        case 2:
+            PocketMetricTile(title: "Disk · Boş", value: "\(volume.map { pocketBytes($0.availableBytes) } ?? "—")",
+                             detail: volume.map { "\($0.name) · \(pocketBytes($0.totalBytes)) toplam" } ?? "—",
+                             icon: "internaldrive", color: PocketTheme.disk)
+        default:
+            PocketMetricTile(title: "Termal durum", value: "\(pocketThermalTitle(system?.thermalState))",
+                             detail: "Güç: \(pocketPowerSourceTitle(system?.power.source))",
+                             icon: "thermometer.medium", color: pocketThermalTone(system?.thermalState).color)
+        }
     }
 }

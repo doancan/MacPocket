@@ -1,23 +1,25 @@
 import AppKit
 import SwiftUI
 
+/// Raw values are stable identifiers (stored as the launch page); show `localizedTitle` instead.
 enum PocketPage: String, CaseIterable, Identifiable, Hashable {
     case overview = "Genel Bakış", performance = "Sistem İzleme", power = "Güç Merkezi"
-    case cleanup = "Temizlik", storage = "Disk Analizi", applications = "Uygulamalar", tools = "Tools"
+    case cleanup = "Temizlik", storage = "Disk Analizi", applications = "Uygulamalar", tools = "Araçlar"
     var id: String { rawValue }
     var icon: String {
         switch self {
-        case .overview: "square.grid.2x2"
+        case .overview: "square.grid.2x2.fill"
         case .performance: "waveform.path.ecg"
-        case .power: "battery.100percent.bolt"
+        case .power: "bolt.fill"
         case .cleanup: "sparkles"
-        case .storage: "internaldrive"
-        case .applications: "app.badge"
-        case .tools: "wrench.and.screwdriver"
+        case .storage: "internaldrive.fill"
+        case .applications: "app.badge.fill"
+        case .tools: "wrench.and.screwdriver.fill"
         }
     }
 }
 
+/// Raw values are stable identifiers; show `localizedTitle` instead.
 enum PocketTool: String, Identifiable {
     case similarImages = "Benzer Görseller", screenCleaning = "Ekran Temizleme"
     case utilities = "macOS Araçları", leftovers = "Uygulama Kalıntıları"
@@ -28,9 +30,10 @@ enum PocketTool: String, Identifiable {
 /// Navigation changes are independent of the live monitoring publisher.
 @MainActor
 final class PocketNavigation: ObservableObject {
-    @Published private(set) var page = PocketPage.overview
+    /// Starts on the page chosen in Settings → General.
+    @Published private(set) var page = PocketPage.launchPage
     @Published var tool: PocketTool?
-    var title: String { page == .tools ? tool?.rawValue ?? page.rawValue : page.rawValue }
+    var title: String { page == .tools ? tool?.localizedTitle ?? page.localizedTitle : page.localizedTitle }
     func select(_ page: PocketPage) {
         guard self.page != page || tool != nil else { return }
         tool = nil

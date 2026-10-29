@@ -100,7 +100,7 @@ final class ScreenCleaningController: ObservableObject {
             return blocked ? nil : event
         }
         guard inputMonitor != nil else {
-            failure = "Yerel giriş koruması başlatılamadı. Ekran temizleme modu kapatıldı."
+            failure = String(localized: "Yerel giriş koruması başlatılamadı. Ekran temizleme modu kapatıldı.")
             stop(); return
         }
     }
@@ -122,7 +122,7 @@ private struct CleaningOverlayView: View {
                 Text("\(controller.remaining) saniye sonra kapanır").monospacedDigit()
                 Text("Esc ile çık · Fareyi 2 saniye basılı tutarak çık")
                 Text("Sistem kısayolları kullanılabilir; başka uygulamaya geçmek bu modu kapatır.")
-                    .font(.caption)
+                    .font(.subheadline)
             }.font(.callout).foregroundStyle(.white.opacity(0.72)).padding(48)
         }.frame(maxWidth: .infinity, maxHeight: .infinity).background(.black).ignoresSafeArea()
     }

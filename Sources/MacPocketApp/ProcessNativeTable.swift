@@ -17,11 +17,11 @@ struct ProcessNativeTable: NSViewRepresentable {
         let table = NSTableView()
         table.delegate = context.coordinator
         table.dataSource = context.coordinator
-        table.rowHeight = 29
+        table.style = .inset
+        table.rowHeight = 24
+        table.intercellSpacing = NSSize(width: 6, height: 0)
         table.usesAlternatingRowBackgroundColors = true
-        table.backgroundColor = NSColor.textBackgroundColor
-        table.gridColor = NSColor.separatorColor
-        table.gridStyleMask = .solidVerticalGridLineMask
+        table.setAccessibilityLabel(String(localized: "Süreç listesi"))
         table.allowsColumnReordering = true
         table.allowsMultipleSelection = false
         table.columnAutoresizingStyle = .lastColumnOnlyAutoresizingStyle
@@ -38,15 +38,21 @@ struct ProcessNativeTable: NSViewRepresentable {
     func updateNSView(_ scroll: NSScrollView, context: Context) {
         guard let table = scroll.documentView as? NSTableView else { return }
         let coordinator = context.coordinator
-        let entriesChanged = coordinator.parent.entries != entries
+        let previous = coordinator.parent.entries
+        let entriesChanged = previous != entries
+        // Same processes in the same order (the common case between samples): refresh only the
+        // visible rows instead of reloading and re-laying out the whole table.
+        let sameRows = entriesChanged && previous.count == entries.count
+            && zip(previous, entries).allSatisfy { $0.identity == $1.identity }
         coordinator.parent = self
         coordinator.updating = true
         defer { coordinator.updating = false }
         let columns: [(String, String, CGFloat)] = [
-            ("name", "Süreç", 190), ("pid", "PID", 58),
-        ] + (showUser ? [("user", "Kullanıcı", 90)] : []) + [
-            ("state", "Durum", 85), ("cpu", "CPU %", 75), ("memory", "Bellek · RSS", 100),
-        ] + (showThreads ? [("threads", "İş parç.", 60)] : [])
+            ("name", String(localized: "Süreç"), 190), ("pid", "PID", 58),
+        ] + (showUser ? [("user", String(localized: "Kullanıcı"), 90)] : []) + [
+            ("state", String(localized: "Durum"), 85), ("cpu", String(localized: "CPU %"), 75),
+            ("memory", String(localized: "Bellek · RSS"), 100),
+        ] + (showThreads ? [("threads", String(localized: "İş parç."), 60)] : [])
         let columnsChanged = Set(table.tableColumns.map { $0.identifier.rawValue }) != Set(columns.map { $0.0 })
         if columnsChanged {
             for column in table.tableColumns { table.removeTableColumn(column) }
@@ -55,13 +61,23 @@ struct ProcessNativeTable: NSViewRepresentable {
                 column.title = title
                 column.width = width
                 column.minWidth = key == "name" ? 120 : 45
+                column.headerToolTip = key == "cpu" ? String(localized: "Tek mantıksal çekirdeğe göre")
+                    : key == "memory" ? String(localized: "Yerleşik bellek (RSS)") : nil
                 if key != "threads" {
                     column.sortDescriptorPrototype = NSSortDescriptor(key: key, ascending: key == "name")
                 }
                 table.addTableColumn(column)
             }
         }
-        if entriesChanged || columnsChanged { table.reloadData() }
+        if columnsChanged || (entriesChanged && !sameRows) {
+            table.reloadData()
+        } else if sameRows {
+            let visible = table.rows(in: table.visibleRect)
+            if visible.length > 0 {
+                table.reloadData(forRowIndexes: IndexSet(integersIn: visible.location..<NSMaxRange(visible)),
+                                 columnIndexes: IndexSet(integersIn: 0..<table.numberOfColumns))
+            }
+        }
         if let selection, let row = entries.firstIndex(where: { $0.pid == selection }) {
             if table.selectedRow != row { table.selectRowIndexes(IndexSet(integer: row), byExtendingSelection: false) }
         } else if table.selectedRow != -1 { table.deselectAll(nil) }
@@ -77,20 +93,20 @@ struct ProcessNativeTable: NSViewRepresentable {
             guard parent.entries.indices.contains(row), let key = tableColumn?.identifier.rawValue else { return nil }
             let entry = parent.entries[row]
             let id = NSUserInterfaceItemIdentifier("cell-" + key)
-            let label = (tableView.makeView(withIdentifier: id, owner: nil) as? NSTextField) ?? NSTextField(labelWithString: "")
-            label.identifier = id
-            label.font = key == "pid" || key == "threads" ? .monospacedSystemFont(ofSize: 10, weight: .regular) : .systemFont(ofSize: 11)
-            label.lineBreakMode = .byTruncatingTail
+            let cell = (tableView.makeView(withIdentifier: id, owner: nil) as? NSTableCellView) ?? Self.makeCell(id)
+            guard let label = cell.textField else { return cell }
+            let numeric = ["pid", "cpu", "memory", "threads"].contains(key)
+            label.font = numeric ? Self.numberFont : Self.textFont
+            label.alignment = numeric ? .right : .left
             label.textColor = .secondaryLabelColor
             label.drawsBackground = false
-            label.alignment = ["pid", "cpu", "memory", "threads"].contains(key) ? .right : .left
             switch key {
             case "name": label.stringValue = entry.name; label.textColor = .labelColor
             case "pid": label.stringValue = String(entry.pid)
             case "user": label.stringValue = entry.user
-            case "state": label.stringValue = entry.canTerminate ? entry.state : "Korunuyor"
+            case "state": label.stringValue = entry.canTerminate ? pocketProcessStateTitle(entry.state) : String(localized: "Korunuyor")
             case "cpu":
-                label.stringValue = entry.cpuSampleAvailable ? String(format: "%.1f%%", entry.cpuPercent) : "—"
+                label.stringValue = entry.cpuSampleAvailable ? pocketPercent(entry.cpuPercent, decimals: true) : "—"
                 if entry.cpuSampleAvailable && entry.cpuPercent > 1 {
                     label.backgroundColor = NSColor.systemBlue.withAlphaComponent(0.15); label.drawsBackground = true
                 }
@@ -102,7 +118,29 @@ struct ProcessNativeTable: NSViewRepresentable {
             case "threads": label.stringValue = entry.threadCount.map { String($0) } ?? "—"
             default: label.stringValue = "—"
             }
-            return label
+            return cell
+        }
+
+        private static let textFont = NSFont.systemFont(ofSize: NSFont.systemFontSize)
+        private static let numberFont = NSFont.monospacedDigitSystemFont(ofSize: NSFont.systemFontSize, weight: .regular)
+
+        /// Cell view with a vertically centered, truncating label.
+        private static func makeCell(_ id: NSUserInterfaceItemIdentifier) -> NSTableCellView {
+            let cell = NSTableCellView()
+            cell.identifier = id
+            let label = NSTextField(labelWithString: "")
+            label.lineBreakMode = .byTruncatingTail
+            label.cell?.truncatesLastVisibleLine = true
+            label.translatesAutoresizingMaskIntoConstraints = false
+            label.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
+            cell.addSubview(label)
+            cell.textField = label
+            NSLayoutConstraint.activate([
+                label.leadingAnchor.constraint(equalTo: cell.leadingAnchor, constant: 2),
+                label.trailingAnchor.constraint(equalTo: cell.trailingAnchor, constant: -2),
+                label.centerYAnchor.constraint(equalTo: cell.centerYAnchor),
+            ])
+            return cell
         }
         func tableViewSelectionDidChange(_ notification: Notification) {
             guard !updating, let table = notification.object as? NSTableView else { return }

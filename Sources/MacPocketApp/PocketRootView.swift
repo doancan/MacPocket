@@ -10,6 +10,11 @@ struct PocketRootView: View {
     @State private var columnVisibility = NavigationSplitViewVisibility.all
     @Environment(\.openWindow) private var openWindow
     @Environment(\.openSettings) private var openSettings
+    @Environment(\.dismissWindow) private var dismissWindow
+    @PocketReduceMotion private var reduceMotion
+    @AppStorage(PocketPreferenceKey.sidebarIcons) private var sidebarIcons = PocketSidebarIconStyle.colorful
+
+    private var destinationKey: String { navigation.page.rawValue + "/" + (navigation.tool?.rawValue ?? "") }
 
     init(model: PocketModel) {
         self.model = model
@@ -31,25 +36,33 @@ struct PocketRootView: View {
                         sidebarRow(.cleanup)
                         sidebarRow(.storage)
                         sidebarRow(.applications)
+                        sidebarRow(.tools)
                     }
-                    Section("Araçlar") { sidebarRow(.tools) }
                 }
                 .listStyle(.sidebar)
+                .safeAreaInset(edge: .top, spacing: 0) { PocketSidebarBrand() }
                 .navigationTitle("MacPocket")
-                .navigationSplitViewColumnWidth(220)
-                .safeAreaInset(edge: .bottom) { PocketSidebarStatus(model: model).padding(12) }
+                .navigationSplitViewColumnWidth(min: 200, ideal: 220, max: 280)
+                .safeAreaInset(edge: .bottom) { PocketSidebarSettingsButton().padding(.horizontal, 10).padding(.bottom, 10) }
             } detail: {
                 destination
+                    // A short crossfade on page/tool changes only; nothing animates while a page is idle.
+                    .id(destinationKey)
+                    .transition(.opacity.combined(with: .offset(y: 6)))
+                    .animation(reduceMotion ? nil : .easeOut(duration: 0.2), value: destinationKey)
                     .frame(minWidth: 0, maxWidth: .infinity, minHeight: 0, maxHeight: .infinity, alignment: .topLeading)
                     .clipped()
-                    .background(PocketTheme.background)
+                    .background(PocketBackdrop(tint: navigation.page.tint))
+                    .environment(\.pocketTint, navigation.page.tint)
                     .navigationTitle(navigation.title)
-                    .navigationSubtitle("MacPocket")
+                    // The page heading already names the page; the toolbar keeps only its buttons and the
+                    // backdrop flows under it, so there is no separator line to misalign with the sidebar.
+                    .modifier(PocketToolbarChrome())
                     .toolbar(id: "MacPocket.main") {
                         ToolbarItem(id: "back", placement: .navigation) {
                             if navigation.tool != nil {
-                                Button { navigation.select(.tools) } label: { Label("Tools’a Dön", systemImage: "chevron.left") }
-                                    .help("Tools’a dön (⌘[)")
+                                Button { navigation.select(.tools) } label: { Label("Araçlara Dön", systemImage: "chevron.left") }
+                                    .help("Araçlara dön (⌘[)")
                             }
                         }
                         ToolbarItem(id: "refresh", placement: .primaryAction) { PocketRefreshButton(model: model) }
@@ -62,19 +75,34 @@ struct PocketRootView: View {
             }
             .frame(width: bounds.size.width, height: bounds.size.height)
         }
-        .frame(minWidth: 1100, minHeight: 740)
+        .frame(minWidth: 960, minHeight: 620)
         .onAppear {
             let windowAction = openWindow, settingsAction = openSettings
             model.openMainWindow = { showPocketWindow(windowAction) }
             model.openSettingsWindow = { settingsAction(); NSApp.activate(ignoringOtherApps: true) }
             model.mainWindowVisible = true
+            if !PocketLaunch.handledFirstWindow {
+                PocketLaunch.handledFirstWindow = true
+                // "Show main window at launch" off: SwiftUI always creates the window, so close it right away.
+                // The open action captured above keeps working for the menu bar and the Dock icon.
+                if !PocketLaunch.showsWindow { dismissWindow(id: "main"); return }
+            }
             Task { await model.refresh() }
         }
         .onDisappear { model.mainWindowVisible = false }
     }
 
     private func sidebarRow(_ page: PocketPage) -> some View {
-        Label(page.rawValue, systemImage: page.icon).tag(page).padding(.vertical, 4)
+        HStack(spacing: 10) {
+            switch sidebarIcons {
+            case .colorful: PocketIconTile(symbol: page.icon, tint: page.tint, size: 24)
+            case .monochrome:
+                Image(systemName: page.icon).font(.system(size: 14, weight: .medium))
+                    .foregroundStyle(.secondary).frame(width: 24, height: 24).accessibilityHidden(true)
+            }
+            Text(page.localizedTitle).font(.body)
+        }
+        .tag(page).padding(.vertical, 4)
             .contentShape(Rectangle())
             .simultaneousGesture(TapGesture().onEnded { navigation.select(page) })
     }
@@ -84,8 +112,8 @@ struct PocketRootView: View {
         case .overview: OverviewView(model: model, files: model.cleanup, applications: model.applications, navigation: navigation)
         case .performance: PerformanceView(model: model)
         case .power: PowerManagementView(model: model)
-        case .cleanup: FileWorkspaceView(model: model.cleanup, cleanup: true)
-        case .storage: FileWorkspaceView(model: model.storage)
+        case .cleanup: CleanupView(model: model.cleanup.junk)
+        case .storage: StorageView(model: model.storage)
         case .applications: ApplicationsView(model: model.applications)
         case .tools:
             switch navigation.tool {
@@ -96,7 +124,7 @@ struct PocketRootView: View {
             case .taskManager: TaskManagerView(model: model)
             case .diagnostics: SystemToolsView()
             case .windowSwitcher: WindowSwitcherView()
-            case .none: ToolsHubView(sleepController: model.sleepController, openTool: openCatalogTool)
+            case .none: ToolsHubView(model: model, openTool: openCatalogTool)
             }
         }
     }
@@ -118,34 +146,59 @@ struct PocketRootView: View {
         case "security": utility = .systemIntegrity; navigation.open(.utilities)
         case "permissions": NSWorkspace.shared.open(URL(fileURLWithPath: "/System/Applications/System Settings.app"))
         case "task-manager": navigation.open(.taskManager)
-        case "system-reports", "maintenance": navigation.open(.diagnostics)
+        case "system-reports": navigation.open(.diagnostics)
         case "window-switcher": navigation.open(.windowSwitcher)
         case "uninstaller": model.applications.showUpdates = false; navigation.select(.applications)
         case "app-updater": model.applications.showUpdates = true; navigation.select(.applications)
         case "downloads": model.storage.useRoot(home.appendingPathComponent("Downloads")); navigation.select(.storage)
         case "duplicates": model.storage.scope = .duplicates; navigation.select(.storage)
         case "large-old": model.storage.scope = .old; navigation.select(.storage)
-        case "system-junk": model.cleanup.useRoot(home.appendingPathComponent("Library/Caches"), scope: .folders); navigation.select(.cleanup)
-        case "trash": model.storage.useRoot(home.appendingPathComponent(".Trash"), scope: .folders); navigation.select(.storage)
+        case "system-junk": navigation.select(.cleanup)
+        case "trash": navigation.select(.cleanup)
         case "login-items", "background-items": SMAppService.openSystemSettingsLoginItems()
         default: break
         }
     }
 }
 
-private struct PocketSidebarStatus: View {
-    @ObservedObject var model: PocketModel
+private struct PocketSidebarBrand: View {
     var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            Label(model.paused ? "İzleme duraklatıldı" : "Canlı sistem verisi", systemImage: model.paused ? "pause.circle" : "waveform.path.ecg")
-                .font(.system(size: 11, weight: .medium)).foregroundStyle(model.paused ? Color.orange : PocketTheme.disk)
-            if let date = model.lastUpdate {
-                Text("Son ölçüm \(date.formatted(date: .omitted, time: .standard))")
-                    .font(.system(size: 10)).foregroundStyle(.secondary).monospacedDigit()
+        HStack(spacing: PocketSpacing.s) {
+            Image(nsImage: NSApp.applicationIconImage).resizable().interpolation(.high)
+                .frame(width: 30, height: 30)
+                .accessibilityHidden(true)
+            VStack(alignment: .leading, spacing: 0) {
+                Text("MacPocket").font(.headline)
+                Text("Bakım ve izleme").font(.subheadline).foregroundStyle(.secondary)
             }
+            Spacer(minLength: 0)
         }
-        .frame(maxWidth: .infinity, minHeight: 42, maxHeight: 42, alignment: .leading)
-        .padding(12).pocketGlass()
+        .padding(.horizontal, PocketSpacing.l)
+        .padding(.top, PocketSpacing.xs)
+        .padding(.bottom, PocketSpacing.s)
+        .accessibilityElement(children: .combine)
+    }
+}
+
+/// Bottom of the sidebar: Settings, styled like a sidebar row.
+private struct PocketSidebarSettingsButton: View {
+    @State private var hovering = false
+
+    var body: some View {
+        SettingsLink {
+            HStack(spacing: PocketSpacing.s) {
+                PocketIconTile(symbol: "gearshape.fill", tint: Color(hex: 0x8E8E93), size: 22)
+                Text("Ayarlar")
+                Spacer(minLength: 0)
+                Text("⌘,").font(.subheadline).foregroundStyle(.tertiary)
+            }
+            .padding(.horizontal, 8).padding(.vertical, 7)
+            .contentShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+            .background(hovering ? Color.primary.opacity(0.07) : .clear, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+        }
+        .buttonStyle(.plain)
+        .onHover { hovering = $0 }
+        .help("MacPocket ayarlarını aç (⌘,)")
     }
 }
 
@@ -197,13 +250,13 @@ struct PocketCommands: Commands {
                 .keyboardShortcut("m", modifiers: [.command, .shift]).disabled(!showMenuBar)
             Divider()
             ForEach(Array(PocketPage.allCases.enumerated()), id: \.element.id) { index, page in
-                Button(page.rawValue) { navigation.select(page); showPocketWindow(openWindow) }
+                Button(page.localizedTitle) { navigation.select(page); showPocketWindow(openWindow) }
                     .keyboardShortcut(KeyEquivalent(Character(String(index + 1))), modifiers: .command)
             }
             Divider()
             Button("Görev Yöneticisi") { navigation.open(.taskManager); showPocketWindow(openWindow) }
                 .keyboardShortcut("t", modifiers: [.command, .shift])
-            Button("Tools’a Dön") { navigation.select(.tools) }.keyboardShortcut("[", modifiers: .command).disabled(navigation.tool == nil)
+            Button("Araçlara Dön") { navigation.select(.tools) }.keyboardShortcut("[", modifiers: .command).disabled(navigation.tool == nil)
         }
         CommandMenu("İzleme") {
             Button("Şimdi Yenile") { Task { await model.refresh() } }.keyboardShortcut("r", modifiers: .command)
@@ -216,6 +269,18 @@ struct PocketCommands: Commands {
             }
             Divider()
             Toggle("Menü Çubuğunda Göster", isOn: $showMenuBar)
+        }
+    }
+}
+
+private struct PocketToolbarChrome: ViewModifier {
+    func body(content: Content) -> some View {
+        if #available(macOS 15.0, *) {
+            content
+                .toolbar(removing: .title)
+                .toolbarBackgroundVisibility(.hidden, for: .windowToolbar)
+        } else {
+            content.toolbarBackground(.hidden, for: .windowToolbar)
         }
     }
 }

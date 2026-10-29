@@ -51,6 +51,59 @@ oluşturulmadı. AI Dosyaları katalogdan ve ürün kapsamından çıkarıldı.
 - Ekran temizleme native paneli açıldı ve Escape ile kapandı. Ayrı 15 saniyelik
   seans, 3 saniyelik geri sayımın ardından süre sonunda kendiliğinden kapandı.
 
+## Üretim sağlamlaştırması ve arayüz yenilemesi — 29 Ekim 2026
+
+Sürüm numarası değiştirilmedi.
+
+Core düzeltmeleri (her biri regresyon testiyle, `CoreHardeningTests`):
+- Paket içi dosyalar (.app, .photoslibrary…) toplamlara sayılır ama tek tek
+  listelenmez; `FileTrashRequest.validate` paket içindeki öğeyi reddeder.
+- Kopya karşılaştırması okunamayan/değişen dosyada durmaz; iCloud yer tutucuları
+  indirilmez; ilerleme her dosyada ilerler.
+- Komut çalıştırıcı: stdout/stderr ayrımı (brew JSON), uzun brew işleminin çıktı
+  sınırında öldürülmemesi, iptalde önce SIGINT sonra SIGKILL, pipe’ı tutan yetim
+  alt süreçte süreli bekleme (askıda kalma giderildi).
+- Oturum için kritik süreçler (loginwindow, WindowServer, OS daemon’ları)
+  sonlandırılamaz; SIGTERM’i yok sayan süreç için “Zorla Sonlandır” çalışır.
+- Kalıntılar: büyük/küçük harf duyarsız ve `App-Helper` eşleşmesi; aynı üreticinin
+  kurulu uygulaması varsa aday “Üretici uygulaması kurulu” diye işaretlenir; boş
+  envanterde liste oluşturulmaz.
+- Güç geçmişi JSON Lines’a geçti (dakikada ~4 MB yeniden yazım yerine tek satır);
+  eski biçim otomatik taşınır, bozuk dosya `.corrupt` olarak saklanıp kayıt sürer.
+- Bellek: Activity Monitor uyumlu “Kullanılan Bellek” (uygulama + wired +
+  sıkıştırılmış) ve swap; açık kalma süresi uykuyu içerir; boş alan Finder ile
+  aynı (“important usage”). Başlıksız pencere önizlemesi eşleşir.
+
+Arayüz:
+- Ortak tasarım sistemi `PocketDesign.swift`: boşluk/köşe token’ları, kart,
+  başlık, mesaj, rozet, metrik kutucuğu, halka gösterge, ikon önbelleği,
+  Türkçe biçimlendiriciler. Sabit 9–11 pt fontlar semantik stillere çevrildi.
+- Genel Bakış (canlı halkalar), Sistem İzleme (Swift Charts CPU ve bellek
+  bileşimi), Güç Merkezi, menü çubuğu, Görev Yöneticisi, Araçlar, dosya ve
+  uygulama ekranları yeniden düzenlendi; her ekranda yükleniyor/hata/boş durumu.
+- Araçlar’da çalışmayan beş kart ve yinelenen “Bakım Görevleri” kaldırıldı;
+  uyanık tutma tek kaynaktan (`PocketModel`) yönetilir. “Tools” → “Araçlar”.
+- Görünüm varsayılanı sistem teması; minimum pencere 960 × 620.
+- Paketleme: hardened runtime, isteğe bağlı `MACPOCKET_SIGN_IDENTITY` ve
+  `MACPOCKET_NOTARY_PROFILE` ile Developer ID imzası ve notarization.
+
+Doğrulama: 76 XCTest geçti. Uygulama Mac Studio’da çalıştırıldı; Genel Bakış,
+Sistem İzleme, Güç, Araçlar, Görev Yöneticisi, Uygulamalar ve Temizlik ekranları
+görsel olarak kontrol edildi. Silme/sonlandırma akışları canlı uygulanmadı.
+
+## Çok dilli arayüz ve genişletilmiş ayarlar — 29 Ekim 2026
+
+- Türkçe kaynak dil olarak kaldı; İngilizce eklendi (`Resources/tr.lproj`, `Resources/en.lproj`,
+  `CFBundleLocalizations`). `scripts/build-app.sh` her `Resources/*.lproj` klasörünü pakete kopyalar.
+- Ayarlar → Genel → “Dil / Language”: Sistem, Türkçe, English. Seçim uygulama alanındaki
+  `AppleLanguages` değerine yazılır (Sistem’de silinir); “Yeniden Başlat / Relaunch” uygulamayı
+  `/usr/bin/open -n` ile yeniden açar. Biçimlendiriciler (`pocketLocale`) çalışan dili izler.
+- `scripts/check-localizations.sh`, derleyicinin çıkardığı anahtarları İngilizce tabloyla karşılaştırır.
+- Yeni ayarlar: Dock’ta göster, açılış sayfası, ana pencereyi açılışta göster, uyanık tutarken çıkış onayı,
+  vurgu rengi, kenar çubuğu simgeleri, kart yoğunluğu, hareketleri azalt, güç geçmişi süresi,
+  disk/termal/bellek bildirimleri (saatte en çok bir), Gelişmiş sekmesinde ayarları JSON olarak
+  dışa/içe aktarma, tüm ayarları sıfırlama ve güç geçmişini temizleme.
+
 ## Devam eden kabul ve eksikler
 
 MacPocket için Erişilebilirlik ve Ekran Kaydı izinleri kullanıcıdan istendi;

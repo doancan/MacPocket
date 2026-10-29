@@ -38,9 +38,9 @@ public enum SimilarImagesError: Error, LocalizedError {
     case imageTooLarge, unreadableImage, missingFeature
     public var errorDescription: String? {
         switch self {
-        case .imageTooLarge: "Görsel 64 MiB veya 100 megapiksel sınırını aşıyor."
-        case .unreadableImage: "Görsel veya ilk karesi okunamadı."
-        case .missingFeature: "Vision bu görsel için karşılaştırma verisi üretemedi."
+        case .imageTooLarge: String(localized: "Görsel 64 MiB veya 100 megapiksel sınırını aşıyor.")
+        case .unreadableImage: String(localized: "Görsel veya ilk karesi okunamadı.")
+        case .missingFeature: String(localized: "Vision bu görsel için karşılaştırma verisi üretemedi.")
         }
     }
 }
@@ -75,7 +75,7 @@ public actor SimilarImagesService {
         scanOptions.maximumDuration = min(20, seconds / 3)
         scanOptions.maximumEntries = 100_000
         scanOptions.includeHidden = false
-        await progress(.init(message: "Desteklenen görseller bulunuyor…"))
+        await progress(.init(message: String(localized: "Desteklenen görseller bulunuyor…")))
         let files = try await FileScanner().scan(root, options: scanOptions)
         let work = SimilarVisionWork()
         return try await withTaskCancellationHandler {
@@ -92,7 +92,7 @@ public actor SimilarImagesService {
         for file in scan.files {
             try Task.checkCancellation()
             if Date() >= deadline { partial = true; break }
-            await progress(.init(message: "\(observations.count + skipped + 1) / \(scan.files.count) görsel analiz ediliyor…"))
+            await progress(.init(message: String(localized: "\(observations.count + skipped + 1) / \(scan.files.count) görsel analiz ediliyor…")))
             do {
                 let feature = try autoreleasepool { try featurePrint(file, work: work) }
                 observations.append((file, feature))
@@ -123,11 +123,11 @@ public actor SimilarImagesService {
                     }
                 } catch {
                     partial = true
-                    if issues.count < 12 { issues.append("Bir görsel çifti karşılaştırılamadı: \(error.localizedDescription)") }
+                    if issues.count < 12 { issues.append(String(localized: "Bir görsel çifti karşılaştırılamadı: \(error.localizedDescription)")) }
                 }
                 comparisons += 1
                 if comparisons.isMultiple(of: 128) {
-                    await progress(.init(message: "\(comparisons.formatted()) çift karşılaştırıldı · \(matchCount) aday"))
+                    await progress(.init(message: String(localized: "\(comparisons) çift karşılaştırıldı · \(matchCount) aday")))
                     await Task.yield()
                 }
             }

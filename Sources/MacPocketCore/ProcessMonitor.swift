@@ -52,21 +52,21 @@ public enum ProcessMonitorError: Error, LocalizedError, Equatable, Sendable {
     public var errorDescription: String? {
         switch self {
         case .enumerationFailed(let code):
-            return "Süreç listesi okunamadı (\(code))."
+            return String(localized: "Süreç listesi okunamadı (\(code)).")
         case .protectedProcess(let pid):
-            return "Korunan süreç sonlandırılamaz (PID \(pid))."
+            return String(localized: "Korunan süreç sonlandırılamaz (PID \(pid)).")
         case .processNotObserved(let pid):
-            return "Süreç bu izleyicide seçilmeden sonlandırılamaz (PID \(pid))."
+            return String(localized: "Süreç bu izleyicide seçilmeden sonlandırılamaz (PID \(pid)).")
         case .differentUser(let pid):
-            return "Başka kullanıcıya ait süreç sonlandırılamaz (PID \(pid))."
+            return String(localized: "Başka kullanıcıya ait süreç sonlandırılamaz (PID \(pid)).")
         case .identityChanged(let pid):
-            return "Süreç kimliği değişti; listeyi yenileyip yeniden seçin (PID \(pid))."
+            return String(localized: "Süreç kimliği değişti; listeyi yenileyip yeniden seçin (PID \(pid)).")
         case .identityUnavailable(let pid):
-            return "Süreç kimliği doğrulanamadı (PID \(pid))."
+            return String(localized: "Süreç kimliği doğrulanamadı (PID \(pid)).")
         case .notRunning(let pid):
-            return "Süreç artık çalışmıyor (PID \(pid))."
+            return String(localized: "Süreç artık çalışmıyor (PID \(pid)).")
         case .signalFailed(let pid, let code):
-            return "Sonlandırma isteği gönderilemedi (PID \(pid), hata \(code))."
+            return String(localized: "Sonlandırma isteği gönderilemedi (PID \(pid), hata \(code)).")
         }
     }
 }
@@ -149,6 +149,7 @@ public actor ProcessMonitor {
                 && (bsd.pbi_flags & UInt32(PROC_FLAG_SYSTEM)) == 0
                 && bsd.pbi_status != UInt32(SZOMB)
                 && !executable.isEmpty
+                && !Self.isSessionCritical(executable)
             entries.append(ProcessEntry(
                 pid: pid, name: name, user: userName(uid: bsd.pbi_uid),
                 state: Self.stateName(bsd.pbi_status),
@@ -209,14 +210,33 @@ public actor ProcessMonitor {
         guard !executable.isEmpty else {
             throw ProcessMonitorError.identityUnavailable(pid)
         }
+        guard !Self.isSessionCritical(executable) else {
+            throw ProcessMonitorError.protectedProcess(pid)
+        }
         guard Self.identity(pid: pid, info: current, executablePath: executable) == entry.identity else {
             throw ProcessMonitorError.identityChanged(pid)
         }
         guard kill(pid, force ? SIGKILL : SIGTERM) == 0 else {
             throw ProcessMonitorError.signalFailed(pid: pid, code: errno)
         }
-        observed.removeValue(forKey: pid)
-        previousCPU.removeValue(forKey: pid)
+        // A process may ignore SIGTERM; keep it observed so "force" stays possible until the
+        // next snapshot shows it gone. SIGKILL cannot be ignored.
+        if force {
+            observed.removeValue(forKey: pid)
+            previousCPU.removeValue(forKey: pid)
+        }
+    }
+
+    /// User-owned processes whose termination logs the user out or breaks the session.
+    /// OS daemons and agents are never a cleanup target. Apps in /System/Applications (Mail, Music…)
+    /// and relaunching shells like Finder/Dock stay terminable, as in Activity Monitor.
+    static func isSessionCritical(_ executable: String) -> Bool {
+        let systemRoots = ["/System/Library/PrivateFrameworks/", "/System/Library/Frameworks/",
+                           "/usr/libexec/", "/usr/sbin/", "/sbin/"]
+        if systemRoots.contains(where: executable.hasPrefix) { return true }
+        let critical: Set<String> = ["loginwindow", "launchd", "WindowServer", "SystemUIServer", "ControlCenter",
+                                     "cfprefsd", "distnoted", "UserEventAgent", "secd", "trustd"]
+        return critical.contains(URL(fileURLWithPath: executable).lastPathComponent)
     }
 
     // Task CPU counters and mach_absolute_time both use native Mach ticks.

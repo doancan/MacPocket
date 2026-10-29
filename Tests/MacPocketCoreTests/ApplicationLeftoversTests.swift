@@ -7,12 +7,14 @@ final class ApplicationLeftoversTests: XCTestCase {
         let cache = root.appendingPathComponent("Library/Caches")
         try FileManager.default.createDirectory(at: cache, withIntermediateDirectories: true)
         defer { try? FileManager.default.removeItem(at: root) }
-        for id in ["com.example.removed", "com.example.installed", "com.example.installed.Helper", "com.apple.system", "Shared Vendor"] {
+        for id in ["com.example.removed", "com.example.installed", "com.example.installed.Helper", "COM.EXAMPLE.Installed-Helper",
+                   "com.apple.system", "Shared Vendor"] {
             try FileManager.default.createDirectory(at: cache.appendingPathComponent(id), withIntermediateDirectories: true)
         }
         try FileManager.default.createSymbolicLink(at: cache.appendingPathComponent("com.example.alias"), withDestinationURL: cache.appendingPathComponent("com.example.removed"))
         let rows = try await ApplicationLeftoverScanner().scan(installedIDs: ["com.example.installed"], home: root)
         XCTAssertEqual(rows.map(\.bundleID), ["com.example.removed"])
+        XCTAssertTrue(rows[0].sharedVendor)
         XCTAssertNoThrow(try rows[0].request.validate())
     }
 
