@@ -1,0 +1,10 @@
+.DS_Store
+.build/
+.env
+.env.*
+!.env.example
+node_modules/
+DerivedData/
+*.xcuserstate
+xcuserdata/
+.superdesign/tmp/
