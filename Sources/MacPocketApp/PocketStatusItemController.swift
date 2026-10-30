@@ -202,5 +202,6 @@ final class PocketApplicationState: ObservableObject {
         ClipboardService.shared.start()
         WindowLayoutService.shared.start()
         QuitGuardService.shared.start()
+        DisplayBrightnessService.shared.start()
     }
 }
