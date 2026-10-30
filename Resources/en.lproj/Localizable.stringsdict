@@ -114,6 +114,22 @@
 			<string>%lld settings saved.</string>
 		</dict>
 	</dict>
+	<key>%lld dakika odaklandın. Kısa bir mola iyi gelir.</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key>
+		<string>%#@count@</string>
+		<key>count</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key>
+			<string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key>
+			<string>lld</string>
+			<key>one</key>
+			<string>You focused for %lld minute. A short break helps.</string>
+			<key>other</key>
+			<string>You focused for %lld minutes. A short break helps.</string>
+		</dict>
+	</dict>
 	<key>%lld değişiklik bekliyor</key>
 	<dict>
 		<key>NSStringLocalizedFormatKey</key>
@@ -672,6 +688,22 @@
 			<string>Showing the largest %lld file.</string>
 			<key>other</key>
 			<string>Showing the largest %lld files.</string>
+		</dict>
+	</dict>
+	<key>Oturum %lld dakikada bitirildi.</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key>
+		<string>%#@count@</string>
+		<key>count</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key>
+			<string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key>
+			<string>lld</string>
+			<key>one</key>
+			<string>Session ended after %lld minute.</string>
+			<key>other</key>
+			<string>Session ended after %lld minutes.</string>
 		</dict>
 	</dict>
 	<key>Son %lld ölçüm:</key>

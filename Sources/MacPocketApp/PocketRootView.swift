@@ -140,6 +140,7 @@ struct PocketRootView: View {
             case .macros: MacrosView()
             case .freezer: AppFreezerView()
             case .supportReport: SupportReportView(model: model)
+            case .focus: FocusSessionView()
             case .none: ToolsHubView(model: model, openTool: openCatalogTool)
             }
         }
@@ -160,6 +161,7 @@ struct PocketRootView: View {
         case "macros": navigation.open(.macros)
         case "freezer": navigation.open(.freezer)
         case "support-report": navigation.open(.supportReport)
+        case "focus": navigation.open(.focus)
         case "disk-info": utility = .diskInfo; navigation.open(.utilities)
         case "spotlight": utility = .spotlight; navigation.open(.utilities)
         case "dns": utility = .dns; navigation.open(.utilities)

@@ -86,15 +86,22 @@ final class QuickActionService: ObservableObject {
     }
 
     private static func toggleDesktopIcons() async -> Outcome? {
-        let store = SystemHiddenSettingsStore()
-        let shown = (store.read("CreateDesktop", domain: .finder) as? NSNumber)?.boolValue ?? true
-        // Showing again deletes the key, leaving Finder exactly as macOS ships it.
-        guard store.write(shown ? .bool(false) : nil, key: "CreateDesktop", domain: .finder) else {
-            return Outcome(text: String(localized: "Finder ayarı kaydedilemedi."), tone: .warning)
-        }
-        do { try await KillallRestarter().restart(.finder) } catch { return Outcome(text: error.localizedDescription, tone: .warning) }
+        let shown = desktopIconsVisible
+        do { try await setDesktopIcons(visible: !shown) } catch { return Outcome(text: error.localizedDescription, tone: .warning) }
         return Outcome(text: shown ? String(localized: "Masaüstü simgeleri gizlendi.") : String(localized: "Masaüstü simgeleri gösteriliyor."),
                        tone: .success)
+    }
+
+    static var desktopIconsVisible: Bool {
+        (SystemHiddenSettingsStore().read("CreateDesktop", domain: .finder) as? NSNumber)?.boolValue ?? true
+    }
+
+    /// Showing again deletes the key, leaving Finder exactly as macOS ships it. Restarts Finder.
+    static func setDesktopIcons(visible: Bool) async throws {
+        guard SystemHiddenSettingsStore().write(visible ? nil : .bool(false), key: "CreateDesktop", domain: .finder) else {
+            throw NSError(domain: "MacPocket.desktop", code: 1, userInfo: [NSLocalizedDescriptionKey: String(localized: "Finder ayarı kaydedilemedi.")])
+        }
+        try await KillallRestarter().restart(.finder)
     }
 
     static func ejectableVolumes() -> [MountedVolume] {

@@ -119,8 +119,11 @@ final class DisplayBrightnessService: ObservableObject {
     }
 
     /// Moves every external display to the scheduled level, unless the user changed it since the last point.
+    /// Set by a focus session so the schedule doesn't undo its dimming.
+    var scheduleHeld = false
+
     func applySchedule() {
-        guard schedule.enabled, let target = schedule.level(at: Self.currentMinute) else { return }
+        guard schedule.enabled, !scheduleHeld, let target = schedule.level(at: Self.currentMinute) else { return }
         if let until = overrideUntil {
             if Date() < until { return }
             overrideUntil = nil

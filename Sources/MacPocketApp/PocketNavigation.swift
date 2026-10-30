@@ -27,7 +27,7 @@ enum PocketTool: String, Identifiable {
     case hiddenSettings = "Gizli Ayarlar", clipboard = "Pano Geçmişi", windowLayout = "Pencere Yerleşimi"
     case speedTest = "Ağ Hız Testi", ports = "Port Yöneticisi", quickActions = "Hızlı İşlemler"
     case quitGuard = "Kapatma Koruması", brightness = "Ekran Parlaklığı", macros = "Makrolar"
-    case freezer = "Uygulama Dondurucu", supportReport = "Destek Raporu"
+    case freezer = "Uygulama Dondurucu", supportReport = "Destek Raporu", focus = "Odak Oturumu"
     var id: String { rawValue }
 }
 
