@@ -14,8 +14,9 @@ final class GainBox: @unchecked Sendable {
 /// One app's audio, captured with a Core Audio process tap (its own output muted while tapped) and played to the
 /// current output through a private aggregate device with the chosen gain. Private objects disappear with
 /// MacPocket's process, so the app's normal sound returns even after a crash.
+/// Created and invalidated only on `VolumeMixerService`'s setup queue; `gain` is the one thing touched elsewhere.
 @available(macOS 14.2, *)
-final class AppAudioTap {
+final class AppAudioTap: @unchecked Sendable {
     struct Failure: Error, LocalizedError {
         let step: String
         let status: OSStatus
@@ -138,6 +139,12 @@ final class VolumeMixerService: ObservableObject {
     private var taps: [String: AnyObject] = [:]
     private var tappedOutput: String?
     private var timer: Timer?
+    /// Core Audio calls that can block for as long as coreaudiod likes (the first one waits on the system-audio
+    /// permission prompt) run here, never on the main thread.
+    private let setupQueue = DispatchQueue(label: "MacPocket.mixer.setup", qos: .userInitiated)
+    private var pending: Set<String> = []
+    /// Bumped when the output changes, so a tap finished for the old output is thrown away.
+    private var outputGeneration = 0
 
     static var isSupported: Bool {
         if #available(macOS 14.2, *) { return true }
@@ -162,20 +169,29 @@ final class VolumeMixerService: ObservableObject {
     }
 
     func stopAll() {
-        if #available(macOS 14.2, *) { for tap in taps.values { (tap as? AppAudioTap)?.invalidate() } }
+        if #available(macOS 14.2, *) { for tap in taps.values { if let tap = tap as? AppAudioTap { release(tap) } } }
         taps = [:]
+    }
+
+    @available(macOS 14.2, *)
+    private func release(_ tap: AppAudioTap) {
+        setupQueue.async { tap.invalidate() }
     }
 
     private func apply() {
         guard #available(macOS 14.2, *) else { return }
         let output = AudioOutputSystem.defaultOutput.flatMap { id in AudioOutputSystem.outputDevices().first { $0.objectID == id }?.uid }
-        if output != tappedOutput { stopAll(); tappedOutput = output } // the output changed: rebuild on the new one
+        if output != tappedOutput { // the output changed: rebuild on the new one
+            stopAll()
+            tappedOutput = output
+            outputGeneration += 1
+        }
         guard let output else { return }
         let wanted = Dictionary(uniqueKeysWithValues: apps.compactMap { app -> (String, AudioApp)? in
             settings.entry(for: app.bundleID).isNeutral ? nil : (app.bundleID, app)
         })
         for (bundleID, tap) in taps where wanted[bundleID] == nil {
-            (tap as? AppAudioTap)?.invalidate()
+            if let tap = tap as? AppAudioTap { release(tap) }
             taps[bundleID] = nil
         }
         for (bundleID, app) in wanted {
@@ -184,12 +200,30 @@ final class VolumeMixerService: ObservableObject {
                 tap.gain.value = gain
                 continue
             }
-            do {
-                taps[bundleID] = try AppAudioTap(processObjects: app.processObjects, outputUID: output, gain: gain)
-                failure = nil
-            } catch {
-                failure = error.localizedDescription
+            guard !pending.contains(bundleID) else { continue }
+            pending.insert(bundleID)
+            let generation = outputGeneration
+            let objects = app.processObjects
+            setupQueue.async { [weak self] in
+                let result = Result { try AppAudioTap(processObjects: objects, outputUID: output, gain: gain) }
+                DispatchQueue.main.async { MainActor.assumeIsolated { self?.finish(bundleID, result, generation: generation) } }
             }
+        }
+    }
+
+    /// Keeps a finished tap only if it is still wanted on the same output, with the gain as it is now.
+    @available(macOS 14.2, *)
+    private func finish(_ bundleID: String, _ result: Result<AppAudioTap, Error>, generation: Int) {
+        pending.remove(bundleID)
+        switch result {
+        case let .success(tap):
+            let entry = settings.entry(for: bundleID)
+            guard generation == outputGeneration, !entry.isNeutral, taps[bundleID] == nil else { release(tap); return }
+            tap.gain.value = entry.gain
+            taps[bundleID] = tap
+            failure = nil
+        case let .failure(error):
+            failure = error.localizedDescription
         }
     }
 
