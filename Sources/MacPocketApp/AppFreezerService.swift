@@ -67,8 +67,8 @@ final class AppFreezerService: ObservableObject {
     func evaluate() {
         let now = Date()
         let front = NSWorkspace.shared.frontmostApplication?.processIdentifier
-        for app in NSWorkspace.shared.runningApplications where app.activationPolicy == .regular {
-            guard let bundleID = app.bundleIdentifier, app.processIdentifier != getpid() else { continue }
+        for app in NSWorkspace.shared.runningApplications where app.activationPolicy == .regular && !app.isTerminated {
+            guard let bundleID = app.bundleIdentifier, app.processIdentifier > 1, app.processIdentifier != getpid() else { continue }
             let pid = app.processIdentifier
             let since = backgroundSince[pid] ?? app.launchDate ?? now
             backgroundSince[pid] = since
@@ -83,7 +83,7 @@ final class AppFreezerService: ObservableObject {
     }
 
     func freezeNow(_ app: NSRunningApplication) {
-        guard let bundleID = app.bundleIdentifier, AppFreezer.canFreeze(bundleID), app.processIdentifier != getpid(),
+        guard !app.isTerminated, let bundleID = app.bundleIdentifier, AppFreezer.canFreeze(bundleID), app.processIdentifier != getpid(),
               app.processIdentifier != NSWorkspace.shared.frontmostApplication?.processIdentifier else { return }
         freeze(app.processIdentifier, bundleID: bundleID)
     }
@@ -104,7 +104,9 @@ final class AppFreezerService: ObservableObject {
 
     /// Sends `sig` to the app and its helper processes (renderers, plug-ins), which would otherwise keep running.
     private func signal(_ pid: pid_t, _ sig: Int32) {
-        for child in Self.children(of: pid) { kill(child, sig) }
+        // A terminated app reports pid -1: kill(-1, …) would reach every process of the user, kill(0, …) our group.
+        guard pid > 1, pid != getpid() else { return }
+        for child in Self.children(of: pid) where child > 1 && child != getpid() { kill(child, sig) }
         kill(pid, sig)
     }
 

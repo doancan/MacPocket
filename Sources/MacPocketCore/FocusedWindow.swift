@@ -7,9 +7,13 @@ public struct FocusedWindow {
     public let element: AXUIElement
     public let processID: pid_t
 
+    /// Seconds an Accessibility call may wait for a busy app.
+    public static let messagingTimeout: Float = 0.5
+
     /// nil without Accessibility access, or when the front app has no focused window (e.g. Finder's desktop).
     public static func current() -> FocusedWindow? {
         let system = AXUIElementCreateSystemWide()
+        AXUIElementSetMessagingTimeout(system, messagingTimeout)
         guard let app = element(system, kAXFocusedApplicationAttribute),
               let window = element(app, kAXFocusedWindowAttribute) else { return nil }
         var pid: pid_t = 0
@@ -25,6 +29,8 @@ public struct FocusedWindow {
     /// An app's ordinary windows, front to back; minimized windows, sheets and panels are skipped.
     public static func windows(of processID: pid_t) -> [FocusedWindow] {
         let app = AXUIElementCreateApplication(processID)
+        // An unresponsive (or paused) app would otherwise block the caller for the ~6 s default.
+        AXUIElementSetMessagingTimeout(app, messagingTimeout)
         var value: CFTypeRef?
         guard AXUIElementCopyAttributeValue(app, kAXWindowsAttribute as CFString, &value) == .success,
               let list = value as? [AXUIElement] else { return [] }

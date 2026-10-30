@@ -156,11 +156,14 @@ extension DashboardTile where Accessory == EmptyView {
     }
 }
 
-/// Large number plus a one-line caption. Numbers roll when they change.
+/// Large number plus a one-line caption. Values that change rarely roll when they change; live readings that
+/// update every refresh don't animate (measured: the rolling animation on every tick took the dashboard from
+/// ~8 % to 40–55 % CPU).
 private struct TileValue: View {
     let value: String
     let caption: String
     var tint: Color = .primary
+    var rolls = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 2) {
@@ -169,8 +172,8 @@ private struct TileValue: View {
                 .monospacedDigit()
                 .foregroundStyle(tint)
                 .lineLimit(1).minimumScaleFactor(0.6)
-                .contentTransition(.numericText())
-                .animation(.snappy(duration: 0.35), value: value)
+                .contentTransition(rolls ? .numericText() : .identity)
+                .animation(rolls ? .snappy(duration: 0.35) : nil, value: value)
             Text(verbatim: caption)
                 .font(.subheadline).foregroundStyle(.secondary)
                 .lineLimit(1).truncationMode(.tail)
@@ -384,7 +387,7 @@ private struct ClipboardTile: View {
         } value: {
             TileValue(value: service.settings.enabled ? String(localized: "\(service.history.items.count) öğe") : String(localized: "Kapalı"),
                       caption: service.settings.enabled ? String(localized: "\(service.settings.shortcut.displayName) ile panel")
-                                                        : String(localized: "Kopyaladıkların kaydedilmiyor"))
+                                                        : String(localized: "Kopyaladıkların kaydedilmiyor"), rolls: true)
         } bottom: {
             HStack(spacing: PocketSpacing.s) {
                 Button { service.togglePanel() } label: { Label("Paneli aç", systemImage: "rectangle.and.text.magnifyingglass").frame(maxWidth: .infinity) }
@@ -413,7 +416,7 @@ private struct SpeedTestTile: View {
             } else {
                 TileValue(value: "↓ " + SpeedFormatter.bitRate(latest?.downloadBitsPerSecond),
                           caption: latest.map { "↑ " + SpeedFormatter.bitRate($0.uploadBitsPerSecond) + ($0.responsivenessRPM.map { " · \(Int($0)) RPM" } ?? "") }
-                              ?? String(localized: "Henüz ölçüm yok"))
+                              ?? String(localized: "Henüz ölçüm yok"), rolls: true)
             }
         } bottom: {
             if model.running {
@@ -437,11 +440,11 @@ private struct CleanupTile: View {
     var body: some View {
         DashboardTile(title: "Temizlik", icon: "sparkles", tint: PocketPage.cleanup.tint, open: open) {
             if cleanup.scanning {
-                TileValue(value: cleanup.progress.map { pocketBytes($0.measuredBytes) } ?? "…", caption: String(localized: "Taranıyor…"))
+                TileValue(value: cleanup.progress.map { pocketBytes($0.measuredBytes) } ?? "…", caption: String(localized: "Taranıyor…"), rolls: true)
             } else if let report = cleanup.report {
-                TileValue(value: pocketBytes(report.bytes), caption: String(localized: "\(report.itemCount.formatted()) öğe temizlenebilir"))
+                TileValue(value: pocketBytes(report.bytes), caption: String(localized: "\(report.itemCount.formatted()) öğe temizlenebilir"), rolls: true)
             } else {
-                TileValue(value: "—", caption: String(localized: "Önbellek ve günlükleri tara"))
+                TileValue(value: "—", caption: String(localized: "Önbellek ve günlükleri tara"), rolls: true)
             }
         } bottom: {
             HStack(spacing: PocketSpacing.s) {
@@ -465,7 +468,7 @@ private struct ApplicationsTile: View {
             TileValue(value: applications.loaded ? "\(applications.applications.count)" : "…",
                       caption: applications.updatesCheckedAt == nil ? String(localized: "Güncellemeler denetlenmedi")
                           : applications.updates.isEmpty ? String(localized: "Homebrew uygulamaları güncel")
-                          : String(localized: "\(applications.updates.count) güncelleme hazır"))
+                          : String(localized: "\(applications.updates.count) güncelleme hazır"), rolls: true)
         } bottom: {
             HStack(spacing: PocketSpacing.s) {
                 Button { Task { await applications.checkUpdates() } } label: {

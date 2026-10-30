@@ -27,7 +27,11 @@ final class FocusSessionService: ObservableObject {
     private struct Pending: Codable {
         var hidDesktopIcons = false
         var guardedQuit = false
+        /// Display ID → brightness before dimming.
+        var dimmed: [UInt32: Double]?
     }
+    /// Set while start or finish is between awaits, so a second click can't interleave with it.
+    private var transitioning = false
 
     func attach(_ model: PocketModel) {
         self.model = model
@@ -39,6 +43,7 @@ final class FocusSessionService: ObservableObject {
         for change in applied {
             if case .hideDesktopIcons = change { pending.hidDesktopIcons = true }
             if case .guardQuit = change { pending.guardedQuit = true }
+            if case let .dimDisplay(display, _, previous) = change { pending.dimmed = (pending.dimmed ?? [:]).merging([display: previous]) { $1 } }
         }
         UserDefaults.standard.set(try? JSONEncoder().encode(pending), forKey: Self.pendingKey)
     }
@@ -48,6 +53,7 @@ final class FocusSessionService: ObservableObject {
               let pending = try? JSONDecoder().decode(Pending.self, from: data) else { return }
         UserDefaults.standard.removeObject(forKey: Self.pendingKey)
         if pending.guardedQuit { QuitGuardService.shared.settings.quitMode = .off }
+        for (display, level) in pending.dimmed ?? [:] { DisplayBrightnessService.shared.restoreLevelNow(level, for: display) }
         if pending.hidDesktopIcons { Task { try? await QuickActionService.setDesktopIcons(visible: true) } }
     }
 
@@ -64,6 +70,8 @@ final class FocusSessionService: ObservableObject {
                 try? restart.run()
             case .guardQuit:
                 QuitGuardService.shared.settings.quitMode = .off
+            case let .dimDisplay(display, _, previous):
+                DisplayBrightnessService.shared.restoreLevelNow(previous, for: display)
             default:
                 break
             }
@@ -74,7 +82,9 @@ final class FocusSessionService: ObservableObject {
     var isRunning: Bool { startedAt != nil }
 
     func start() async {
-        guard !isRunning else { return }
+        guard !isRunning, !transitioning else { return }
+        transitioning = true
+        defer { transitioning = false }
         let brightness = DisplayBrightnessService.shared
         var active: UInt32?
         var id: CGDirectDisplayID = 0
@@ -121,7 +131,9 @@ final class FocusSessionService: ObservableObject {
 
     /// Ends the session and undoes exactly what it changed.
     func finish(completed: Bool) async {
-        guard let started = startedAt else { return }
+        guard let started = startedAt, !transitioning else { return }
+        transitioning = true
+        defer { transitioning = false }
         timer?.invalidate()
         timer = nil
         let brightness = DisplayBrightnessService.shared

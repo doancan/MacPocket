@@ -2086,3 +2086,5 @@
 "Şu anki yerleşimle güncelle" = "Update with Current Arrangement";
 "“%@” yüklendi: %lld pencere yerleşti, %lld pencere atlandı (artık bağlı olmayan ekran veya taşınamayan pencere)." = "“%@” restored: %lld windows placed, %lld skipped (a display no longer connected or a window that can’t be moved).";
 "“%@” yüklendi: %lld pencere yerleşti." = "“%@” restored: %lld windows placed.";
+"Süre sınırı aşıldı; işlem durduruldu." = "The time limit was exceeded; the process was stopped.";
+"İşlem durduruldu." = "The process was stopped.";

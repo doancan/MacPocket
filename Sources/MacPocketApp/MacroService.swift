@@ -240,9 +240,10 @@ enum MacroRunner {
         case let .openURL(url):
             NSWorkspace.shared.open(url)
         case let .appleScript(source):
-            var error: NSDictionary?
-            NSAppleScript(source: source)?.executeAndReturnError(&error)
-            if let error { throw Failure.script((error[NSAppleScript.errorMessage] as? String) ?? "?") }
+            // osascript, off the main thread and time-limited: an AppleScript waiting on a hung app must not
+            // stall the main run loop, where every MacPocket event tap (and so the keyboard) is served.
+            let result = try await BoundedProcess.run("/usr/bin/osascript", ["-e", source], timeout: MacroRunLimits.shellTimeout)
+            if result.status != 0 { throw Failure.script(result.errorOutput.trimmingCharacters(in: .whitespacesAndNewlines)) }
         case let .shortcut(name):
             try await runProcess("/usr/bin/shortcuts", ["run", name], label: String(localized: "Kestirme"))
         case let .shell(command):
@@ -278,6 +279,8 @@ enum MacroRunner {
             for keyDown in [true, false] {
                 guard let event = CGEvent(keyboardEventSource: source, virtualKey: 0, keyDown: keyDown) else { continue }
                 event.keyboardSetUnicodeString(stringLength: chunk.count, unicodeString: chunk)
+                // The trigger's ⌃⌥/⌘ may still be held: without clearing them the text would arrive as shortcuts.
+                event.flags = []
                 event.setIntegerValueField(.eventSourceUserData, value: MacroService.marker)
                 event.post(tap: .cgSessionEventTap)
             }
@@ -285,35 +288,14 @@ enum MacroRunner {
         }
     }
 
-    /// Stops a shell and the commands it started: zsh running `a; b` forks children that would otherwise
-    /// outlive it.
-    private nonisolated static func terminateTree(_ process: Process) {
-        guard process.isRunning else { return }
-        let children = Process()
-        children.executableURL = URL(fileURLWithPath: "/usr/bin/pkill")
-        children.arguments = ["-TERM", "-P", String(process.processIdentifier)]
-        try? children.run()
-        children.waitUntilExit()
-        process.terminate()
-    }
-
     private static func runProcess(_ path: String, _ arguments: [String], label: String) async throws {
-        let process = Process()
-        process.executableURL = URL(fileURLWithPath: path)
-        process.arguments = arguments
-        process.standardOutput = FileHandle.nullDevice
-        process.standardError = FileHandle.nullDevice
-        let status: Int32 = try await withTaskCancellationHandler {
-            try await withCheckedThrowingContinuation { continuation in
-                process.terminationHandler = { continuation.resume(returning: $0.terminationStatus) }
-                do { try process.run() } catch { continuation.resume(throwing: error) }
-                DispatchQueue.global().asyncAfter(deadline: .now() + MacroRunLimits.shellTimeout) { terminateTree(process) }
-            }
-        } onCancel: {
-            terminateTree(process)
+        let result: BoundedProcess.Result
+        do {
+            result = try await BoundedProcess.run(path, arguments, timeout: MacroRunLimits.shellTimeout)
+        } catch BoundedProcess.Failure.timedOut {
+            throw Failure.timedOut(label)
         }
-        if process.terminationReason == .uncaughtSignal { throw Failure.timedOut(label) }
-        guard status == 0 else { throw Failure.process(label, status) }
+        guard result.status == 0 else { throw Failure.process(label, result.status) }
     }
 }
 

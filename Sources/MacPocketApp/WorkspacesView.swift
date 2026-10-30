@@ -45,8 +45,10 @@ final class WorkspaceService: ObservableObject {
             return nil
         }
         var windows: [SavedWindow] = []
+        let frozen = AppFreezerService.shared.frozen
         for app in NSWorkspace.shared.runningApplications where app.activationPolicy == .regular && app.processIdentifier != getpid() {
-            guard let bundleID = app.bundleIdentifier, !app.isHidden else { continue }
+            // A paused app can't answer Accessibility requests.
+            guard let bundleID = app.bundleIdentifier, !app.isHidden, frozen[app.processIdentifier] == nil else { continue }
             for window in FocusedWindow.windows(of: app.processIdentifier) {
                 if let frame = window.frame { windows.append(SavedWindow(bundleID: bundleID, title: window.title, frame: frame)) }
             }
@@ -83,6 +85,7 @@ final class WorkspaceService: ObservableObject {
                 }
             }
             guard let app else { continue }
+            if AppFreezerService.shared.frozen[app.processIdentifier] != nil { AppFreezerService.shared.thaw(app.processIdentifier) }
             if app.isHidden { app.unhide() }
             let current = FocusedWindow.windows(of: app.processIdentifier)
             let saved = layout.windows.filter { $0.bundleID == bundleID }

@@ -153,7 +153,11 @@ final class ClipboardService: ObservableObject {
         if let text = pasteboard.string(forType: .string) {
             return ClipboardCapture.text(text, sourceBundleID: source?.bundleIdentifier, sourceName: source?.localizedName)
         }
-        guard settings.keepImages, let image = NSImage(pasteboard: pasteboard), let reference = storeImage(image) else { return nil }
+        guard settings.keepImages else { return nil }
+        // Check the raw size before decoding: converting a huge screenshot on the main thread would stall the
+        // run loop that also serves MacPocket's event taps.
+        let rawSize = [NSPasteboard.PasteboardType.png, .tiff].lazy.compactMap { self.pasteboard.data(forType: $0)?.count }.first ?? 0
+        guard rawSize <= settings.maximumImageBytes * 4, let image = NSImage(pasteboard: pasteboard), let reference = storeImage(image) else { return nil }
         return capture(.image(reference))
     }
 

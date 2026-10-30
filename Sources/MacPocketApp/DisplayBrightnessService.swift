@@ -60,7 +60,10 @@ final class DisplayBrightnessService: ObservableObject {
     @Published private(set) var detecting = false
     @Published private(set) var tapActive = false
 
-    private var channels: [CGDirectDisplayID: DDCChannel] = [:]
+    /// DDC channel per display, with the registry entry it was opened for (a reused display ID after swapping
+    /// monitors must not keep writing to the old monitor's channel).
+    private var channels: [CGDirectDisplayID: (serviceID: UInt64, channel: DDCChannel)] = [:]
+    private var refreshAgain = false
     private var maximums: [CGDirectDisplayID: (brightness: UInt16, contrast: UInt16)] = [:]
     private var pendingWrites: [CGDirectDisplayID: Task<Void, Never>] = [:]
     /// Each display's calibrated gamma table, captured before MacPocket first dims it.
@@ -142,9 +145,18 @@ final class DisplayBrightnessService: ObservableObject {
 
     // MARK: Detection
 
+    /// Serialized: a request arriving during a refresh runs once more afterwards instead of racing it.
     func refreshDisplays() async {
+        if detecting { refreshAgain = true; return }
         detecting = true
-        defer { detecting = false }
+        repeat {
+            refreshAgain = false
+            await detect()
+        } while refreshAgain
+        detecting = false
+    }
+
+    private func detect() async {
         let online = Self.onlineExternalDisplays()
         let registry = DisplayRegistry.scan()
         let matches = DisplayMatcher.match(online.map { (id: $0, vendor: CGDisplayVendorNumber($0), product: CGDisplayModelNumber($0),
@@ -153,10 +165,16 @@ final class DisplayBrightnessService: ObservableObject {
         for id in online {
             let key = Self.key(for: id)
             let preference = settings.methods[key] ?? .automatic
-            var channel = channels[id]
-            if channel == nil, DDCChannel.isAvailable, let serviceID = matches[id] {
-                channel = DDCChannel(registryID: serviceID)
-                channels[id] = channel
+            var channel: DDCChannel?
+            if let serviceID = matches[id], DDCChannel.isAvailable {
+                if let existing = channels[id], existing.serviceID == serviceID {
+                    channel = existing.channel
+                } else if let opened = DDCChannel(registryID: serviceID) {
+                    channels[id] = (serviceID, opened)
+                    channel = opened
+                }
+            } else {
+                channels[id] = nil
             }
             // Probe off the main thread: a DDC read blocks for ~50 ms per attempt.
             typealias Reading = (current: UInt16, maximum: UInt16)
@@ -179,6 +197,8 @@ final class DisplayBrightnessService: ObservableObject {
             }
             // Untouched displays keep their ColorSync calibration: gamma is only changed once dimmed.
             if active == .software, level < 1 { applySoftware(id, level: level) }
+            // Switched away from software dimming: put the calibrated table back.
+            if active != .software, let original = originalGamma.removeValue(forKey: id) { original.apply(to: id) }
             result.append(ManagedDisplay(id: id, key: key, name: Self.name(of: id), active: active, level: level,
                                          contrast: contrast, hardwareAvailable: hardware))
         }
@@ -225,8 +245,21 @@ final class DisplayBrightnessService: ObservableObject {
     }
 
     /// Coalesces slider and key-repeat bursts: only the latest value is written, at most every 40 ms.
+    /// Restores a level right away (quit, crash recovery): DDC is written synchronously, and the stored level is
+    /// updated so the next launch doesn't re-apply a dimmed one.
+    func restoreLevelNow(_ level: Double, for id: CGDirectDisplayID) {
+        let key = displays.first { $0.id == id }?.key ?? "\(CGDisplayVendorNumber(id))-\(CGDisplayModelNumber(id))-\(CGDisplaySerialNumber(id))"
+        settings.levels[key] = level
+        if let index = displays.firstIndex(where: { $0.id == id }) { displays[index].level = level }
+        if let channel = channels[id]?.channel, displays.first(where: { $0.id == id })?.active == .hardware {
+            channel.set(.brightness, value: UInt16((level * Double(maximums[id]?.brightness ?? 100)).rounded()))
+        } else if originalGamma[id] != nil {
+            applySoftware(id, level: level)
+        }
+    }
+
     private func scheduleHardware(_ id: CGDirectDisplayID, code: VCPCode, fraction: Double) {
-        guard let channel = channels[id] else { return }
+        guard let channel = channels[id]?.channel else { return }
         let maximum = code == .brightness ? (maximums[id]?.brightness ?? 100) : (maximums[id]?.contrast ?? 100)
         let value = UInt16((min(1, max(0, fraction)) * Double(maximum)).rounded())
         pendingWrites[id]?.cancel()

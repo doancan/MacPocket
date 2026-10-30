@@ -77,7 +77,9 @@ final class QuitGuardService: ObservableObject {
             if let tap { CGEvent.tapEnable(tap: tap, enable: true) }
             return true
         case .keyDown:
-            guard event.getIntegerValueField(.eventSourceUserData) != Self.marker,
+            let source = event.getIntegerValueField(.eventSourceUserData)
+            // Its own re-sent shortcut, and keystrokes a macro posts on purpose, pass untouched.
+            guard source != Self.marker, source != MacroService.marker,
                   let shortcut = Self.shortcut(of: event),
                   settings.protects(NSWorkspace.shared.frontmostApplication?.bundleIdentifier) else { return true }
             let isRepeat = event.getIntegerValueField(.keyboardEventAutorepeat) != 0

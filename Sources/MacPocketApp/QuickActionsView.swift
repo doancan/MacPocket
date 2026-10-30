@@ -39,14 +39,14 @@ final class QuickActionService: ObservableObject {
         case .sleepMac:
             return run("/usr/bin/pmset", ["sleepnow"])
         case .toggleDarkMode:
-            return appleScript("tell application \"System Events\" to tell appearance preferences to set dark mode to not dark mode",
-                               success: nil)
+            return await appleScript("tell application \"System Events\" to tell appearance preferences to set dark mode to not dark mode",
+                                     success: nil)
         case .toggleDesktopIcons:
             return await toggleDesktopIcons()
         case .ejectDisks:
             return ejectDisks()
         case .emptyTrash:
-            return appleScript("tell application \"Finder\" to empty trash", success: String(localized: "Çöp boşaltıldı."))
+            return await appleScript("tell application \"Finder\" to empty trash", success: String(localized: "Çöp boşaltıldı."))
         }
     }
 
@@ -72,17 +72,22 @@ final class QuickActionService: ObservableObject {
         }
     }
 
-    private static func appleScript(_ source: String, success: String?) -> Outcome? {
-        var error: NSDictionary?
-        NSAppleScript(source: source)?.executeAndReturnError(&error)
-        guard let error else { return success.map { Outcome(text: $0, tone: .success) } }
-        let code = (error[NSAppleScript.errorNumber] as? NSNumber)?.intValue ?? 0
-        if code == -1743 {
+    /// Through osascript, off the main thread with a time limit, so a busy Finder can't stall MacPocket.
+    private static func appleScript(_ source: String, success: String?) async -> Outcome? {
+        let result: BoundedProcess.Result
+        do {
+            result = try await BoundedProcess.run("/usr/bin/osascript", ["-e", source], timeout: 60)
+        } catch {
+            return Outcome(text: error.localizedDescription, tone: .warning)
+        }
+        guard result.status != 0 else { return success.map { Outcome(text: $0, tone: .success) } }
+        if result.errorOutput.contains("-1743") {
             return Outcome(text: String(localized: "macOS izin vermedi. Sistem Ayarları › Gizlilik ve Güvenlik › Otomasyon’da MacPocket’e izin ver."),
                            tone: .warning)
         }
-        if code == -128 { return nil } // user cancelled Finder's own confirmation
-        return Outcome(text: (error[NSAppleScript.errorMessage] as? String) ?? String(localized: "İşlem tamamlanamadı."), tone: .warning)
+        if result.errorOutput.contains("-128") { return nil } // the user cancelled Finder's own confirmation
+        let message = result.errorOutput.trimmingCharacters(in: .whitespacesAndNewlines)
+        return Outcome(text: message.isEmpty ? String(localized: "İşlem tamamlanamadı.") : message, tone: .warning)
     }
 
     private static func toggleDesktopIcons() async -> Outcome? {
