@@ -208,5 +208,6 @@ final class PocketApplicationState: ObservableObject {
         FocusSessionService.shared.attach(model)
         WorkspaceService.shared.start()
         SnippetService.shared.start()
+        ScreenGrabService.shared.start()
     }
 }

@@ -183,6 +183,7 @@ extension PocketTool {
         case .focus: String(localized: "Odak Oturumu")
         case .workspaces: String(localized: "Masa Düzenleri")
         case .snippets: String(localized: "Metin Kısaltmaları")
+        case .screenGrab: String(localized: "Ekrandan Al")
         }
     }
 }

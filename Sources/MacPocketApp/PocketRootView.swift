@@ -143,6 +143,7 @@ struct PocketRootView: View {
             case .focus: FocusSessionView()
             case .workspaces: WorkspacesView()
             case .snippets: SnippetsView()
+            case .screenGrab: ScreenGrabView()
             case .none: ToolsHubView(model: model, openTool: openCatalogTool)
             }
         }
@@ -166,6 +167,7 @@ struct PocketRootView: View {
         case "focus": navigation.open(.focus)
         case "workspaces": navigation.open(.workspaces)
         case "snippets": navigation.open(.snippets)
+        case "screen-grab": navigation.open(.screenGrab)
         case "disk-info": utility = .diskInfo; navigation.open(.utilities)
         case "spotlight": utility = .spotlight; navigation.open(.utilities)
         case "dns": utility = .dns; navigation.open(.utilities)
