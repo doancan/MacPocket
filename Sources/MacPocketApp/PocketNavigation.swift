@@ -24,7 +24,7 @@ enum PocketTool: String, Identifiable {
     case similarImages = "Benzer Görseller", screenCleaning = "Ekran Temizleme"
     case utilities = "macOS Araçları", leftovers = "Uygulama Kalıntıları"
     case taskManager = "Görev Yöneticisi", diagnostics = "Sistem Raporları", windowSwitcher = "Pencere Geçişi"
-    case hiddenSettings = "Gizli Ayarlar"
+    case hiddenSettings = "Gizli Ayarlar", clipboard = "Pano Geçmişi"
     var id: String { rawValue }
 }
 

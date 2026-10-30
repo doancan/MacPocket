@@ -170,6 +170,7 @@ extension PocketTool {
         case .diagnostics: String(localized: "Sistem Raporları")
         case .windowSwitcher: String(localized: "Pencere Geçişi")
         case .hiddenSettings: String(localized: "Gizli Ayarlar")
+        case .clipboard: String(localized: "Pano Geçmişi")
         }
     }
 }

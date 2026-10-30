@@ -81,6 +81,7 @@ final class PocketAppDelegate: NSObject, NSApplicationDelegate {
     }
 
     func applicationWillTerminate(_ notification: Notification) {
+        ClipboardService.shared.flushSave()
         PocketRelaunch.spawnIfPending()
     }
 

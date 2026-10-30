@@ -199,5 +199,6 @@ final class PocketApplicationState: ObservableObject {
         _ = WindowSwitcherHotkeyController.shared
         loginItem = LoginItemController()
         statusItem = PocketStatusItemController(model: model)
+        ClipboardService.shared.start()
     }
 }
