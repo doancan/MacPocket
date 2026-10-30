@@ -194,13 +194,12 @@ private struct MacroEditor: View {
                 if isOn && macro.needsReview == true { reviewing = true } else { macro.enabled = isOn }
             }))
             .toggleStyle(.switch).labelsHidden().help("Makroyu aç veya kapat")
-            .confirmationDialog("İçe aktarılan makro etkinleştirilsin mi?", isPresented: $reviewing) {
-                Button("İnceledim, etkinleştir") {
+            .sheet(isPresented: $reviewing) {
+                MacroReviewSheet(macro: macro, approve: {
                     macro.needsReview = nil
                     macro.enabled = true
-                }
-            } message: {
-                Text(reviewMessage)
+                    reviewing = false
+                }, cancel: { reviewing = false })
             }
             if service.running == macro.id {
                 Button("Durdur") { service.stop() }
@@ -298,21 +297,6 @@ private struct MacroEditor: View {
         .pocketCard()
     }
 
-    /// Lists every step that runs code or opens something, so enabling an imported macro is an informed choice.
-    private var reviewMessage: String {
-        let sensitive = macro.sensitiveSteps.map { action -> String in
-            switch action {
-            case let .shell(command): String(localized: "Komut: \(command)")
-            case let .appleScript(source): String(localized: "AppleScript: \(String(source.prefix(120)))")
-            case let .openURL(url): String(localized: "Açılacak: \(url.absoluteString)")
-            case let .shortcut(name): String(localized: "Kestirme: \(name)")
-            default: ""
-            }
-        }
-        guard !sensitive.isEmpty else { return String(localized: "Bu makro kod çalıştıran bir adım içermiyor.") }
-        return String(localized: "Bu makro şunları çalıştıracak:") + "\n" + sensitive.joined(separator: "\n")
-    }
-
     static func applicationName(_ bundleID: String) -> String {
         NSWorkspace.shared.urlForApplication(withBundleIdentifier: bundleID)
             .map { FileManager.default.displayName(atPath: $0.path).replacingOccurrences(of: ".app", with: "") } ?? bundleID
@@ -326,6 +310,59 @@ private struct MacroEditor: View {
         guard panel.runModal() == .OK else { return }
         let ids = panel.urls.compactMap { Bundle(url: $0)?.bundleIdentifier }.filter { !macro.applications.contains($0) }
         macro.applications.append(contentsOf: ids)
+    }
+}
+
+/// Shows every step of an imported macro that runs code or opens something, in full, before it may be enabled.
+/// Nothing is shortened: a harmless-looking start must not hide what follows.
+private struct MacroReviewSheet: View {
+    let macro: Macro
+    let approve: () -> Void
+    let cancel: () -> Void
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: PocketSpacing.m) {
+            Label("İçe aktarılan makro etkinleştirilsin mi?", systemImage: "exclamationmark.shield")
+                .font(.title3.weight(.semibold))
+            Text("“\(macro.name)” başka bir yerden geldi. Etkinleştirmeden önce çalıştıracağı her şeyi oku.")
+                .foregroundStyle(.secondary)
+            ScrollView {
+                VStack(alignment: .leading, spacing: PocketSpacing.m) {
+                    if macro.sensitiveSteps.isEmpty {
+                        Text("Bu makro kod çalıştıran bir adım içermiyor.")
+                    }
+                    ForEach(Array(macro.sensitiveSteps.enumerated()), id: \.offset) { _, action in
+                        VStack(alignment: .leading, spacing: PocketSpacing.xs) {
+                            Label(action.kind.title, systemImage: action.kind.symbol).font(.callout.weight(.semibold))
+                            Text(verbatim: Self.fullText(action))
+                                .font(.system(.callout, design: .monospaced))
+                                .textSelection(.enabled)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .padding(PocketSpacing.s)
+                                .background(PocketTheme.sidebar, in: RoundedRectangle(cornerRadius: 6, style: .continuous))
+                        }
+                    }
+                }
+            }
+            .frame(minHeight: 160, maxHeight: 360)
+            HStack {
+                Spacer()
+                Button("Vazgeç", role: .cancel, action: cancel).keyboardShortcut(.cancelAction)
+                Button("İnceledim, etkinleştir", action: approve)
+            }
+        }
+        .padding(PocketSpacing.xl)
+        .frame(width: 560)
+    }
+
+    private static func fullText(_ action: MacroAction) -> String {
+        switch action {
+        case let .shell(command): command
+        case let .appleScript(source): source
+        case let .openURL(url): url.isFileURL ? url.path : url.absoluteString
+        case let .shortcut(name): name
+        default: ""
+        }
     }
 }
 

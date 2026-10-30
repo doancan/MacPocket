@@ -1986,12 +1986,8 @@
 "“%@” durdu: %@" = "“%@” stopped: %@";
 "“%@” silinsin mi?" = "Delete “%@”?";
 "“%@” çalıştırılamadı: %@" = "Couldn’t run “%@”: %@";
-"AppleScript: %@" = "AppleScript: %@";
-"Açılacak: %@" = "Opens: %@";
 "Bu makro kod çalıştıran bir adım içermiyor." = "This macro has no steps that run code.";
-"Bu makro şunları çalıştıracak:" = "This macro will run:";
-"Kestirme: %@" = "Shortcut: %@";
-"Komut: %@" = "Command: %@";
 "İnceledim, etkinleştir" = "I Reviewed It, Enable";
 "İçe aktarılan makro etkinleştirilsin mi?" = "Enable the imported macro?";
 "“%@” içe aktarıldı; çalıştırmadan önce adımlarını inceleyip etkinleştir." = "“%@” was imported; review its steps and enable it before running it.";
+"“%@” başka bir yerden geldi. Etkinleştirmeden önce çalıştıracağı her şeyi oku." = "“%@” came from elsewhere. Read everything it will run before enabling it.";
