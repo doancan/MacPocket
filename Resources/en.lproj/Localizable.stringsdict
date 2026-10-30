@@ -674,6 +674,22 @@
 			<string>Uptime: %lld hours</string>
 		</dict>
 	</dict>
+	<key>Bu oturumda %lld kez genişletildi.</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key>
+		<string>%#@count@</string>
+		<key>count</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key>
+			<string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key>
+			<string>lld</string>
+			<key>one</key>
+			<string>Expanded %lld time this session.</string>
+			<key>other</key>
+			<string>Expanded %lld times this session.</string>
+		</dict>
+	</dict>
 	<key>En büyük %lld dosya listeleniyor.</key>
 	<dict>
 		<key>NSStringLocalizedFormatKey</key>

@@ -182,6 +182,7 @@ extension PocketTool {
         case .supportReport: String(localized: "Destek Raporu")
         case .focus: String(localized: "Odak Oturumu")
         case .workspaces: String(localized: "Masa Düzenleri")
+        case .snippets: String(localized: "Metin Kısaltmaları")
         }
     }
 }

@@ -207,5 +207,6 @@ final class PocketApplicationState: ObservableObject {
         AppFreezerService.shared.start()
         FocusSessionService.shared.attach(model)
         WorkspaceService.shared.start()
+        SnippetService.shared.start()
     }
 }

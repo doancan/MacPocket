@@ -251,7 +251,7 @@ enum MacroRunner {
         }
     }
 
-    private static func post(_ combo: KeyCombo) {
+    static func post(_ combo: KeyCombo) {
         let source = CGEventSource(stateID: .combinedSessionState)
         var flags = CGEventFlags()
         if combo.modifiers.contains(.command) { flags.insert(.maskCommand) }
@@ -266,8 +266,8 @@ enum MacroRunner {
         }
     }
 
-    /// Types text in chunks of Unicode characters, independent of the keyboard layout.
-    private static func type(_ text: String) {
+    /// Types text in chunks of Unicode characters, independent of the keyboard layout. Also used by snippets.
+    static func type(_ text: String) {
         let source = CGEventSource(stateID: .combinedSessionState)
         let units = Array(text.utf16)
         var index = 0
