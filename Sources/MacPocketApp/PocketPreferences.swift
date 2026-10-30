@@ -186,6 +186,7 @@ extension PocketTool {
         case .screenGrab: String(localized: "Ekrandan Al")
         case .mouseScroll: String(localized: "Fare Kaydırma")
         case .audio: String(localized: "Ses Çıkışı")
+        case .mixer: String(localized: "Ses Mikseri")
         }
     }
 }

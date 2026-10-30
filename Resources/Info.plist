@@ -19,5 +19,6 @@
   <key>NSHumanReadableCopyright</key><string>© 2026 Doğancan</string>
   <key>NSSupportsAutomaticTermination</key><false/>
   <key>NSSupportsSuddenTermination</key><false/>
+  <key>NSAudioCaptureUsageDescription</key><string>MacPocket, ses mikserinde seçtiğin uygulamaların sesini yakalayıp ayarladığın seviyede yeniden çalar; ses kaydedilmez ve bu Mac’ten çıkmaz.</string>
   <key>NSAppleEventsUsageDescription</key><string>MacPocket, hızlı işlemler için Finder’dan Çöp’ü boşaltmasını ve System Events’ten görünümü değiştirmesini ister.</string>
 </dict></plist>

@@ -85,6 +85,7 @@ final class PocketAppDelegate: NSObject, NSApplicationDelegate {
         DisplayBrightnessService.shared.restoreSoftwareDimming()
         AppFreezerService.shared.thawAll()
         FocusSessionService.shared.undoForQuit()
+        VolumeMixerService.shared.stopAll()
         PocketRelaunch.spawnIfPending()
     }
 

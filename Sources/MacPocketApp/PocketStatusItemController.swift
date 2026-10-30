@@ -211,5 +211,6 @@ final class PocketApplicationState: ObservableObject {
         ScreenGrabService.shared.start()
         MouseScrollService.shared.start()
         AudioOutputService.shared.start()
+        VolumeMixerService.shared.start()
     }
 }

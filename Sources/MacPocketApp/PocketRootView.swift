@@ -146,6 +146,7 @@ struct PocketRootView: View {
             case .screenGrab: ScreenGrabView()
             case .mouseScroll: MouseScrollView()
             case .audio: AudioOutputView()
+            case .mixer: VolumeMixerView()
             case .none: ToolsHubView(model: model, openTool: openCatalogTool)
             }
         }
@@ -172,6 +173,7 @@ struct PocketRootView: View {
         case "screen-grab": navigation.open(.screenGrab)
         case "mouse-scroll": navigation.open(.mouseScroll)
         case "audio": navigation.open(.audio)
+        case "mixer": navigation.open(.mixer)
         case "disk-info": utility = .diskInfo; navigation.open(.utilities)
         case "spotlight": utility = .spotlight; navigation.open(.utilities)
         case "dns": utility = .dns; navigation.open(.utilities)
