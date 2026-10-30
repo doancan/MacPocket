@@ -174,6 +174,7 @@ extension PocketTool {
         case .windowLayout: String(localized: "Pencere Yerleşimi")
         case .speedTest: String(localized: "Ağ Hız Testi")
         case .ports: String(localized: "Port Yöneticisi")
+        case .quickActions: String(localized: "Hızlı İşlemler")
         }
     }
 }

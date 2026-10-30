@@ -42,7 +42,7 @@ struct OverviewView: View {
                     CleanupTile(cleanup: files.junk, open: { navigation.select(.cleanup) })
                     ApplicationsTile(applications: applications, open: { navigation.select(.applications) },
                                      openUpdates: { applications.showUpdates = true; navigation.select(.applications) })
-                    QuickSettingsTile(open: { navigation.open(.hiddenSettings) })
+                    QuickSettingsTile(open: { navigation.open(.quickActions) })
                 }
             }
             .padding(PocketSpacing.page)
@@ -486,6 +486,7 @@ private struct ApplicationsTile: View {
 private struct QuickSettingsTile: View {
     @ObservedObject private var layout = WindowLayoutService.shared
     @ObservedObject private var menuBar = MenuBarSettingsStore.shared
+    @ObservedObject private var quickActions = QuickActionService.shared
     @State private var hiddenFiles = HiddenSettingsService().state(of: Self.hiddenFilesSetting).value == .bool(true)
     @State private var applying = false
     let open: () -> Void
@@ -501,7 +502,18 @@ private struct QuickSettingsTile: View {
                 row("Menü çubuğu simgesi", icon: "menubar.rectangle", isOn: $menuBar.preferences.visible)
             }
         } bottom: {
-            Text("Gizli dosyalar Finder’ı yeniden başlatır.").font(.caption).foregroundStyle(.secondary)
+            Menu {
+                ForEach(QuickAction.allCases.filter { !$0.needsConfirmation }) { action in
+                    Button { quickActions.perform(action) } label: { Label(action.title, systemImage: action.symbol) }
+                }
+                Divider()
+                Button("Tüm hızlı işlemler…", action: open)
+            } label: {
+                Label("Hızlı işlemler", systemImage: "bolt.circle")
+            }
+            .menuStyle(.borderedButton)
+            .fixedSize()
+            .help("Gizli dosyalar Finder’ı yeniden başlatır.")
         }
     }
 

@@ -25,7 +25,7 @@ enum PocketTool: String, Identifiable {
     case utilities = "macOS Araçları", leftovers = "Uygulama Kalıntıları"
     case taskManager = "Görev Yöneticisi", diagnostics = "Sistem Raporları", windowSwitcher = "Pencere Geçişi"
     case hiddenSettings = "Gizli Ayarlar", clipboard = "Pano Geçmişi", windowLayout = "Pencere Yerleşimi"
-    case speedTest = "Ağ Hız Testi", ports = "Port Yöneticisi"
+    case speedTest = "Ağ Hız Testi", ports = "Port Yöneticisi", quickActions = "Hızlı İşlemler"
     var id: String { rawValue }
 }
 

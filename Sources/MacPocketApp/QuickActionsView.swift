@@ -1,0 +1,219 @@
+import AppKit
+import MacPocketCore
+import SwiftUI
+
+@MainActor
+final class QuickActionService: ObservableObject {
+    static let shared = QuickActionService()
+
+    struct Outcome: Equatable {
+        let text: String
+        let tone: PocketTone
+    }
+
+    @Published private(set) var running: QuickAction?
+    @Published private(set) var outcome: Outcome?
+
+    private init() {}
+
+    func perform(_ action: QuickAction) {
+        guard running == nil else { return }
+        running = action
+        outcome = nil
+        Task {
+            let result = await Self.run(action)
+            running = nil
+            outcome = result
+        }
+    }
+
+    func dismiss() { outcome = nil }
+
+    private static func run(_ action: QuickAction) async -> Outcome? {
+        switch action {
+        case .lockScreen:
+            if lockScreen() { return nil }
+            return run("/usr/bin/pmset", ["displaysleepnow"])
+        case .sleepDisplay:
+            return run("/usr/bin/pmset", ["displaysleepnow"])
+        case .sleepMac:
+            return run("/usr/bin/pmset", ["sleepnow"])
+        case .toggleDarkMode:
+            return appleScript("tell application \"System Events\" to tell appearance preferences to set dark mode to not dark mode",
+                               success: nil)
+        case .toggleDesktopIcons:
+            return await toggleDesktopIcons()
+        case .ejectDisks:
+            return ejectDisks()
+        case .emptyTrash:
+            return appleScript("tell application \"Finder\" to empty trash", success: String(localized: "Çöp boşaltıldı."))
+        }
+    }
+
+    /// The login framework's immediate lock, the same call the menu bar lock item uses.
+    private static func lockScreen() -> Bool {
+        guard let handle = dlopen("/System/Library/PrivateFrameworks/login.framework/Versions/Current/login", RTLD_LAZY),
+              let symbol = dlsym(handle, "SACLockScreenImmediate") else { return false }
+        typealias Lock = @convention(c) () -> Int32
+        return unsafeBitCast(symbol, to: Lock.self)() == 0
+    }
+
+    private static func run(_ path: String, _ arguments: [String]) -> Outcome? {
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: path)
+        process.arguments = arguments
+        do {
+            try process.run()
+            process.waitUntilExit()
+            return process.terminationStatus == 0 ? nil
+                : Outcome(text: String(localized: "İşlem tamamlanamadı (\(process.terminationStatus))."), tone: .warning)
+        } catch {
+            return Outcome(text: error.localizedDescription, tone: .warning)
+        }
+    }
+
+    private static func appleScript(_ source: String, success: String?) -> Outcome? {
+        var error: NSDictionary?
+        NSAppleScript(source: source)?.executeAndReturnError(&error)
+        guard let error else { return success.map { Outcome(text: $0, tone: .success) } }
+        let code = (error[NSAppleScript.errorNumber] as? NSNumber)?.intValue ?? 0
+        if code == -1743 {
+            return Outcome(text: String(localized: "macOS izin vermedi. Sistem Ayarları › Gizlilik ve Güvenlik › Otomasyon’da MacPocket’e izin ver."),
+                           tone: .warning)
+        }
+        if code == -128 { return nil } // user cancelled Finder's own confirmation
+        return Outcome(text: (error[NSAppleScript.errorMessage] as? String) ?? String(localized: "İşlem tamamlanamadı."), tone: .warning)
+    }
+
+    private static func toggleDesktopIcons() async -> Outcome? {
+        let store = SystemHiddenSettingsStore()
+        let shown = (store.read("CreateDesktop", domain: .finder) as? NSNumber)?.boolValue ?? true
+        // Showing again deletes the key, leaving Finder exactly as macOS ships it.
+        guard store.write(shown ? .bool(false) : nil, key: "CreateDesktop", domain: .finder) else {
+            return Outcome(text: String(localized: "Finder ayarı kaydedilemedi."), tone: .warning)
+        }
+        do { try await KillallRestarter().restart(.finder) } catch { return Outcome(text: error.localizedDescription, tone: .warning) }
+        return Outcome(text: shown ? String(localized: "Masaüstü simgeleri gizlendi.") : String(localized: "Masaüstü simgeleri gösteriliyor."),
+                       tone: .success)
+    }
+
+    static func ejectableVolumes() -> [MountedVolume] {
+        let keys: [URLResourceKey] = [.volumeIsEjectableKey, .volumeIsRemovableKey, .volumeIsInternalKey,
+                                      .volumeIsRootFileSystemKey, .volumeLocalizedNameKey]
+        let urls = FileManager.default.mountedVolumeURLs(includingResourceValuesForKeys: keys, options: [.skipHiddenVolumes]) ?? []
+        return urls.compactMap { url in
+            guard let values = try? url.resourceValues(forKeys: Set(keys)) else { return nil }
+            return MountedVolume(url: url, name: values.volumeLocalizedName ?? url.lastPathComponent,
+                                 isEjectable: values.volumeIsEjectable ?? false, isRemovable: values.volumeIsRemovable ?? false,
+                                 isInternal: values.volumeIsInternal ?? true, isRoot: values.volumeIsRootFileSystem ?? false)
+        }
+        .filter(\.canEject)
+    }
+
+    private static func ejectDisks() -> Outcome {
+        let volumes = ejectableVolumes()
+        guard !volumes.isEmpty else { return Outcome(text: String(localized: "Çıkarılacak disk yok."), tone: .neutral) }
+        var busy: [String] = []
+        for volume in volumes {
+            do { try NSWorkspace.shared.unmountAndEjectDevice(at: volume.url) } catch { busy.append(volume.name) }
+        }
+        let ejected = volumes.count - busy.count
+        if busy.isEmpty { return Outcome(text: String(localized: "\(ejected) disk çıkarıldı."), tone: .success) }
+        return Outcome(text: String(localized: "\(ejected) disk çıkarıldı; kullanımda olduğu için çıkarılamayan: \(busy.joined(separator: ", "))."),
+                       tone: .warning)
+    }
+}
+
+/// Tools → Hızlı İşlemler: one-click system actions in a grid of equal tiles.
+struct QuickActionsView: View {
+    @ObservedObject private var service = QuickActionService.shared
+    @State private var confirming: QuickAction?
+    @State private var volumes = QuickActionService.ejectableVolumes()
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: PocketSpacing.l) {
+            PocketPageHeading(title: "Hızlı İşlemler", subtitle: "Sık yapılan sistem işlemlerini tek tıkla çalıştır.", icon: "bolt.circle")
+            if let outcome = service.outcome { PocketMessage(outcome.text, tone: outcome.tone) }
+            LazyVGrid(columns: [GridItem(.adaptive(minimum: 240), spacing: PocketSpacing.m)], spacing: PocketSpacing.m) {
+                ForEach(QuickAction.allCases) { action in
+                    QuickActionTile(action: action, running: service.running == action,
+                                    detail: action == .ejectDisks ? ejectDetail : action.detail) {
+                        action.needsConfirmation ? (confirming = action) : service.perform(action)
+                    }
+                    .disabled(service.running != nil || (action == .ejectDisks && volumes.isEmpty))
+                }
+            }
+            Spacer(minLength: 0)
+        }
+        .pocketPage()
+        .onReceive(NSWorkspace.shared.notificationCenter.publisher(for: NSWorkspace.didMountNotification)) { _ in volumes = QuickActionService.ejectableVolumes() }
+        .onReceive(NSWorkspace.shared.notificationCenter.publisher(for: NSWorkspace.didUnmountNotification)) { _ in volumes = QuickActionService.ejectableVolumes() }
+        .confirmationDialog(confirming?.title ?? "", isPresented: Binding(get: { confirming != nil }, set: { if !$0 { confirming = nil } })) {
+            if let action = confirming {
+                Button(action.title, role: action == .emptyTrash ? .destructive : nil) { service.perform(action) }
+            }
+        } message: {
+            Text(confirming == .emptyTrash ? "Çöp’teki öğeler kalıcı olarak silinir; geri alınamaz." : "Açık işler uyku boyunca bekler.")
+        }
+    }
+
+    private var ejectDetail: String {
+        volumes.isEmpty ? String(localized: "Takılı harici disk yok.")
+            : String(localized: "Çıkarılacak: \(volumes.map(\.name).joined(separator: ", "))")
+    }
+}
+
+private struct QuickActionTile: View {
+    let action: QuickAction
+    let running: Bool
+    let detail: String
+    let perform: () -> Void
+    @State private var hovering = false
+    @Environment(\.isEnabled) private var isEnabled
+    @PocketReduceMotion private var reduceMotion
+
+    var body: some View {
+        Button(action: perform) {
+            HStack(alignment: .top, spacing: PocketSpacing.m) {
+                ZStack {
+                    PocketIconTile(symbol: action.symbol, tint: action.tint, size: 36)
+                    if running { ProgressView().controlSize(.small).tint(.white) }
+                }
+                VStack(alignment: .leading, spacing: PocketSpacing.xxs) {
+                    Text(action.title).font(.body.weight(.semibold)).foregroundStyle(.primary)
+                    Text(detail).font(.subheadline).foregroundStyle(.secondary)
+                        .lineLimit(2, reservesSpace: true)
+                        .multilineTextAlignment(.leading)
+                }
+                Spacer(minLength: 0)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .pocketCard()
+        .overlay {
+            RoundedRectangle(cornerRadius: PocketRadius.large, style: .continuous)
+                .strokeBorder(action.tint.opacity(hovering && isEnabled ? 0.5 : 0), lineWidth: 1)
+        }
+        .scaleEffect(hovering && isEnabled && !reduceMotion ? 1.015 : 1)
+        .animation(reduceMotion ? nil : .spring(response: 0.3, dampingFraction: 0.8), value: hovering)
+        .opacity(isEnabled ? 1 : 0.55)
+        .onHover { hovering = $0 }
+        .accessibilityHint(Text(detail))
+    }
+}
+
+extension QuickAction {
+    var tint: Color {
+        switch self {
+        case .lockScreen: Color(hex: 0x5F6B7E)
+        case .sleepDisplay: PocketTheme.brand
+        case .sleepMac: Color(hex: 0x5B4BFF)
+        case .toggleDarkMode: Color(hex: 0x2C2C34)
+        case .toggleDesktopIcons: Color(hex: 0x00A6C8)
+        case .ejectDisks: PocketTheme.disk
+        case .emptyTrash: Color(hex: 0xE8458B)
+        }
+    }
+}

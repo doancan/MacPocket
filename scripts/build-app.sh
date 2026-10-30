@@ -39,7 +39,8 @@ if [ "$macpocket_configuration" = debug ]; then
     codesign --force --sign "$macpocket_identity" --entitlements Resources/MacPocket.entitlements "$macpocket_app_dir"
 else
     # Hardened runtime is required for notarization; it needs no extra entitlements for this app.
-    macpocket_sign_flags=(--force --options runtime --sign "$macpocket_identity")
+    # Hardened runtime blocks Apple events to other apps (Finder, System Events) without this entitlement.
+    macpocket_sign_flags=(--force --options runtime --entitlements Resources/MacPocketRelease.entitlements --sign "$macpocket_identity")
     if [ "$macpocket_identity" != "-" ]; then macpocket_sign_flags+=(--timestamp); fi
     codesign "${macpocket_sign_flags[@]}" "$macpocket_app_dir"
 fi

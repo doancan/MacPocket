@@ -130,6 +130,38 @@
 			<string>%lld changes pending</string>
 		</dict>
 	</dict>
+	<key>%lld disk çıkarıldı.</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key>
+		<string>%#@count@</string>
+		<key>count</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key>
+			<string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key>
+			<string>lld</string>
+			<key>one</key>
+			<string>%lld disk ejected.</string>
+			<key>other</key>
+			<string>%lld disks ejected.</string>
+		</dict>
+	</dict>
+	<key>%lld disk çıkarıldı; kullanımda olduğu için çıkarılamayan: %@.</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key>
+		<string>%#@count@</string>
+		<key>count</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key>
+			<string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key>
+			<string>lld</string>
+			<key>one</key>
+			<string>%lld disk ejected; couldn’t eject because in use: %@.</string>
+			<key>other</key>
+			<string>%lld disks ejected; couldn’t eject because in use: %@.</string>
+		</dict>
+	</dict>
 	<key>%lld dosya</key>
 	<dict>
 		<key>NSStringLocalizedFormatKey</key>

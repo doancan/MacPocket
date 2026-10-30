@@ -1,0 +1,2 @@
+/* Info.plist privacy strings in English; the Turkish source lives in Info.plist. */
+"NSAppleEventsUsageDescription" = "MacPocket asks Finder to empty the Trash and System Events to switch the appearance for quick actions.";
