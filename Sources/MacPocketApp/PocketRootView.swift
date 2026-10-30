@@ -135,6 +135,7 @@ struct PocketRootView: View {
             case .speedTest: SpeedTestView()
             case .ports: PortManagerView(model: model)
             case .quickActions: QuickActionsView()
+            case .quitGuard: QuitGuardView()
             case .none: ToolsHubView(model: model, openTool: openCatalogTool)
             }
         }
@@ -150,6 +151,7 @@ struct PocketRootView: View {
         case "launch-jobs": utility = .launchJobs; navigation.open(.utilities)
         case "listening-ports": navigation.open(.ports)
         case "quick-actions": navigation.open(.quickActions)
+        case "quit-guard": navigation.open(.quitGuard)
         case "disk-info": utility = .diskInfo; navigation.open(.utilities)
         case "spotlight": utility = .spotlight; navigation.open(.utilities)
         case "dns": utility = .dns; navigation.open(.utilities)

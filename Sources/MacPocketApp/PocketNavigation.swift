@@ -26,6 +26,7 @@ enum PocketTool: String, Identifiable {
     case taskManager = "Görev Yöneticisi", diagnostics = "Sistem Raporları", windowSwitcher = "Pencere Geçişi"
     case hiddenSettings = "Gizli Ayarlar", clipboard = "Pano Geçmişi", windowLayout = "Pencere Yerleşimi"
     case speedTest = "Ağ Hız Testi", ports = "Port Yöneticisi", quickActions = "Hızlı İşlemler"
+    case quitGuard = "Kapatma Koruması"
     var id: String { rawValue }
 }
 
