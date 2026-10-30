@@ -17,6 +17,32 @@ public struct FocusedWindow {
         return FocusedWindow(element: window, processID: pid)
     }
 
+    public init(element: AXUIElement, processID: pid_t) {
+        self.element = element
+        self.processID = processID
+    }
+
+    /// An app's ordinary windows, front to back; minimized windows, sheets and panels are skipped.
+    public static func windows(of processID: pid_t) -> [FocusedWindow] {
+        let app = AXUIElementCreateApplication(processID)
+        var value: CFTypeRef?
+        guard AXUIElementCopyAttributeValue(app, kAXWindowsAttribute as CFString, &value) == .success,
+              let list = value as? [AXUIElement] else { return [] }
+        return list.filter { window in
+            var subrole: CFTypeRef?, minimized: CFTypeRef?
+            AXUIElementCopyAttributeValue(window, kAXSubroleAttribute as CFString, &subrole)
+            AXUIElementCopyAttributeValue(window, kAXMinimizedAttribute as CFString, &minimized)
+            return (subrole as? String) == (kAXStandardWindowSubrole as String) && (minimized as? Bool) != true
+        }
+        .map { FocusedWindow(element: $0, processID: processID) }
+    }
+
+    public var title: String {
+        var value: CFTypeRef?
+        AXUIElementCopyAttributeValue(element, kAXTitleAttribute as CFString, &value)
+        return value as? String ?? ""
+    }
+
     public var frame: CGRect? {
         guard let position = Self.value(element, kAXPositionAttribute), let size = Self.value(element, kAXSizeAttribute) else { return nil }
         var point = CGPoint.zero, extent = CGSize.zero

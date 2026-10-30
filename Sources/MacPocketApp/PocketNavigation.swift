@@ -28,6 +28,7 @@ enum PocketTool: String, Identifiable {
     case speedTest = "Ağ Hız Testi", ports = "Port Yöneticisi", quickActions = "Hızlı İşlemler"
     case quitGuard = "Kapatma Koruması", brightness = "Ekran Parlaklığı", macros = "Makrolar"
     case freezer = "Uygulama Dondurucu", supportReport = "Destek Raporu", focus = "Odak Oturumu"
+    case workspaces = "Masa Düzenleri"
     var id: String { rawValue }
 }
 

@@ -181,6 +181,7 @@ extension PocketTool {
         case .freezer: String(localized: "Uygulama Dondurucu")
         case .supportReport: String(localized: "Destek Raporu")
         case .focus: String(localized: "Odak Oturumu")
+        case .workspaces: String(localized: "Masa Düzenleri")
         }
     }
 }
