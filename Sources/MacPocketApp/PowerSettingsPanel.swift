@@ -55,7 +55,7 @@ struct PowerSettingsPanel: View {
                 Text("Değişiklikler yalnızca \(profile.profile.title.lowercased()) profiline uygulanır ve yönetici parolası ister.")
                     .font(.subheadline).foregroundStyle(.secondary)
                 Divider()
-                ForEach(profile.values) { value in
+                ForEach(profile.terminalOnlyValues) { value in
                     PowerSettingRow(value: value, live: liveValue(for: value), profile: profile.profile, center: center)
                     Divider()
                 }
@@ -72,7 +72,7 @@ struct PowerSettingsPanel: View {
     private var footer: some View {
         HStack(alignment: .top, spacing: PocketSpacing.m) {
             Image(systemName: "lock.shield").foregroundStyle(.secondary).accessibilityHidden(true)
-            Text("MacPocket ayarları yalnızca `/usr/bin/pmset` ile, onayladığın tek bir komutla değiştirir. Komut sabit bir ayar listesinden ve doğrulanmış sayılardan oluşturulur. Ekran kilidi ve Power Nap gibi ayarlar Sistem Ayarları’nda da bulunur.")
+            Text("Burada yalnız Sistem Ayarları’nda karşılığı olmayan, normalde Terminal’de pmset ile değiştirilen ayarlar listelenir; uyku, Power Nap ve ağ erişimiyle uyandırma gibi ayarlar Sistem Ayarları’nda kalır. MacPocket değişikliği yalnızca `/usr/bin/pmset` ile, onayladığın tek bir komutla yapar; komut sabit bir ayar listesinden ve doğrulanmış sayılardan oluşturulur.")
                 .font(.subheadline).foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
             Spacer()

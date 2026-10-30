@@ -1,6 +1,5 @@
 import AppKit
 import MacPocketCore
-import ServiceManagement
 import SwiftUI
 
 struct PocketRootView: View {
@@ -130,6 +129,7 @@ struct PocketRootView: View {
             case .taskManager: TaskManagerView(model: model)
             case .diagnostics: SystemToolsView()
             case .windowSwitcher: WindowSwitcherView()
+            case .hiddenSettings: HiddenSettingsView()
             case .none: ToolsHubView(model: model, openTool: openCatalogTool)
             }
         }
@@ -150,10 +150,10 @@ struct PocketRootView: View {
         case "routes": utility = .routes; navigation.open(.utilities)
         case "os-updates": utility = .updateHistory; navigation.open(.utilities)
         case "security": utility = .systemIntegrity; navigation.open(.utilities)
-        case "permissions": NSWorkspace.shared.open(URL(fileURLWithPath: "/System/Applications/System Settings.app"))
         case "task-manager": navigation.open(.taskManager)
         case "system-reports": navigation.open(.diagnostics)
         case "window-switcher": navigation.open(.windowSwitcher)
+        case "hidden-settings": navigation.open(.hiddenSettings)
         case "uninstaller": model.applications.showUpdates = false; navigation.select(.applications)
         case "app-updater": model.applications.showUpdates = true; navigation.select(.applications)
         case "downloads": model.storage.useRoot(home.appendingPathComponent("Downloads")); navigation.select(.storage)
@@ -161,7 +161,6 @@ struct PocketRootView: View {
         case "large-old": model.storage.scope = .old; navigation.select(.storage)
         case "system-junk": navigation.select(.cleanup)
         case "trash": navigation.select(.cleanup)
-        case "login-items", "background-items": SMAppService.openSystemSettingsLoginItems()
         default: break
         }
     }

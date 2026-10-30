@@ -185,6 +185,18 @@ public enum PMSettingKey: String, CaseIterable, Codable, Sendable {
         }
     }
 
+    /// macOS already offers a control for this in System Settings (Battery, Energy, Lock Screen), so MacPocket
+    /// doesn't duplicate it; only Terminal-only settings are listed.
+    public var hasSystemSettingsControl: Bool {
+        switch self {
+        case .displaysleep, .sleep, .disksleep, .womp, .powernap, .autorestart, .lowpowermode, .powermode,
+             .lessbright, .gpuswitch:
+            true
+        default:
+            false
+        }
+    }
+
     /// Display order: the settings people change most come first.
     public var order: Int { Self.allCases.firstIndex(of: self) ?? Int.max }
 
@@ -254,6 +266,9 @@ public struct PMSettingsProfile: Equatable, Sendable, Identifiable {
     public let values: [PMSettingValue]
 
     public func value(_ key: PMSettingKey) -> PMSettingValue? { values.first { $0.key == key } }
+
+    /// Settings that have no control in System Settings; unknown keys stay visible so nothing pmset reports is hidden.
+    public var terminalOnlyValues: [PMSettingValue] { values.filter { !($0.key?.hasSystemSettingsControl ?? false) } }
 }
 
 /// `pmset -g` "Currently in use" block plus processes reported as preventing sleep.

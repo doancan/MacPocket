@@ -146,7 +146,10 @@ struct ToolsHubView: View {
 
     // MARK: - Data
 
-    private var favoriteIDs: Set<String> { Set(favorites.split(separator: ",").map(String.init)) }
+    /// Stored favorites, minus tools that were removed from the catalog.
+    private var favoriteIDs: Set<String> {
+        Set(favorites.split(separator: ",").map(String.init)).intersection(HubTool.catalog.map(\.id))
+    }
 
     private var visibleTools: [HubTool] {
         let favoriteIDs = favoriteIDs
@@ -164,9 +167,7 @@ struct ToolsHubView: View {
                 ? .init(text: String(localized: "Etkin"), symbol: "circle.fill", tone: .accent)
                 : nil
         }
-        return tool.opensSystemSettings
-            ? .init(text: String(localized: "Sistem Ayarları"), symbol: "arrow.up.forward.app", tone: .neutral)
-            : nil
+        return nil
     }
 
     private func open(_ tool: HubTool) {
@@ -490,8 +491,6 @@ private struct HubTool: Identifiable {
     let description: String
     let icon: String
     let category: HubCategory
-    /// The tool hands off to macOS System Settings instead of a MacPocket page.
-    var opensSystemSettings = false
 
     static let catalog: [HubTool] = [
         .init(id: "mac-utilities", title: String(localized: "macOS Araçları"), description: String(localized: "Sistem raporları ve macOS ayarlarına hızlı erişim."), icon: "hammer", category: .system),
@@ -504,17 +503,15 @@ private struct HubTool: Identifiable {
         .init(id: "os-updates", title: String(localized: "macOS Güncellemeleri"), description: String(localized: "Yüklü sistem güncellemelerini incele ve sistem ayarlarına git."), icon: "arrow.down.circle", category: .system),
         .init(id: "security", title: String(localized: "Sistem Güvenliği"), description: String(localized: "SIP ve Gatekeeper durumunu salt okunur olarak incele."), icon: "lock.shield", category: .privacy),
         .init(id: "task-manager", title: String(localized: "Görev Yöneticisi"), description: String(localized: "Süreçleri ve kaynak kullanımını incele, seçtiğin uygulamayı sonlandır."), icon: "list.bullet.rectangle", category: .system),
+        .init(id: "hidden-settings", title: String(localized: "Gizli Ayarlar"), description: String(localized: "Sistem Ayarları’nda olmayan Dock, Finder, ekran görüntüsü ve klavye ayarlarını Terminal’e girmeden değiştir."), icon: "terminal", category: .system),
         .init(id: "system-reports", title: String(localized: "Sistem Raporları"), description: String(localized: "Bellek, ağ, açık dosyalar ve güç için salt okunur tanılar."), icon: "terminal", category: .system),
         .init(id: "keep-awake", title: String(localized: "Mac'i Uyanık Tut"), description: String(localized: "Süreli veya sen durdurana kadar uyanık tut. Ekranı ayrıca açık tutabilirsin."), icon: "cup.and.saucer", category: .productivity),
         .init(id: "window-switcher", title: String(localized: "Pencere Geçişi"), description: String(localized: "Açık pencereler arasında klavyeyle geçiş yap."), icon: "macwindow.on.rectangle", category: .productivity),
         .init(id: "app-leftovers", title: String(localized: "Uygulama Kalıntıları"), description: String(localized: "Kaldırılan uygulamaların geride bıraktığı öğeleri bul."), icon: "square.dashed", category: .applications),
         .init(id: "app-updater", title: String(localized: "Uygulama Güncelleme"), description: String(localized: "Kurulum kanalına göre uygulama güncellemelerini incele."), icon: "arrow.triangle.2.circlepath", category: .applications),
-        .init(id: "permissions", title: String(localized: "Uygulama İzinleri"), description: String(localized: "macOS Sistem Ayarlarını aç; Gizlilik ve Güvenlik bölümünden izinlerini yönet."), icon: "hand.raised", category: .privacy, opensSystemSettings: true),
-        .init(id: "background-items", title: String(localized: "Arka Plan Öğeleri"), description: String(localized: "Arka planda çalışan görev ve yardımcıları Sistem Ayarları'nda yönet."), icon: "rectangle.stack", category: .applications, opensSystemSettings: true),
         .init(id: "downloads", title: String(localized: "İndirilenler"), description: String(localized: "İndirilmiş dosyaları boyut ve tarihe göre ayıkla."), icon: "arrow.down.circle", category: .files),
         .init(id: "duplicates", title: String(localized: "Yinelenen Dosyalar"), description: String(localized: "İçeriği aynı dosyaları karşılaştırarak alan kazan."), icon: "doc.on.doc", category: .files),
         .init(id: "large-old", title: String(localized: "Büyük ve Eski Dosyalar"), description: String(localized: "Diskte yer kaplayan büyük ve eski dosyaları bul."), icon: "doc.badge.clock", category: .files),
-        .init(id: "login-items", title: String(localized: "Giriş Öğeleri"), description: String(localized: "Oturum açılışında başlayan uygulamaları Sistem Ayarları'nda incele."), icon: "power", category: .applications, opensSystemSettings: true),
         .init(id: "screen-cleaning", title: String(localized: "Ekran Temizleme Modu"), description: String(localized: "Ekranları kısa süre karart; MacPocket içindeki yanlış girişleri önle. Escape veya iki saniye basılı tutarak çık."), icon: "display", category: .productivity),
         .init(id: "similar-images", title: String(localized: "Benzer Görseller"), description: String(localized: "Görsel benzerliği bulunan adayları yan yana karşılaştır."), icon: "photo.on.rectangle", category: .files),
         .init(id: "system-junk", title: String(localized: "Sistem Gereksiz Dosyaları"), description: String(localized: "Önbellek ve log adaylarını kategorileriyle incele."), icon: "externaldrive.badge.minus", category: .system),

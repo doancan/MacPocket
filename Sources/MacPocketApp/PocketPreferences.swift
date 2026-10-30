@@ -169,6 +169,7 @@ extension PocketTool {
         case .taskManager: String(localized: "Görev Yöneticisi")
         case .diagnostics: String(localized: "Sistem Raporları")
         case .windowSwitcher: String(localized: "Pencere Geçişi")
+        case .hiddenSettings: String(localized: "Gizli Ayarlar")
         }
     }
 }

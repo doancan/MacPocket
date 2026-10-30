@@ -160,6 +160,21 @@ final class PowerParserTests: XCTestCase {
         XCTAssertTrue(PMSettingsParser.parseLive("garbage\n").values.isEmpty)
     }
 
+    func testPanelListsOnlySettingsMissingFromSystemSettings() {
+        let ac = PMSettingsParser.parseCustom(Self.customDesktop)[0]
+        // Sleep, display sleep, Power Nap, wake for network, restart after power failure, low power and disk
+        // sleep all have controls in System Settings; the rest exist only in pmset.
+        XCTAssertEqual(Set(ac.terminalOnlyValues.map(\.name)),
+                       ["Sleep On Power Button", "autorestartatconnect", "standby", "ttyskeepawake", "networkoversleep", "tcpkeepalive"])
+        XCTAssertTrue(PMSettingKey.hibernatemode.isEditable && !PMSettingKey.hibernatemode.hasSystemSettingsControl)
+        XCTAssertTrue(PMSettingKey.powernap.hasSystemSettingsControl)
+    }
+
+    func testUnknownKeysStayVisibleInThePanel() {
+        let profile = PMSettingsParser.parseCustom("AC Power:\n futurekey            7\n sleep 1\n")[0]
+        XCTAssertEqual(profile.terminalOnlyValues.map(\.name), ["futurekey"])
+    }
+
     func testUnknownKeysStayReadable() {
         let profiles = PMSettingsParser.parseCustom("AC Power:\n futurekey            7\n")
         XCTAssertEqual(profiles.first?.values.first?.name, "futurekey")

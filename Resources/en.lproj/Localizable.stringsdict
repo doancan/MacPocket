@@ -98,6 +98,38 @@
 			<string>%lld dark wakes</string>
 		</dict>
 	</dict>
+	<key>%lld ayar kaydedildi.</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key>
+		<string>%#@count@</string>
+		<key>count</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key>
+			<string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key>
+			<string>lld</string>
+			<key>one</key>
+			<string>%lld setting saved.</string>
+			<key>other</key>
+			<string>%lld settings saved.</string>
+		</dict>
+	</dict>
+	<key>%lld değişiklik bekliyor</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key>
+		<string>%#@count@</string>
+		<key>count</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key>
+			<string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key>
+			<string>lld</string>
+			<key>one</key>
+			<string>%lld change pending</string>
+			<key>other</key>
+			<string>%lld changes pending</string>
+		</dict>
+	</dict>
 	<key>%lld dosya</key>
 	<dict>
 		<key>NSStringLocalizedFormatKey</key>
