@@ -179,6 +179,7 @@ extension PocketTool {
         case .brightness: String(localized: "Ekran Parlaklığı")
         case .macros: String(localized: "Makrolar")
         case .freezer: String(localized: "Uygulama Dondurucu")
+        case .supportReport: String(localized: "Destek Raporu")
         }
     }
 }

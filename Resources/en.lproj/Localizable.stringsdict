@@ -642,6 +642,22 @@
 			<string>%lld sleeps in 24 hours</string>
 		</dict>
 	</dict>
+	<key>Açık kalma süresi: %lld saat</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key>
+		<string>%#@count@</string>
+		<key>count</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key>
+			<string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key>
+			<string>lld</string>
+			<key>one</key>
+			<string>Uptime: %lld hour</string>
+			<key>other</key>
+			<string>Uptime: %lld hours</string>
+		</dict>
+	</dict>
 	<key>En büyük %lld dosya listeleniyor.</key>
 	<dict>
 		<key>NSStringLocalizedFormatKey</key>
