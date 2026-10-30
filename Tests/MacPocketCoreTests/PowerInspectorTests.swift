@@ -1,4 +1,5 @@
 import Darwin
+import CoreGraphics
 import XCTest
 @testable import MacPocketCore
 
@@ -144,8 +145,11 @@ final class PowerLiveSystemTests: XCTestCase {
         let assertions = try await PowerCommandReader.assertions()
         XCTAssertFalse(assertions.systemWide.isEmpty)
         XCTAssertTrue(assertions.systemWide.keys.contains("PreventUserIdleSystemSleep"))
-        // powerd holds an assertion while the display is on on every Mac.
-        XCTAssertTrue(assertions.assertions.contains { $0.process == "powerd" }, "\(assertions.assertions.map(\.process))")
+        // powerd holds an assertion while the display is on on every Mac; with the display asleep (e.g. a test run
+        // at night) it legitimately doesn't.
+        if CGDisplayIsAsleep(CGMainDisplayID()) == 0 {
+            XCTAssertTrue(assertions.assertions.contains { $0.process == "powerd" }, "\(assertions.assertions.map(\.process))")
+        }
 
         let thermal = try await PowerCommandReader.thermal()
         XCTAssertFalse(thermal.notes.isEmpty && thermal.values.isEmpty)
