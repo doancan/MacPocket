@@ -1991,3 +1991,17 @@
 "İçe aktarılan makro etkinleştirilsin mi?" = "Enable the imported macro?";
 "“%@” içe aktarıldı; çalıştırmadan önce adımlarını inceleyip etkinleştir." = "“%@” was imported; review its steps and enable it before running it.";
 "“%@” başka bir yerden geldi. Etkinleştirmeden önce çalıştıracağı her şeyi oku." = "“%@” came from elsewhere. Read everything it will run before enabling it.";
+"%@ kuralını kaldır" = "Remove the rule for %@";
+"Arka planda bekleyen uygulamaları dondurup işlemci ve pili koru; öne geldiklerinde anında çözülsünler." = "Freeze apps waiting in the background to save CPU and battery; they resume the moment they come forward.";
+"Arka planda müzik çalan, dosya indiren veya senkronize eden uygulamaları ekleme: dondurulduklarında bu işler de durur." = "Don’t add apps that play music, download or sync in the background: freezing stops that work too.";
+"Bekleme" = "Wait";
+"Donduruldu" = "Frozen";
+"Henüz kural yok. Aşağıdan çalışan bir uygulamayı ekleyebilir ya da Uygulamalar klasöründen seçebilirsin." = "No rules yet. Add a running app below or choose one from the Applications folder.";
+"Kural ekle" = "Add Rule";
+"Kurallar" = "Rules";
+"Seçtiğin uygulamalar arka planda bir süre kalınca dondurulur ve işlemci kullanmaz; öne geldiklerinde anında çözülür." = "Chosen apps are frozen after some time in the background and use no CPU; they resume as soon as they come forward.";
+"Uygulama Dondurucu" = "App Freezer";
+"Uygulama dondurucu" = "App freezer";
+"Çalışan uygulamalar" = "Running apps";
+"Çöz" = "Resume";
+"Şimdi dondur" = "Freeze Now";

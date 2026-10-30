@@ -204,5 +204,6 @@ final class PocketApplicationState: ObservableObject {
         QuitGuardService.shared.start()
         DisplayBrightnessService.shared.start()
         MacroService.shared.start()
+        AppFreezerService.shared.start()
     }
 }
