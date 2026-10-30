@@ -210,6 +210,22 @@
 			<string>%lld updates</string>
 		</dict>
 	</dict>
+	<key>%lld güncelleme hazır</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key>
+		<string>%#@count@</string>
+		<key>count</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key>
+			<string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key>
+			<string>lld</string>
+			<key>one</key>
+			<string>%lld update ready</string>
+			<key>other</key>
+			<string>%lld updates ready</string>
+		</dict>
+	</dict>
 	<key>%lld günden uzun süredir dokunulmamış indirilen öğeler. Seçmeden önce incele.</key>
 	<dict>
 		<key>NSStringLocalizedFormatKey</key>
@@ -352,6 +368,22 @@
 			<string>Found %lld duplicate group.</string>
 			<key>other</key>
 			<string>Found %lld duplicate groups.</string>
+		</dict>
+	</dict>
+	<key>%lld çekirdek</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key>
+		<string>%#@count@</string>
+		<key>count</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key>
+			<string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key>
+			<string>lld</string>
+			<key>one</key>
+			<string>%lld core</string>
+			<key>other</key>
+			<string>%lld cores</string>
 		</dict>
 	</dict>
 	<key>%lld öğe</key>

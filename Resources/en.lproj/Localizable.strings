@@ -17,7 +17,6 @@
 "%@ bırak" = "Release %@";
 "%@ bırak: seç" = "Release %@: choose";
 "%@ dolu, %@ boş" = "%@ full, %@ free";
-"%@ doluluk" = "%@ usage";
 "%@ etkin. Shift ile ters yönde gezin." = "%@ active. Hold Shift to go backwards.";
 "%@ fiziksel" = "%@ physical";
 "%@ fiziksel · Sıkıştırılmış %@" = "%@ physical · %@ compressed";
@@ -53,7 +52,6 @@
 "%@ · PID %d sonlandı." = "%@ · PID %d has quit.";
 "%@ · dolmasına %@" = "%@ · %@ until full";
 "%@ öndeyken kısayollar devre dışı." = "Shortcuts are paused while %@ is in front.";
-"%@ öğe · %@ temizlenebilir" = "%@ items · %@ can be freed";
 "%@, işlemci %@" = "%1$@, CPU %2$@";
 "%@: %@ boş" = "%@: %@ free";
 "%@: %@ dolu" = "%@: %@ full";
@@ -146,7 +144,6 @@
 "3 Saniye Sonra Başlat" = "Start in 3 Seconds";
 "30 dakika" = "30 minutes";
 "30 dk" = "30 min";
-"30 dk Uyanık Tut" = "Keep Awake 30 Min";
 "30 dk uyanık tut" = "Keep awake for 30 minutes";
 "30 günden eski" = "Older than 30 days";
 "30 saniye" = "30 seconds";
@@ -181,7 +178,6 @@
 "Arama: %@" = "Search: %@";
 "Aramayı veya kategori seçimini değiştir." = "Try a different search or category.";
 "Arayüz sayaçları ve hatalar" = "Interface counters and errors";
-"Araç Kutusu" = "Toolbox";
 "Araç ara" = "Search tools";
 "Araç ara…" = "Search Tools…";
 "Araç bulunamadı" = "No Tools Found";
@@ -217,7 +213,6 @@
 "Ayrı" = "Separate";
 "Ayrı gösterilemeyecek kadar küçük öğelerin toplamı" = "Combined size of items too small to show individually";
 "Ayrık GPU" = "Discrete GPU";
-"Ayrıntılar için Sistem İzleme’yi aç." = "Open System Monitor for details.";
 "Ayrıntılar ve işlemler için listeden bir süreç seç." = "Select a process in the list for details and actions.";
 "Ayrıntıları göstermek için tıkla" = "Click to show details";
 "Aç" = "Open";
@@ -339,7 +334,6 @@
 "Bu Mac’te bulunmayan konumlar: %@" = "Not on this Mac: %@";
 "Bu Mac’te dahili pil yok" = "This Mac has no internal battery";
 "Bu Mac’te dahili pil yok. Anlık güç tüketimi ve uyku yönetimi aşağıda." = "This Mac has no internal battery. Live power use and sleep management are below.";
-"Bu Mac’te dahili pil yok. Uyku yönetimi ve güç geçmişi kullanılabilir." = "This Mac has no internal battery. Sleep management and power history are available.";
 "Bu Uygulamayı Hariç Tut" = "Exclude This App";
 "Bu aralıkta ölçülebilir enerji kullanımı yok." = "No measurable energy use in this interval.";
 "Bu araç dosya silmez veya yüklemez; tüm analiz bu Mac’te yapılır." = "This tool never deletes or uploads files; all analysis happens on this Mac.";
@@ -400,7 +394,6 @@
 "Dakika" = "Minutes";
 "Dakikada bir" = "Every minute";
 "Davranış" = "Behavior";
-"Depolama" = "Storage";
 "Derleme ara ürünleri ve dizinler. Xcode bir sonraki derlemede yeniden oluşturur." = "Intermediate build products and indexes. Xcode rebuilds them on the next build.";
 "Desteklenen görseller bulunuyor…" = "Finding supported images…";
 "Değer" = "Value";
@@ -413,10 +406,8 @@
 "Dinleyen Portlar" = "Listening Ports";
 "Disk" = "Disk";
 "Disk Analizi" = "Disk Analysis";
-"Disk Analizini Aç" = "Open Disk Analysis";
 "Disk Bilgileri" = "Disk Info";
 "Disk alanı azaldı" = "Disk space is low";
-"Disk bilgisi okunuyor…" = "Reading disk information…";
 "Disk bölümü" = "Volume";
 "Disk doluluğu" = "Disk usage";
 "Disk etkinliği: okuma %@, yazma %@" = "Disk activity: read %@, write %@";
@@ -605,7 +596,6 @@
 "Güncelleme bulunamadı" = "No Updates Found";
 "Güncellemeler" = "Updates";
 "Güncellemeler hakkında" = "About updates";
-"Güncellemeler henüz kontrol edilmedi" = "Updates not checked yet";
 "Güncellemeler kontrol ediliyor…" = "Checking for updates…";
 "Güncellemeleri Kontrol Et" = "Check for Updates";
 "Güncellemeleri kontrol et" = "Check for Updates";
@@ -621,7 +611,6 @@
 "Güç Geçmişini Temizle…" = "Clear Power History…";
 "Güç Merkezi" = "Power Center";
 "Güç Merkezi bölümü" = "Power Center section";
-"Güç Merkezini Aç" = "Open Power Center";
 "Güç Raporları" = "Power Reports";
 "Güç adaptörü" = "Power Adapter";
 "Güç adaptörü takılıp çıkarıldığında Mac uyanır." = "The Mac wakes when the power adapter is connected or disconnected.";
@@ -718,7 +707,6 @@
 "Kaydedilen pil ve güç olayları silinir. Bu işlem geri alınamaz." = "Recorded battery and power events will be deleted. This can’t be undone.";
 "Kaydedilmemiş değişiklikler kaybolabilir." = "Unsaved changes may be lost.";
 "Kaydedilmiş durum" = "Saved state";
-"Kaynaklar dengeli; %@ kesintisiz çalışıyor." = "Resources are balanced; running for %@ without a restart.";
 "Kayıt tarihi: %@ – %@" = "Recorded: %1$@ – %2$@";
 "Kayıtlı olay yok" = "No Recorded Events";
 "Kenar çubuğu simgeleri" = "Sidebar icons";
@@ -829,9 +817,7 @@
 "Mac’i uyanık tutma etkin" = "Keep-awake is on";
 "Mac’in" = "Your Mac";
 "Mac’in güç girişinden çektiği anlık güç (PowerTelemetry)" = "Instantaneous power the Mac draws from its power input (PowerTelemetry)";
-"Mac’in inceleniyor" = "Checking your Mac";
 "Mac’in iyi durumda" = "Your Mac is in good shape";
-"Mac’inin durumu, bakım işlemleri ve günlük araçların." = "Your Mac’s health, maintenance and everyday tools.";
 "Mail Ekleri" = "Mail Attachments";
 "Mail’in açtığın ekler için tuttuğu kopyalar. Asılları Mail’de kalır." = "Copies Mail keeps of attachments you’ve opened. The originals stay in Mail.";
 "Maksimum kapasite" = "Maximum capacity";
@@ -887,7 +873,6 @@
 "Otomatik kapanma" = "Auto power off";
 "Otomatik kapanma gecikmesi" = "Auto power off delay";
 "Otomatik kapanmaya geçmeden önce uykuda geçen saniye." = "Seconds spent asleep before powering off automatically.";
-"Otomatik uyku normal" = "Automatic sleep is normal";
 "Otomatik, düşük güç veya yüksek güç modu (destekleyen Mac’lerde)." = "Automatic, low power or high power mode (on supported Macs).";
 "Oturum Görevleri" = "Session Jobs";
 "Oturum açıldığında MacPocket’ı başlat" = "Open MacPocket at login";
@@ -926,7 +911,6 @@
 "Pencereyi kapattığında izleme menü çubuğunda sürer. Dock simgesi gizliyken MacPocket’a menü çubuğundan ulaşırsın." = "Monitoring continues in the menu bar after you close the window. With the Dock icon hidden, reach MacPocket from the menu bar.";
 "Pencereyi Öne Getir" = "Bring Window to Front";
 "Pil" = "Battery";
-"Pil %@" = "Battery %@";
 "Pil Ayarları" = "Battery Settings";
 "Pil denetleyicisi" = "Battery controller";
 "Pil dolu; adaptörden çalışıyor." = "Battery charged; running on the adapter.";
@@ -936,11 +920,9 @@
 "Pil kullanılıyor" = "On battery";
 "Pil sağlığı" = "Battery health";
 "Pil sağlığı, döngü sayısı ve şarj bilgileri yalnızca dizüstü Mac’lerde gösterilir." = "Battery health, cycle count and charging details appear only on Mac laptops.";
-"Pil seviyesi okunuyor" = "Reading battery level";
 "Pil ve güç olayları dakikada en çok bir kez kaydedilir. Süreyi kısaltmak eski kayıtları siler." = "Battery and power events are recorded at most once a minute. Shortening the period deletes older records.";
 "Pil yok" = "No battery";
 "Pil yüzdesi" = "Battery percentage";
-"Pil, termal durum ve uyku yönetimi." = "Battery, thermal state and sleep management.";
 "Pil: %@" = "Battery: %@";
 "Pil: %@ (şarj oluyor)" = "Battery: %@ (charging)";
 "Pilde ekranı hafif karart" = "Slightly dim the display on battery";
@@ -1115,7 +1097,6 @@
 "Sürüm" = "Version";
 "Sürüm %@" = "Version %@";
 "Sürüm sabitlenmiş" = "Version pinned";
-"Sürümleri ve kurulum kanallarını gör; kaldırmadan önce ilişkili dosyaları incele." = "See versions and install sources; review related files before uninstalling.";
 "Sütunlar" = "Columns";
 "Sıcaklık" = "Temperature";
 "Sıfırla" = "Reset";
@@ -1181,7 +1162,6 @@
 "Trackpad" = "Trackpad";
 "Tuş %u" = "Key %u";
 "Tuşlara bas…" = "Press keys…";
-"Tüm Araçları Aç" = "Open All Tools";
 "Tüm Araçları Göster" = "Show All Tools";
 "Tüm Ayarları Sıfırla…" = "Reset All Settings…";
 "Tüm ayarlar sıfırlansın mı?" = "Reset all settings?";
@@ -1216,7 +1196,6 @@
 "Uyanık Tutmayı Başlat" = "Start Keeping Awake";
 "Uyanık Tutmayı Durdur" = "Stop Keeping Awake";
 "Uyanık tut" = "Keep Awake";
-"Uyanık tutma etkin" = "Keep awake is on";
 "Uyanık tutma süresi sıfırdan büyük, sonlu ve en fazla 7 gün olmalıdır." = "The keep-awake duration must be greater than zero, finite and at most 7 days.";
 "Uyanık tutuluyor" = "Keeping awake";
 "Uyarı" = "Warning";
@@ -1253,7 +1232,6 @@
 "Uygulamalar inceleniyor…" = "Scanning applications…";
 "Uygulamalar, arka plan işlemleri ve sistem süreçleri." = "Apps, background tasks and system processes.";
 "Uygulamalar, belgeler, önbellekler ve geliştirici verilerinin diskte gerçekte kapladığı alanı ölçer. Dosyalar değiştirilmez." = "Measures the actual disk space used by apps, documents, caches and developer data. Files aren’t changed.";
-"Uygulamaları Yönet" = "Manage Applications";
 "Uygulamaların gerektiğinde yeniden oluşturduğu önbellek klasörleri." = "Cache folders that apps recreate when needed.";
 "Uygulamaların yeniden oluşturabildiği önbellek dosyaları." = "Cache files that apps can recreate.";
 "Uygulamaların ~/Library/Application Support altında tuttuğu veriler." = "Data apps keep in ~/Library/Application Support.";
@@ -1447,7 +1425,6 @@
 "Ölçüm sınıra ulaştı; boyut eksik olabilir." = "Measurement hit a limit; the size may be incomplete.";
 "Önbellek" = "Cache";
 "Önbellek ve boş" = "Cached and free";
-"Önbellek ve günlükleri inceleyerek başla." = "Start by reviewing caches and logs.";
 "Önbellek ve log adaylarını kategorileriyle incele." = "Review cache and log candidates by category.";
 "Önbellekler" = "Caches";
 "Önbellekler, günlükler, Xcode verileri ve paket yöneticisi indirmeleri. Tarama hiçbir dosyayı değiştirmez." = "Caches, logs, Xcode data and package manager downloads. Scanning never changes any files.";
@@ -1487,7 +1464,6 @@
 "İlk ölçüm alınıyor…" = "Taking the first sample…";
 "İlk ölçüm aralığından sonra grafik oluşur." = "The chart appears after the first sampling interval.";
 "İlk ölçüm bekleniyor" = "Waiting for the first sample";
-"İlk ölçüm birkaç saniye içinde gelir." = "The first reading arrives in a few seconds.";
 "İncele" = "Review";
 "İnceleme iptal edildi." = "Analysis canceled.";
 "İncelenecek en büyük görsel sayısı" = "Maximum number of images to analyze";
@@ -1809,3 +1785,31 @@
 "İndirme ve yükleme aynı anda ölçülür; gerçek kullanıma en yakın sonuç ve yanıt verme puanı bu modda çıkar." = "Download and upload are measured at once; this gives the result closest to real use and the responsiveness score.";
 "İndirme, yükleme ve yanıt verme hızını macOS’un yerleşik aracıyla ölç; sonuçları karşılaştır." = "Measure download, upload and responsiveness with macOS’s built-in tool and compare results.";
 "İptal" = "Cancel";
+"%@ ayrıntılarını aç" = "Open %@ details";
+"%@ dolu" = "%@ full";
+"%@ ile panel" = "%@ opens the panel";
+"%@ uyanık tut" = "Keep awake for %@";
+"%@ · %@ içinde boş" = "%@ free of %@";
+"%@ öğe temizlenebilir" = "%@ items to clean";
+"Azami fan hızına oran" = "Share of maximum fan speed";
+"Ağ Hızı" = "Network Speed";
+"Bu oturumda ↓ %@ · ↑ %@" = "This session ↓ %@ · ↑ %@";
+"Denetle" = "Check";
+"Durdurana kadar uyanık tut" = "Keep awake until stopped";
+"En hızlı fan · ısı %@" = "Fastest fan · thermal %@";
+"Gizli dosyalar" = "Hidden files";
+"Gizli dosyalar Finder’ı yeniden başlatır." = "Hidden files restarts Finder.";
+"Güncellemeler denetlenmedi" = "Updates not checked";
+"Güç ve Isı" = "Power and Heat";
+"Hızlı Ayarlar" = "Quick Settings";
+"Hızı ölç" = "Test Speed";
+"Isı %@" = "Thermal %@";
+"Kopyaladıkların kaydedilmiyor" = "Copies aren’t being saved";
+"Mac ve ekran uyanık" = "Mac and display awake";
+"Menü çubuğu simgesi" = "Menu bar icon";
+"Otomatik uyku normal çalışıyor" = "Automatic sleep works normally";
+"Pil · ısı %@" = "Battery · thermal %@";
+"Uyanık Tut" = "Keep Awake";
+"Yük %@" = "Load %@";
+"Önbellek ve günlükleri tara" = "Scan caches and logs";
+"İnceleniyor" = "Checking";
