@@ -44,7 +44,7 @@ struct PocketMenuBarView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: PocketSpacing.m) {
             if content == .grouped {
-                GlassTabBar(tabs: tabs, selection: $selection)
+                GlassTabBar(tabs: tabs, selection: $selection, showsShortcutHints: true)
                     .background { GlassTabKeyboardShortcuts(tabs: tabs, selection: $selection) }
             }
             MenuBarModuleDetail(module: module, model: model, history: history, binaryUnits: store.preferences.binaryUnits)

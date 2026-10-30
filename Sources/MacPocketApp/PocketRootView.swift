@@ -70,6 +70,10 @@ struct PocketRootView: View {
                         ToolbarItem(id: "refresh", placement: .primaryAction) { PocketRefreshButton(model: model) }
                         ToolbarItem(id: "pause", placement: .primaryAction) { PocketPauseButton(model: model) }
                         ToolbarItem(id: "interval", placement: .primaryAction) { PocketIntervalMenu(model: model) }
+                        // Monitoring controls share one glass group; Settings sits in its own.
+                        if #available(macOS 26.0, *) {
+                            ToolbarSpacer(.fixed, placement: .primaryAction)
+                        }
                         ToolbarItem(id: "settings", placement: .primaryAction) {
                             SettingsLink { Label("Ayarlar", systemImage: "gearshape") }.help("Ayarlar (⌘,)")
                         }
@@ -206,15 +210,42 @@ private struct PocketSidebarSettingsButton: View {
 
 private struct PocketRefreshButton: View {
     @ObservedObject var model: PocketModel
+    @State private var refreshCount = 0
+    @PocketReduceMotion private var reduceMotion
+
     var body: some View {
-        Button { Task { await model.refresh() } } label: { Label("Şimdi Yenile", systemImage: "arrow.clockwise") }.help("Şimdi yenile (⌘R)")
+        Button {
+            refreshCount += 1
+            Task { await model.refresh() }
+        } label: {
+            Label("Şimdi Yenile", systemImage: "arrow.clockwise")
+                .modifier(PocketRefreshSpin(trigger: refreshCount, enabled: !reduceMotion))
+        }
+        .help("Şimdi yenile (⌘R)")
     }
 }
+
+/// One clockwise turn of the refresh glyph per click (macOS 15+).
+private struct PocketRefreshSpin: ViewModifier {
+    let trigger: Int
+    let enabled: Bool
+
+    @ViewBuilder
+    func body(content: Content) -> some View {
+        if #available(macOS 15.0, *), enabled {
+            content.symbolEffect(.rotate.clockwise, options: .speed(1.6), value: trigger)
+        } else {
+            content
+        }
+    }
+}
+
 private struct PocketPauseButton: View {
     @ObservedObject var model: PocketModel
     var body: some View {
         Button { model.paused.toggle() } label: {
             Label(model.paused ? "İzlemeyi Sürdür" : "İzlemeyi Duraklat", systemImage: model.paused ? "play" : "pause")
+                .contentTransition(.symbolEffect(.replace))
         }.help("İzlemeyi duraklat/sürdür (⇧⌘P)")
     }
 }

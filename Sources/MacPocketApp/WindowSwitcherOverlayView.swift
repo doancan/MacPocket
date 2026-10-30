@@ -14,11 +14,50 @@ struct WindowSwitcherOverlayView: View {
     @Namespace private var selectionSpace
     @State private var appeared = false
 
+    private static let radius: CGFloat = 20
+
     var body: some View {
-        let windows = model.filtered
         let layout = controller.layout
+        surface(layout)
+            .frame(width: layout.panelSize.width, height: layout.panelSize.height)
+            .onAppear { withAnimation(reduceMotion ? .linear(duration: 0.05) : .spring(response: 0.22, dampingFraction: 0.86)) { appeared = true } }
+            .animation(reduceMotion ? nil : .spring(response: 0.28, dampingFraction: 0.88), value: model.filtered.map(\.id))
+            .accessibilityElement(children: .contain)
+            .accessibilityLabel("Pencere geçişi")
+    }
+
+    /// macOS 26+: the panel is a Liquid Glass HUD that materializes over the desktop; the selection frame,
+    /// hover fills and search pill on it are plain fills (no glass on glass). Earlier systems: a thick material
+    /// that fades and scales in.
+    @ViewBuilder private func surface(_ layout: SwitcherLayout) -> some View {
+        let shape = RoundedRectangle(cornerRadius: Self.radius, style: .continuous)
+        if #available(macOS 26.0, *) {
+            GlassEffectContainer {
+                if appeared {
+                    panel(layout)
+                        .glassEffect(.regular, in: shape)
+                        .glassEffectTransition(.materialize)
+                }
+            }
+        } else {
+            panel(layout)
+                .background {
+                    if reduceTransparency {
+                        shape.fill(Color(nsColor: .windowBackgroundColor))
+                    } else {
+                        shape.fill(.ultraThickMaterial)
+                    }
+                }
+                .overlay { shape.strokeBorder(.primary.opacity(0.10), lineWidth: 0.75) }
+                .opacity(appeared ? 1 : 0)
+                .scaleEffect(appeared || reduceMotion ? 1 : 0.96)
+        }
+    }
+
+    private func panel(_ layout: SwitcherLayout) -> some View {
+        let windows = model.filtered
         let style = controller.style
-        VStack(spacing: PocketSpacing.s) {
+        return VStack(spacing: PocketSpacing.s) {
             if windows.isEmpty {
                 emptyState
             } else {
@@ -38,34 +77,21 @@ struct WindowSwitcherOverlayView: View {
         }
         .padding(SwitcherLayout.padding)
         .frame(width: layout.panelSize.width, height: layout.panelSize.height)
-        .background {
-            let shape = RoundedRectangle(cornerRadius: 20, style: .continuous)
-            if reduceTransparency {
-                shape.fill(Color(nsColor: .windowBackgroundColor))
-            } else {
-                shape.fill(.ultraThickMaterial)
-            }
-        }
-        .overlay { RoundedRectangle(cornerRadius: 20, style: .continuous).strokeBorder(.primary.opacity(0.10), lineWidth: 0.75) }
         .overlay(alignment: .top) { searchPill.padding(.top, 8) }
-        .opacity(appeared ? 1 : 0)
-        .scaleEffect(appeared || reduceMotion ? 1 : 0.96)
-        .onAppear { withAnimation(reduceMotion ? .linear(duration: 0.05) : .spring(response: 0.22, dampingFraction: 0.86)) { appeared = true } }
-        .animation(reduceMotion ? nil : .spring(response: 0.28, dampingFraction: 0.88), value: windows.map(\.id))
-        .accessibilityElement(children: .contain)
-        .accessibilityLabel("Pencere geçişi")
     }
 
-    /// Search appears only while typing, floating over the panel's top edge.
+    /// Search appears only while typing, floating over the panel's top edge. It sits on the panel's
+    /// surface, so it is an accent-tinted fill rather than a second layer of glass or material.
     @ViewBuilder private var searchPill: some View {
         if !model.sessionSearch.isEmpty {
             HStack(spacing: PocketSpacing.xs) {
                 Image(systemName: "magnifyingglass")
                 Text(model.sessionSearch).fontWeight(.semibold)
+                    .contentTransition(.interpolate)
             }
             .font(.callout)
             .padding(.horizontal, 12).padding(.vertical, 5)
-            .background(.regularMaterial, in: Capsule())
+            .background(Color.accentColor.opacity(0.16), in: Capsule())
             .overlay { Capsule().strokeBorder(Color.accentColor.opacity(0.5), lineWidth: 1) }
             .transition(.move(edge: .top).combined(with: .opacity))
             .accessibilityLabel("Arama: \(model.sessionSearch)")

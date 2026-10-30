@@ -1,20 +1,33 @@
+import AppKit
 import SwiftUI
 
 /// One tab of a `GlassTabBar`.
 struct GlassTab<ID: Hashable>: Identifiable {
     let id: ID
-    let title: String
-    let symbol: String
-    let tint: Color
+    let title: Text
+    var symbol: String?
+    /// nil: the page's module color (`pocketTint`).
+    var tint: Color?
+
+    init(id: ID, title: LocalizedStringKey, symbol: String? = nil, tint: Color? = nil) {
+        self.id = id; self.title = Text(title); self.symbol = symbol; self.tint = tint
+    }
+
+    /// Already-localized or user data text, shown verbatim.
+    @_disfavoredOverload
+    init<S: StringProtocol>(id: ID, title: S, symbol: String? = nil, tint: Color? = nil) {
+        self.id = id; self.title = Text(title); self.symbol = symbol; self.tint = tint
+    }
 }
 
 /// Segmented tab bar with a Liquid Glass selection lens.
 ///
-/// - Click a tab, or press and drag: the lens follows the pointer continuously (lifted and slightly
-///   enlarged), the selection switches as the lens crosses a tab's midpoint, and on release it springs
-///   onto the selected tab.
-/// - macOS 26+: the lens is an interactive, tinted `.glassEffect` inside a `GlassEffectContainer` with a
-///   `glassEffectID`. Earlier systems use materials with the same geometry.
+/// - Click a tab, or press and drag: the lens lifts and grows, follows the pointer continuously, stretches
+///   with the drag speed like a liquid drop, switches the selection (with a trackpad tick) as it crosses a
+///   tab's midpoint, and on release springs onto the selected tab.
+/// - macOS 26+: the lens is an interactive `.glassEffect` inside a `GlassEffectContainer` with a
+///   `glassEffectID`: tinted at rest, clear while held so the labels read through it as through a lens.
+///   Earlier systems use materials with the same geometry.
 /// - Reduce Motion: no lens travel or scaling, the selection jumps. Reduce Transparency: solid fills.
 /// - Each tab is a real button (keyboard focus, VoiceOver "selected" trait); arrow keys and ⌘1… are
 ///   handled by the owner through `GlassTabBar.keyboardShortcuts`.
@@ -23,14 +36,23 @@ struct GlassTabBar<ID: Hashable>: View {
     @Binding var selection: ID
     /// false: clear, untinted glass lens and monochrome labels, like the system segmented control.
     var tinted = true
+    /// true when the owner installs `GlassTabKeyboardShortcuts`, so tooltips mention ⌘1…
+    var showsShortcutHints = false
 
     @Namespace private var namespace
     @State private var trackWidth: CGFloat = 0
     /// Pointer x while pressing; nil when idle.
     @State private var dragX: CGFloat?
+    /// 0…maxStretch, from the horizontal drag speed; widens and flattens the held lens.
+    @State private var stretch: CGFloat = 0
+
+    private static var maxStretch: CGFloat { 0.22 }
+    /// Points per second of pointer speed that produce the full stretch.
+    private static var fullStretchSpeed: CGFloat { 2400 }
     @PocketReduceMotion private var reduceMotion
     @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
     @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.pocketTint) private var pageTint
 
     private let height: CGFloat = 34
     private let inset: CGFloat = 3
@@ -39,7 +61,7 @@ struct GlassTabBar<ID: Hashable>: View {
     private var segmentWidth: CGFloat { tabs.isEmpty ? 0 : max(0, trackWidth - inset * 2) / CGFloat(tabs.count) }
     private var selectedTint: Color {
         guard tinted else { return .primary }
-        return tabs.indices.contains(selectedIndex) ? tabs[selectedIndex].tint : .accentColor
+        return tabs.indices.contains(selectedIndex) ? tabs[selectedIndex].tint ?? pageTint : pageTint
     }
     private var snapAnimation: Animation? { reduceMotion ? nil : .spring(response: 0.34, dampingFraction: 0.78) }
 
@@ -73,11 +95,10 @@ struct GlassTabBar<ID: Hashable>: View {
             ZStack(alignment: .leading) {
                 GlassEffectContainer {
                     lens
-                        .glassEffect(tinted ? .regular.tint(selectedTint.opacity(colorScheme == .dark ? 0.32 : 0.2)).interactive()
-                                            : .regular.interactive(), in: .capsule)
+                        .glassEffect(lensGlass, in: .capsule)
                         .glassEffectID("selection", in: namespace)
                 }
-                .scaleEffect(lifted ? 1.08 : 1)
+                .scaleEffect(x: lensScale.width, y: lensScale.height)
                 .animation(snapAnimation, value: lifted)
                 .offset(x: lensCenter - lensWidth / 2 - inset)
                 labels
@@ -92,7 +113,7 @@ struct GlassTabBar<ID: Hashable>: View {
                     .background(fallbackLensFill, in: Capsule())
                     .overlay { Capsule().strokeBorder(tinted ? selectedTint.opacity(0.35) : PocketTheme.line, lineWidth: 0.75) }
                     .shadow(color: .black.opacity(dragX == nil ? 0.12 : 0.22), radius: dragX == nil ? 2 : 6, y: 1)
-                    .scaleEffect(lifted ? 1.08 : 1)
+                    .scaleEffect(x: lensScale.width, y: lensScale.height)
                     .animation(snapAnimation, value: lifted)
                     .offset(x: lensCenter - lensWidth / 2 - inset)
                 labels
@@ -110,6 +131,18 @@ struct GlassTabBar<ID: Hashable>: View {
 
     private var fallbackLensFill: AnyShapeStyle {
         reduceTransparency ? AnyShapeStyle(PocketTheme.panel) : AnyShapeStyle(.thickMaterial)
+    }
+
+    @available(macOS 26.0, *)
+    private var lensGlass: Glass {
+        if lifted { return .clear.interactive() }
+        return tinted ? .regular.tint(selectedTint.opacity(colorScheme == .dark ? 0.32 : 0.2)).interactive() : .regular.interactive()
+    }
+
+    /// Held: grown, wider and flatter the faster it moves. At rest: its tab's exact size.
+    private var lensScale: CGSize {
+        guard lifted else { return CGSize(width: 1, height: 1) }
+        return CGSize(width: 1.12 + stretch, height: 1.14 - stretch * 0.45)
     }
 
     private var lifted: Bool { dragX != nil && !reduceMotion }
@@ -130,10 +163,12 @@ struct GlassTabBar<ID: Hashable>: View {
                     select(index)
                 } label: {
                     HStack(spacing: 4) {
-                        Image(systemName: tab.symbol)
-                            .font(.system(size: 11, weight: .semibold))
-                            .foregroundStyle(isSelected ? (tinted ? tab.tint : .primary) : .secondary)
-                        Text(tab.title)
+                        if let symbol = tab.symbol {
+                            Image(systemName: symbol)
+                                .font(.system(size: 11, weight: .semibold))
+                                .foregroundStyle(isSelected ? (tinted ? tab.tint ?? pageTint : .primary) : .secondary)
+                        }
+                        tab.title
                             .font(.system(size: 11.5, weight: isSelected ? .semibold : .medium))
                             .foregroundStyle(isSelected ? .primary : .secondary)
                             .lineLimit(1)
@@ -146,7 +181,7 @@ struct GlassTabBar<ID: Hashable>: View {
                 .accessibilityLabel(tab.title)
                 .accessibilityAddTraits(isSelected ? [.isSelected, .isButton] : .isButton)
                 .accessibilityHint("Sekmeyi göster")
-                .help("\(tab.title) (⌘\(index + 1))")
+                .help(showsShortcutHints ? tab.title + Text(verbatim: " (⌘\(index + 1))") : tab.title)
             }
         }
     }
@@ -163,16 +198,23 @@ struct GlassTabBar<ID: Hashable>: View {
                 } else {
                     var transaction = Transaction()
                     transaction.animation = .interactiveSpring(response: 0.16, dampingFraction: 0.86)
-                    withTransaction(transaction) { dragX = value.location.x }
+                    withTransaction(transaction) {
+                        dragX = value.location.x
+                        stretch = min(Self.maxStretch, abs(value.velocity.width) / Self.fullStretchSpeed * Self.maxStretch)
+                    }
                 }
                 let index = index(at: value.location.x)
-                if index != selectedIndex { select(index, animated: false) }
+                if index != selectedIndex {
+                    select(index, animated: false)
+                    NSHapticFeedbackManager.defaultPerformer.perform(.alignment, performanceTime: .now)
+                }
             }
             .onEnded { value in
                 let index = index(at: value.location.x)
                 withAnimation(snapAnimation) {
                     selection = tabs[index].id
                     dragX = nil
+                    stretch = 0
                 }
             }
     }

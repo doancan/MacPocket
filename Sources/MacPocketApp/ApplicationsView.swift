@@ -25,12 +25,10 @@ struct ApplicationsView: View {
             PocketPageHeading(title: "Uygulamalar", subtitle: "Kurulu uygulamalar, güncellemeler ve ilişkili dosyalar.", icon: "app.badge") {
                 headingActions
             }
-            Picker("Bölüm", selection: $model.showUpdates) {
-                Text("Kurulu Uygulamalar").tag(false)
-                Text("Güncellemeler").tag(true)
-            }
-            .pickerStyle(.segmented)
-            .labelsHidden()
+            GlassTabBar(tabs: [GlassTab(id: false, title: "Kurulu Uygulamalar", symbol: "square.grid.2x2"),
+                               GlassTab(id: true, title: "Güncellemeler", symbol: "arrow.down.circle")],
+                        selection: $model.showUpdates)
+            .accessibilityLabel("Bölüm")
             .frame(maxWidth: 360)
             if working { PocketProgressRow(message: progressMessage) }
             if let error = model.failure { PocketMessage(error, tone: .warning) }

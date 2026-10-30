@@ -170,11 +170,9 @@ struct FileWorkspaceView: View {
     private var controls: some View {
         VStack(alignment: .leading, spacing: PocketSpacing.s) {
             HStack(spacing: PocketSpacing.m) {
-                Picker("Görünüm", selection: $model.scope) {
-                    ForEach(FileWorkspaceScope.allCases) { Text($0.localizedTitle).tag($0) }
-                }
-                .pickerStyle(.segmented)
-                .labelsHidden()
+                GlassTabBar(tabs: FileWorkspaceScope.allCases.map { GlassTab(id: $0, title: $0.localizedTitle) },
+                            selection: $model.scope)
+                .accessibilityLabel("Görünüm")
                 .frame(maxWidth: 480)
                 .disabled(model.busy)
                 Spacer(minLength: PocketSpacing.s)

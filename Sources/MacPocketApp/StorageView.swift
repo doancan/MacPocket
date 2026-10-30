@@ -87,14 +87,10 @@ struct StorageView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: PocketSpacing.l) {
             PocketPageHeading(title: "Disk Analizi", subtitle: subtitle, icon: "internaldrive") {
-                Picker("Bölüm", selection: $model.storageTab) {
-                    ForEach(StorageTab.allCases) { tab in
-                        Label(tab.localizedTitle, systemImage: tab.symbol).tag(tab)
-                    }
-                }
-                .pickerStyle(.segmented)
-                .labelsHidden()
-                .fixedSize()
+                GlassTabBar(tabs: StorageTab.allCases.map { GlassTab(id: $0, title: $0.localizedTitle, symbol: $0.symbol) },
+                            selection: $model.storageTab)
+                .accessibilityLabel("Bölüm")
+                .frame(width: 400)
             }
             switch model.storageTab {
             case .overview:

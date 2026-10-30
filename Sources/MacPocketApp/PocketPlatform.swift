@@ -97,8 +97,21 @@ struct PocketBackdrop: View {
         }
         // Three full-window gradient layers flattened into one texture (~20 MB each on a 5K display).
         .drawingGroup()
+        .modifier(PocketBackgroundExtension())
         .ignoresSafeArea()
         .accessibilityHidden(true)
+    }
+}
+
+/// macOS 26+: mirrors the module wash under the floating glass sidebar so the window reads as one surface.
+private struct PocketBackgroundExtension: ViewModifier {
+    @ViewBuilder
+    func body(content: Content) -> some View {
+        if #available(macOS 26.0, *) {
+            content.backgroundExtensionEffect()
+        } else {
+            content
+        }
     }
 }
 

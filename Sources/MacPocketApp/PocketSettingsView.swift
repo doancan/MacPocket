@@ -149,9 +149,10 @@ private struct PocketAppearanceSettings: View {
     var body: some View {
         Form {
             Section {
-                Picker("Görünüm", selection: $appearance) {
-                    ForEach(PocketAppearance.allCases) { Text($0.localizedTitle).tag($0) }
-                }.pickerStyle(.segmented)
+LabeledContent("Görünüm") {
+                    GlassTabBar(tabs: PocketAppearance.allCases.map { GlassTab(id: $0, title: $0.localizedTitle) }, selection: $appearance)
+                        .frame(maxWidth: 300)
+                }
                 Picker("Vurgu rengi", selection: $accent) {
                     ForEach(PocketAccentStyle.allCases) { style in
                         Label { Text(style.localizedTitle) } icon: {
@@ -166,12 +167,14 @@ private struct PocketAppearanceSettings: View {
             } header: { Text("Tema") }
 
             Section {
-                Picker("Kenar çubuğu simgeleri", selection: $sidebarIcons) {
-                    ForEach(PocketSidebarIconStyle.allCases) { Text($0.localizedTitle).tag($0) }
-                }.pickerStyle(.segmented)
-                Picker("Kart yoğunluğu", selection: $density) {
-                    ForEach(PocketDensity.allCases) { Text($0.localizedTitle).tag($0) }
-                }.pickerStyle(.segmented)
+LabeledContent("Kenar çubuğu simgeleri") {
+                    GlassTabBar(tabs: PocketSidebarIconStyle.allCases.map { GlassTab(id: $0, title: $0.localizedTitle) }, selection: $sidebarIcons)
+                        .frame(maxWidth: 300)
+                }
+LabeledContent("Kart yoğunluğu") {
+                    GlassTabBar(tabs: PocketDensity.allCases.map { GlassTab(id: $0, title: $0.localizedTitle) }, selection: $density)
+                        .frame(maxWidth: 220)
+                }
                 Text("Sıkı yoğunluk kart ve sayfa boşluklarını azaltır; küçük ekranlarda daha çok bilgi gösterir.")
                     .font(.callout).foregroundStyle(.secondary)
             } header: { Text("Yerleşim") }

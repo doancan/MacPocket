@@ -14,6 +14,7 @@ struct WindowSwitcherView: View {
     private enum Section: String, CaseIterable {
         case settings, windows
         var title: LocalizedStringKey { self == .settings ? "Ayarlar" : "Pencereler" }
+        var symbol: String { self == .settings ? "slider.horizontal.3" : "macwindow.on.rectangle" }
     }
 
     var body: some View {
@@ -24,10 +25,9 @@ struct WindowSwitcherView: View {
                     .help("Pencere geçişini şimdi aç")
             }
             permissions
-            Picker("Bölüm", selection: $section) {
-                ForEach(Section.allCases, id: \.self) { Text($0.title).tag($0) }
-            }
-            .pickerStyle(.segmented).labelsHidden().frame(maxWidth: 320)
+            GlassTabBar(tabs: Section.allCases.map { GlassTab(id: $0, title: $0.title, symbol: $0.symbol) }, selection: $section)
+                .accessibilityLabel("Bölüm")
+                .frame(maxWidth: 320)
             switch section {
             case .settings: SwitcherSettingsForm(controller: controller)
             case .windows: SwitcherWindowTable(model: model)
@@ -127,12 +127,13 @@ private struct SwitcherSettingsForm: View {
             }
 
             Section("Görünüm") {
-                Picker("Stil", selection: $style) {
-                    Text("Küçük resimler").tag(SwitcherStyle.thumbnails.rawValue)
-                    Text("Uygulama simgeleri").tag(SwitcherStyle.icons.rawValue)
-                    Text("Başlık listesi").tag(SwitcherStyle.titles.rawValue)
+LabeledContent("Stil") {
+                    GlassTabBar(tabs: [GlassTab(id: SwitcherStyle.thumbnails.rawValue, title: "Küçük resimler", symbol: "rectangle.grid.2x2"),
+                                       GlassTab(id: SwitcherStyle.icons.rawValue, title: "Uygulama simgeleri", symbol: "app.dashed"),
+                                       GlassTab(id: SwitcherStyle.titles.rawValue, title: "Başlık listesi", symbol: "list.bullet")],
+                                selection: $style)
+                        .frame(maxWidth: 420)
                 }
-                .pickerStyle(.segmented)
                 Toggle("Otomatik boyut (pencere sayısına göre küçült)", isOn: $autoSize)
                 LabeledContent("Boyut") {
                     Slider(value: $size, in: 0.6...1.4, step: 0.1) { Text("Boyut") } minimumValueLabel: { Text("Küçük") } maximumValueLabel: { Text("Büyük") }

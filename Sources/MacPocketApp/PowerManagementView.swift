@@ -50,13 +50,8 @@ struct PowerManagementView: View {
     }
 
     private var tabPicker: some View {
-        Picker("Bölüm", selection: $center.tab) {
-            ForEach(center.visibleTabs) { tab in
-                Label(tab.localizedTitle, systemImage: tab.icon).tag(tab)
-            }
-        }
-        .pickerStyle(.segmented)
-        .labelsHidden()
+        GlassTabBar(tabs: center.visibleTabs.map { GlassTab(id: $0, title: $0.localizedTitle, symbol: $0.icon) },
+                    selection: $center.tab)
         .accessibilityLabel("Güç Merkezi bölümü")
     }
 }

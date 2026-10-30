@@ -39,11 +39,10 @@ struct PowerSettingsPanel: View {
             PocketSectionHeader("Güç ayarları", icon: "slider.horizontal.3") {
                 HStack(spacing: PocketSpacing.s) {
                     if center.profiles.count > 1 {
-                        Picker("Güç kaynağı", selection: Binding(get: { profile?.profile ?? .ac },
-                                                                set: { selectedProfile = $0 })) {
-                            ForEach(center.profiles) { Text($0.profile.title).tag($0.profile) }
-                        }
-                        .pickerStyle(.segmented).labelsHidden().fixedSize()
+                        GlassTabBar(tabs: center.profiles.map { GlassTab(id: $0.profile, title: $0.profile.title) },
+                                    selection: Binding(get: { profile?.profile ?? .ac }, set: { selectedProfile = $0 }))
+                        .accessibilityLabel("Güç kaynağı")
+                        .frame(width: 220)
                     } else if let profile {
                         Text(profile.profile.title)
                     }

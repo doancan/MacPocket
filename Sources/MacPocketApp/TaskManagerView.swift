@@ -109,11 +109,8 @@ struct TaskManagerView: View {
                 .frame(maxWidth: 260)
                 .focused($searchFocused)
                 .accessibilityLabel("Süreç ara")
-            Picker("Kapsam", selection: $scope) {
-                ForEach(ProcessScope.allCases) { Text($0.localizedTitle).tag($0) }
-            }
-            .pickerStyle(.segmented)
-            .labelsHidden()
+            GlassTabBar(tabs: ProcessScope.allCases.map { GlassTab(id: $0, title: $0.localizedTitle) }, selection: $scope)
+            .accessibilityLabel("Kapsam")
             .frame(maxWidth: 340)
             .help("Süreçleri türüne göre filtrele")
             Spacer(minLength: PocketSpacing.s)

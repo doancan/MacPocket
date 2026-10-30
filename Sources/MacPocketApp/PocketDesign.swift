@@ -560,7 +560,6 @@ struct PocketSearchField: View {
     private var isFocused: Bool { focus?.wrappedValue ?? ownFocus }
 
     var body: some View {
-        let shape = RoundedRectangle(cornerRadius: 8, style: .continuous)
         HStack(spacing: 6) {
             Image(systemName: "magnifyingglass")
                 .font(.system(size: 12, weight: .semibold))
@@ -579,12 +578,7 @@ struct PocketSearchField: View {
         }
         .padding(.horizontal, 9)
         .frame(height: 30)
-        .background(shape.fill(PocketTheme.panel))
-        .overlay {
-            shape.strokeBorder(isFocused ? Color.accentColor.opacity(0.85) : (hovering ? PocketTheme.line.opacity(2) : PocketTheme.line.opacity(1.4)),
-                               lineWidth: isFocused ? 1.5 : 0.75)
-        }
-        .contentShape(shape)
+        .modifier(PocketSearchFieldSurface(isFocused: isFocused, hovering: hovering))
         .onHover { hovering = $0 }
         .animation(.easeOut(duration: 0.12), value: isFocused)
     }
@@ -598,11 +592,55 @@ struct PocketSearchField: View {
     }
 }
 
-/// Primary (filled accent) and secondary (surface + hairline) buttons with one height and radius
-/// per control size, hover and pressed states. Applied app-wide as the default button style.
-struct PocketButtonStyle: ButtonStyle {
+/// macOS 26+: an interactive glass capsule, tinted with the accent color while focused.
+/// Earlier systems: a panel fill with a hairline that turns into an accent focus ring.
+private struct PocketSearchFieldSurface: ViewModifier {
+    let isFocused: Bool
+    let hovering: Bool
+
+    @ViewBuilder
+    func body(content: Content) -> some View {
+        if #available(macOS 26.0, *) {
+            content
+                .contentShape(Capsule())
+                .glassEffect(isFocused ? .regular.tint(Color.accentColor.opacity(0.18)).interactive() : .regular.interactive(),
+                             in: .capsule)
+        } else {
+            let shape = RoundedRectangle(cornerRadius: 8, style: .continuous)
+            content
+                .background(shape.fill(PocketTheme.panel))
+                .overlay {
+                    shape.strokeBorder(isFocused ? Color.accentColor.opacity(0.85) : (hovering ? PocketTheme.line.opacity(2) : PocketTheme.line.opacity(1.4)),
+                                       lineWidth: isFocused ? 1.5 : 0.75)
+                }
+                .contentShape(shape)
+        }
+    }
+}
+
+/// Primary and secondary buttons, applied app-wide as the default button style.
+/// - macOS 26+: the system Liquid Glass styles (`.glassProminent` for the primary action, `.glass`
+///   otherwise), which bring their own press, hover and shimmer feedback.
+/// - Earlier systems: a filled accent / surface + hairline look with one height per control size.
+struct PocketButtonStyle: PrimitiveButtonStyle {
     enum Kind { case primary, secondary }
     let kind: Kind
+
+    @ViewBuilder
+    func makeBody(configuration: Configuration) -> some View {
+        if #available(macOS 26.0, *) {
+            switch kind {
+            case .primary: Button(configuration).buttonStyle(.glassProminent)
+            case .secondary: Button(configuration).buttonStyle(.glass)
+            }
+        } else {
+            Button(configuration).buttonStyle(PocketLegacyButtonStyle(kind: kind))
+        }
+    }
+}
+
+private struct PocketLegacyButtonStyle: ButtonStyle {
+    let kind: PocketButtonStyle.Kind
 
     func makeBody(configuration: Configuration) -> some View {
         PocketButtonBody(configuration: configuration, kind: kind)
@@ -653,7 +691,7 @@ private struct PocketButtonBody: View {
     }
 }
 
-extension ButtonStyle where Self == PocketButtonStyle {
+extension PrimitiveButtonStyle where Self == PocketButtonStyle {
     static var pocketPrimary: PocketButtonStyle { PocketButtonStyle(kind: .primary) }
     static var pocketSecondary: PocketButtonStyle { PocketButtonStyle(kind: .secondary) }
 }
