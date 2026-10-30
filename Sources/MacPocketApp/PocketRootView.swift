@@ -132,6 +132,7 @@ struct PocketRootView: View {
             case .hiddenSettings: HiddenSettingsView()
             case .clipboard: ClipboardHistoryView()
             case .windowLayout: WindowLayoutView()
+            case .speedTest: SpeedTestView()
             case .none: ToolsHubView(model: model, openTool: openCatalogTool)
             }
         }
@@ -158,6 +159,7 @@ struct PocketRootView: View {
         case "hidden-settings": navigation.open(.hiddenSettings)
         case "clipboard": navigation.open(.clipboard)
         case "window-layout": navigation.open(.windowLayout)
+        case "speed-test": navigation.open(.speedTest)
         case "uninstaller": model.applications.showUpdates = false; navigation.select(.applications)
         case "app-updater": model.applications.showUpdates = true; navigation.select(.applications)
         case "downloads": model.storage.useRoot(home.appendingPathComponent("Downloads")); navigation.select(.storage)

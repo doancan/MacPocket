@@ -172,6 +172,7 @@ extension PocketTool {
         case .hiddenSettings: String(localized: "Gizli Ayarlar")
         case .clipboard: String(localized: "Pano Geçmişi")
         case .windowLayout: String(localized: "Pencere Yerleşimi")
+        case .speedTest: String(localized: "Ağ Hız Testi")
         }
     }
 }
