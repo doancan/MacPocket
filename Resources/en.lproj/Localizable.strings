@@ -2005,3 +2005,11 @@
 "Çalışan uygulamalar" = "Running apps";
 "Çöz" = "Resume";
 "Şimdi dondur" = "Freeze Now";
+"Elle ayarlandı; %@’de çizelgeye döner." = "Set by hand; returns to the schedule at %@.";
+"Günlük parlaklık eğrisi" = "Daily brightness curve";
+"Harici ekranların parlaklığı günün saatine göre yumuşakça değişir. Elle değiştirdiğinde çizelge bir sonraki noktaya kadar bekler." = "External displays change brightness smoothly with the time of day. After you change it by hand, the schedule waits until its next point.";
+"Nokta ekle" = "Add Point";
+"Noktayı sil" = "Delete point";
+"Saat" = "Time";
+"Zaman çizelgesi" = "Schedule";
+"Şimdi" = "Now";

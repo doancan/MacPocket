@@ -26,6 +26,8 @@ final class DisplayBrightnessService: ObservableObject {
         /// Per display (vendor-product-serial): the chosen method and last level, re-applied after a relaunch.
         var methods: [String: Method] = [:]
         var levels: [String: Double] = [:]
+        /// Optional so settings saved before the schedule existed still decode (and keep their levels).
+        var schedule: BrightnessSchedule?
 
         static let storageKey = "MacPocket.brightness.settings"
     }
@@ -66,6 +68,10 @@ final class DisplayBrightnessService: ObservableObject {
     private var tap: CFMachPort?
     private var tapSource: CFRunLoopSource?
     private var observers: [NSObjectProtocol] = []
+    private var scheduleTimer: Timer?
+    /// Until when a manual change wins over the schedule. A date, not a minute of the day, so a Mac asleep
+    /// at that minute still returns to the schedule afterwards.
+    @Published private(set) var overrideUntil: Date?
     /// Never dim software displays to black: the screen would look off with no way to see the slider.
     private static let softwareFloor = 0.12
 
@@ -83,8 +89,45 @@ final class DisplayBrightnessService: ObservableObject {
                                                                 object: nil, queue: .main) { [weak self] _ in
             MainActor.assumeIsolated { self?.configureTap() }
         })
-        Task { await refreshDisplays() }
+        Task { await refreshDisplays(); applySchedule() }
         configureTap()
+        let timer = Timer(timeInterval: 60, repeats: true) { [weak self] _ in MainActor.assumeIsolated { self?.applySchedule() } }
+        timer.tolerance = 10
+        RunLoop.main.add(timer, forMode: .common)
+        scheduleTimer = timer
+    }
+
+    // MARK: Schedule
+
+    var schedule: BrightnessSchedule {
+        get { settings.schedule ?? BrightnessSchedule() }
+        set {
+            settings.schedule = newValue
+            overrideUntil = nil
+            applySchedule()
+        }
+    }
+
+    /// The next time the clock shows `minute` (today if still ahead, otherwise tomorrow).
+    static func nextDate(atMinute minute: Int, after now: Date = Date()) -> Date {
+        Calendar.current.nextDate(after: now, matching: DateComponents(hour: minute / 60, minute: minute % 60), matchingPolicy: .nextTime) ?? now
+    }
+
+    static var currentMinute: Int {
+        let parts = Calendar.current.dateComponents([.hour, .minute], from: Date())
+        return (parts.hour ?? 0) * 60 + (parts.minute ?? 0)
+    }
+
+    /// Moves every external display to the scheduled level, unless the user changed it since the last point.
+    func applySchedule() {
+        guard schedule.enabled, let target = schedule.level(at: Self.currentMinute) else { return }
+        if let until = overrideUntil {
+            if Date() < until { return }
+            overrideUntil = nil
+        }
+        for display in displays where abs(display.level - target) > 0.01 {
+            setLevel(target, for: display.id, fromSchedule: true)
+        }
     }
 
     /// Restores every gamma table MacPocket changed (called at quit).
@@ -158,7 +201,10 @@ final class DisplayBrightnessService: ObservableObject {
 
     // MARK: Changing brightness
 
-    func setLevel(_ level: Double, for id: CGDirectDisplayID) {
+    func setLevel(_ level: Double, for id: CGDirectDisplayID, fromSchedule: Bool = false) {
+        if !fromSchedule, schedule.enabled, let minute = schedule.nextPoint(after: Self.currentMinute) {
+            overrideUntil = Self.nextDate(atMinute: minute)
+        }
         guard let index = displays.firstIndex(where: { $0.id == id }) else { return }
         let clamped = min(1, max(0, level))
         displays[index].level = clamped

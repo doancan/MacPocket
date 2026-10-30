@@ -72,3 +72,38 @@ final class BrightnessStepTests: XCTestCase {
         XCTAssertEqual(BrightnessStep.chiclets(0.5).total, 64)
     }
 }
+
+final class BrightnessScheduleTests: XCTestCase {
+    private func schedule(_ points: [(Int, Double)]) -> BrightnessSchedule {
+        var schedule = BrightnessSchedule()
+        schedule.points = points.map { BrightnessSchedule.Point(minute: $0.0, level: $0.1) }
+        return schedule
+    }
+
+    func testInterpolatesBetweenPoints() throws {
+        let day = schedule([(8 * 60, 1), (20 * 60, 0.4)])
+        XCTAssertEqual(try XCTUnwrap(day.level(at: 8 * 60)), 1, accuracy: 0.0001)
+        XCTAssertEqual(try XCTUnwrap(day.level(at: 14 * 60)), 0.7, accuracy: 0.0001, "halfway between 08:00 and 20:00")
+        XCTAssertEqual(try XCTUnwrap(day.level(at: 20 * 60)), 0.4, accuracy: 0.0001)
+    }
+
+    func testWrapsPastMidnight() throws {
+        let day = schedule([(8 * 60, 1), (20 * 60, 0.4)])
+        // 20:00 → 08:00 is 12 hours; 02:00 is halfway: 0.4 + 0.6 * 0.5.
+        XCTAssertEqual(try XCTUnwrap(day.level(at: 2 * 60)), 0.7, accuracy: 0.0001)
+        XCTAssertEqual(try XCTUnwrap(day.level(at: 23 * 60)), 0.55, accuracy: 0.0001)
+    }
+
+    func testOrderOfPointsDoesNotMatterAndEdgeCases() throws {
+        XCTAssertEqual(schedule([(20 * 60, 0.4), (8 * 60, 1)]).level(at: 14 * 60).map { ($0 * 1000).rounded() / 1000 }, 0.7)
+        XCTAssertEqual(schedule([(600, 0.3)]).level(at: 0), 0.3)
+        XCTAssertNil(schedule([]).level(at: 0))
+        XCTAssertEqual(BrightnessSchedule.Point(minute: 5000, level: 7), BrightnessSchedule.Point(minute: 1439, level: 1))
+    }
+
+    func testOverrideLastsUntilTheNextPoint() {
+        let day = schedule([(8 * 60, 1), (20 * 60, 0.4)])
+        XCTAssertEqual(day.nextPoint(after: 9 * 60), 20 * 60)
+        XCTAssertEqual(day.nextPoint(after: 21 * 60), 8 * 60, "wraps to tomorrow morning")
+    }
+}

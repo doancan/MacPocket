@@ -213,3 +213,50 @@ public enum DisplayRegistry {
         return (number("LegacyManufacturerID"), number("ProductID"), number("SerialNumber"))
     }
 }
+
+// MARK: - Schedule
+
+/// Brightness by time of day: levels at chosen times with straight-line fades between them, wrapping past
+/// midnight.
+public struct BrightnessSchedule: Codable, Equatable, Sendable {
+    public struct Point: Codable, Equatable, Hashable, Identifiable, Sendable {
+        public var id: Int { minute }
+        /// Minutes after midnight, 0…1439.
+        public var minute: Int
+        /// 0…1.
+        public var level: Double
+
+        public init(minute: Int, level: Double) {
+            self.minute = min(max(minute, 0), 1439)
+            self.level = min(max(level, 0), 1)
+        }
+    }
+
+    public var enabled = false
+    public var points: [Point] = [Point(minute: 7 * 60, level: 1), Point(minute: 19 * 60, level: 0.8), Point(minute: 22 * 60 + 30, level: 0.5)]
+
+    public init() {}
+
+    private var sorted: [Point] { points.sorted { $0.minute < $1.minute } }
+
+    /// The level for a minute of the day; nil without points.
+    public func level(at minute: Int) -> Double? {
+        let points = sorted
+        guard let first = points.first, let last = points.last else { return nil }
+        guard points.count > 1 else { return first.level }
+        let minute = ((minute % 1440) + 1440) % 1440
+        // The segment that contains `minute`, the last one wrapping to the first point of the next day.
+        let previous = points.last { $0.minute <= minute } ?? last
+        let next = points.first { $0.minute > minute } ?? first
+        let span = ((next.minute - previous.minute) % 1440 + 1440) % 1440
+        guard span > 0 else { return previous.level }
+        let elapsed = ((minute - previous.minute) % 1440 + 1440) % 1440
+        return previous.level + (next.level - previous.level) * Double(elapsed) / Double(span)
+    }
+
+    /// The next point after `minute`, where a manual override ends.
+    public func nextPoint(after minute: Int) -> Int? {
+        let points = sorted
+        return (points.first { $0.minute > minute } ?? points.first)?.minute
+    }
+}
