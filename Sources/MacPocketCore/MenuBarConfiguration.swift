@@ -635,6 +635,8 @@ public enum MenuBarAttention {
             case .lowDisk: String(localized: "Disk alanı azaldı")
             case .thermal: String(localized: "Isı yüksek")
             case .memoryPressure: String(localized: "Bellek baskısı kritik")
+            case .sustainedCPU: String(localized: "İşlemci uzun süredir yoğun")
+            case .lowBattery: String(localized: "Pil azaldı")
             }
         }
     }

@@ -1879,3 +1879,10 @@
 "İzin bekliyor" = "Waiting for permission";
 "⌘Q ve ⌘W yanlışlıkla basılınca uygulama kapanmasın: basılı tutma veya çift basış iste, uygulama bazında ayarla." = "Keep apps from closing on a stray ⌘Q or ⌘W: require a hold or a double press, per app.";
 "⌘Q ve ⌘W’ye yanlışlıkla basınca uygulama ya da pencere kapanmasın; basılı tut veya iki kez bas." = "Keep a stray ⌘Q or ⌘W from closing an app or window; hold it or press it twice.";
+"Eşik" = "Threshold";
+"Pil %@ seviyesinde. Mac’i prize takmayı unutma." = "Battery is at %@. Remember to plug in your Mac.";
+"Pil azaldı" = "Battery low";
+"Pil azaldığında" = "When the battery runs low";
+"Pil eşiği" = "Battery threshold";
+"İşlemci uzun süre yoğun kaldığında" = "When the CPU stays busy for a long time";
+"İşlemci uzun süredir yoğun" = "CPU busy for a long time";

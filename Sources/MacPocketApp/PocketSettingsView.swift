@@ -214,6 +214,11 @@ private struct PocketMonitoringSettings: View {
     @AppStorage(ResourceAlertSettings.enabledKey(.thermal)) private var alertThermal = false
     @AppStorage(ResourceAlertSettings.enabledKey(.memoryPressure)) private var alertMemory = false
     @AppStorage(ResourceAlertSettings.diskThresholdKey) private var diskThreshold = 10.0
+    @AppStorage(ResourceAlertSettings.enabledKey(.sustainedCPU)) private var alertCPU = false
+    @AppStorage(ResourceAlertSettings.cpuThresholdKey) private var cpuThreshold = 85.0
+    @AppStorage(ResourceAlertSettings.cpuMinutesKey) private var cpuMinutes = 5
+    @AppStorage(ResourceAlertSettings.enabledKey(.lowBattery)) private var alertBattery = false
+    @AppStorage(ResourceAlertSettings.batteryThresholdKey) private var batteryThreshold = 15.0
     @State private var notificationsDenied = false
 
     var body: some View {
@@ -249,6 +254,21 @@ private struct PocketMonitoringSettings: View {
                 .disabled(!alertDisk)
                 alertToggle(.thermal, isOn: $alertThermal)
                 alertToggle(.memoryPressure, isOn: $alertMemory)
+                alertToggle(.sustainedCPU, isOn: $alertCPU)
+                HStack {
+                    Picker("Eşik", selection: $cpuThreshold) {
+                        ForEach(ResourceAlertSettings.cpuThresholdChoices, id: \.self) { Text(verbatim: pocketPercent($0)).tag($0) }
+                    }
+                    Picker("Süre", selection: $cpuMinutes) {
+                        ForEach(ResourceAlertSettings.cpuMinuteChoices, id: \.self) { Text("\($0) dk").tag($0) }
+                    }
+                }
+                .disabled(!alertCPU)
+                alertToggle(.lowBattery, isOn: $alertBattery)
+                Picker("Pil eşiği", selection: $batteryThreshold) {
+                    ForEach(ResourceAlertSettings.batteryThresholdChoices, id: \.self) { Text(verbatim: pocketPercent($0)).tag($0) }
+                }
+                .disabled(!alertBattery)
                 if notificationsDenied {
                     HStack {
                         Label("MacPocket’ın bildirim izni kapalı.", systemImage: "bell.slash")
@@ -275,7 +295,7 @@ private struct PocketMonitoringSettings: View {
         }
         .formStyle(.grouped)
         .task {
-            guard alertDisk || alertThermal || alertMemory else { return }
+            guard alertDisk || alertThermal || alertMemory || alertCPU || alertBattery else { return }
             notificationsDenied = await PocketAlertNotifier.authorizationDenied()
         }
     }

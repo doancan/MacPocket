@@ -117,6 +117,41 @@ final class AppPreferencesTests: XCTestCase {
         XCTAssertEqual(ResourceAlertReading(diskFreePercent: 1, thermalState: "critical", memoryPressureLevel: 4).triggered(.init()), [])
     }
 
+    func testSustainedThresholdMeasuresAnUnbrokenStreak() {
+        var streak = SustainedThreshold()
+        let start = Date(timeIntervalSince1970: 1_800_000_000)
+        XCTAssertEqual(streak.update(90, threshold: 85, at: start), 0)
+        XCTAssertEqual(streak.update(86, threshold: 85, at: start + 120), 120)
+        XCTAssertNil(streak.update(40, threshold: 85, at: start + 180), "dropping below breaks the streak")
+        XCTAssertEqual(streak.update(95, threshold: 85, at: start + 240), 0, "a new streak starts over")
+        XCTAssertNil(streak.update(nil, threshold: 85, at: start + 300), "a missing sample breaks it too")
+    }
+
+    func testSustainedCPUAndLowBatteryAlerts() {
+        let all = ResourceAlertSettings(enabled: Set(ResourceAlertKind.allCases), diskFreePercent: 10, cpuPercent: 85, cpuMinutes: 5,
+                                        batteryPercent: 15)
+        func reading(cpu: TimeInterval? = nil, battery: Double? = nil, discharging: Bool = false) -> ResourceAlertReading {
+            ResourceAlertReading(diskFreePercent: 50, thermalState: "nominal", memoryPressureLevel: 1, cpuHighDuration: cpu,
+                                 batteryPercent: battery, discharging: discharging)
+        }
+        XCTAssertEqual(reading(cpu: 299).triggered(all), [])
+        XCTAssertEqual(reading(cpu: 300).triggered(all), [.sustainedCPU])
+        XCTAssertEqual(reading(battery: 15, discharging: true).triggered(all), [.lowBattery])
+        XCTAssertEqual(reading(battery: 10, discharging: false).triggered(all), [], "charging or on power: no alert")
+        XCTAssertEqual(reading(battery: 16, discharging: true).triggered(all), [])
+    }
+
+    func testNewAlertThresholdsLoadWithDefaultsAndClamp() {
+        let defaults = UserDefaults(suiteName: "AlertThresholdTests")!
+        defer { defaults.removePersistentDomain(forName: "AlertThresholdTests") }
+        XCTAssertEqual(ResourceAlertSettings.load(from: defaults).cpuMinutes, 5)
+        defaults.set(500.0, forKey: ResourceAlertSettings.cpuThresholdKey)
+        defaults.set(20.0, forKey: ResourceAlertSettings.batteryThresholdKey)
+        let settings = ResourceAlertSettings.load(from: defaults)
+        XCTAssertEqual(settings.cpuPercent, 100)
+        XCTAssertEqual(settings.batteryPercent, 20)
+    }
+
     func testAlertReadingUsesStartupVolume() {
         let snapshot = SystemSnapshot(capturedAt: Date(), hardwareModel: "fixture", logicalCPUCount: 1, cpuUserPercent: nil,
                                       cpuSystemPercent: nil, cpuIdlePercent: nil, physicalMemoryBytes: 1, freeMemoryBytes: 1,

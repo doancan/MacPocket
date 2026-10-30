@@ -2,23 +2,26 @@ import Foundation
 import MacPocketCore
 import UserNotifications
 
-/// Optional system notifications for low disk space, serious thermal state and critical memory pressure
-/// (Settings → Monitoring). Conditions are checked on every monitoring refresh; each alert is sent at most
-/// once per hour.
+/// Optional system notifications for low disk space, serious thermal state, critical memory pressure,
+/// sustained CPU load and low battery (Settings → Monitoring). Conditions are checked on every monitoring
+/// refresh; each alert is sent at most once per hour.
 @MainActor
 final class PocketAlertNotifier {
     private var limiter = ResourceAlertLimiter()
+    private var cpuStreak = SustainedThreshold()
 
     /// UserNotifications needs a real app bundle; `swift run` builds have none.
     static var isAvailable: Bool { Bundle.main.bundleURL.pathExtension == "app" && Bundle.main.bundleIdentifier != nil }
 
     func evaluate(_ snapshot: SystemSnapshot) {
         let settings = ResourceAlertSettings.load(from: .standard)
+        // The streak is tracked even while the alert is off, so turning it on doesn't restart the clock.
+        let cpuHigh = cpuStreak.update(snapshot.cpuTotalPercent, threshold: settings.cpuPercent, at: snapshot.capturedAt)
         guard !settings.enabled.isEmpty, Self.isAvailable else { return }
-        let reading = ResourceAlertReading(snapshot)
+        let reading = ResourceAlertReading(snapshot, cpuHighDuration: cpuHigh)
         let due = limiter.admit(reading.triggered(settings), now: snapshot.capturedAt)
         guard !due.isEmpty else { return }
-        let requests = due.map { Self.request(for: $0, reading: reading) }
+        let requests = due.map { Self.request(for: $0, reading: reading, settings: settings) }
         Task {
             let center = UNUserNotificationCenter.current()
             let status = await center.notificationSettings().authorizationStatus
@@ -38,7 +41,8 @@ final class PocketAlertNotifier {
         return await UNUserNotificationCenter.current().notificationSettings().authorizationStatus == .denied
     }
 
-    private static func request(for kind: ResourceAlertKind, reading: ResourceAlertReading) -> UNNotificationRequest {
+    private static func request(for kind: ResourceAlertKind, reading: ResourceAlertReading,
+                                settings: ResourceAlertSettings) -> UNNotificationRequest {
         let content = UNMutableNotificationContent()
         switch kind {
         case .lowDisk:
@@ -51,6 +55,12 @@ final class PocketAlertNotifier {
         case .memoryPressure:
             content.title = String(localized: "Bellek baskısı kritik")
             content.body = String(localized: "Bellek tükenmek üzere. Kullanmadığın uygulamaları kapatmak Mac’i rahatlatır.")
+        case .sustainedCPU:
+            content.title = String(localized: "İşlemci uzun süredir yoğun")
+            content.body = String(localized: "İşlemci kullanımı \(settings.cpuMinutes) dakikadır \(pocketPercent(settings.cpuPercent)) üzerinde. Görev Yöneticisi’nden en çok tüketen süreçlere bakabilirsin.")
+        case .lowBattery:
+            content.title = String(localized: "Pil azaldı")
+            content.body = String(localized: "Pil \(pocketPercent(reading.batteryPercent ?? 0)) seviyesinde. Mac’i prize takmayı unutma.")
         }
         content.sound = .default
         return UNNotificationRequest(identifier: "MacPocket.alert." + kind.rawValue, content: content, trigger: nil)
@@ -63,6 +73,8 @@ extension ResourceAlertKind {
         case .lowDisk: "Boş disk alanı azaldığında"
         case .thermal: "Termal durum ciddi olduğunda"
         case .memoryPressure: "Bellek baskısı kritik olduğunda"
+        case .sustainedCPU: "İşlemci uzun süre yoğun kaldığında"
+        case .lowBattery: "Pil azaldığında"
         }
     }
 }

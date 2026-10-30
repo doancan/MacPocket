@@ -626,5 +626,21 @@
 			<string>Last %lld samples:</string>
 		</dict>
 	</dict>
+	<key>İşlemci kullanımı %lld dakikadır %@ üzerinde. Görev Yöneticisi’nden en çok tüketen süreçlere bakabilirsin.</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key>
+		<string>%#@count@</string>
+		<key>count</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key>
+			<string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key>
+			<string>lld</string>
+			<key>one</key>
+			<string>For %lld minute, CPU use has stayed above %@. Task Manager shows the processes using the most.</string>
+			<key>other</key>
+			<string>For %lld minutes, CPU use has stayed above %@. Task Manager shows the processes using the most.</string>
+		</dict>
+	</dict>
 </dict>
 </plist>

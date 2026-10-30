@@ -140,7 +140,7 @@ public enum SettingsTransfer {
 // MARK: - Resource alerts
 
 public enum ResourceAlertKind: String, CaseIterable, Identifiable, Sendable {
-    case lowDisk, thermal, memoryPressure
+    case lowDisk, thermal, memoryPressure, sustainedCPU, lowBattery
     public var id: String { rawValue }
 }
 
@@ -149,21 +149,41 @@ public struct ResourceAlertSettings: Equatable, Sendable {
     /// Alert when the startup volume's free space falls below this share (percent).
     public var diskFreePercent: Double
 
-    public static let diskThresholdChoices: [Double] = [5, 10, 15, 20]
+    /// Alert when total CPU stays at or above this percentage for `cpuMinutes`.
+    public var cpuPercent: Double
+    public var cpuMinutes: Int
+    /// Alert when the battery falls to this percentage while discharging.
+    public var batteryPercent: Double
 
-    public init(enabled: Set<ResourceAlertKind> = [], diskFreePercent: Double = 10) {
+    public static let diskThresholdChoices: [Double] = [5, 10, 15, 20]
+    public static let cpuThresholdChoices: [Double] = [70, 85, 95]
+    public static let cpuMinuteChoices = [2, 5, 10, 15]
+    public static let batteryThresholdChoices: [Double] = [10, 15, 20, 30]
+
+    public init(enabled: Set<ResourceAlertKind> = [], diskFreePercent: Double = 10, cpuPercent: Double = 85, cpuMinutes: Int = 5,
+                batteryPercent: Double = 15) {
         self.enabled = enabled
         self.diskFreePercent = diskFreePercent
+        self.cpuPercent = cpuPercent
+        self.cpuMinutes = cpuMinutes
+        self.batteryPercent = batteryPercent
     }
 
     public static let enabledKeyPrefix = "MacPocket.alerts."
     public static let diskThresholdKey = "MacPocket.alerts.diskThreshold"
+    public static let cpuThresholdKey = "MacPocket.alerts.cpuThreshold"
+    public static let cpuMinutesKey = "MacPocket.alerts.cpuMinutes"
+    public static let batteryThresholdKey = "MacPocket.alerts.batteryThreshold"
     public static func enabledKey(_ kind: ResourceAlertKind) -> String { enabledKeyPrefix + kind.rawValue }
 
     public static func load(from defaults: UserDefaults) -> ResourceAlertSettings {
         let enabled = Set(ResourceAlertKind.allCases.filter { defaults.bool(forKey: enabledKey($0)) })
         let threshold = defaults.double(forKey: diskThresholdKey)
-        return ResourceAlertSettings(enabled: enabled, diskFreePercent: threshold > 0 ? min(50, threshold) : 10)
+        let cpu = defaults.double(forKey: cpuThresholdKey), minutes = defaults.integer(forKey: cpuMinutesKey)
+        let battery = defaults.double(forKey: batteryThresholdKey)
+        return ResourceAlertSettings(enabled: enabled, diskFreePercent: threshold > 0 ? min(50, threshold) : 10,
+                                     cpuPercent: cpu > 0 ? min(100, cpu) : 85, cpuMinutes: minutes > 0 ? min(120, minutes) : 5,
+                                     batteryPercent: battery > 0 ? min(50, battery) : 15)
     }
 }
 
@@ -172,17 +192,29 @@ public struct ResourceAlertReading: Equatable, Sendable {
     public var diskFreePercent: Double?
     public var thermalState: String
     public var memoryPressureLevel: Int?
+    /// How long total CPU has stayed at or above the alert threshold (see `SustainedThreshold`).
+    public var cpuHighDuration: TimeInterval?
+    public var batteryPercent: Double?
+    /// On battery and not charging.
+    public var discharging: Bool
 
-    public init(diskFreePercent: Double?, thermalState: String, memoryPressureLevel: Int?) {
+    public init(diskFreePercent: Double?, thermalState: String, memoryPressureLevel: Int?, cpuHighDuration: TimeInterval? = nil,
+                batteryPercent: Double? = nil, discharging: Bool = false) {
         self.diskFreePercent = diskFreePercent
         self.thermalState = thermalState
         self.memoryPressureLevel = memoryPressureLevel
+        self.cpuHighDuration = cpuHighDuration
+        self.batteryPercent = batteryPercent
+        self.discharging = discharging
     }
 
-    public init(_ snapshot: SystemSnapshot) {
+    public init(_ snapshot: SystemSnapshot, cpuHighDuration: TimeInterval? = nil) {
         let volume = snapshot.volumes.first { $0.path == "/" } ?? snapshot.volumes.first
         let free = volume.flatMap { $0.totalBytes > 0 ? Double($0.availableBytes) / Double($0.totalBytes) * 100 : nil }
-        self.init(diskFreePercent: free, thermalState: snapshot.thermalState, memoryPressureLevel: snapshot.memoryPressureLevel)
+        let power = snapshot.power
+        self.init(diskFreePercent: free, thermalState: snapshot.thermalState, memoryPressureLevel: snapshot.memoryPressureLevel,
+                  cpuHighDuration: cpuHighDuration, batteryPercent: power.batteryPresent ? power.chargePercent : nil,
+                  discharging: power.batteryPresent && power.source == "Battery Power" && power.isCharging != true)
     }
 
     /// Conditions currently met for the enabled alerts.
@@ -192,7 +224,28 @@ public struct ResourceAlertReading: Equatable, Sendable {
         if settings.enabled.contains(.thermal), thermalState == "serious" || thermalState == "critical" { result.insert(.thermal) }
         // kern.memorystatus_vm_pressure_level: 4 is critical.
         if settings.enabled.contains(.memoryPressure), (memoryPressureLevel ?? 0) >= 4 { result.insert(.memoryPressure) }
+        if settings.enabled.contains(.sustainedCPU), let duration = cpuHighDuration, duration >= Double(settings.cpuMinutes) * 60 {
+            result.insert(.sustainedCPU)
+        }
+        if settings.enabled.contains(.lowBattery), discharging, let battery = batteryPercent, battery <= settings.batteryPercent {
+            result.insert(.lowBattery)
+        }
         return result
+    }
+}
+
+/// How long a value has stayed at or above a threshold without a break. A missing sample breaks the streak.
+public struct SustainedThreshold: Sendable {
+    private var since: Date?
+
+    public init() {}
+
+    /// Feeds one sample; returns the length of the current streak, or nil when below the threshold.
+    public mutating func update(_ value: Double?, threshold: Double, at date: Date) -> TimeInterval? {
+        guard let value, value >= threshold else { since = nil; return nil }
+        let start = since ?? date
+        since = start
+        return date.timeIntervalSince(start)
     }
 }
 
