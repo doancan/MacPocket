@@ -184,6 +184,7 @@ extension PocketTool {
         case .workspaces: String(localized: "Masa Düzenleri")
         case .snippets: String(localized: "Metin Kısaltmaları")
         case .screenGrab: String(localized: "Ekrandan Al")
+        case .mouseScroll: String(localized: "Fare Kaydırma")
         }
     }
 }

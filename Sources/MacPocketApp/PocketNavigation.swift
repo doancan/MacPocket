@@ -29,6 +29,7 @@ enum PocketTool: String, Identifiable {
     case quitGuard = "Kapatma Koruması", brightness = "Ekran Parlaklığı", macros = "Makrolar"
     case freezer = "Uygulama Dondurucu", supportReport = "Destek Raporu", focus = "Odak Oturumu"
     case workspaces = "Masa Düzenleri", snippets = "Metin Kısaltmaları", screenGrab = "Ekrandan Al"
+    case mouseScroll = "Fare Kaydırma"
     var id: String { rawValue }
 }
 

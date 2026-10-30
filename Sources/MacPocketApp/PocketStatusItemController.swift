@@ -209,5 +209,6 @@ final class PocketApplicationState: ObservableObject {
         WorkspaceService.shared.start()
         SnippetService.shared.start()
         ScreenGrabService.shared.start()
+        MouseScrollService.shared.start()
     }
 }

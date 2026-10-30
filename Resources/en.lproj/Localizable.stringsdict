@@ -738,6 +738,22 @@
 			<string>Last %lld samples:</string>
 		</dict>
 	</dict>
+	<key>Çentik başına %lld satır</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key>
+		<string>%#@count@</string>
+		<key>count</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key>
+			<string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key>
+			<string>lld</string>
+			<key>one</key>
+			<string>%lld line per notch</string>
+			<key>other</key>
+			<string>%lld lines per notch</string>
+		</dict>
+	</dict>
 	<key>İşlemci kullanımı %lld dakikadır %@ üzerinde. Görev Yöneticisi’nden en çok tüketen süreçlere bakabilirsin.</key>
 	<dict>
 		<key>NSStringLocalizedFormatKey</key>
