@@ -62,6 +62,16 @@ final class MenuBarSettingsStore: ObservableObject {
     }
 }
 
+extension MenuBarGroupedStyle {
+    var settingsSymbol: String {
+        switch self {
+        case .symbol: "app"
+        case .dial: "speedometer"
+        case .ring: "circle.circle"
+        }
+    }
+}
+
 /// Settings → Menü Çubuğu.
 struct StatusBarPreferencesView: View {
     @ObservedObject var model: PocketModel
@@ -73,19 +83,16 @@ struct StatusBarPreferencesView: View {
         Form {
             Section {
                 Toggle("Menü çubuğunda göster", isOn: $store.preferences.visible)
-                Picker("Düzen", selection: $store.preferences.layout) {
-                    ForEach(MenuBarLayout.allCases) { Text($0.title).tag($0) }
+                LabeledContent("Düzen") {
+                    GlassTabBar(tabs: MenuBarLayout.allCases.map { GlassTab(id: $0, title: $0.title) }, selection: $store.preferences.layout)
+                        .frame(maxWidth: 220)
                 }
-                .pickerStyle(.segmented)
                 Text(store.preferences.layout == .grouped
-                     ? "Tek simge; tıklayınca her modül için bir sekme açılır. Etkin modüller simgede kompakt olarak gösterilir."
-                     : "Her etkin modül kendi menü çubuğu öğesini ve kendi ayarlarını kullanır. Öğeler ⌘ basılıyken sürüklenebilir.")
+                     ? "Menü çubuğunda tek, kompakt bir simge; tıklayınca her modül kendi sekmesinde açılır."
+                     : "Her etkin modül kendi menü çubuğu öğesini ve kendi ayarlarını kullanır: CPU, bellek, disk, ağ, güç ve fan. Öğeler ⌘ basılıyken sürüklenebilir.")
                     .font(.subheadline).foregroundStyle(.secondary)
-                if store.preferences.layout == .grouped {
-                    Picker("Simge görünümü", selection: $store.preferences.groupedStyle) {
-                        ForEach(MenuBarGroupedStyle.allCases) { Text($0.title).tag($0) }
-                    }
-                }
+                    .fixedSize(horizontal: false, vertical: true)
+                if store.preferences.layout == .grouped { groupedOptions }
                 LabeledContent("Önizleme") { preview }
             } header: { Text("Yerleşim") }
 
@@ -96,7 +103,7 @@ struct StatusBarPreferencesView: View {
             } header: {
                 Text("Modüller")
             } footer: {
-                Text("Pil bilgileri yalnız pili olan Mac’lerde gösterilir. Sığmayan öğeleri macOS ekran alanına göre gizleyebilir.")
+                Text("Pil bilgileri yalnız pili olan Mac’lerde, fan hızı yalnız fanlı Mac’lerde gösterilir. Sığmayan öğeleri macOS ekran alanına göre gizleyebilir.")
                     .font(.subheadline).foregroundStyle(.secondary)
             }
 
@@ -115,17 +122,37 @@ struct StatusBarPreferencesView: View {
         .formStyle(.grouped)
     }
 
+    @ViewBuilder private var groupedOptions: some View {
+        LabeledContent("Simge") {
+            GlassTabBar(tabs: MenuBarGroupedStyle.allCases.map { GlassTab(id: $0, title: $0.title, symbol: $0.settingsSymbol) },
+                        selection: $store.preferences.groupedStyle)
+                .frame(maxWidth: 380)
+        }
+        if store.preferences.groupedStyle.isLive {
+            Picker("Göstergenin izlediği", selection: $store.preferences.groupedMetric) {
+                ForEach(MenuBarModule.allCases) { module in
+                    Label(module.title, systemImage: module.symbol).tag(module)
+                }
+            }
+            Text("Gösterge, modülün kendi ayarlarında seçili değeri izler; örneğin Güç ve Fan için “Fan hızı (%)” seçiliyse fanın en yüksek hızına oranını gösterir. Hız gibi üst sınırı olmayan değerler son ölçümlerin en yükseğine göre oranlanır.")
+                .font(.subheadline).foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        Toggle("Dikkat gerektiğinde nokta göster", isOn: $store.preferences.groupedBadge)
+        Text("Başlangıç diskindeki boş alan bildirim eşiğinin altına düştüğünde, ısı yükseldiğinde veya bellek baskısı kritikleştiğinde simgenin köşesinde nokta belirir; nedeni ipucunda yazar.")
+            .font(.subheadline).foregroundStyle(.secondary)
+            .fixedSize(horizontal: false, vertical: true)
+    }
+
     @ViewBuilder private var preview: some View {
         let preferences = store.preferences
         if !preferences.visible {
             Text("Gizli").foregroundStyle(.secondary)
         } else if preferences.layout == .grouped || preferences.enabledModules.isEmpty {
-            let readings = preferences.enabledModules.map {
-                ($0, MenuBarFormatter.reading($0, settings: preferences.settings(for: $0), snapshot: model.system,
-                                              binaryUnits: preferences.binaryUnits))
-            }
-            MenuBarItemPreview(image: MenuBarRenderer.grouped(style: preferences.groupedStyle, readings: readings,
-                                                              history: history, preferences: preferences))
+            let attention = MenuBarAttention.isNeeded(model.system,
+                                                      diskFreeThreshold: ResourceAlertSettings.load(from: .standard).diskFreePercent)
+            MenuBarItemPreview(image: MenuBarRenderer.grouped(MenuBarRenderer.groupedState(preferences: preferences, snapshot: model.system,
+                                                                                            history: history, attention: attention)))
         } else {
             HStack(spacing: PocketSpacing.xs) {
                 ForEach(preferences.enabledModules) { module in
@@ -198,10 +225,10 @@ private struct ModuleSettingsEditor: View {
                     ForEach(volumes, id: \.path) { Text($0.name).tag($0.path) }
                 }
             }
-            Picker("Görünüm", selection: $settings.style) {
-                ForEach(MenuBarDisplayStyle.allCases) { Text($0.title).tag($0) }
+            LabeledContent("Görünüm") {
+                GlassTabBar(tabs: MenuBarDisplayStyle.allCases.map { GlassTab(id: $0, title: $0.title) }, selection: $settings.style)
+                    .frame(maxWidth: 300)
             }
-            .pickerStyle(.segmented)
             HStack(spacing: PocketSpacing.l) {
                 Toggle("Etiket", isOn: $settings.showLabel)
                 Toggle("Simge", isOn: $settings.showIcon)
@@ -213,7 +240,7 @@ private struct ModuleSettingsEditor: View {
             .disabled(settings.style == .icon)
             .toggleStyle(.checkbox)
             if layout == .grouped {
-                Text("Gruplu düzende bu modülün değeri ve ondalık ayarı tek simgede kullanılır; görünüm seçenekleri Ayrı düzende uygulanır.")
+                Text("Gruplu düzende bu modül açılır pencerede kendi sekmesinde gösterilir; seçili değer canlı göstergeyi de besler. Görünüm seçenekleri Ayrı düzende uygulanır.")
                     .font(.subheadline).foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
             }

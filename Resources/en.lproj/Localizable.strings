@@ -4,7 +4,6 @@
 "%@ %lld" = "%@ %lld";
 "%@ (%@): %@ olarak ayarlandı." = "%1$@ (%2$@) set to %3$@.";
 "%@ (bağlı değil)" = "%@ (not connected)";
-"%@ (⌘%lld)" = "%@ (⌘%lld)";
 "%@ / %@ kullanılıyor" = "%@ of %@ in use";
 "%@ Finder’da göster" = "Show %@ in Finder";
 "%@ Homebrew ile güncelleniyor…" = "Updating %@ with Homebrew…";
@@ -587,7 +586,6 @@
 "Grup %lld · %lld aynı içerik" = "Group %1$lld · identical copies: %2$lld";
 "Gruplar yalnız referansla doğrudan eşleşen adayları içerir; adaylar birbirine benzemeyebilir." = "Groups contain only candidates that match the reference directly; candidates may not resemble each other.";
 "Gruplu" = "Grouped";
-"Gruplu düzende bu modülün değeri ve ondalık ayarı tek simgede kullanılır; görünüm seçenekleri Ayrı düzende uygulanır." = "In the grouped layout, this module’s value and decimals setting appear in the single icon; style options apply to the separate layout.";
 "Gönderme" = "Upload";
 "Gönderme ve alma (iki satır)" = "Upload and download (two lines)";
 "Görev Yöneticisi" = "Task Manager";
@@ -669,7 +667,6 @@
 "Henüz favori eklemedin" = "No Favorites Yet";
 "Henüz klasör seçilmedi" = "No folder selected";
 "Henüz kontrol edilmedi" = "Not checked yet";
-"Her etkin modül kendi menü çubuğu öğesini ve kendi ayarlarını kullanır. Öğeler ⌘ basılıyken sürüklenebilir." = "Each enabled module gets its own menu bar item and settings. ⌘-drag to rearrange items.";
 "Her grupta ilk dosyayı koru, diğerlerini seç" = "Keep the first file in each group and select the rest";
 "Her kısayolun kendi filtreleri vardır; örneğin ⌥⇥ tüm pencereler, ⌥` yalnız öndeki uygulama. Shift ters yönde gezer." = "Each shortcut has its own filters — for example ⌥⇥ for all windows and ⌥` for the front app only. Shift goes backwards.";
 "Her yinelenen grupta en az bir dosyayı korumalısın." = "Keep at least one file in each duplicate group.";
@@ -863,7 +860,6 @@
 "Mevcut kapasite" = "Current capacity";
 "Mini grafik" = "Mini graph";
 "Mini çubuk" = "Mini bar";
-"Mini çubuklar" = "Mini bars";
 "Model" = "Model";
 "Modem çağrısıyla uyan" = "Wake on modem ring";
 "Modüller" = "Modules";
@@ -937,7 +933,6 @@
 "Pil" = "Battery";
 "Pil %@" = "Battery %@";
 "Pil Ayarları" = "Battery Settings";
-"Pil bilgileri yalnız pili olan Mac’lerde gösterilir. Sığmayan öğeleri macOS ekran alanına göre gizleyebilir." = "Battery details appear only on Macs with a battery. macOS may hide items that don’t fit in the menu bar.";
 "Pil denetleyicisi" = "Battery controller";
 "Pil dolu; adaptörden çalışıyor." = "Battery charged; running on the adapter.";
 "Pil eşiğin altındayken beklemeye geçiş süresi (saniye)." = "Time before standby while the battery is below the threshold (seconds).";
@@ -1016,7 +1011,6 @@
 "Seçimi Temizle" = "Clear Selection";
 "Silinen öğelerin geri getirilemeyeceğini anlıyorum" = "I understand deleted items can’t be recovered";
 "Simge" = "Icon";
-"Simge görünümü" = "Icon style";
 "Simülatör Önbellekleri" = "Simulator Caches";
 "Sistem" = "System";
 "Sistem %@" = "System %@";
@@ -1171,7 +1165,6 @@
 "Taşınmış veya başka diskteki uygulamaların verileri de aday olarak görünebilir." = "Data from apps that were moved or live on another disk may also appear as candidates.";
 "Tek mantıksal çekirdeğe göre" = "Relative to one logical core";
 "Tek renk" = "Monochrome";
-"Tek simge; tıklayınca her modül için bir sekme açılır. Etkin modüller simgede kompakt olarak gösterilir." = "A single icon; clicking it opens a tab for each module. Enabled modules appear compactly in the icon.";
 "Tema" = "Theme";
 "Temiz. Kaldırılacak öğe yok." = "Clean. Nothing to remove.";
 "Temizle" = "Clean";
@@ -1495,7 +1488,6 @@
 "Üst klasöre dön (⌘↑)" = "Back to parent folder (⌘↑)";
 "Üst süreç" = "Parent process";
 "Üç parmakla kaydır" = "Three-finger swipe";
-"İki satırlı değerler" = "Two-line values";
 "İkili (1024)" = "Binary (1024)";
 "İlgili macOS Sistem Ayarları bölümünü aç" = "Open the related pane in macOS System Settings";
 "İlk 300 öğe gösteriliyor; tümünü seçmek için başlıktaki kutuyu kullan." = "Showing the first 300 items; use the checkbox in the header to select all.";
@@ -1568,3 +1560,29 @@
 
 "Aramayı temizle" = "Clear search";
 "Bekleniyor: %@. macOS bir izin penceresi göstermiş olabilir; yanıt verince tarama sürer." = "Waiting for: %@. macOS may be showing a permission prompt; the scan continues once you answer.";
+"Başlangıç diskindeki boş alan bildirim eşiğinin altına düştüğünde, ısı yükseldiğinde veya bellek baskısı kritikleştiğinde simgenin köşesinde nokta belirir; nedeni ipucunda yazar." = "A dot appears in the icon’s corner when free space on the startup disk falls below the notification threshold, the Mac runs hot or memory pressure turns critical; the tooltip names the reason.";
+"Bu Mac’te fan yok" = "This Mac has no fans";
+"Canlı gösterge" = "Live dial";
+"Canlı halka" = "Live ring";
+"Dikkat gerektiğinde nokta göster" = "Show a dot when something needs attention";
+"En hızlı fan: %@" = "Fastest fan: %@";
+"Fan %lld" = "Fan %lld";
+"Fan hızı (%)" = "Fan speed (%)";
+"Fan hızı (rpm)" = "Fan speed (rpm)";
+"Fan: %@" = "Fan: %@";
+"Fanlar" = "Fans";
+"Gruplu düzende bu modül açılır pencerede kendi sekmesinde gösterilir; seçili değer canlı göstergeyi de besler. Görünüm seçenekleri Ayrı düzende uygulanır." = "In the grouped layout this module appears as its own tab in the popover, and the selected value also drives the live icon. Appearance options apply to the separate layout.";
+"Gösterge, modülün kendi ayarlarında seçili değeri izler; örneğin Güç ve Fan için “Fan hızı (%)” seçiliyse fanın en yüksek hızına oranını gösterir. Hız gibi üst sınırı olmayan değerler son ölçümlerin en yükseğine göre oranlanır." = "The icon follows the value selected in the module’s own settings; for example, with “Fan speed (%)” selected for Power & Fans it shows how close the fan is to its maximum speed. Values without an upper bound, such as rates, are scaled to the highest recent reading.";
+"Göstergenin izlediği" = "Icon tracks";
+"Güç ve Fan" = "Power & Fans";
+"Her etkin modül kendi menü çubuğu öğesini ve kendi ayarlarını kullanır: CPU, bellek, disk, ağ, güç ve fan. Öğeler ⌘ basılıyken sürüklenebilir." = "Each enabled module gets its own menu bar item and settings: CPU, memory, disk, network, power and fans. Hold ⌘ to drag items.";
+"Isı durumu" = "Thermal state";
+"Isı durumu: %@" = "Thermal state: %@";
+"Isı yüksek" = "The Mac is running hot";
+"MenuBar.rpm" = "rpm";
+"MenuBar.shortLabel.fan" = "FAN";
+"MenuBar.shortLabel.thermal" = "HEAT";
+"Menü çubuğunda tek, kompakt bir simge; tıklayınca her modül kendi sekmesinde açılır." = "A single compact icon in the menu bar; click it to open each module in its own tab.";
+"Pil bilgileri yalnız pili olan Mac’lerde, fan hızı yalnız fanlı Mac’lerde gösterilir. Sığmayan öğeleri macOS ekran alanına göre gizleyebilir." = "Battery details appear only on Macs with a battery, fan speed only on Macs with fans. macOS may hide items that don’t fit on screen.";
+"Sabit simge" = "Static icon";
+"azami hızın %@" = "%@ of maximum speed";

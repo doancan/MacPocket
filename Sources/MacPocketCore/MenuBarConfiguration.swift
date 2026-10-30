@@ -14,7 +14,7 @@ public enum MenuBarModule: String, CaseIterable, Codable, Sendable, Identifiable
         case .memory: String(localized: "Bellek")
         case .disk: String(localized: "Disk")
         case .network: String(localized: "Ağ")
-        case .power: String(localized: "Güç")
+        case .power: String(localized: "Güç ve Fan")
         }
     }
 
@@ -26,6 +26,15 @@ public enum MenuBarModule: String, CaseIterable, Codable, Sendable, Identifiable
         case .disk: String(localized: "MenuBar.shortLabel.disk", defaultValue: "DİSK")
         case .network: String(localized: "MenuBar.shortLabel.network", defaultValue: "AĞ")
         case .power: String(localized: "MenuBar.shortLabel.power", defaultValue: "GÜÇ")
+        }
+    }
+
+    /// The label for what the module currently shows: the power module reads "FAN" or "ISI" for those values.
+    public func shortLabel(for value: MenuBarValue) -> String {
+        switch value {
+        case .powerFanSpeed, .powerFanPercent: String(localized: "MenuBar.shortLabel.fan", defaultValue: "FAN")
+        case .powerThermal: String(localized: "MenuBar.shortLabel.thermal", defaultValue: "ISI")
+        default: shortLabel
         }
     }
 
@@ -46,7 +55,7 @@ public enum MenuBarModule: String, CaseIterable, Codable, Sendable, Identifiable
         case .memory: [.memoryUsedPercent, .memoryUsedBytes, .memoryFreeBytes, .memoryPressure]
         case .disk: [.diskFreeBytes, .diskUsedPercent, .diskFreePercent, .diskActivity]
         case .network: [.networkUpDown, .networkCombined, .networkDownload, .networkUpload]
-        case .power: [.powerBattery, .powerTimeRemaining, .powerSource]
+        case .power: [.powerBattery, .powerTimeRemaining, .powerSource, .powerFanSpeed, .powerFanPercent, .powerThermal]
         }
     }
 
@@ -65,8 +74,18 @@ public enum MenuBarValue: String, Codable, Sendable, CaseIterable, Identifiable 
     case diskFreeBytes, diskUsedPercent, diskFreePercent, diskActivity
     case networkUpDown, networkCombined, networkDownload, networkUpload
     case powerBattery, powerTimeRemaining, powerSource
+    case powerFanSpeed, powerFanPercent, powerThermal
 
     public var id: String { rawValue }
+
+    /// A symbol that replaces the module's own when this value is shown (fans, heat).
+    public var symbol: String? {
+        switch self {
+        case .powerFanSpeed, .powerFanPercent: "fan"
+        case .powerThermal: "thermometer.medium"
+        default: nil
+        }
+    }
 
     public var title: String {
         switch self {
@@ -88,6 +107,9 @@ public enum MenuBarValue: String, Codable, Sendable, CaseIterable, Identifiable 
         case .powerBattery: String(localized: "Pil yüzdesi")
         case .powerTimeRemaining: String(localized: "Kalan süre")
         case .powerSource: String(localized: "Güç kaynağı")
+        case .powerFanSpeed: String(localized: "Fan hızı (rpm)")
+        case .powerFanPercent: String(localized: "Fan hızı (%)")
+        case .powerThermal: String(localized: "Isı durumu")
         }
     }
 }
@@ -101,17 +123,28 @@ public enum MenuBarLayout: String, Codable, Sendable, CaseIterable, Identifiable
     public var title: String { self == .grouped ? String(localized: "Gruplu") : String(localized: "Ayrı") }
 }
 
-/// How the single grouped status item draws itself.
+/// How the single grouped status item draws itself: always one compact, icon-sized image.
+/// Earlier versions also offered wide text and bar layouts ("stacked", "gauges"); those stored values
+/// no longer decode and fall back to the default.
 public enum MenuBarGroupedStyle: String, Codable, Sendable, CaseIterable, Identifiable {
-    case glyph, stacked, gauges
+    /// The static MacPocket glyph.
+    case symbol = "glyph"
+    /// A speedometer whose needle and arc follow the chosen metric.
+    case dial
+    /// A progress ring around the chosen metric's symbol.
+    case ring
+
+    public static let defaultValue = MenuBarGroupedStyle.dial
     public var id: String { rawValue }
     public var title: String {
         switch self {
-        case .glyph: String(localized: "Yalnız simge")
-        case .stacked: String(localized: "İki satırlı değerler")
-        case .gauges: String(localized: "Mini çubuklar")
+        case .symbol: String(localized: "Sabit simge")
+        case .dial: String(localized: "Canlı gösterge")
+        case .ring: String(localized: "Canlı halka")
         }
     }
+
+    public var isLive: Bool { self != .symbol }
 }
 
 /// How a separate status item draws its module.
@@ -184,6 +217,10 @@ public struct MenuBarPreferences: Equatable, Sendable {
     public var visible: Bool
     public var layout: MenuBarLayout
     public var groupedStyle: MenuBarGroupedStyle
+    /// The module whose level drives the live grouped icon.
+    public var groupedMetric: MenuBarModule
+    /// Marks the grouped icon with a dot while something needs attention (see `MenuBarAttention`).
+    public var groupedBadge: Bool
     public var order: [MenuBarModule]
     public var enabled: Set<MenuBarModule>
     public var modules: [MenuBarModule: MenuBarModuleSettings]
@@ -193,17 +230,20 @@ public struct MenuBarPreferences: Equatable, Sendable {
     public static let visibleKey = "MacPocket.showMenuBar"
     public static let layoutKey = "MacPocket.menubar.layout"
     public static let groupedStyleKey = "MacPocket.menubar.groupedStyle"
+    public static let groupedMetricKey = "MacPocket.menubar.groupedMetric"
+    public static let groupedBadgeKey = "MacPocket.menubar.groupedBadge"
     public static let orderKey = "MacPocket.menubar.order"
     public static let unitsKey = "MacPocket.bar.units"
     public static let schemaKey = "MacPocket.menubar.schema"
     public static let schemaVersion = 1
     public static func moduleKey(_ module: MenuBarModule) -> String { "MacPocket.menubar.module.\(module.rawValue)" }
 
-    public init(visible: Bool = true, layout: MenuBarLayout = .grouped, groupedStyle: MenuBarGroupedStyle = .stacked,
-                order: [MenuBarModule] = MenuBarModule.allCases,
+    public init(visible: Bool = true, layout: MenuBarLayout = .grouped, groupedStyle: MenuBarGroupedStyle = .defaultValue,
+                groupedMetric: MenuBarModule = .cpu, groupedBadge: Bool = true, order: [MenuBarModule] = MenuBarModule.allCases,
                 enabled: Set<MenuBarModule> = Set(MenuBarModule.allCases.filter(\.enabledByDefault)),
                 modules: [MenuBarModule: MenuBarModuleSettings] = [:], binaryUnits: Bool = true) {
         self.visible = visible; self.layout = layout; self.groupedStyle = groupedStyle
+        self.groupedMetric = groupedMetric; self.groupedBadge = groupedBadge
         self.order = Self.completeOrder(order); self.enabled = enabled; self.modules = modules
         self.binaryUnits = binaryUnits
     }
@@ -238,7 +278,9 @@ public struct MenuBarPreferences: Equatable, Sendable {
         }
         return Self(visible: defaults.object(forKey: visibleKey) as? Bool ?? true,
                     layout: defaults.string(forKey: layoutKey).flatMap(MenuBarLayout.init(rawValue:)) ?? .grouped,
-                    groupedStyle: defaults.string(forKey: groupedStyleKey).flatMap(MenuBarGroupedStyle.init(rawValue:)) ?? .stacked,
+                    groupedStyle: defaults.string(forKey: groupedStyleKey).flatMap(MenuBarGroupedStyle.init(rawValue:)) ?? .defaultValue,
+                    groupedMetric: defaults.string(forKey: groupedMetricKey).flatMap(MenuBarModule.init(rawValue:)) ?? .cpu,
+                    groupedBadge: defaults.object(forKey: groupedBadgeKey) as? Bool ?? true,
                     order: order, enabled: Set(enabled), modules: modules,
                     binaryUnits: defaults.string(forKey: unitsKey) != "decimal")
     }
@@ -253,6 +295,8 @@ public struct MenuBarPreferences: Equatable, Sendable {
         set(visible, Self.visibleKey)
         set(layout.rawValue, Self.layoutKey)
         set(groupedStyle.rawValue, Self.groupedStyleKey)
+        set(groupedMetric.rawValue, Self.groupedMetricKey)
+        set(groupedBadge, Self.groupedBadgeKey)
         set(order.map(\.rawValue).joined(separator: ","), Self.orderKey)
         set(binaryUnits ? "binary" : "decimal", Self.unitsKey)
         for module in MenuBarModule.allCases {
@@ -287,8 +331,8 @@ public struct MenuBarPreferences: Equatable, Sendable {
             defaults.set(layout == "separate" ? MenuBarLayout.separate.rawValue : MenuBarLayout.grouped.rawValue,
                          forKey: layoutKey)
         }
-        // The old bar showed values; keep that look rather than collapsing to a glyph.
-        defaults.set(MenuBarGroupedStyle.stacked.rawValue, forKey: groupedStyleKey)
+        // The old bar showed live values; keep it live rather than collapsing to the static glyph.
+        defaults.set(MenuBarGroupedStyle.dial.rawValue, forKey: groupedStyleKey)
 
         // Old enable defaults: only CPU was on. Make them explicit so new defaults don't add items.
         func legacyBool(_ key: String, _ fallback: Bool) -> Bool { defaults.object(forKey: key) as? Bool ?? fallback }
@@ -392,6 +436,30 @@ public enum MenuBarFormatter {
         let kilo = max(0, bytesPerSecond) / base
         if kilo < base * 0.9995 { return number(kilo, fractionDigits: 0) + " KB/s" }
         return bytes(bytesPerSecond, binary: binary) + "/s"
+    }
+
+    public static var rpmUnit: String { String(localized: "MenuBar.rpm", defaultValue: "rpm") }
+
+    /// `ProcessInfo.ThermalState` names as produced by the system monitor.
+    public static func thermalTitle(_ state: String) -> String {
+        switch state {
+        case "nominal": String(localized: "Normal")
+        case "fair": String(localized: "Hafif yüksek")
+        case "serious": String(localized: "Yüksek")
+        case "critical": String(localized: "Kritik")
+        default: String(localized: "Bilinmiyor")
+        }
+    }
+
+    /// Thermal pressure on a 0…1 scale for gauges; nil for an unknown state.
+    public static func thermalLevel(_ state: String) -> Double? {
+        switch state {
+        case "nominal": 0.25
+        case "fair": 0.5
+        case "serious": 0.75
+        case "critical": 1
+        default: nil
+        }
     }
 
     public static func duration(minutes: Int) -> String {
@@ -499,6 +567,25 @@ public enum MenuBarFormatter {
                 return MenuBarReading(lines: ["↑ " + rate(up, binary: binaryUnits)], reserve: ["↑ 999 KB/s"], fraction: nil,
                                       magnitude: up, accessibility: spoken)
             }
+        case .powerFanSpeed, .powerFanPercent:
+            let reserve = settings.value == .powerFanSpeed ? "9999 " + rpmUnit : percentReserve
+            guard let fans = s.fans else { return pending(reserve) }
+            guard let fastest = fans.max(by: { $0.rpm < $1.rpm }) else {
+                return MenuBarReading(lines: ["—"], reserve: [reserve], fraction: nil, magnitude: nil,
+                                      accessibility: String(localized: "Bu Mac’te fan yok"))
+            }
+            let speed = number(fastest.rpm, fractionDigits: 0) + " " + rpmUnit
+            let text = settings.value == .powerFanPercent ? fastest.fraction.map { percent($0 * 100, decimals: decimals) } ?? speed : speed
+            let spoken = fans.count > 1 ? String(localized: "En hızlı fan: \(speed)") : String(localized: "Fan: \(speed)")
+            return MenuBarReading(lines: [text], reserve: [reserve], fraction: fastest.fraction, magnitude: fastest.rpm,
+                                  accessibility: spoken)
+        case .powerThermal:
+            let text = thermalTitle(s.thermalState)
+            let level = thermalLevel(s.thermalState)
+            // The state changes rarely, so the item sizes to the current word instead of reserving the
+            // widest one (which left a wide gap after short states like "Normal").
+            return MenuBarReading(lines: [text], reserve: [text], fraction: level, magnitude: level.map { $0 * 100 },
+                                  accessibility: String(localized: "Isı durumu: \(text)"))
         case .powerBattery, .powerTimeRemaining, .powerSource:
             let power = s.power
             let charging = power.isCharging == true
@@ -525,6 +612,30 @@ public enum MenuBarFormatter {
             let text = percent(charge, decimals: decimals)
             return MenuBarReading(lines: [text], reserve: [percentReserve], fraction: charge / 100, magnitude: charge,
                                   accessibility: batterySpoken(text))
+        }
+    }
+}
+
+// MARK: - Attention
+
+/// Whether the grouped icon carries its attention dot. Independent of notification settings: the dot is a
+/// glanceable state, not an alert. Uses the same rules as resource alerts, with every condition enabled.
+public enum MenuBarAttention {
+    public static func isNeeded(_ snapshot: SystemSnapshot?, diskFreeThreshold: Double) -> Bool {
+        !reasons(snapshot, diskFreeThreshold: diskFreeThreshold).isEmpty
+    }
+
+    /// Spoken reasons, in a stable order, for the accessibility label and tooltip.
+    public static func reasons(_ snapshot: SystemSnapshot?, diskFreeThreshold: Double) -> [String] {
+        guard let snapshot else { return [] }
+        let everything = ResourceAlertSettings(enabled: Set(ResourceAlertKind.allCases), diskFreePercent: diskFreeThreshold)
+        let triggered = ResourceAlertReading(snapshot).triggered(everything)
+        return ResourceAlertKind.allCases.filter(triggered.contains).map { kind in
+            switch kind {
+            case .lowDisk: String(localized: "Disk alanı azaldı")
+            case .thermal: String(localized: "Isı yüksek")
+            case .memoryPressure: String(localized: "Bellek baskısı kritik")
+            }
         }
     }
 }

@@ -50,6 +50,8 @@ public struct SystemSnapshot: Codable, Sendable {
     public var loadAverages: [Double]? = nil
     public var network: NetworkSnapshot? = nil
     public var diskIO: DiskIOSnapshot? = nil
+    /// Fans reported by the SMC; empty on fanless Macs, nil when the SMC can't be read.
+    public var fans: [FanSnapshot]? = nil
     public let uptimeSeconds: Double
     public let thermalState: String
     public let volumes: [VolumeSnapshot]
@@ -124,6 +126,7 @@ public actor SystemMonitor {
     private var previousCPU: [SystemCPUTicks]?
     private var network = NetworkSampler()
     private var diskIO = DiskIOSampler()
+    private let fanSensor = FanSensor()
 
     public init() {}
 
@@ -156,6 +159,7 @@ public actor SystemMonitor {
         // Both samplers are a single getifaddrs / IOKit registry pass: cheap enough for every tick.
         snapshot.network = network.sample()
         snapshot.diskIO = diskIO.sample()
+        snapshot.fans = fanSensor.sample()
         return snapshot
     }
 

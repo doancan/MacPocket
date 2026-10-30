@@ -504,6 +504,52 @@ private struct NetworkDetail: View {
     }
 }
 
+/// One fan: a spinning glyph, its speed and how far it is toward its maximum.
+private struct FanRow: View {
+    let number: Int
+    let fan: FanSnapshot
+    let tint: Color
+    @PocketReduceMotion private var reduceMotion
+
+    var body: some View {
+        let speed = MenuBarFormatter.number(fan.rpm, fractionDigits: 0) + " " + MenuBarFormatter.rpmUnit
+        VStack(alignment: .leading, spacing: PocketSpacing.xs) {
+            HStack(spacing: PocketSpacing.xs + 2) {
+                Image(systemName: "fan")
+                    .foregroundStyle(tint)
+                    .modifier(FanSpin(active: !reduceMotion && fan.rpm > 0))
+                Text("Fan \(number)").foregroundStyle(.secondary)
+                Spacer(minLength: PocketSpacing.s)
+                Text(speed).monospacedDigit()
+                if let fraction = fan.fraction {
+                    Text(percentText(fraction * 100)).monospacedDigit().foregroundStyle(.secondary)
+                        .frame(minWidth: 34, alignment: .trailing)
+                }
+            }
+            .font(.callout)
+            CapacityBar(fraction: fan.fraction ?? 0, tint: tint, height: 5)
+        }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(Text("Fan \(number)"))
+        .accessibilityValue(fan.fraction.map { Text(verbatim: "\(speed), ") + Text("azami hızın \(percentText($0 * 100))") }
+                            ?? Text(speed))
+    }
+}
+
+/// Continuous rotation of the fan glyph (macOS 15+).
+private struct FanSpin: ViewModifier {
+    let active: Bool
+
+    @ViewBuilder
+    func body(content: Content) -> some View {
+        if #available(macOS 15.0, *) {
+            content.symbolEffect(.rotate.byLayer, options: .repeat(.continuous), isActive: active)
+        } else {
+            content
+        }
+    }
+}
+
 private struct PowerDetail: View {
     @ObservedObject var model: PocketModel
     private let module = MenuBarModule.power
@@ -549,6 +595,16 @@ private struct PowerDetail: View {
             }
             .menuBarSection()
 
+            if let fans = system?.fans, !fans.isEmpty {
+                VStack(alignment: .leading, spacing: PocketSpacing.s) {
+                    SectionTitle(title: "Fanlar")
+                    ForEach(Array(fans.enumerated()), id: \.offset) { index, fan in
+                        FanRow(number: index + 1, fan: fan, tint: module.tint)
+                    }
+                }
+                .menuBarSection()
+            }
+
             keepAwake.menuBarSection()
         }
     }
@@ -590,7 +646,8 @@ private struct PowerDetail: View {
         Button { Task { await model.startAwake(duration: seconds) } } label: {
             Text(title).frame(maxWidth: .infinity)
         }
-        .buttonStyle(.pocketSecondary)
+        // The popover is already glass on macOS 26; a glass button here would be glass on glass.
+        .buttonStyle(.bordered)
         .controlSize(.small)
         .accessibilityLabel(spoken)
     }

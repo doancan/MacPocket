@@ -99,11 +99,13 @@ final class PocketStatusItemController: NSObject, NSPopoverDelegate {
                     ($0, MenuBarFormatter.reading($0, settings: preferences.settings(for: $0), snapshot: snapshot,
                                                   binaryUnits: preferences.binaryUnits))
                 }
-                renderKey = MenuBarRenderer.groupedKey(style: preferences.groupedStyle, readings: readings, history: history,
-                                                       preferences: preferences)
-                image = { MenuBarRenderer.grouped(style: preferences.groupedStyle, readings: readings, history: self.history,
-                                                  preferences: preferences) }
-                spoken = readings.isEmpty ? String(localized: "Sistem durumu") : readings.map(\.1.accessibility).joined(separator: ", ")
+                let reasons = MenuBarAttention.reasons(snapshot, diskFreeThreshold: diskFreeThreshold)
+                let state = MenuBarRenderer.groupedState(preferences: preferences, snapshot: snapshot, history: history,
+                                                         attention: !reasons.isEmpty)
+                renderKey = MenuBarRenderer.groupedKey(state)
+                image = { MenuBarRenderer.grouped(state) }
+                let parts = readings.map(\.1.accessibility) + (state.attention ? reasons : [])
+                spoken = parts.isEmpty ? String(localized: "Sistem durumu") : parts.joined(separator: ", ")
             }
             if renderKeys[key] != renderKey {
                 renderKeys[key] = renderKey
@@ -116,6 +118,9 @@ final class PocketStatusItemController: NSObject, NSPopoverDelegate {
             }
         }
     }
+
+    /// The same low-disk threshold the resource alerts use (Settings → Notifications).
+    private var diskFreeThreshold: Double { ResourceAlertSettings.load(from: .standard).diskFreePercent }
 
     private func rebuildItems(_ keys: [String]) {
         popover.performClose(nil)

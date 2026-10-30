@@ -117,7 +117,9 @@ final class MenuBarPreferencesTests: XCTestCase {
     func testFreshInstallUsesGroupedDefaults() {
         let preferences = MenuBarPreferences.load(from: defaults)
         XCTAssertEqual(preferences.layout, .grouped)
-        XCTAssertEqual(preferences.groupedStyle, .stacked)
+        XCTAssertEqual(preferences.groupedStyle, .dial)
+        XCTAssertEqual(preferences.groupedMetric, .cpu)
+        XCTAssertTrue(preferences.groupedBadge)
         XCTAssertEqual(preferences.order, MenuBarModule.allCases)
         XCTAssertEqual(preferences.enabledModules, [.cpu, .memory])
         XCTAssertEqual(preferences.settings(for: .network).value, .networkUpDown)
@@ -181,7 +183,9 @@ final class MenuBarPreferencesTests: XCTestCase {
     func testSaveLoadRoundTripPerModuleSettings() {
         var preferences = MenuBarPreferences.load(from: defaults)
         preferences.layout = .separate
-        preferences.groupedStyle = .gauges
+        preferences.groupedStyle = .ring
+        preferences.groupedMetric = .power
+        preferences.groupedBadge = false
         preferences.order = [.network, .cpu]
         preferences.enabled = [.network, .disk]
         preferences.binaryUnits = false
@@ -192,13 +196,34 @@ final class MenuBarPreferencesTests: XCTestCase {
 
         let loaded = MenuBarPreferences.load(from: defaults)
         XCTAssertEqual(loaded.layout, .separate)
-        XCTAssertEqual(loaded.groupedStyle, .gauges)
+        XCTAssertEqual(loaded.groupedStyle, .ring)
+        XCTAssertEqual(loaded.groupedMetric, .power)
+        XCTAssertFalse(loaded.groupedBadge)
         XCTAssertEqual(loaded.order, [.network, .cpu, .memory, .disk, .power])
         XCTAssertEqual(loaded.enabledModules, [.network, .disk])
         XCTAssertFalse(loaded.binaryUnits)
         XCTAssertEqual(loaded.settings(for: .network), preferences.modules[.network])
         XCTAssertEqual(loaded.settings(for: .disk).volumePath, "/")
         XCTAssertEqual(defaults.object(forKey: "MacPocket.menuBarCPU") as? Bool, false)
+    }
+
+    func testRetiredWideGroupedStylesBecomeTheLiveDial() {
+        defaults.set(MenuBarPreferences.schemaVersion, forKey: MenuBarPreferences.schemaKey)
+        for retired in ["stacked", "gauges"] {
+            defaults.set(retired, forKey: MenuBarPreferences.groupedStyleKey)
+            XCTAssertEqual(MenuBarPreferences.load(from: defaults).groupedStyle, .dial, retired)
+        }
+    }
+
+    func testStoredGlyphStyleStillMeansTheStaticIcon() {
+        defaults.set(MenuBarPreferences.schemaVersion, forKey: MenuBarPreferences.schemaKey)
+        defaults.set("glyph", forKey: MenuBarPreferences.groupedStyleKey)
+        XCTAssertEqual(MenuBarPreferences.load(from: defaults).groupedStyle, .symbol)
+    }
+
+    func testLegacyMigrationKeepsTheGroupedIconLive() {
+        defaults.set("combined", forKey: "MacPocket.bar.layout")
+        XCTAssertEqual(MenuBarPreferences.load(from: defaults).groupedStyle, .dial)
     }
 
     func testValueOutsideModuleOptionsFallsBackToDefault() throws {

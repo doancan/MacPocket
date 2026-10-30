@@ -16,6 +16,9 @@ struct MenuBarSample: Identifiable, Sendable {
     let diskRead: Double?
     let diskWrite: Double?
     let battery: Double?
+    /// Fastest fan as a share of its maximum speed.
+    let fan: Double?
+    let thermal: Double?
     var id: Date { date }
     var cpuTotal: Double? { cpuUser.flatMap { user in cpuSystem.map { min(100, user + $0) } } }
 }
@@ -36,7 +39,9 @@ final class MenuBarHistory: ObservableObject {
             memoryFraction: memory, memoryPressure: snapshot.memoryPressurePercent,
             networkDown: snapshot.network?.receivedBytesPerSecond, networkUp: snapshot.network?.sentBytesPerSecond,
             diskRead: snapshot.diskIO?.readBytesPerSecond, diskWrite: snapshot.diskIO?.writeBytesPerSecond,
-            battery: snapshot.power.chargePercent))
+            battery: snapshot.power.chargePercent,
+            fan: snapshot.fans?.compactMap(\.fraction).max(),
+            thermal: MenuBarFormatter.thermalLevel(snapshot.thermalState)))
         if samples.count > Self.capacity { samples.removeFirst(samples.count - Self.capacity) }
     }
 
@@ -72,7 +77,13 @@ final class MenuBarHistory: ObservableObject {
             }
             return scaled(values, floor: 65_536)
         case .power:
-            return recent.map { ($0.battery ?? 0) / 100 }
+            return recent.map { sample in
+                switch settings.value {
+                case .powerFanSpeed, .powerFanPercent: sample.fan ?? 0
+                case .powerThermal: sample.thermal ?? 0
+                default: (sample.battery ?? 0) / 100
+                }
+            }
         }
     }
 
@@ -112,8 +123,10 @@ enum MenuBarRenderer {
         ceil((text as NSString).size(withAttributes: attributes).width)
     }
 
-    /// Symbol for a module; the power symbol reflects battery level and charging.
-    static func symbol(for module: MenuBarModule, snapshot: SystemSnapshot?) -> String {
+    /// Symbol for a module showing `value`: fans and heat have their own; the battery symbol reflects
+    /// charge level and charging.
+    static func symbol(for module: MenuBarModule, value: MenuBarValue? = nil, snapshot: SystemSnapshot?) -> String {
+        if let symbol = value?.symbol { return symbol }
         guard module == .power, let power = snapshot?.power, power.batteryPresent, let charge = power.chargePercent else {
             return module.symbol
         }
@@ -207,14 +220,6 @@ enum MenuBarRenderer {
         return image
     }
 
-    static func glyph() -> NSImage {
-        let configuration = NSImage.SymbolConfiguration(pointSize: 14, weight: .medium)
-        let image = NSImage(systemSymbolName: "gauge.with.dots.needle.50percent", accessibilityDescription: "MacPocket")?
-            .withSymbolConfiguration(configuration) ?? NSImage()
-        image.isTemplate = true
-        return image
-    }
-
     // MARK: Separate item
 
     static func moduleKey(_ module: MenuBarModule, settings: MenuBarModuleSettings, reading: MenuBarReading,
@@ -230,13 +235,14 @@ enum MenuBarRenderer {
                 levels += history.graph(for: module, settings: settings, count: graphSamples).map { Int($0 * 40) }
             }
         }
-        return Key(parts: [module.rawValue, String(describing: settings), symbol(for: module, snapshot: snapshot)]
+        return Key(parts: [module.rawValue, String(describing: settings), symbol(for: module, value: settings.value, snapshot: snapshot)]
                    + reading.lines + reading.reserve, levels: levels)
     }
 
     static func module(_ module: MenuBarModule, settings: MenuBarModuleSettings, reading: MenuBarReading,
                        snapshot: SystemSnapshot?, history: MenuBarHistory) -> NSImage {
-        let symbolName = symbol(for: module, snapshot: snapshot)
+        let symbolName = symbol(for: module, value: settings.value, snapshot: snapshot)
+        let shortLabel = module.shortLabel(for: settings.value)
         if settings.style == .icon {
             return template(width: 18) { drawSymbol(symbolName, in: NSRect(x: 0, y: 2, width: 18, height: 18), pointSize: 14) }
         }
@@ -261,7 +267,7 @@ enum MenuBarRenderer {
             add(width: 15) { start in drawSymbol(symbolName, in: NSRect(x: start, y: 3, width: 15, height: 16)) }
         }
         if sideLabel {
-            let label = module.shortLabel
+            let label = shortLabel
             add(width: width(label, sideLabelAttributes)) { start in
                 drawText(label, x: start, baseline: centeredY(sideLabelAttributes), sideLabelAttributes)
             }
@@ -294,7 +300,7 @@ enum MenuBarRenderer {
                 let reserve = reading.reserve.first ?? value
                 let valueWidth = max(width(value, valueAttributes), width(reserve, valueAttributes))
                 if stackedLabel {
-                    let label = module.shortLabel
+                    let label = shortLabel
                     let blockWidth = max(valueWidth, width(label, labelAttributes))
                     add(width: blockWidth, gap: 0) { start in
                         drawText(label, x: start, baseline: 12.5, labelAttributes)
@@ -317,76 +323,106 @@ enum MenuBarRenderer {
 
     // MARK: Grouped item
 
-    static func groupedKey(style: MenuBarGroupedStyle, readings: [(MenuBarModule, MenuBarReading)], history: MenuBarHistory,
-                           preferences: MenuBarPreferences) -> Key {
-        var key = Key(parts: [style.rawValue], levels: [])
-        guard style != .glyph else { return key }
-        for (module, reading) in readings {
-            key.parts.append(module.rawValue)
-            key.parts += style == .stacked ? reading.lines + reading.reserve : []
-            if style == .gauges { key.levels.append(Int(level(module, reading, history, preferences) * 40)) }
-        }
-        return key
+    /// Everything the single grouped icon depends on; equal states draw identical images.
+    struct GroupedState: Equatable {
+        var style: MenuBarGroupedStyle
+        /// Symbol of the metric module (ring center).
+        var symbol: String
+        /// 0…1 level of the metric module.
+        var level: Double
+        var attention: Bool
     }
 
-    private static func level(_ module: MenuBarModule, _ reading: MenuBarReading, _ history: MenuBarHistory,
-                              _ preferences: MenuBarPreferences) -> Double {
-        reading.fraction ?? history.graph(for: module, settings: preferences.settings(for: module), count: graphSamples).last ?? 0
+    static func groupedState(preferences: MenuBarPreferences, snapshot: SystemSnapshot?, history: MenuBarHistory,
+                             attention: Bool) -> GroupedState {
+        let metric = preferences.groupedMetric
+        let settings = preferences.settings(for: metric)
+        let reading = MenuBarFormatter.reading(metric, settings: settings, snapshot: snapshot, binaryUnits: preferences.binaryUnits)
+        let level = reading.fraction ?? history.graph(for: metric, settings: settings, count: graphSamples).last ?? 0
+        return GroupedState(style: preferences.groupedStyle,
+                            symbol: symbol(for: metric, value: settings.value, snapshot: snapshot),
+                            level: min(1, max(0, level)), attention: preferences.groupedBadge && attention)
     }
 
-    static func grouped(style: MenuBarGroupedStyle, readings: [(MenuBarModule, MenuBarReading)], history: MenuBarHistory,
-                        preferences: MenuBarPreferences) -> NSImage {
-        guard style != .glyph, !readings.isEmpty else { return glyph() }
-        if style == .gauges {
-            let barWidth: CGFloat = 4.5, gap: CGFloat = 2.5
-            let levels = readings.map { level($0.0, $0.1, history, preferences) }
-            let width = 17 + CGFloat(levels.count) * (barWidth + gap) - gap
-            return template(width: width) {
-                drawSymbol("gauge.with.dots.needle.50percent", in: NSRect(x: 0, y: 3, width: 14, height: 16), pointSize: 12)
-                for (index, value) in levels.enumerated() {
-                    drawGauge(value, in: NSRect(x: 17 + CGFloat(index) * (barWidth + gap), y: 3, width: barWidth, height: 16))
-                }
-            }
-        }
+    static func groupedKey(_ state: GroupedState) -> Key {
+        Key(parts: [state.style.rawValue, state.style == .ring ? state.symbol : "", state.attention ? "attention" : ""],
+            levels: state.style.isLive ? [Int((state.level * Double(levelSteps)).rounded())] : [])
+    }
 
-        // Stacked: two rows per column. Single-line modules pair up as "CPU %12"; a two-line
-        // reading (network up/down) takes a column of its own.
-        let labelAttributes = attributes(font(8, .semibold), alpha: 0.62)
-        let valueAttributes = attributes(font(9.5))
-        struct Row { let label: String?; let value: String; let reserve: String }
-        var columns: [[Row]] = []
-        var pending: [Row] = []
-        for (module, reading) in readings {
-            if reading.lines.count > 1 {
-                columns.append(zip(reading.lines, reading.reserve).map { Row(label: nil, value: $0, reserve: $1) })
-            } else {
-                pending.append(Row(label: module.shortLabel, value: reading.lines.first ?? "—",
-                                   reserve: reading.reserve.first ?? "—"))
-                if pending.count == 2 { columns.append(pending); pending = [] }
-            }
-        }
-        if !pending.isEmpty { columns.append(pending) }
+    /// Quantization of the live icon: fine enough for the needle to move smoothly, coarse enough that
+    /// sampling noise doesn't re-render the image every tick.
+    private static let levelSteps = 50
+    private static let iconWidth: CGFloat = 19
+    private static let badgeRoom: CGFloat = 3
 
-        let columnGap: CGFloat = 7
-        let layouts = columns.map { rows -> (rows: [Row], labelWidth: CGFloat, valueWidth: CGFloat) in
-            let labelWidth = rows.compactMap(\.label).map { width($0, labelAttributes) }.max() ?? 0
-            let valueWidth = rows.map { max(width($0.value, valueAttributes), width($0.reserve, valueAttributes)) }.max() ?? 0
-            return (rows, labelWidth, valueWidth)
-        }
-        let total = layouts.reduce(CGFloat(0)) { $0 + $1.labelWidth + ($1.labelWidth > 0 ? 3 : 0) + $1.valueWidth }
-            + columnGap * CGFloat(max(0, layouts.count - 1))
-        return template(width: total) {
-            var x: CGFloat = 0
-            for layout in layouts {
-                let valueX = x + layout.labelWidth + (layout.labelWidth > 0 ? 3 : 0)
-                let baselines: [CGFloat] = layout.rows.count == 1 ? [centeredY(valueAttributes)] : [11.5, 1.5]
-                for (row, baseline) in zip(layout.rows, baselines) {
-                    if let label = row.label { drawText(label, x: x, baseline: baseline + 0.5, labelAttributes) }
-                    drawText(row.value, x: valueX + layout.valueWidth - width(row.value, valueAttributes), baseline: baseline, valueAttributes)
-                }
-                x = valueX + layout.valueWidth + columnGap
+    static func grouped(_ state: GroupedState) -> NSImage {
+        let width = iconWidth + (state.attention ? badgeRoom : 0)
+        let level = Double(Int((state.level * Double(levelSteps)).rounded())) / Double(levelSteps)
+        return template(width: width) {
+            switch state.style {
+            case .symbol:
+                drawSymbol("gauge.with.dots.needle.50percent", in: NSRect(x: 0, y: 2, width: iconWidth, height: 18), pointSize: 14)
+            case .dial:
+                drawDial(level, center: NSPoint(x: iconWidth / 2, y: 9.4), radius: 7.5)
+            case .ring:
+                drawRing(level, symbol: state.symbol, center: NSPoint(x: iconWidth / 2, y: height / 2), radius: 7.2)
             }
+            if state.attention { drawBadge(center: NSPoint(x: width - 3, y: height - 4.5)) }
         }
+    }
+
+    /// Speedometer: a 250° track, the filled arc and a needle at the level, all from the lower left.
+    private static func drawDial(_ level: Double, center: NSPoint, radius: CGFloat) {
+        let start: CGFloat = 215, sweep: CGFloat = 250
+        let end = start - sweep * CGFloat(level)
+        func arc(to angle: CGFloat, alpha: CGFloat) {
+            let path = NSBezierPath()
+            path.appendArc(withCenter: center, radius: radius, startAngle: start, endAngle: angle, clockwise: true)
+            path.lineWidth = 2
+            path.lineCapStyle = .round
+            NSColor.black.withAlphaComponent(alpha).setStroke()
+            path.stroke()
+        }
+        arc(to: start - sweep, alpha: 0.3)
+        if level > 0.01 { arc(to: end, alpha: 1) }
+        let radians = end * .pi / 180
+        let needle = NSBezierPath()
+        needle.move(to: center)
+        needle.line(to: NSPoint(x: center.x + cos(radians) * (radius - 2.6), y: center.y + sin(radians) * (radius - 2.6)))
+        needle.lineWidth = 1.6
+        needle.lineCapStyle = .round
+        NSColor.black.setStroke()
+        needle.stroke()
+        NSColor.black.setFill()
+        NSBezierPath(ovalIn: NSRect(x: center.x - 1.8, y: center.y - 1.8, width: 3.6, height: 3.6)).fill()
+    }
+
+    /// Progress ring filling clockwise from the top, with the metric's symbol inside.
+    private static func drawRing(_ level: Double, symbol: String, center: NSPoint, radius: CGFloat) {
+        let track = NSBezierPath(ovalIn: NSRect(x: center.x - radius, y: center.y - radius, width: radius * 2, height: radius * 2))
+        track.lineWidth = 2.2
+        NSColor.black.withAlphaComponent(0.28).setStroke()
+        track.stroke()
+        if level > 0.01 {
+            let arc = NSBezierPath()
+            arc.appendArc(withCenter: center, radius: radius, startAngle: 90, endAngle: 90 - 360 * CGFloat(level), clockwise: true)
+            arc.lineWidth = 2.2
+            arc.lineCapStyle = .round
+            NSColor.black.setStroke()
+            arc.stroke()
+        }
+        drawSymbol(symbol, in: NSRect(x: center.x - 4.5, y: center.y - 4.5, width: 9, height: 9), pointSize: 7.5)
+    }
+
+    /// A dot with a transparent moat, so it stays distinct where it overlaps the icon.
+    private static func drawBadge(center: NSPoint) {
+        guard let context = NSGraphicsContext.current else { return }
+        context.saveGraphicsState()
+        context.compositingOperation = .clear
+        NSBezierPath(ovalIn: NSRect(x: center.x - 4, y: center.y - 4, width: 8, height: 8)).fill()
+        context.restoreGraphicsState()
+        NSColor.black.setFill()
+        NSBezierPath(ovalIn: NSRect(x: center.x - 2.6, y: center.y - 2.6, width: 5.2, height: 5.2)).fill()
     }
 }
 
