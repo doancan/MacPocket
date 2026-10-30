@@ -177,6 +177,7 @@ extension PocketTool {
         case .quickActions: String(localized: "Hızlı İşlemler")
         case .quitGuard: String(localized: "Kapatma Koruması")
         case .brightness: String(localized: "Ekran Parlaklığı")
+        case .macros: String(localized: "Makrolar")
         }
     }
 }

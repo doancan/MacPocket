@@ -274,6 +274,22 @@
 			<string>Downloads untouched for more than %lld days. Review before selecting.</string>
 		</dict>
 	</dict>
+	<key>%lld kez çalıştır</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key>
+		<string>%#@count@</string>
+		<key>count</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key>
+			<string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key>
+			<string>lld</string>
+			<key>one</key>
+			<string>Run %lld time</string>
+			<key>other</key>
+			<string>Run %lld times</string>
+		</dict>
+	</dict>
 	<key>%lld kurulu uygulama</key>
 	<dict>
 		<key>NSStringLocalizedFormatKey</key>
@@ -304,6 +320,38 @@
 			<string>%lld small item</string>
 			<key>other</key>
 			<string>%lld small items</string>
+		</dict>
+	</dict>
+	<key>%lld makro dışa aktarıldı.</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key>
+		<string>%#@count@</string>
+		<key>count</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key>
+			<string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key>
+			<string>lld</string>
+			<key>one</key>
+			<string>%lld macro exported.</string>
+			<key>other</key>
+			<string>%lld macros exported.</string>
+		</dict>
+	</dict>
+	<key>%lld makro içe aktarıldı. Kısayolları kontrol et.</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key>
+		<string>%#@count@</string>
+		<key>count</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key>
+			<string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key>
+			<string>lld</string>
+			<key>one</key>
+			<string>%lld macro imported. Check its shortcut.</string>
+			<key>other</key>
+			<string>%lld macros imported. Check their shortcuts.</string>
 		</dict>
 	</dict>
 	<key>%lld mantıksal çekirdek</key>

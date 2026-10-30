@@ -137,6 +137,7 @@ struct PocketRootView: View {
             case .quickActions: QuickActionsView()
             case .quitGuard: QuitGuardView()
             case .brightness: DisplayBrightnessView()
+            case .macros: MacrosView()
             case .none: ToolsHubView(model: model, openTool: openCatalogTool)
             }
         }
@@ -154,6 +155,7 @@ struct PocketRootView: View {
         case "quick-actions": navigation.open(.quickActions)
         case "quit-guard": navigation.open(.quitGuard)
         case "brightness": navigation.open(.brightness)
+        case "macros": navigation.open(.macros)
         case "disk-info": utility = .diskInfo; navigation.open(.utilities)
         case "spotlight": utility = .spotlight; navigation.open(.utilities)
         case "dns": utility = .dns; navigation.open(.utilities)

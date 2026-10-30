@@ -7,6 +7,8 @@ import SwiftUI
 struct KeyComboRecorder: View {
     @Binding var combo: KeyCombo?
     var allowsClearing = false
+    /// false for macro steps, which may press plain keys such as ↩ or ⇥.
+    var requiresModifier = true
     var recording: (Bool) -> Void = { _ in }
     @State private var monitor: Any?
     @State private var isRecording = false
@@ -30,7 +32,7 @@ struct KeyComboRecorder: View {
             }
             .help(allowsClearing ? "Yeni kısayolu kaydetmek için tıkla; kapatmak için kayıt sırasında ⌫" : "Yeni kısayolu kaydetmek için tıkla")
             if rejected {
-                Text("⌘, ⌃ veya ⌥ içermeli").font(.caption).foregroundStyle(.orange)
+                Text(requiresModifier ? "⌘, ⌃ veya ⌥ içermeli" : "Bu tuş desteklenmiyor").font(.caption).foregroundStyle(.orange)
             }
         }
         .onDisappear(perform: stop)
@@ -61,7 +63,7 @@ struct KeyComboRecorder: View {
         if flags.contains(.control) { modifiers.insert(.control) }
         if flags.contains(.shift) { modifiers.insert(.shift) }
         let candidate = KeyCombo(keyCode: event.keyCode, modifiers: modifiers)
-        guard candidate.isValidGlobalShortcut else { rejected = true; return }
+        guard requiresModifier ? candidate.isValidGlobalShortcut : SwitcherKeys.isSupported(candidate.keyCode) else { rejected = true; return }
         combo = candidate
         stop()
     }
