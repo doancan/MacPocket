@@ -147,6 +147,7 @@ private struct MacroRow: View {
                     Text(macro.trigger?.displayName ?? String(localized: "Kısayol yok")).monospaced()
                     if !macro.isGlobal { Image(systemName: "app.badge").accessibilityLabel("Uygulamaya özel") }
                     if conflict { Image(systemName: "exclamationmark.triangle.fill").foregroundStyle(.orange).accessibilityLabel("Çakışıyor") }
+                    if macro.needsReview == true { Text("İncele").foregroundStyle(.orange).fontWeight(.semibold) }
                 }
                 .font(.caption).foregroundStyle(.secondary)
             }
@@ -168,6 +169,7 @@ private struct MacroEditor: View {
     let export: () -> Void
     let delete: () -> Void
     @State private var confirmDelete = false
+    @State private var reviewing = false
 
     var body: some View {
         ScrollView {
@@ -187,7 +189,19 @@ private struct MacroEditor: View {
     private var header: some View {
         HStack(spacing: PocketSpacing.m) {
             TextField("Makro adı", text: $macro.name).textFieldStyle(.plain).font(.title2.weight(.semibold))
-            Toggle("Etkin", isOn: $macro.enabled).toggleStyle(.switch).labelsHidden().help("Makroyu aç veya kapat")
+            Toggle("Etkin", isOn: Binding(get: { macro.enabled }, set: { isOn in
+                // Imported macros are reviewed once before they may run.
+                if isOn && macro.needsReview == true { reviewing = true } else { macro.enabled = isOn }
+            }))
+            .toggleStyle(.switch).labelsHidden().help("Makroyu aç veya kapat")
+            .confirmationDialog("İçe aktarılan makro etkinleştirilsin mi?", isPresented: $reviewing) {
+                Button("İnceledim, etkinleştir") {
+                    macro.needsReview = nil
+                    macro.enabled = true
+                }
+            } message: {
+                Text(reviewMessage)
+            }
             if service.running == macro.id {
                 Button("Durdur") { service.stop() }
             } else {
@@ -282,6 +296,21 @@ private struct MacroEditor: View {
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .pocketCard()
+    }
+
+    /// Lists every step that runs code or opens something, so enabling an imported macro is an informed choice.
+    private var reviewMessage: String {
+        let sensitive = macro.sensitiveSteps.map { action -> String in
+            switch action {
+            case let .shell(command): String(localized: "Komut: \(command)")
+            case let .appleScript(source): String(localized: "AppleScript: \(String(source.prefix(120)))")
+            case let .openURL(url): String(localized: "Açılacak: \(url.absoluteString)")
+            case let .shortcut(name): String(localized: "Kestirme: \(name)")
+            default: ""
+            }
+        }
+        guard !sensitive.isEmpty else { return String(localized: "Bu makro kod çalıştıran bir adım içermiyor.") }
+        return String(localized: "Bu makro şunları çalıştıracak:") + "\n" + sensitive.joined(separator: "\n")
     }
 
     static func applicationName(_ bundleID: String) -> String {

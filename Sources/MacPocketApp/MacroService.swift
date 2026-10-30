@@ -160,6 +160,10 @@ final class MacroService: ObservableObject {
 
     func run(_ macro: Macro) {
         guard running == nil else { return }
+        if macro.needsReview == true {
+            lastError = String(localized: "“\(macro.name)” içe aktarıldı; çalıştırmadan önce adımlarını inceleyip etkinleştir.")
+            return
+        }
         if let problem = macro.problems.first {
             lastError = String(localized: "“\(macro.name)” çalıştırılamadı: \(problem)")
             return

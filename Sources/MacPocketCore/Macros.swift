@@ -90,6 +90,9 @@ public struct Macro: Codable, Hashable, Identifiable, Sendable {
     public var applications: [String] = []
     public var repeatCount = 1
     public var enabled = true
+    /// Set on imported macros: they stay off until the user has seen the steps that run code and turned
+    /// them on. Optional so libraries saved before it existed still decode.
+    public var needsReview: Bool?
 
     public init(id: UUID = UUID(), name: String, steps: [MacroStep] = [], trigger: KeyCombo? = nil, applications: [String] = [],
                 repeatCount: Int = 1, enabled: Bool = true) {
@@ -106,6 +109,22 @@ public struct Macro: Codable, Hashable, Identifiable, Sendable {
     }
 
     public var problems: [String] { steps.compactMap(\.action.problem) }
+
+    /// Steps that run code or open things: what to show before enabling an imported macro.
+    public var sensitiveSteps: [MacroAction] {
+        steps.map(\.action).filter { action in
+            switch action {
+            case .shell, .appleScript, .openURL, .shortcut: true
+            default: false
+            }
+        }
+    }
+
+    /// A trigger is only ever watched when it has ⌘, ⌃ or ⌥: a plain key as trigger would run the macro
+    /// on ordinary typing.
+    var usableTrigger: KeyCombo? { trigger.flatMap { $0.isValidGlobalShortcut ? $0 : nil } }
+
+    var isRunnable: Bool { enabled && needsReview != true && !steps.isEmpty }
 }
 
 public struct MacroLibrary: Codable, Equatable, Sendable {
@@ -115,13 +134,13 @@ public struct MacroLibrary: Codable, Equatable, Sendable {
 
     /// The macro a trigger runs with `frontmost` in front: an app-specific macro wins over a global one.
     public func macro(for combo: KeyCombo, frontmost: String?) -> Macro? {
-        let candidates = macros.filter { $0.enabled && $0.trigger == combo && !$0.steps.isEmpty }
+        let candidates = macros.filter { $0.isRunnable && $0.usableTrigger == combo }
         if let frontmost, let specific = candidates.first(where: { $0.applications.contains(frontmost) }) { return specific }
         return candidates.first(where: \.isGlobal)
     }
 
     /// Triggers the tap must watch.
-    public var triggers: Set<KeyCombo> { Set(macros.filter(\.enabled).compactMap(\.trigger)) }
+    public var triggers: Set<KeyCombo> { Set(macros.filter(\.isRunnable).compactMap(\.usableTrigger)) }
 
     /// Macros whose trigger overlaps an earlier macro's in the same scope (both global, or a shared app).
     public var conflicts: Set<Macro.ID> {
@@ -138,7 +157,7 @@ public struct MacroLibrary: Codable, Equatable, Sendable {
 
     public func search(_ query: String) -> [Macro] {
         let needle = query.trimmingCharacters(in: .whitespaces)
-        let enabled = macros.filter { $0.enabled && !$0.steps.isEmpty }
+        let enabled = macros.filter(\.isRunnable)
         guard !needle.isEmpty else { return enabled }
         return enabled.filter { $0.name.range(of: needle, options: [.caseInsensitive, .diacriticInsensitive]) != nil }
     }
@@ -218,12 +237,16 @@ public struct MacroArchive: Sendable {
         try FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: file.path)
     }
 
-    /// Imported macros get fresh identities so importing the same file twice doesn't create clashing IDs.
+    /// Imported macros are untrusted: they arrive switched off and marked for review, triggers without a
+    /// modifier are dropped, and they get fresh identities so importing a file twice doesn't clash.
     public static func importing(_ data: Data) throws -> [Macro] {
         try JSONDecoder().decode(MacroLibrary.self, from: data).macros.map { macro in
             var copy = macro
             copy.id = UUID()
             copy.steps = macro.steps.map { MacroStep($0.action) }
+            copy.trigger = macro.usableTrigger
+            copy.enabled = false
+            copy.needsReview = true
             return copy
         }
     }

