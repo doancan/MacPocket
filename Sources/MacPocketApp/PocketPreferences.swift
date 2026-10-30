@@ -173,6 +173,7 @@ extension PocketTool {
         case .clipboard: String(localized: "Pano Geçmişi")
         case .windowLayout: String(localized: "Pencere Yerleşimi")
         case .speedTest: String(localized: "Ağ Hız Testi")
+        case .ports: String(localized: "Port Yöneticisi")
         }
     }
 }

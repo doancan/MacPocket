@@ -496,7 +496,7 @@ private struct HubTool: Identifiable {
         .init(id: "mac-utilities", title: String(localized: "macOS Araçları"), description: String(localized: "Sistem raporları ve macOS ayarlarına hızlı erişim."), icon: "hammer", category: .system),
         .init(id: "launch-jobs", title: String(localized: "Başlatma Görevleri"), description: String(localized: "Kullanıcı oturumunun launchd görevlerini incele."), icon: "list.bullet", category: .system),
         .init(id: "speed-test", title: String(localized: "Ağ Hız Testi"), description: String(localized: "İndirme, yükleme ve yanıt verme hızını macOS’un yerleşik aracıyla ölç; sonuçları karşılaştır."), icon: "speedometer", category: .system),
-        .init(id: "listening-ports", title: String(localized: "Dinleyen Portlar"), description: String(localized: "Yerel sunucuları ve dinleyen ağ portlarını incele."), icon: "network", category: .system),
+        .init(id: "listening-ports", title: String(localized: "Port Yöneticisi"), description: String(localized: "Hangi sürecin hangi portu dinlediğini ve ağa açık olup olmadığını gör; gerekirse durdur."), icon: "network", category: .system),
         .init(id: "disk-info", title: String(localized: "Disk Bilgileri"), description: String(localized: "Dosya sistemi, disk özellikleri ve desteklenen sağlık verilerini oku."), icon: "internaldrive", category: .files),
         .init(id: "spotlight", title: String(localized: "Spotlight Durumu"), description: String(localized: "Arama indekslemesinin sistemdeki durumunu incele."), icon: "magnifyingglass", category: .system),
         .init(id: "dns", title: String(localized: "DNS Yapılandırması"), description: String(localized: "Sistemin etkin DNS çözümleyici yapılandırmasını incele."), icon: "globe", category: .system),

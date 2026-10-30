@@ -290,6 +290,22 @@
 			<string>%lld logical cores</string>
 		</dict>
 	</dict>
+	<key>%lld süreç ağdan gelen bağlantılara açık; diğerleri yalnız bu Mac’ten erişilebilir.</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key>
+		<string>%#@count@</string>
+		<key>count</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key>
+			<string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key>
+			<string>lld</string>
+			<key>one</key>
+			<string>%lld process accepts connections from the network; the rest are reachable only from this Mac.</string>
+			<key>other</key>
+			<string>%lld processes accept connections from the network; the rest are reachable only from this Mac.</string>
+		</dict>
+	</dict>
 	<key>%lld tekil dosya</key>
 	<dict>
 		<key>NSStringLocalizedFormatKey</key>
