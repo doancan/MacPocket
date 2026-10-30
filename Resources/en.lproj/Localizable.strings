@@ -2145,3 +2145,14 @@
 "Yumuşak kaydırma" = "Smooth scrolling";
 "Yön" = "Direction";
 "Örneğin kendi kaydırma ayarı olan oyunlar ve tasarım uygulamaları." = "For example games and design apps with their own scrolling settings.";
+"%@: ses %@ seviyesine indirildi" = "%@: volume lowered to %@";
+"Hoparlör sesi" = "Speaker volume";
+"Hoparlör, kulaklık ve monitör arasında kısayolla geç; kulaklık ayrılınca ses kendiliğinden kısılsın." = "Switch between speakers, headphones and monitor with a shortcut; the volume drops by itself when headphones disconnect.";
+"Hoparlör, kulaklık ve monitör sesi arasında tek tıkla ya da kısayolla geç; kulaklık ayrılınca ses kendiliğinden kısılsın." = "Switch between speakers, headphones and monitor audio in one click or with a shortcut; the volume drops by itself when headphones disconnect.";
+"Kulaklık ayrılıp ses hoparlöre geçince sesi kıs" = "Turn the volume down when headphones disconnect and sound moves to speakers";
+"Kullanılıyor" = "In use";
+"Kısayol döngüsünde" = "In shortcut cycle";
+"Ses Çıkışı" = "Sound Output";
+"Ses çıkışı: %@" = "Sound output: %@";
+"Sonraki çıkışa geç" = "Switch to next output";
+"Çıkışlar" = "Outputs";
