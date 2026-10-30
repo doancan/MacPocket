@@ -439,7 +439,9 @@ public struct ClipboardArchive: Sendable {
         let encoder = JSONEncoder()
         encoder.dateEncodingStrategy = .iso8601
         let data = try encoder.encode(history)
-        try data.write(to: historyFile, options: [.atomic, .completeFileProtection])
+        // Owner-only permissions protect it. `.completeFileProtection` is an iOS data-protection class; on macOS it
+        // makes the atomic write's temporary file fail now and then (EPERM), losing the save.
+        try data.write(to: historyFile, options: .atomic)
         try FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: historyFile.path)
     }
 
