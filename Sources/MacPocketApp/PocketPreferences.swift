@@ -171,6 +171,7 @@ extension PocketTool {
         case .windowSwitcher: String(localized: "Pencere Geçişi")
         case .hiddenSettings: String(localized: "Gizli Ayarlar")
         case .clipboard: String(localized: "Pano Geçmişi")
+        case .windowLayout: String(localized: "Pencere Yerleşimi")
         }
     }
 }

@@ -200,5 +200,6 @@ final class PocketApplicationState: ObservableObject {
         loginItem = LoginItemController()
         statusItem = PocketStatusItemController(model: model)
         ClipboardService.shared.start()
+        WindowLayoutService.shared.start()
     }
 }

@@ -143,7 +143,11 @@ private struct ClipboardSettingsForm: View {
     var body: some View {
         Form {
             Section {
-                LabeledContent("Paneli aç") { KeyComboRecorder(service: service) }
+                LabeledContent("Paneli aç") {
+                    KeyComboRecorder(combo: Binding(get: { service.settings.shortcut },
+                                                    set: { if let combo = $0 { service.settings.shortcut = combo } }),
+                                     recording: { service.recordingShortcut = $0 })
+                }
                 Toggle("Seçilen öğeyi öndeki uygulamaya yapıştır", isOn: $service.settings.pasteOnSelect)
                 if service.settings.pasteOnSelect && !accessibility {
                     HStack {
@@ -251,59 +255,5 @@ private struct ClipboardSettingsForm: View {
         guard panel.runModal() == .OK else { return }
         let ids = panel.urls.compactMap { Bundle(url: $0)?.bundleIdentifier }
         service.settings.excludedBundleIDs.append(contentsOf: ids.filter { !service.settings.excludedBundleIDs.contains($0) })
-    }
-}
-
-/// Click, then press a combination with ⌘, ⌃ or ⌥. Esc cancels.
-struct KeyComboRecorder: View {
-    @ObservedObject var service: ClipboardService
-    @State private var monitor: Any?
-    @State private var rejected = false
-
-    var body: some View {
-        HStack(spacing: PocketSpacing.s) {
-            Button {
-                service.recordingShortcut ? stop() : start()
-            } label: {
-                Text(service.recordingShortcut ? "Kısayola bas…" as LocalizedStringKey : "\(service.settings.shortcut.displayName)")
-                    .monospaced()
-                    .frame(minWidth: 110)
-            }
-            .help("Yeni kısayolu kaydetmek için tıkla")
-            if rejected {
-                Text("⌘, ⌃ veya ⌥ içermeli").font(.caption).foregroundStyle(.orange)
-            }
-        }
-        .onDisappear(perform: stop)
-    }
-
-    private func start() {
-        rejected = false
-        service.recordingShortcut = true
-        monitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { event in
-            MainActor.assumeIsolated { record(event) }
-            return nil
-        }
-    }
-
-    /// Every key press is consumed while recording.
-    private func record(_ event: NSEvent) {
-                if event.keyCode == 53 { stop(); return }
-                let flags = event.modifierFlags
-                var modifiers: KeyCombo.Modifiers = []
-                if flags.contains(.command) { modifiers.insert(.command) }
-                if flags.contains(.option) { modifiers.insert(.option) }
-                if flags.contains(.control) { modifiers.insert(.control) }
-                if flags.contains(.shift) { modifiers.insert(.shift) }
-                let combo = KeyCombo(keyCode: event.keyCode, modifiers: modifiers)
-                guard combo.isValidGlobalShortcut else { rejected = true; return }
-                service.settings.shortcut = combo
-                stop()
-    }
-
-    private func stop() {
-        if let monitor { NSEvent.removeMonitor(monitor) }
-        monitor = nil
-        if service.recordingShortcut { service.recordingShortcut = false }
     }
 }
