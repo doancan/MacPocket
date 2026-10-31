@@ -229,10 +229,16 @@ final class PocketModel: ObservableObject {
         } catch { powerHistoryError = error.localizedDescription }
     }
 
-    /// `duration` nil keeps the Mac awake until stopped.
-    func startAwake(duration: Double? = 1800, display: Bool = false) async {
+    static let awakeDisplayKey = "MacPocket.power.awakeDisplay"
+    /// Users expect "keep awake" to keep the screen on, so the display is held unless they opt out.
+    static let awakeDisplayDefault = true
+
+    /// `duration` nil keeps the Mac awake until stopped; `display` nil follows the saved preference.
+    func startAwake(duration: Double? = 1800, display: Bool? = nil) async {
+        let keepDisplayAwake = display
+            ?? (UserDefaults.standard.object(forKey: Self.awakeDisplayKey) as? Bool ?? Self.awakeDisplayDefault)
         do {
-            awakeSession = try await sleepController.start(durationSeconds: duration, keepDisplayAwake: display)
+            awakeSession = try await sleepController.start(durationSeconds: duration, keepDisplayAwake: keepDisplayAwake)
             awakeError = nil
         } catch { awakeError = error.localizedDescription }
     }

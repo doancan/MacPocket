@@ -770,5 +770,37 @@
 			<string>For %lld minutes, CPU use has stayed above %@. Task Manager shows the processes using the most.</string>
 		</dict>
 	</dict>
+	<key>%lld sensör</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key>
+		<string>%#@count@</string>
+		<key>count</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key>
+			<string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key>
+			<string>lld</string>
+			<key>one</key>
+			<string>%lld sensor</string>
+			<key>other</key>
+			<string>%lld sensors</string>
+		</dict>
+	</dict>
+	<key>%lld sensör; en yüksek ve ortalama</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key>
+		<string>%#@count@</string>
+		<key>count</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key>
+			<string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key>
+			<string>lld</string>
+			<key>one</key>
+			<string>%lld sensor; maximum and average</string>
+			<key>other</key>
+			<string>%lld sensors; maximum and average</string>
+		</dict>
+	</dict>
 </dict>
 </plist>

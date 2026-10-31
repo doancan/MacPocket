@@ -6,6 +6,7 @@ import SwiftUI
 struct PowerManagementView: View {
     @ObservedObject var model: PocketModel
     @StateObject private var center = PowerCenterModel()
+    @AppStorage(PocketDetailLevel.key("power")) private var level = PocketDetailLevel.defaultValue
 
     var body: some View {
         ScrollView {
@@ -22,13 +23,14 @@ struct PowerManagementView: View {
                             Label("Güç Raporları", systemImage: "doc.text.magnifyingglass")
                         }
                         .help("Uykuyu engelleyen süreçleri ve güç ayarlarını gösteren salt okunur raporlar")
+                        PocketDetailLevelSwitch(level: $level)
                     }
                 }
                 PowerHeroCard(center: center, model: model)
                 tabPicker
                 Group {
                     switch center.tab {
-                    case .overview: PowerOverviewPanel(center: center, model: model)
+                    case .overview: PowerOverviewPanel(center: center, model: model, advanced: level == .advanced)
                     case .battery: PowerBatteryPanel(center: center, model: model)
                     case .blockers: PowerBlockersPanel(center: center)
                     case .energy: PowerEnergyPanel(center: center)
@@ -245,21 +247,31 @@ struct PowerHeroCard: View {
 
 // MARK: - Overview
 
+/// Basic: keeping awake and the top energy users. Advanced adds thermal limits, sensors and schedules.
 struct PowerOverviewPanel: View {
     @ObservedObject var center: PowerCenterModel
     @ObservedObject var model: PocketModel
+    let advanced: Bool
 
     var body: some View {
         VStack(alignment: .leading, spacing: PocketSpacing.l) {
-            ViewThatFits(in: .horizontal) {
-                HStack(alignment: .top, spacing: PocketSpacing.l) { PowerKeepAwakeCard(model: model); statusCard }
-                VStack(spacing: PocketSpacing.l) { PowerKeepAwakeCard(model: model); statusCard }
+            if advanced {
+                ViewThatFits(in: .horizontal) {
+                    HStack(alignment: .top, spacing: PocketSpacing.l) { PowerKeepAwakeCard(model: model); statusCard }
+                    VStack(spacing: PocketSpacing.l) { PowerKeepAwakeCard(model: model); statusCard }
+                }
+                PocketSensorsCard(system: model.system)
+                ViewThatFits(in: .horizontal) {
+                    HStack(alignment: .top, spacing: PocketSpacing.l) { topEnergy; scheduleCard }
+                    VStack(spacing: PocketSpacing.l) { topEnergy; scheduleCard }
+                }
+                if let ups = center.overview?.upsSources, !ups.isEmpty { upsCard(ups) }
+            } else {
+                ViewThatFits(in: .horizontal) {
+                    HStack(alignment: .top, spacing: PocketSpacing.l) { PowerKeepAwakeCard(model: model); topEnergy }
+                    VStack(spacing: PocketSpacing.l) { PowerKeepAwakeCard(model: model); topEnergy }
+                }
             }
-            ViewThatFits(in: .horizontal) {
-                HStack(alignment: .top, spacing: PocketSpacing.l) { topEnergy; scheduleCard }
-                VStack(spacing: PocketSpacing.l) { topEnergy; scheduleCard }
-            }
-            if let ups = center.overview?.upsSources, !ups.isEmpty { upsCard(ups) }
         }
     }
 
@@ -388,7 +400,7 @@ struct PowerOverviewPanel: View {
 struct PowerKeepAwakeCard: View {
     @ObservedObject var model: PocketModel
     @AppStorage("MacPocket.power.awakeMinutes") private var minutes = 30.0
-    @AppStorage("MacPocket.power.awakeDisplay") private var displayAwake = false
+    @AppStorage(PocketModel.awakeDisplayKey) private var displayAwake = PocketModel.awakeDisplayDefault
     @State private var changing = false
 
     var body: some View {

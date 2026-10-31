@@ -1,5 +1,6 @@
 import AppKit
 import Charts
+import MacPocketCore
 import SwiftUI
 import UniformTypeIdentifiers
 
@@ -485,6 +486,12 @@ func pocketBytes(_ value: Int64) -> String {
 
 func pocketPercent(_ value: Double, decimals: Bool = false) -> String {
     (value / 100).formatted(.percent.precision(.fractionLength(decimals ? 1 : 0)).locale(pocketLocale))
+}
+
+/// A process's per-core CPU sample in the scale chosen in Settings → Monitoring.
+func pocketProcessCPU(_ perCorePercent: Double) -> String {
+    let scale = ProcessCPUScale.load(from: .standard)
+    return pocketPercent(scale.value(perCorePercent, logicalCPUCount: ProcessInfo.processInfo.activeProcessorCount), decimals: true)
 }
 
 /// Human description of `ProcessInfo.ThermalState` names produced by the core.

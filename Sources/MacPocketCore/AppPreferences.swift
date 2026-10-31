@@ -282,3 +282,35 @@ public enum PowerHistoryRetention {
         return dayChoices.contains(value) ? value : defaultDays
     }
 }
+
+// MARK: - Process CPU scale
+
+/// How a process's CPU share is shown. Samples are always per-core ("Unix" style, as `top` and Activity
+/// Monitor report them: a process busy on 5 cores reads 500%); `wholeMac` divides by the core count so
+/// every process stays within 0–100%.
+public enum ProcessCPUScale: String, CaseIterable, Identifiable, Sendable {
+    case wholeMac, perCore
+
+    public static let key = "MacPocket.processCPUScale"
+    public static let defaultValue = ProcessCPUScale.wholeMac
+    public var id: String { rawValue }
+
+    public var title: String {
+        switch self {
+        case .wholeMac: String(localized: "Tüm Mac (%100 üst sınır)")
+        case .perCore: String(localized: "Çekirdek başına (Unix/Linux)")
+        }
+    }
+
+    public static func load(from defaults: UserDefaults) -> ProcessCPUScale {
+        defaults.string(forKey: key).flatMap(ProcessCPUScale.init(rawValue:)) ?? defaultValue
+    }
+
+    /// `perCorePercent` as shown in this scale.
+    public func value(_ perCorePercent: Double, logicalCPUCount: Int) -> Double {
+        switch self {
+        case .wholeMac: perCorePercent / Double(max(1, logicalCPUCount))
+        case .perCore: perCorePercent
+        }
+    }
+}

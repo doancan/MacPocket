@@ -38,6 +38,8 @@ struct GlassTabBar<ID: Hashable>: View {
     var tinted = true
     /// true when the owner installs `GlassTabKeyboardShortcuts`, so tooltips mention ⌘1…
     var showsShortcutHints = false
+    /// false: symbols only (the title stays as tooltip and VoiceOver label), for narrow bars.
+    var showsTitles = true
 
     @Namespace private var namespace
     @State private var trackWidth: CGFloat = 0
@@ -165,14 +167,16 @@ struct GlassTabBar<ID: Hashable>: View {
                     HStack(spacing: 4) {
                         if let symbol = tab.symbol {
                             Image(systemName: symbol)
-                                .font(.system(size: 11, weight: .semibold))
+                                .font(.system(size: showsTitles ? 11 : 13, weight: .semibold))
                                 .foregroundStyle(isSelected ? (tinted ? tab.tint ?? pageTint : .primary) : .secondary)
                         }
-                        tab.title
-                            .font(.system(size: 11.5, weight: isSelected ? .semibold : .medium))
-                            .foregroundStyle(isSelected ? .primary : .secondary)
-                            .lineLimit(1)
-                            .minimumScaleFactor(0.8)
+                        if showsTitles || tab.symbol == nil {
+                            tab.title
+                                .font(.system(size: 11.5, weight: isSelected ? .semibold : .medium))
+                                .foregroundStyle(isSelected ? .primary : .secondary)
+                                .lineLimit(1)
+                                .minimumScaleFactor(0.8)
+                        }
                     }
                     .frame(width: segmentWidth > 0 ? segmentWidth : nil, height: height - inset * 2)
                     .contentShape(Capsule())

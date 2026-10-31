@@ -192,7 +192,7 @@ struct TaskManagerView: View {
                         detail("Kullanıcı", entry.user)
                         detail("Durum", pocketProcessStateTitle(entry.state))
                         detail("Üst süreç", String(entry.parentPID))
-                        detail("CPU", entry.cpuSampleAvailable ? pocketPercent(entry.cpuPercent, decimals: true) : String(localized: "Örnek bekleniyor"))
+                        detail("CPU", entry.cpuSampleAvailable ? pocketProcessCPU(entry.cpuPercent) : String(localized: "Örnek bekleniyor"))
                         detail("Bellek · RSS", entry.memorySampleAvailable ? pocketBytes(entry.residentBytes) : String(localized: "Okunamıyor"))
                         detail("İş parçacığı", entry.threadCount.map { String($0) } ?? "—")
                         detail("Başlangıç", Date(timeIntervalSince1970: Double(entry.identity.startSeconds))

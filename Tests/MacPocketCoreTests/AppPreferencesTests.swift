@@ -217,3 +217,27 @@ final class AppPreferencesTests: XCTestCase {
         XCTAssertTrue(reloaded.isEmpty)
     }
 }
+
+final class ProcessCPUScaleTests: XCTestCase {
+    func testWholeMacScaleDividesByCoreCount() {
+        XCTAssertEqual(ProcessCPUScale.wholeMac.value(500, logicalCPUCount: 10), 50)
+        XCTAssertEqual(ProcessCPUScale.wholeMac.value(1000, logicalCPUCount: 10), 100)
+    }
+
+    func testPerCoreScaleKeepsTheSample() {
+        XCTAssertEqual(ProcessCPUScale.perCore.value(500, logicalCPUCount: 10), 500)
+    }
+
+    func testZeroCoreCountDoesNotDivideByZero() {
+        XCTAssertEqual(ProcessCPUScale.wholeMac.value(80, logicalCPUCount: 0), 80)
+    }
+
+    func testLoadDefaultsToWholeMacAndIgnoresUnknownValues() throws {
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: "ProcessCPUScaleTests.\(UUID().uuidString)"))
+        XCTAssertEqual(ProcessCPUScale.load(from: defaults), .wholeMac)
+        defaults.set("linux", forKey: ProcessCPUScale.key)
+        XCTAssertEqual(ProcessCPUScale.load(from: defaults), .wholeMac)
+        defaults.set(ProcessCPUScale.perCore.rawValue, forKey: ProcessCPUScale.key)
+        XCTAssertEqual(ProcessCPUScale.load(from: defaults), .perCore)
+    }
+}

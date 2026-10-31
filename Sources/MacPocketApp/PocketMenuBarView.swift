@@ -44,7 +44,7 @@ struct PocketMenuBarView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: PocketSpacing.m) {
             if content == .grouped {
-                GlassTabBar(tabs: tabs, selection: $selection, showsShortcutHints: true)
+                GlassTabBar(tabs: tabs, selection: $selection, showsShortcutHints: true, showsTitles: false)
                     .background { GlassTabKeyboardShortcuts(tabs: tabs, selection: $selection) }
             }
             MenuBarModuleDetail(module: module, model: model, history: history, binaryUnits: store.preferences.binaryUnits)
@@ -75,20 +75,6 @@ struct PocketMenuBarView: View {
 
     private var footer: some View {
         HStack(spacing: PocketSpacing.s) {
-            Circle()
-                .fill(model.paused ? Color.orange : PocketTheme.disk)
-                .frame(width: 6, height: 6)
-                .accessibilityHidden(true)
-            Group {
-                if model.paused {
-                    Text("İzleme duraklatıldı")
-                } else if let date = model.lastUpdate {
-                    Text("Son ölçüm \(date.formatted(date: .omitted, time: .standard))")
-                } else {
-                    Text("İlk ölçüm bekleniyor")
-                }
-            }
-            .font(.caption).foregroundStyle(.secondary).monospacedDigit()
             Spacer(minLength: PocketSpacing.s)
             footerButton("MacPocket’ı aç", symbol: "macwindow") { model.openMainWindow?() }
                 .keyboardShortcut("0", modifiers: .command)

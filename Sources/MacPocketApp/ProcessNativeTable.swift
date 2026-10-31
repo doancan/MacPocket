@@ -106,7 +106,7 @@ struct ProcessNativeTable: NSViewRepresentable {
             case "user": label.stringValue = entry.user
             case "state": label.stringValue = entry.canTerminate ? pocketProcessStateTitle(entry.state) : String(localized: "Korunuyor")
             case "cpu":
-                label.stringValue = entry.cpuSampleAvailable ? pocketPercent(entry.cpuPercent, decimals: true) : "—"
+                label.stringValue = entry.cpuSampleAvailable ? pocketProcessCPU(entry.cpuPercent) : "—"
                 if entry.cpuSampleAvailable && entry.cpuPercent > 1 {
                     label.backgroundColor = NSColor.systemBlue.withAlphaComponent(0.15); label.drawsBackground = true
                 }

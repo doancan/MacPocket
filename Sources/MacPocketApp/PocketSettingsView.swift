@@ -209,6 +209,7 @@ private struct PocketMonitoringSettings: View {
     @ObservedObject var model: PocketModel
     @AppStorage("manager.showUser") private var showUser = true
     @AppStorage("manager.showThreads") private var showThreads = true
+    @AppStorage(ProcessCPUScale.key) private var cpuScale = ProcessCPUScale.defaultValue
     @AppStorage(PowerHistoryRetention.key) private var historyDays = PowerHistoryRetention.defaultDays
     @AppStorage(ResourceAlertSettings.enabledKey(.lowDisk)) private var alertDisk = false
     @AppStorage(ResourceAlertSettings.enabledKey(.thermal)) private var alertThermal = false
@@ -291,6 +292,11 @@ private struct PocketMonitoringSettings: View {
             Section {
                 Toggle("Kullanıcı sütununu göster", isOn: $showUser)
                 Toggle("İş parçacığı sütununu göster", isOn: $showThreads)
+                Picker("Süreç CPU yüzdesi", selection: $cpuScale) {
+                    ForEach(ProcessCPUScale.allCases) { Text($0.title).tag($0) }
+                }
+                Text("Tüm Mac: her süreç %0–100 arasında, tüm çekirdeklere oranla gösterilir. Çekirdek başına: Unix/Linux ve Etkinlik Monitörü gibi; birden çok çekirdeği kullanan süreç %100’ü aşabilir.")
+                    .font(.callout).foregroundStyle(.secondary)
             } header: { Text("Görev Yöneticisi") }
         }
         .formStyle(.grouped)

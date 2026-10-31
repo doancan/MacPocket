@@ -157,7 +157,7 @@ struct PowerEnergyRow: View {
             }
             Spacer(minLength: PocketSpacing.s)
             if !compact {
-                Text(pocketPercent(process.cpuPercent, decimals: true)).frame(width: 64, alignment: .trailing)
+                Text(pocketProcessCPU(process.cpuPercent)).frame(width: 64, alignment: .trailing)
                 Text(process.wakeupsPerSecond.formatted(.number.precision(.fractionLength(0)).locale(pocketLocale)))
                     .frame(width: 70, alignment: .trailing)
             }
@@ -167,7 +167,7 @@ struct PowerEnergyRow: View {
         .help(process.executablePath)
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(displayName)
-        .accessibilityValue(Text("\(powerMilliwatts(process.milliwatts)), işlemci \(pocketPercent(process.cpuPercent))"))
+        .accessibilityValue(Text("\(powerMilliwatts(process.milliwatts)), işlemci \(pocketProcessCPU(process.cpuPercent))"))
     }
 
     private var displayName: String {

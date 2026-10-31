@@ -322,7 +322,7 @@ private struct HubAwakeSheet: View {
     @Environment(\.dismiss) private var dismiss
     @State private var duration: HubAwakeDuration = .hour
     @State private var customMinutes = "45"
-    @State private var keepDisplayAwake = false
+    @AppStorage(PocketModel.awakeDisplayKey) private var keepDisplayAwake = PocketModel.awakeDisplayDefault
     @State private var starting = false
 
     var body: some View {

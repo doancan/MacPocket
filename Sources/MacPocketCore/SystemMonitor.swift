@@ -52,6 +52,11 @@ public struct SystemSnapshot: Codable, Sendable {
     public var diskIO: DiskIOSnapshot? = nil
     /// Fans reported by the SMC; empty on fanless Macs, nil when the SMC can't be read.
     public var fans: [FanSnapshot]? = nil
+    /// Nil when the Mac publishes no temperature sensors.
+    public var temperatures: [TemperatureReading]? = nil
+    /// SMC whole-system power draw and DC input power, in watts.
+    public var systemPowerWatts: Double? = nil
+    public var powerInputWatts: Double? = nil
     public let uptimeSeconds: Double
     public let thermalState: String
     public let volumes: [VolumeSnapshot]
@@ -127,6 +132,7 @@ public actor SystemMonitor {
     private var network = NetworkSampler()
     private var diskIO = DiskIOSampler()
     private let fanSensor = FanSensor()
+    private let temperatureSensor = TemperatureSensor()
 
     public init() {}
 
@@ -160,6 +166,8 @@ public actor SystemMonitor {
         snapshot.network = network.sample()
         snapshot.diskIO = diskIO.sample()
         snapshot.fans = fanSensor.sample()
+        snapshot.temperatures = temperatureSensor.sample()
+        (snapshot.systemPowerWatts, snapshot.powerInputWatts) = fanSensor.power()
         return snapshot
     }
 

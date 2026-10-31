@@ -32,8 +32,6 @@ private struct ModuleHeader<Trailing: View>: View {
         HStack(alignment: .center, spacing: PocketSpacing.s + 2) {
             PocketIconTile(symbol: module.symbol, tint: module.tint, size: 30)
             VStack(alignment: .leading, spacing: 0) {
-                Text(module.title).font(.caption.weight(.semibold)).foregroundStyle(.secondary)
-                    .accessibilityAddTraits(.isHeader)
                 Text(value).font(.system(size: 22, weight: .semibold, design: .rounded)).monospacedDigit()
                     .lineLimit(1).minimumScaleFactor(0.7)
                     .contentTransition(.numericText())
@@ -206,7 +204,7 @@ private struct TopProcessList: View {
 
     private func value(_ process: ProcessEntry) -> String {
         switch metric {
-        case .cpu: MenuBarFormatter.percentText(MenuBarFormatter.number(process.cpuPercent, fractionDigits: 1))
+        case .cpu: pocketProcessCPU(process.cpuPercent)
         case .memory: MenuBarFormatter.bytes(Double(process.residentBytes), binary: MenuBarSettingsStore.shared.preferences.binaryUnits)
         }
     }
@@ -227,20 +225,38 @@ private struct ProcessIcon: View {
 
 // MARK: - Module views
 
-/// Detail view for one module, as shown in a popover (tab content or a separate item's popover).
+/// Detail view for one module, as shown in a popover (tab content or a separate item's popover):
+/// the module's name with its own Temel / Gelişmiş switch, then the content for that level.
 struct MenuBarModuleDetail: View {
     let module: MenuBarModule
     @ObservedObject var model: PocketModel
     @ObservedObject var history: MenuBarHistory
     let binaryUnits: Bool
+    @AppStorage private var level: PocketDetailLevel
+
+    init(module: MenuBarModule, model: PocketModel, history: MenuBarHistory, binaryUnits: Bool) {
+        self.module = module
+        self.model = model
+        self.history = history
+        self.binaryUnits = binaryUnits
+        _level = AppStorage(wrappedValue: .defaultValue, PocketDetailLevel.key("menubar.\(module.rawValue)"))
+    }
 
     var body: some View {
-        switch module {
-        case .cpu: CPUDetail(model: model, history: history)
-        case .memory: MemoryDetail(model: model, history: history, binary: binaryUnits)
-        case .disk: DiskDetail(model: model, history: history, binary: binaryUnits)
-        case .network: NetworkDetail(model: model, history: history, binary: binaryUnits)
-        case .power: PowerDetail(model: model)
+        let advanced = level == .advanced
+        VStack(alignment: .leading, spacing: PocketSpacing.s + 2) {
+            HStack {
+                Text(module.title).font(.headline).accessibilityAddTraits(.isHeader)
+                Spacer(minLength: PocketSpacing.s)
+                PocketDetailLevelSwitch(level: $level).controlSize(.small)
+            }
+            switch module {
+            case .cpu: CPUDetail(model: model, history: history, advanced: advanced)
+            case .memory: MemoryDetail(model: model, history: history, binary: binaryUnits, advanced: advanced)
+            case .disk: DiskDetail(model: model, history: history, binary: binaryUnits, advanced: advanced)
+            case .network: NetworkDetail(model: model, history: history, binary: binaryUnits, advanced: advanced)
+            case .power: PowerDetail(model: model, advanced: advanced)
+            }
         }
     }
 }
@@ -252,6 +268,7 @@ private func percentText(_ value: Double?, decimals: Bool = false) -> String {
 private struct CPUDetail: View {
     @ObservedObject var model: PocketModel
     @ObservedObject var history: MenuBarHistory
+    let advanced: Bool
     private let module = MenuBarModule.cpu
 
     var body: some View {
@@ -268,7 +285,7 @@ private struct CPUDetail: View {
             ], ceiling: 100, stacked: true)
             .menuBarSection()
 
-            if let cores = system?.cpuCorePercents, !cores.isEmpty {
+            if advanced, let cores = system?.cpuCorePercents, !cores.isEmpty {
                 VStack(alignment: .leading, spacing: PocketSpacing.xs + 2) {
                     SectionTitle(title: "Çekirdekler", trailing: "\(cores.count)")
                     HStack(alignment: .bottom, spacing: cores.count > 16 ? 1.5 : 3) {
@@ -293,14 +310,16 @@ private struct CPUDetail: View {
                 .menuBarSection()
             }
 
-            VStack(spacing: PocketSpacing.xs + 1) {
-                InfoRow(title: "Yük ortalaması", value: system?.loadAverages.map { values in
-                    values.map { MenuBarFormatter.number($0, fractionDigits: 2) }.joined(separator: "  ")
-                } ?? "—")
-                InfoRow(title: "Çalışma süresi", value: system.map { pocketDuration($0.uptimeSeconds) } ?? "—")
-                InfoRow(title: "Mantıksal çekirdek", value: system.map { "\($0.logicalCPUCount)" } ?? "—")
+            if advanced {
+                VStack(spacing: PocketSpacing.xs + 1) {
+                    InfoRow(title: "Yük ortalaması", value: system?.loadAverages.map { values in
+                        values.map { MenuBarFormatter.number($0, fractionDigits: 2) }.joined(separator: "  ")
+                    } ?? "—")
+                    InfoRow(title: "Çalışma süresi", value: system.map { pocketDuration($0.uptimeSeconds) } ?? "—")
+                    InfoRow(title: "Mantıksal çekirdek", value: system.map { "\($0.logicalCPUCount)" } ?? "—")
+                }
+                .menuBarSection()
             }
-            .menuBarSection()
 
             TopProcessList(processes: model.processes, metric: .cpu).menuBarSection()
         }
@@ -316,6 +335,7 @@ private struct MemoryDetail: View {
     @ObservedObject var model: PocketModel
     @ObservedObject var history: MenuBarHistory
     let binary: Bool
+    let advanced: Bool
     private let module = MenuBarModule.memory
 
     private func bytes(_ value: UInt64?) -> String {
@@ -348,19 +368,21 @@ private struct MemoryDetail: View {
             .accessibilityLabel("Bellek baskısı")
             .accessibilityValue("\(pressureTitle), \(percentText(system?.memoryPressurePercent))")
 
-            VStack(alignment: .leading, spacing: PocketSpacing.xs + 1) {
-                let app = Double(system?.appMemoryBytes ?? 0), wired = Double(system?.wiredMemoryBytes ?? 0)
-                let compressed = Double(system?.compressedMemoryBytes ?? 0), cached = Double(system?.cachedFilesBytes ?? 0)
-                SegmentBar(segments: [(app, module.tint), (wired, .orange), (compressed, .yellow), (cached, .teal),
-                                      (max(0, Double(total) - app - wired - compressed - cached), .clear)])
-                    .padding(.bottom, 2)
-                InfoRow(title: "Uygulama belleği", value: bytes(system?.appMemoryBytes), dot: module.tint)
-                InfoRow(title: "Kalıcı bellek", value: bytes(system?.wiredMemoryBytes), dot: .orange)
-                InfoRow(title: "Sıkıştırılmış", value: bytes(system?.compressedMemoryBytes), dot: .yellow)
-                InfoRow(title: "Önbellekteki dosyalar", value: bytes(system?.cachedFilesBytes), dot: .teal)
-                InfoRow(title: "Kullanılan takas alanı", value: swap(system))
+            if advanced {
+                VStack(alignment: .leading, spacing: PocketSpacing.xs + 1) {
+                    let app = Double(system?.appMemoryBytes ?? 0), wired = Double(system?.wiredMemoryBytes ?? 0)
+                    let compressed = Double(system?.compressedMemoryBytes ?? 0), cached = Double(system?.cachedFilesBytes ?? 0)
+                    SegmentBar(segments: [(app, module.tint), (wired, .orange), (compressed, .yellow), (cached, .teal),
+                                          (max(0, Double(total) - app - wired - compressed - cached), .clear)])
+                        .padding(.bottom, 2)
+                    InfoRow(title: "Uygulama belleği", value: bytes(system?.appMemoryBytes), dot: module.tint)
+                    InfoRow(title: "Kalıcı bellek", value: bytes(system?.wiredMemoryBytes), dot: .orange)
+                    InfoRow(title: "Sıkıştırılmış", value: bytes(system?.compressedMemoryBytes), dot: .yellow)
+                    InfoRow(title: "Önbellekteki dosyalar", value: bytes(system?.cachedFilesBytes), dot: .teal)
+                    InfoRow(title: "Kullanılan takas alanı", value: swap(system))
+                }
+                .menuBarSection()
             }
-            .menuBarSection()
 
             HistoryChart(series: [.init(name: String(localized: "Kullanılan"), color: module.tint,
                                         values: history.samples.compactMap { s in s.memoryFraction.map { (s.date, $0 * 100) } })],
@@ -391,6 +413,7 @@ private struct DiskDetail: View {
     @ObservedObject var model: PocketModel
     @ObservedObject var history: MenuBarHistory
     let binary: Bool
+    let advanced: Bool
     private let module = MenuBarModule.disk
 
     var body: some View {
@@ -436,16 +459,18 @@ private struct DiskDetail: View {
             }
             .menuBarSection()
 
-            VStack(alignment: .leading, spacing: PocketSpacing.xs + 2) {
-                SectionTitle(title: "Etkinlik")
-                HistoryChart(series: [
-                    .init(name: String(localized: "Okuma"), color: module.tint, values: history.samples.compactMap { s in s.diskRead.map { (s.date, $0) } }),
-                    .init(name: String(localized: "Yazma"), color: .orange, values: history.samples.compactMap { s in s.diskWrite.map { (s.date, $0) } }),
-                ], axisLabel: { MenuBarFormatter.rate($0, binary: binary) })
-                InfoRow(title: "Okuma", value: MenuBarFormatter.rate(read, binary: binary), dot: module.tint)
-                InfoRow(title: "Yazma", value: MenuBarFormatter.rate(write, binary: binary), dot: .orange)
+            if advanced {
+                VStack(alignment: .leading, spacing: PocketSpacing.xs + 2) {
+                    SectionTitle(title: "Etkinlik")
+                    HistoryChart(series: [
+                        .init(name: String(localized: "Okuma"), color: module.tint, values: history.samples.compactMap { s in s.diskRead.map { (s.date, $0) } }),
+                        .init(name: String(localized: "Yazma"), color: .orange, values: history.samples.compactMap { s in s.diskWrite.map { (s.date, $0) } }),
+                    ], axisLabel: { MenuBarFormatter.rate($0, binary: binary) })
+                    InfoRow(title: "Okuma", value: MenuBarFormatter.rate(read, binary: binary), dot: module.tint)
+                    InfoRow(title: "Yazma", value: MenuBarFormatter.rate(write, binary: binary), dot: .orange)
+                }
+                .menuBarSection()
             }
-            .menuBarSection()
         }
     }
 }
@@ -454,6 +479,7 @@ private struct NetworkDetail: View {
     @ObservedObject var model: PocketModel
     @ObservedObject var history: MenuBarHistory
     let binary: Bool
+    let advanced: Bool
     private let module = MenuBarModule.network
 
     var body: some View {
@@ -470,17 +496,19 @@ private struct NetworkDetail: View {
             ], height: 76, axisLabel: { MenuBarFormatter.rate($0, binary: binary) })
             .menuBarSection()
 
-            VStack(spacing: PocketSpacing.xs + 1) {
-                InfoRow(title: "Birincil arayüz", value: network?.primaryInterface ?? String(localized: "Bağlantı yok"))
-                InfoRow(title: "Yerel IP adresi", value: network?.localIPv4 ?? "—")
-                InfoRow(title: "Bu oturumda alınan", value: network.map { MenuBarFormatter.bytes(Double($0.totalReceivedBytes), binary: binary) } ?? "—")
-                InfoRow(title: "Bu oturumda gönderilen", value: network.map { MenuBarFormatter.bytes(Double($0.totalSentBytes), binary: binary) } ?? "—")
-            }
-            .menuBarSection()
+            if advanced {
+                VStack(spacing: PocketSpacing.xs + 1) {
+                    InfoRow(title: "Birincil arayüz", value: network?.primaryInterface ?? String(localized: "Bağlantı yok"))
+                    InfoRow(title: "Yerel IP adresi", value: network?.localIPv4 ?? "—")
+                    InfoRow(title: "Bu oturumda alınan", value: network.map { MenuBarFormatter.bytes(Double($0.totalReceivedBytes), binary: binary) } ?? "—")
+                    InfoRow(title: "Bu oturumda gönderilen", value: network.map { MenuBarFormatter.bytes(Double($0.totalSentBytes), binary: binary) } ?? "—")
+                }
+                .menuBarSection()
 
-            Label("Dış IP adresi gizlilik nedeniyle sorgulanmaz; hiçbir ağ isteği yapılmaz.", systemImage: "lock.shield")
-                .font(.caption).foregroundStyle(.secondary)
-                .fixedSize(horizontal: false, vertical: true)
+                Label("Dış IP adresi gizlilik nedeniyle sorgulanmaz; hiçbir ağ isteği yapılmaz.", systemImage: "lock.shield")
+                    .font(.caption).foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
         }
     }
 
@@ -552,6 +580,7 @@ private struct FanSpin: ViewModifier {
 
 private struct PowerDetail: View {
     @ObservedObject var model: PocketModel
+    let advanced: Bool
     private let module = MenuBarModule.power
 
     var body: some View {
@@ -591,11 +620,19 @@ private struct PowerDetail: View {
                 }
                 .font(.callout)
                 .accessibilityElement(children: .combine)
-                InfoRow(title: "Düşük güç modu", value: power.map { $0.lowPowerMode ? String(localized: "Açık") : String(localized: "Kapalı") } ?? "—")
+                if advanced {
+                    InfoRow(title: "Düşük güç modu", value: power.map { $0.lowPowerMode ? String(localized: "Açık") : String(localized: "Kapalı") } ?? "—")
+                    if let watts = system?.systemPowerWatts { InfoRow(title: "Sistem gücü", value: powerWatts(watts)) }
+                    if let watts = system?.powerInputWatts { InfoRow(title: "DC giriş gücü", value: powerWatts(watts)) }
+                }
             }
             .menuBarSection()
 
-            if let fans = system?.fans, !fans.isEmpty {
+            if advanced, let readings = system?.temperatures {
+                temperatures(readings).menuBarSection()
+            }
+
+            if advanced, let fans = system?.fans, !fans.isEmpty {
                 VStack(alignment: .leading, spacing: PocketSpacing.s) {
                     SectionTitle(title: "Fanlar")
                     ForEach(Array(fans.enumerated()), id: \.offset) { index, fan in
@@ -606,6 +643,21 @@ private struct PowerDetail: View {
             }
 
             keepAwake.menuBarSection()
+        }
+    }
+
+    private func temperatures(_ readings: [TemperatureReading]) -> some View {
+        VStack(alignment: .leading, spacing: PocketSpacing.xs + 1) {
+            SectionTitle(title: "Sıcaklıklar", trailing: String(localized: "\(readings.count) sensör"))
+            ForEach(TemperatureSummary.groups(readings)) { summary in
+                let maximum = pocketCelsius(summary.maximum), average = pocketCelsius(summary.average)
+                InfoRow(title: "\(summary.group.title)",
+                        value: summary.count == 1 ? maximum : String(localized: "en yüksek \(maximum) · ort. \(average)"))
+            }
+            DisclosureGroup("Tüm sensörler") {
+                PocketRawSensorList(readings: readings).padding(.top, PocketSpacing.xs)
+            }
+            .font(.callout)
         }
     }
 

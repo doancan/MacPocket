@@ -109,6 +109,16 @@ final class FanSensor {
         }
     }
 
+    /// Whole-system power in watts on Apple silicon: total draw (PSTR) and DC input (PDTR, which includes
+    /// conversion losses). Nil where the SMC does not publish them, e.g. Intel Macs.
+    func power() -> (system: Double?, input: Double?) {
+        guard connection != 0 else { return (nil, nil) }
+        func watts(_ key: String) -> Double? { read(key).flatMap { Self.plausibleWatts.contains($0) ? $0 : nil } }
+        return (watts("PSTR"), watts("PDTR"))
+    }
+
+    static let plausibleWatts = 0.01...2000.0
+
     private func read(_ key: String) -> Double? {
         let code = SMCValue.fourCharCode(key)
         if keyInfo[code] == nil {
