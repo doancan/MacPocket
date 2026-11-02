@@ -38,9 +38,10 @@ final class NightModeService: ObservableObject {
     private static let rampStep = Duration.milliseconds(250)
 
     private let brightness = DisplayBrightnessService.shared
-    private let location = NightLocationProvider()
-    private let nightShift = NightShiftSession(client: NightShiftClient(), load: NightModeService.loadSnapshot,
-                                               save: NightModeService.saveSnapshot)
+    /// Location for the sunrise/sunset times; the page observes its authorization.
+    let location = NightLocationProvider()
+    private let nightShiftClient: NightShiftClient
+    private let nightShift: NightShiftSession
     private var started = false
     private var stopped = false
     private var timer: Timer?
@@ -61,7 +62,14 @@ final class NightModeService: ObservableObject {
     /// The night amount actually in effect at the last evaluation (0 when paused or off).
     private var effectiveNight = 0.0
 
-    private init() {}
+    private init() {
+        let client = NightShiftClient()
+        nightShiftClient = client
+        nightShift = NightShiftSession(client: client, load: NightModeService.loadSnapshot, save: NightModeService.saveSnapshot)
+    }
+
+    /// Whether macOS Night Shift can be driven on this Mac.
+    var nightShiftAvailable: Bool { nightShiftClient.isAvailable }
 
     /// The debug clock when set, otherwise the real time.
     var debugNow: Date? {
@@ -110,6 +118,11 @@ final class NightModeService: ObservableObject {
     func resume() {
         updateNight { $0.pausedUntil = nil }
         evaluate()
+    }
+
+    /// "Use my location": asks for a fresh location now, even if one was fetched earlier today.
+    func useCurrentLocation() {
+        location.request(force: true)
     }
 
     /// Hands Night Shift back to the user and drops the warmth (software dimming is restored by the brightness service).
@@ -307,7 +320,8 @@ final class NightModeService: ObservableObject {
     // MARK: Helpers
 
     /// Writes into the stored night settings without the schedule setter's side effects (it clears manual holds).
-    private func updateNight(_ change: (inout NightSettings) -> Void) {
+    /// The change re-evaluates night mode through the settings subscription.
+    func updateNight(_ change: (inout NightSettings) -> Void) {
         var schedule = brightness.schedule
         var night = schedule.night ?? NightSettings()
         change(&night)

@@ -23,8 +23,10 @@ final class NightLocationProvider: NSObject, ObservableObject, CLLocationManager
         manager.desiredAccuracy = kCLLocationAccuracyReduced
     }
 
-    /// Asks for authorization if needed, then requests a single location. Refreshes at most once per day.
-    func request() {
+    /// Asks for authorization if needed, then requests a single location. Refreshes at most once per day unless
+    /// `force` (the user asked for it explicitly).
+    func request(force: Bool = false) {
+        if force { defaults.removeObject(forKey: Self.fetchedAtKey) }
         guard LocationRefreshPolicy.shouldFetch(lastFetch: defaults.object(forKey: Self.fetchedAtKey) as? Date, now: Date()) else {
             return
         }
