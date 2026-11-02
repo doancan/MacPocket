@@ -85,6 +85,10 @@ final class DisplayBrightnessService: ObservableObject {
     private var pendingWrites: [CGDirectDisplayID: Task<Void, Never>] = [:]
     /// Each display's calibrated gamma table, captured before MacPocket first dims it.
     private var originalGamma: [CGDirectDisplayID: GammaTable] = [:]
+    /// Software brightness scale per display (absent = 1, e.g. DDC displays).
+    private var softwareScale: [CGDirectDisplayID: Float] = [:]
+    /// Night-mode color warmth, multiplied into every managed display's gamma.
+    private var warmth: (red: Float, green: Float, blue: Float) = (1, 1, 1)
     private var keyTap: BrightnessKeyTap?
     private var observers: [NSObjectProtocol] = []
     private var scheduleTimer: Timer?
@@ -154,9 +158,17 @@ final class DisplayBrightnessService: ObservableObject {
 
     /// Restores every gamma table MacPocket changed (called at quit).
     func restoreSoftwareDimming() {
+        warmth = (1, 1, 1)
+        softwareScale = [:]
         guard !originalGamma.isEmpty else { return }
         CGDisplayRestoreColorSyncSettings()
         originalGamma = [:]
+    }
+
+    /// Sets the night-mode color warmth (per-channel factors, 1 = neutral) on every managed display.
+    func setWarmth(_ factors: (red: Double, green: Double, blue: Double)) {
+        warmth = (Float(factors.red), Float(factors.green), Float(factors.blue))
+        for display in displays { applyGamma(display.id) }
     }
 
     // MARK: Detection
@@ -212,9 +224,9 @@ final class DisplayBrightnessService: ObservableObject {
                 maximums[id] = (100, 100) // write-only monitor: the usual 0…100 scale
             }
             // Untouched displays keep their ColorSync calibration: gamma is only changed once dimmed.
-            if active == .software, level < 1 { applySoftware(id, level: level) }
-            // Switched away from software dimming: put the calibrated table back.
-            if active != .software, let original = originalGamma.removeValue(forKey: id) { original.apply(to: id) }
+            if active == .software { applySoftware(id, level: level) } else { softwareScale[id] = nil }
+            // Switched away from software dimming: drop its scale (warmth, if any, stays applied).
+            applyGamma(id)
             result.append(ManagedDisplay(id: id, key: key, name: Self.name(of: id), active: active, level: level,
                                          contrast: contrast, hardwareAvailable: hardware))
         }
@@ -286,15 +298,26 @@ final class DisplayBrightnessService: ObservableObject {
         }
     }
 
-    /// Scales the display's own (calibrated) gamma table. `level` 0…1 maps to floor…1 so the screen never goes
-    /// fully dark; full brightness puts the original table back.
+    /// Records the software brightness scale: `level` 0...1 maps to floor...1 so the screen never goes fully dark.
     private func applySoftware(_ id: CGDirectDisplayID, level: Double) {
+        softwareScale[id] = Float(Self.softwareFloor + (1 - Self.softwareFloor) * level)
+        applyGamma(id)
+    }
+
+    /// The single gamma write: original table x warmth x software brightness scale. The original is captured
+    /// before the first change of either kind; when nothing is left to change it is put back.
+    private func applyGamma(_ id: CGDirectDisplayID) {
+        let scale = softwareScale[id] ?? 1
+        let neutral = warmth.red == 1 && warmth.green == 1 && warmth.blue == 1 && scale == 1
+        if neutral {
+            if let original = originalGamma.removeValue(forKey: id) { original.apply(to: id) }
+            return
+        }
         if originalGamma[id] == nil {
-            guard level < 1, let table = GammaTable.read(id) else { return }
+            guard let table = GammaTable.read(id) else { return }
             originalGamma[id] = table
         }
-        guard let original = originalGamma[id] else { return }
-        original.scaled(by: Float(Self.softwareFloor + (1 - Self.softwareFloor) * level)).apply(to: id)
+        originalGamma[id]?.composed(warmth: warmth, scale: scale).apply(to: id)
     }
 
     // MARK: Keys
@@ -717,8 +740,10 @@ struct GammaTable {
         return GammaTable(red: Array(red.prefix(Int(count))), green: Array(green.prefix(Int(count))), blue: Array(blue.prefix(Int(count))))
     }
 
-    func scaled(by factor: Float) -> GammaTable {
-        GammaTable(red: red.map { $0 * factor }, green: green.map { $0 * factor }, blue: blue.map { $0 * factor })
+    func composed(warmth: (red: Float, green: Float, blue: Float), scale: Float) -> GammaTable {
+        GammaTable(red: GammaComposer.compose(red, factor: warmth.red, scale: scale),
+                   green: GammaComposer.compose(green, factor: warmth.green, scale: scale),
+                   blue: GammaComposer.compose(blue, factor: warmth.blue, scale: scale))
     }
 
     func apply(to display: CGDirectDisplayID) {

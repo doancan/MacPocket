@@ -108,4 +108,11 @@ final class NightModeTests: XCTestCase {
         XCTAssertEqual(s.nightKelvin, 3400)
         XCTAssertEqual(s.colorMethod, .macPocket)
     }
+
+    func testComposeAppliesWarmthThenBrightness() {
+        let result = GammaComposer.compose([1, 0.5], factor: 0.5, scale: 0.8)
+        XCTAssertEqual(result[0], 0.4, accuracy: 1e-6)
+        XCTAssertEqual(result[1], 0.2, accuracy: 1e-6)
+        XCTAssertEqual(GammaComposer.compose([0.25, 1], factor: 1, scale: 1), [0.25, 1])
+    }
 }

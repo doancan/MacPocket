@@ -2,6 +2,15 @@ import CoreGraphics
 import Foundation
 import IOKit
 
+// MARK: - Gamma
+
+/// Pure per-channel gamma math: a calibrated curve times the color-warmth factor times the brightness scale.
+public enum GammaComposer {
+    public static func compose(_ channel: [Float], factor: Float, scale: Float) -> [Float] {
+        channel.map { $0 * factor * scale }
+    }
+}
+
 // MARK: - DDC/CI packets
 
 /// VESA DDC/CI "VCP" codes MacPocket reads and writes.
