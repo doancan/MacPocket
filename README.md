@@ -13,7 +13,7 @@ native macOS projesidir.
 - [CleanMyMac My Tools eşlemesi](docs/CLEANMYMAC_TOOLS.md)
 - [İlk referans incelemesi ve teknik bulgular](docs/research/2026-10-28-initial.md)
 
-Mevcut sürüm **0.1.0**. Genel Bakış, Sistem İzleme, Güç Merkezi, Temizlik,
+Mevcut sürüm **0.1.1**. Genel Bakış, Sistem İzleme, Güç Merkezi, Temizlik,
 Disk Analizi, Uygulamalar ve Tools ana bölümleridir. Görev Yöneticisi ve sekiz
 sistem raporu Tools altında açılır. Native kenar/araç çubukları, Liquid Glass,
 menü çubuğu hızlı bakışı, Ayarlar, tema ve oturum açılışında başlatma desteği vardır.
