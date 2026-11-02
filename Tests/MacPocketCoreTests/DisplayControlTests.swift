@@ -107,3 +107,22 @@ final class BrightnessScheduleTests: XCTestCase {
         XCTAssertEqual(day.nextPoint(after: 21 * 60), 8 * 60, "wraps to tomorrow morning")
     }
 }
+
+final class BrightnessKeyTests: XCTestCase {
+    func testDesktopMacsSendBrightnessAsOrdinaryKeys() {
+        // Measured on a Mac with only external displays: Magic Keyboard F1/F2 arrive as key codes 145/144.
+        XCTAssertEqual(BrightnessKey(keyCode: 145), .down)
+        XCTAssertEqual(BrightnessKey(keyCode: 144), .up)
+        XCTAssertNil(BrightnessKey(keyCode: 122), "F1 without the brightness function is not a brightness key")
+    }
+
+    func testLaptopsSendBrightnessAsSystemDefinedEvents() {
+        XCTAssertEqual(BrightnessKey(systemDefinedSubtype: 8, data1: 0x0003_0A00), .down)
+        XCTAssertEqual(BrightnessKey(systemDefinedSubtype: 8, data1: 0x0002_0A00), .up)
+        XCTAssertEqual(BrightnessKey(systemDefinedSubtype: 8, data1: 0x0002_0B00), .up, "key up still names the key")
+        XCTAssertTrue(BrightnessKey.isSystemDefinedKeyDown(data1: 0x0002_0A00))
+        XCTAssertFalse(BrightnessKey.isSystemDefinedKeyDown(data1: 0x0002_0B00))
+        XCTAssertNil(BrightnessKey(systemDefinedSubtype: 8, data1: 0x0000_0A00), "volume up is not brightness")
+        XCTAssertNil(BrightnessKey(systemDefinedSubtype: 7, data1: 1), "subtype 7 is not a media key")
+    }
+}

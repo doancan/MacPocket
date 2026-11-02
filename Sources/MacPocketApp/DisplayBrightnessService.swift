@@ -1,4 +1,5 @@
 import AppKit
+import SwiftUI
 import ApplicationServices
 import MacPocketCore
 
@@ -19,10 +20,24 @@ final class DisplayBrightnessService: ObservableObject {
         case underPointer, allExternal, main
     }
 
+    /// Where MacPocket's own brightness indicator appears on each screen.
+    enum IndicatorPosition: String, Codable, CaseIterable {
+        case topRight, topCenter, bottomCenter, center
+    }
+
+    /// How the brightness indicator looks: MacPocket's glass slider, a compact one-line capsule, or the classic
+    /// macOS square bezel.
+    enum IndicatorStyle: String, Codable, CaseIterable {
+        case modern, capsule, classic
+    }
+
     struct Settings: Codable, Equatable {
         var keysEnabled = false
         var target = Target.underPointer
         var showIndicator = true
+        /// Optional so settings saved before the option existed still decode.
+        var indicatorPosition: IndicatorPosition?
+        var indicatorStyle: IndicatorStyle?
         /// Per display (vendor-product-serial): the chosen method and last level, re-applied after a relaunch.
         var methods: [String: Method] = [:]
         var levels: [String: Double] = [:]
@@ -56,7 +71,9 @@ final class DisplayBrightnessService: ObservableObject {
             configureTap()
         }
     }
-    @Published private(set) var displays: [ManagedDisplay] = []
+    @Published private(set) var displays: [ManagedDisplay] = [] {
+        didSet { keyTap?.update(managed: displays.map(\.id), target: settings.target) }
+    }
     @Published private(set) var detecting = false
     @Published private(set) var tapActive = false
 
@@ -68,8 +85,7 @@ final class DisplayBrightnessService: ObservableObject {
     private var pendingWrites: [CGDirectDisplayID: Task<Void, Never>] = [:]
     /// Each display's calibrated gamma table, captured before MacPocket first dims it.
     private var originalGamma: [CGDirectDisplayID: GammaTable] = [:]
-    private var tap: CFMachPort?
-    private var tapSource: CFRunLoopSource?
+    private var keyTap: BrightnessKeyTap?
     private var observers: [NSObjectProtocol] = []
     private var scheduleTimer: Timer?
     /// Until when a manual change wins over the schedule. A date, not a minute of the day, so a Mac asleep
@@ -285,78 +301,145 @@ final class DisplayBrightnessService: ObservableObject {
 
     private func configureTap() {
         let wanted = settings.keysEnabled && AXIsProcessTrusted()
-        if wanted && tap == nil {
-            let mask = CGEventMask(1 << 14) // NX_SYSDEFINED: media and brightness keys
-            let callback: CGEventTapCallBack = { _, type, event, context in
-                guard let context else { return Unmanaged.passUnretained(event) }
-                let service = Unmanaged<DisplayBrightnessService>.fromOpaque(context).takeUnretainedValue()
-                let keep: Bool = MainActor.assumeIsolated { service.handle(type, event) }
-                return keep ? Unmanaged.passUnretained(event) : nil
+        if wanted && keyTap == nil {
+            keyTap = BrightnessKeyTap { [weak self] key, fine, targets in
+                Task { @MainActor in self?.apply(key, fine: fine, to: targets) }
             }
-            if let created = CGEvent.tapCreate(tap: .cgSessionEventTap, place: .headInsertEventTap, options: .defaultTap,
-                                               eventsOfInterest: mask, callback: callback,
-                                               userInfo: Unmanaged.passUnretained(self).toOpaque()) {
-                let source = CFMachPortCreateRunLoopSource(nil, created, 0)
-                CFRunLoopAddSource(CFRunLoopGetMain(), source, .commonModes)
-                CGEvent.tapEnable(tap: created, enable: true)
-                tap = created
-                tapSource = source
-            }
-        } else if !wanted, let tap {
-            CGEvent.tapEnable(tap: tap, enable: false)
-            if let tapSource { CFRunLoopRemoveSource(CFRunLoopGetMain(), tapSource, .commonModes) }
-            self.tap = nil
-            tapSource = nil
+        } else if !wanted, let keyTap {
+            keyTap.stop()
+            self.keyTap = nil
         }
-        tapActive = tap != nil
+        keyTap?.update(managed: displays.map(\.id), target: settings.target)
+        tapActive = keyTap != nil
     }
 
-    private static let brightnessUp = 2, brightnessDown = 3
-
-    /// Returns false to swallow the key (it was used for an external display).
-    private func handle(_ type: CGEventType, _ event: CGEvent) -> Bool {
-        if type == .tapDisabledByTimeout || type == .tapDisabledByUserInput {
-            if let tap { CGEvent.tapEnable(tap: tap, enable: true) }
-            return true
+    /// Shows the indicator on every managed display at its current level, so a new position can be seen right away.
+    func previewIndicator() {
+        for display in displays {
+            BrightnessIndicator.show(level: display.level, on: display.id, position: settings.indicatorPosition ?? .topRight,
+                                     style: settings.indicatorStyle ?? .modern)
         }
-        guard let ns = NSEvent(cgEvent: event), ns.type == .systemDefined, ns.subtype.rawValue == 8 else { return true }
-        let keyCode = (ns.data1 & 0xFFFF_0000) >> 16
-        let isDown = ((ns.data1 & 0xFF00) >> 8) == 0xA
-        guard keyCode == Self.brightnessUp || keyCode == Self.brightnessDown else { return true }
-        let targets = targetDisplays()
-        guard !targets.isEmpty else { return true } // pointer on the built-in screen: let macOS handle it
-        guard isDown else { return false }
-        let fine = ns.modifierFlags.contains(.option) && ns.modifierFlags.contains(.shift)
+    }
+
+    private func apply(_ key: BrightnessKey, fine: Bool, to targets: [CGDirectDisplayID]) {
         for id in targets {
             guard let display = displays.first(where: { $0.id == id }) else { continue }
-            let level = BrightnessStep.next(from: display.level, up: keyCode == Self.brightnessUp,
+            let level = BrightnessStep.next(from: display.level, up: key.isUp,
                                             step: fine ? BrightnessStep.fine : BrightnessStep.normal)
             setLevel(level, for: id)
-            if settings.showIndicator { BrightnessIndicator.show(level: level, on: id) }
+            if settings.showIndicator {
+                BrightnessIndicator.show(level: level, on: id, position: settings.indicatorPosition ?? .topRight,
+                                         style: settings.indicatorStyle ?? .modern)
+            }
         }
+    }
+}
+
+/// The brightness-key event tap. It sees every key press (desktop Macs send brightness as ordinary keys), so it runs
+/// on its own thread and never waits for the main thread: other keys pass straight through, and only brightness keys
+/// aimed at a managed display are swallowed and handed over with `onKey`.
+final class BrightnessKeyTap: @unchecked Sendable {
+    private let lock = NSLock()
+    private var managed: [CGDirectDisplayID] = []
+    private var target = DisplayBrightnessService.Target.underPointer
+    private var port: CFMachPort?
+    private var runLoop: CFRunLoop?
+    private let onKey: @Sendable (BrightnessKey, Bool, [CGDirectDisplayID]) -> Void
+
+    /// `onKey` gets the key, whether ⌥⇧ asked for fine steps, and the target displays. It is called on the tap thread.
+    init(onKey: @escaping @Sendable (BrightnessKey, Bool, [CGDirectDisplayID]) -> Void) {
+        self.onKey = onKey
+        let mask = CGEventMask((1 << CGEventType.keyDown.rawValue) | (1 << CGEventType.keyUp.rawValue) | (1 << 14)) // 14: NX_SYSDEFINED
+        let callback: CGEventTapCallBack = { _, type, event, context in
+            guard let context else { return Unmanaged.passUnretained(event) }
+            let tap = Unmanaged<BrightnessKeyTap>.fromOpaque(context).takeUnretainedValue()
+            return tap.handle(type, event) ? Unmanaged.passUnretained(event) : nil
+        }
+        guard let created = CGEvent.tapCreate(tap: .cgSessionEventTap, place: .headInsertEventTap, options: .defaultTap,
+                                              eventsOfInterest: mask, callback: callback,
+                                              userInfo: Unmanaged.passUnretained(self).toOpaque()) else { return }
+        port = created
+        let ready = DispatchSemaphore(value: 0)
+        let thread = Thread { [weak self] in
+            guard let self, let port = lock.withLock({ self.port }) else { ready.signal(); return }
+            CFRunLoopAddSource(CFRunLoopGetCurrent(), CFMachPortCreateRunLoopSource(nil, port, 0), .commonModes)
+            lock.withLock { runLoop = CFRunLoopGetCurrent() }
+            CGEvent.tapEnable(tap: port, enable: true)
+            ready.signal()
+            CFRunLoopRun()
+        }
+        thread.name = "MacPocket brightness keys"
+        thread.qualityOfService = .userInteractive
+        thread.start()
+        ready.wait()
+    }
+
+    deinit { stop() }
+
+    var isRunning: Bool { lock.withLock { port != nil } }
+
+    func update(managed: [CGDirectDisplayID], target: DisplayBrightnessService.Target) {
+        lock.withLock { self.managed = managed; self.target = target }
+    }
+
+    func stop() {
+        let (port, runLoop) = lock.withLock { () -> (CFMachPort?, CFRunLoop?) in
+            defer { self.port = nil; self.runLoop = nil }
+            return (self.port, self.runLoop)
+        }
+        if let port {
+            CGEvent.tapEnable(tap: port, enable: false)
+            CFMachPortInvalidate(port) // otherwise the disabled tap stays registered and a later one is added beside it
+        }
+        if let runLoop { CFRunLoopStop(runLoop) }
+    }
+
+    /// Returns false to swallow the event (it was used for an external display).
+    private func handle(_ type: CGEventType, _ event: CGEvent) -> Bool {
+        if type == .tapDisabledByTimeout || type == .tapDisabledByUserInput {
+            if let port = lock.withLock({ port }) { CGEvent.tapEnable(tap: port, enable: true) }
+            return true
+        }
+        let key: BrightnessKey
+        let isDown: Bool
+        switch type {
+        case .keyDown, .keyUp:
+            guard let decoded = BrightnessKey(keyCode: event.getIntegerValueField(.keyboardEventKeycode)) else { return true }
+            key = decoded
+            isDown = type == .keyDown
+        default:
+            guard let ns = NSEvent(cgEvent: event), ns.type == .systemDefined,
+                  let decoded = BrightnessKey(systemDefinedSubtype: Int(ns.subtype.rawValue), data1: ns.data1) else { return true }
+            key = decoded
+            isDown = BrightnessKey.isSystemDefinedKeyDown(data1: ns.data1)
+        }
+        let targets = targetDisplays(pointer: event.location)
+        guard !targets.isEmpty else { return true } // pointer on the built-in screen: let macOS handle it
+        if isDown { onKey(key, event.flags.contains(.maskAlternate) && event.flags.contains(.maskShift), targets) }
         return false
     }
 
-    private func targetDisplays() -> [CGDirectDisplayID] {
-        let managed = Set(displays.map(\.id))
-        switch settings.target {
+    private func targetDisplays(pointer: CGPoint) -> [CGDirectDisplayID] {
+        let (managed, target) = lock.withLock { (managed, target) }
+        switch target {
         case .allExternal:
-            return displays.map(\.id)
+            return managed
         case .main:
             let main = CGMainDisplayID()
             return managed.contains(main) ? [main] : []
         case .underPointer:
             var id: CGDirectDisplayID = 0
             var count: UInt32 = 0
-            let point = CGEvent(source: nil)?.location ?? .zero
-            guard CGGetDisplaysWithPoint(point, 1, &id, &count) == .success, count > 0, managed.contains(id) else { return [] }
+            guard CGGetDisplaysWithPoint(pointer, 1, &id, &count) == .success, count > 0, managed.contains(id) else { return [] }
             return [id]
         }
     }
 }
 
-/// macOS's own brightness bezel (the OSD framework the system uses for the built-in screen). When that private
-/// class is missing no bezel is shown; Settings says so through `isNative`.
+/// The brightness indicator shown for key presses, in the chosen style. The classic style is macOS's own bezel (the
+/// private OSD framework the system uses for the built-in screen) before macOS 26; from macOS 26 that framework
+/// accepts the call but no longer draws it, so MacPocket draws the classic bezel itself. The modern style is always
+/// MacPocket's glass slider.
 @MainActor
 enum BrightnessIndicator {
     @objc private protocol OSDManaging {
@@ -364,7 +447,8 @@ enum BrightnessIndicator {
                        filledChiclets: UInt32, totalChiclets: UInt32, locked: Bool)
     }
 
-    private static let manager: AnyObject? = {
+    private static let systemManager: AnyObject? = {
+        if #available(macOS 26.0, *) { return nil }
         _ = dlopen("/System/Library/PrivateFrameworks/OSD.framework/OSD", RTLD_LAZY)
         guard let type = NSClassFromString("OSDManager") as? NSObject.Type,
               type.responds(to: NSSelectorFromString("sharedManager")),
@@ -374,15 +458,246 @@ enum BrightnessIndicator {
         return shared
     }()
 
-    static var isNative: Bool { manager != nil }
+    /// One indicator per display, so "all external displays" shows each screen its own level at the same time.
+    private static var huds: [CGDirectDisplayID: BrightnessHUD] = [:]
 
-    static func show(level: Double, on display: CGDirectDisplayID) {
-        let chiclets = BrightnessStep.chiclets(level)
-        if let manager {
-            let osd = unsafeBitCast(manager, to: OSDManaging.self)
+    /// Whether the classic style is drawn by macOS itself (which then also decides where it appears).
+    static var classicIsSystemBezel: Bool { systemManager != nil }
+
+    static func show(level: Double, on display: CGDirectDisplayID, position: DisplayBrightnessService.IndicatorPosition,
+                     style: DisplayBrightnessService.IndicatorStyle) {
+        if style == .classic, let systemManager {
+            let chiclets = BrightnessStep.chiclets(level)
+            let osd = unsafeBitCast(systemManager, to: OSDManaging.self)
             // Image 1 is the brightness sun; priority 0x1F4 is what the system uses for key presses.
             osd.showImage(1, onDisplayID: display, priority: 0x1F4, msecUntilFade: 1000,
                           filledChiclets: chiclets.filled, totalChiclets: chiclets.total, locked: false)
+        } else {
+            let hud = huds[display] ?? BrightnessHUD()
+            huds[display] = hud
+            hud.show(level: level, on: display, position: position, style: style)
+        }
+    }
+}
+
+/// MacPocket's own brightness indicator for one display, in either style. It never takes focus or clicks and fades
+/// out shortly after the last key press.
+@MainActor
+private final class BrightnessHUD {
+    private var panel: NSPanel?
+    private let state = BrightnessHUDState()
+    private var hideWork: DispatchWorkItem?
+    func show(level: Double, on display: CGDirectDisplayID, position: DisplayBrightnessService.IndicatorPosition,
+              style: DisplayBrightnessService.IndicatorStyle) {
+        guard let screen = NSScreen.screens.first(where: {
+            ($0.deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] as? NSNumber)?.uint32Value == display
+        }) ?? NSScreen.main else { return }
+        state.name = screen.localizedName
+        state.style = style
+        if panel?.isVisible == true && panel?.alphaValue == 1 {
+            withAnimation(.snappy(duration: 0.18)) { state.level = level }
+        } else {
+            state.level = level
+        }
+        let panel = self.panel ?? makePanel()
+        self.panel = panel
+        panel.setFrame(Self.frame(in: screen.visibleFrame, position: position, size: Self.size(style)), display: false)
+        if !panel.isVisible || panel.alphaValue < 1 {
+            panel.alphaValue = 1
+            panel.orderFrontRegardless()
+        }
+        hideWork?.cancel()
+        let work = DispatchWorkItem { [weak self] in self?.fadeOut() }
+        hideWork = work
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.5, execute: work)
+    }
+
+    private static func size(_ style: DisplayBrightnessService.IndicatorStyle) -> NSSize {
+        switch style {
+        case .modern: NSSize(width: 320, height: 96)
+        case .capsule: NSSize(width: 300, height: 64)
+        case .classic: NSSize(width: 220, height: 220)
+        }
+    }
+
+    private static func frame(in area: NSRect, position: DisplayBrightnessService.IndicatorPosition, size: NSSize) -> NSRect {
+        let origin: NSPoint
+        switch position {
+        case .topRight: origin = NSPoint(x: area.maxX - size.width - 12, y: area.maxY - size.height - 8)
+        case .topCenter: origin = NSPoint(x: area.midX - size.width / 2, y: area.maxY - size.height - 8)
+        case .bottomCenter: origin = NSPoint(x: area.midX - size.width / 2, y: area.minY + area.height * 0.12)
+        case .center: origin = NSPoint(x: area.midX - size.width / 2, y: area.midY - size.height / 2)
+        }
+        return NSRect(origin: origin, size: size)
+    }
+
+    private func fadeOut() {
+        guard let panel else { return }
+        NSAnimationContext.runAnimationGroup({ context in
+            context.duration = 0.3
+            panel.animator().alphaValue = 0
+        }, completionHandler: { [weak self] in
+            MainActor.assumeIsolated {
+                guard let self, let panel = self.panel, panel.alphaValue == 0 else { return }
+                panel.orderOut(nil)
+            }
+        })
+    }
+
+    private func makePanel() -> NSPanel {
+        let panel = NSPanel(contentRect: .zero, styleMask: [.borderless, .nonactivatingPanel], backing: .buffered, defer: false)
+        panel.isOpaque = false
+        panel.backgroundColor = .clear
+        panel.hasShadow = false
+        panel.ignoresMouseEvents = true
+        panel.level = .statusBar
+        panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .transient, .ignoresCycle, .stationary]
+        panel.contentView = NSHostingView(rootView: BrightnessHUDView(state: state))
+        return panel
+    }
+}
+
+@MainActor
+private final class BrightnessHUDState: ObservableObject {
+    @Published var level = 1.0
+    @Published var name = ""
+    @Published var style = DisplayBrightnessService.IndicatorStyle.modern
+}
+
+/// Laid out like the system's Control Center sliders: the screen's name and percentage above a thick filled track
+/// that carries the sun symbol.
+private struct BrightnessHUDView: View {
+    @ObservedObject var state: BrightnessHUDState
+
+    var body: some View {
+        switch state.style {
+        case .modern: ModernBrightnessHUD(state: state)
+        case .capsule: CapsuleBrightnessHUD(level: state.level)
+        case .classic: ClassicBrightnessHUD(level: state.level)
+        }
+    }
+}
+
+/// A compact one-line glass capsule: the sun, a level bar and the percentage.
+private struct CapsuleBrightnessHUD: View {
+    let level: Double
+
+    var body: some View {
+        HStack(spacing: PocketSpacing.m) {
+            Image(systemName: level < 0.5 ? "sun.min.fill" : "sun.max.fill")
+                .font(.system(size: 17, weight: .semibold))
+                .frame(width: 22)
+            ProgressView(value: level)
+                .progressViewStyle(.linear)
+                .tint(.primary)
+            Text(level, format: .percent.precision(.fractionLength(0)))
+                .font(.callout.weight(.semibold).monospacedDigit())
+                .frame(width: 44, alignment: .trailing)
+        }
+        .padding(.horizontal, PocketSpacing.l)
+        .frame(height: 52)
+        .modifier(CapsuleHUDSurface())
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(Text("Parlaklık"))
+        .accessibilityValue(Text(level, format: .percent.precision(.fractionLength(0))))
+    }
+}
+
+private struct CapsuleHUDSurface: ViewModifier {
+    @ViewBuilder
+    func body(content: Content) -> some View {
+        if #available(macOS 26.0, *) {
+            content.glassEffect(.regular, in: .capsule)
+        } else {
+            content.background(.regularMaterial, in: Capsule()).overlay { Capsule().strokeBorder(PocketTheme.line) }
+        }
+    }
+}
+
+/// The classic macOS bezel: a rounded square with the large sun and a row of 16 segments.
+private struct ClassicBrightnessHUD: View {
+    let level: Double
+
+    var body: some View {
+        VStack(spacing: 22) {
+            Spacer(minLength: 0)
+            Image(systemName: "sun.max.fill")
+                .font(.system(size: 76, weight: .regular))
+                .foregroundStyle(.primary.opacity(0.85))
+            HStack(spacing: 2) {
+                ForEach(0..<16, id: \.self) { index in
+                    Rectangle()
+                        .fill(Double(index) < (level * 16).rounded() ? Color.primary.opacity(0.85) : Color.primary.opacity(0.15))
+                        .frame(width: 7, height: 7)
+                }
+            }
+            .padding(.bottom, 26)
+        }
+        .frame(width: 200, height: 200)
+        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(Text("Parlaklık"))
+        .accessibilityValue(Text(level, format: .percent.precision(.fractionLength(0))))
+    }
+}
+
+private struct ModernBrightnessHUD: View {
+    @ObservedObject var state: BrightnessHUDState
+    private let trackHeight: CGFloat = 26
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: PocketSpacing.s) {
+            HStack(alignment: .firstTextBaseline) {
+                Text(verbatim: state.name)
+                    .font(.subheadline.weight(.semibold))
+                    .lineLimit(1)
+                Spacer(minLength: PocketSpacing.s)
+                Text(state.level, format: .percent.precision(.fractionLength(0)))
+                    .font(.subheadline.weight(.medium).monospacedDigit())
+                    .foregroundStyle(.secondary)
+                    .contentTransition(.numericText(value: state.level))
+            }
+            track
+        }
+        .padding(.horizontal, 18)
+        .padding(.vertical, 14)
+        .frame(width: 300)
+        .modifier(BrightnessHUDSurface())
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(Text("Parlaklık"))
+        .accessibilityValue(Text(state.level, format: .percent.precision(.fractionLength(0))))
+    }
+
+    private var track: some View {
+        GeometryReader { proxy in
+            // Never narrower than the track is tall, so the sun stays on the fill even at 0 %.
+            let fill = trackHeight + (proxy.size.width - trackHeight) * min(1, max(0, state.level))
+            ZStack(alignment: .leading) {
+                Capsule().fill(.primary.opacity(0.12))
+                Capsule().fill(.primary.opacity(0.88)).frame(width: fill)
+                Image(systemName: state.level < 0.5 ? "sun.min.fill" : "sun.max.fill")
+                    .font(.system(size: 13, weight: .bold))
+                    .foregroundStyle(Color(nsColor: .windowBackgroundColor))
+                    .frame(width: trackHeight, height: trackHeight)
+            }
+        }
+        .frame(height: trackHeight)
+    }
+}
+
+/// Liquid Glass on macOS 26+, a material panel before (only reached there when the system bezel is missing).
+private struct BrightnessHUDSurface: ViewModifier {
+    private let shape = RoundedRectangle(cornerRadius: 22, style: .continuous)
+
+    @ViewBuilder
+    func body(content: Content) -> some View {
+        if #available(macOS 26.0, *) {
+            content.glassEffect(.regular, in: shape)
+        } else {
+            content.background(.regularMaterial, in: shape).overlay { shape.strokeBorder(PocketTheme.line) }
         }
     }
 }

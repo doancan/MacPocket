@@ -103,6 +103,35 @@ public enum BrightnessStep {
     }
 }
 
+/// A brightness key press. Laptops deliver the keys as system-defined media events; Macs with only external
+/// displays deliver the same Magic Keyboard keys as ordinary key events with their own key codes.
+public enum BrightnessKey: Equatable, Sendable {
+    case up, down
+
+    public var isUp: Bool { self == .up }
+
+    /// Ordinary key event (desktop Macs): 144 is brightness up, 145 brightness down.
+    public init?(keyCode: Int64) {
+        switch keyCode {
+        case 144: self = .up
+        case 145: self = .down
+        default: return nil
+        }
+    }
+
+    /// System-defined event of subtype 8 (aux control button): NX_KEYTYPE_BRIGHTNESS_UP is 2, _DOWN is 3.
+    public init?(systemDefinedSubtype subtype: Int, data1: Int) {
+        guard subtype == 8 else { return nil }
+        switch (data1 & 0xFFFF_0000) >> 16 {
+        case 2: self = .up
+        case 3: self = .down
+        default: return nil
+        }
+    }
+
+    public static func isSystemDefinedKeyDown(data1: Int) -> Bool { (data1 & 0xFF00) >> 8 == 0xA }
+}
+
 // MARK: - Hardware access (Apple silicon)
 
 /// DDC over the IOAVService I2C bridge Apple silicon exposes for external displays (USB-C, DisplayPort and,

@@ -1906,7 +1906,16 @@
 "Yazılım" = "Software";
 "Yeniden algıla" = "Detect Again";
 "Yöntem" = "Method";
-"macOS parlaklık göstergesini göster" = "Show the macOS brightness indicator";
+"Parlaklık göstergesini göster" = "Show the brightness indicator";
+"Gösterge konumu" = "Indicator position";
+"Gösterge stili" = "Indicator style";
+"Modern" = "Modern";
+"Kapsül" = "Capsule";
+"Klasik (macOS)" = "Classic (macOS)";
+"Sağ üst" = "Top right";
+"Üst orta" = "Top center";
+"Alt orta" = "Bottom center";
+"Ekranın ortası" = "Center of the screen";
 "İmlecin bulunduğu ekran" = "Display under the pointer";
 "%@ %d koduyla bitti" = "%@ finished with code %d";
 "%@ uygulamasını çıkar" = "Remove %@";
