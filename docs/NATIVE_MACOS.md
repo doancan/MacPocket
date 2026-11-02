@@ -80,6 +80,49 @@ macOS sürümleri, VoiceOver ve MacBook donanım kabulü ayrıca tamamlanacaktı
 0.3.0’da dosya/uygulama işlem servisleri ve izin durumunu izleyen pencere geçişi
 eklendi. Gelişmiş şarj denetimleri tamamlanmadı. [Güncel kapsam ve testler](NATIVE_BUILD.md).
 
+## Gece modu
+
+Ekran Parlaklığı → Zaman çizelgesi → Güneşe göre. f.lux ile eşdeğerlik iddiası yoktur.
+
+Uygulanan (statik): gün doğumu/batımı cihaz üzerinde NOAA formülüyle hesaplanır;
+konum Konum Servisleri'nden ya da şehir listesinden gelir. Akşam geçişi gün
+batımının ortasında 20/60/120 dk, sabah 30 dk sürer. Her ekran kendi gündüz
+parlaklığına göre kısılır (varsayılan %60) ve renk 3400 K'e ısınır. Renk MacPocket
+gama tablosuyla ya da macOS Night Shift ile verilir; Night Shift'in önceki durumu
+diskte saklanır, çıkışta veya çökme sonrası açılışta geri yazılır. Bir saatliğine
+kapatma, seçili uygulamalar ve tam ekran video istisnaları; gama okuması tutmayan
+ekranda ekran başına uyarı.
+
+### Canlı kontrol — Mac Studio, 2 Kasım 2026
+
+Dahili ekransız Mac Studio, iki harici DDC ekran (MateView, LG HDR 4K), macOS 27.
+Saat yalnız `MacPocket.night.debugNow` ile taklit edildi; konum İstanbul (şehir
+listesinden), gün batımı 17:58. Gama tabloları ayrı bir süreçten
+`CGGetDisplayTransferByTable` ile okundu. Ekran görüntüsü gamayı içermediği için
+sıcaklık gözle değil tablo okumasıyla doğrulandı.
+
+- Gündüz: tablolar nötr, iki ekran da gündüz parlaklığında (%85).
+- Gün batımı ortası (17:59): iki ekranda %68 (= %85 × 0,8), kanal çarpanları
+  1 / 0,890 / 0,801 (4950 K). Durum rozeti "Geçişte".
+- Gece (22:00): %51 (= %85 × 0,6), çarpanlar 1 / 0,744 / 0,530 (3400 K).
+  LG HDR 4K dahil iki ekranda tablo yazıldığı gibi okundu; uyarı görünmedi.
+- Bir saatliğine kapat: renk ~2,2 sn'de nötre, parlaklık gündüz düzeyine döndü;
+  Yeniden aç ile gece değerleri geri geldi.
+- Night Shift yöntemi: Night Shift açık, güç 0,674 (= (6500−3400)/4600), gama nötr.
+  MacPocket yöntemine dönüşte ve çıkışta önceki durum (kapalı, 0,5, takvim yok)
+  aynen geri geldi. Takvimli bir durumla (güç 0,3, gün batımından doğumuna)
+  `kill -9` sonrası yeniden açılışta önceki durum geri yazıldı.
+- Çıkış: iki yöntemde de tablolar nötr. Gündüz yeniden açılışta DDC parlaklığı
+  gündüz düzeyine (%85) döndü.
+- Türkçe ve İngilizce arayüz açık temada kontrol edildi.
+
+Doğrulanmayanlar: dahili ekran ve MacBook'lar (yazılım kısma/pil), yazılım
+kısmalı (DDC'siz) ekranda gama birleşimi, HDR açıkken gamanın tutmadığı bir ekranda
+uyarı, tarayıcıların tam ekran videosu (oynatma yardımcı süreçte olduğu için
+kaçırılabilir), uygulama istisnası, menü çubuğu hızlı menüsünden kapatma, konum
+izni hiç verilmeden şehirle çalışma (izin istemi testte yanıtlandı) ve gerçek gün
+batımının saat taklidi olmadan izlenmesi.
+
 ## Apple kaynakları
 
 - [SwiftUI ile yeni tasarım](https://developer.apple.com/videos/play/wwdc2025/323/)
