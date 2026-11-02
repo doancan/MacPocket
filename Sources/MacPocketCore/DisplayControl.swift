@@ -261,7 +261,14 @@ public struct BrightnessSchedule: Codable, Equatable, Sendable {
         }
     }
 
+    public enum Source: String, Codable, Sendable {
+        case manual, solar
+    }
+
     public var enabled = false
+    /// nil = manual (older saved schedules).
+    public var source: Source?
+    public var night: NightSettings?
     public var points: [Point] = [Point(minute: 7 * 60, level: 1), Point(minute: 19 * 60, level: 0.8), Point(minute: 22 * 60 + 30, level: 0.5)]
 
     public init() {}

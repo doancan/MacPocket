@@ -69,3 +69,108 @@ public enum SolarCalculator {
                        sunset: midnight.addingTimeInterval(sunsetMinutes * 60))
     }
 }
+
+// MARK: - Colour temperature and night curve
+
+public enum ColorTemperature {
+    /// Per-channel multipliers (0…1) for a white point of `kelvin`
+    /// (Tanner Helland approximation). 6500 K and above is neutral; below 1900 K is clamped.
+    public static func channelFactors(kelvin: Double) -> (red: Double, green: Double, blue: Double) {
+        guard kelvin < 6500 else { return (1, 1, 1) }
+        let t = max(kelvin, 1900) / 100
+        let green = 99.4708025861 * log(t) - 161.1195681661
+        let blue = t >= 66 ? 255 : (t <= 19 ? 0 : 138.5177312231 * log(t - 10) - 305.0447927307)
+        func unit(_ v: Double) -> Double { min(max(v / 255, 0), 1) }
+        return (1, unit(green), unit(blue))
+    }
+}
+
+public enum ColorMethod: String, Codable, CaseIterable, Sendable {
+    case macPocket, nightShift
+}
+
+public struct NightSettings: Codable, Equatable, Sendable {
+    public var nightLevel = 0.6
+    public var nightKelvin = 3400.0
+    public var transitionMinutes = 60
+    public var dimBrightness = true
+    public var warmColor = true
+    public var colorMethod: ColorMethod = .macPocket
+    /// Per display (by identifier): the brightness each display had before night dimming.
+    public var baseLevels: [String: Double] = [:]
+    public var location: Coordinate?
+    public var locationName: String?
+    public var pausedUntil: Date?
+    public var excludedApps: [String] = []
+    public var pauseForFullScreenVideo = false
+
+    public init() {}
+
+    // Missing keys fall back to defaults so records saved by earlier versions still decode.
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        let d = NightSettings()
+        nightLevel = try c.decodeIfPresent(Double.self, forKey: .nightLevel) ?? d.nightLevel
+        nightKelvin = try c.decodeIfPresent(Double.self, forKey: .nightKelvin) ?? d.nightKelvin
+        transitionMinutes = try c.decodeIfPresent(Int.self, forKey: .transitionMinutes) ?? d.transitionMinutes
+        dimBrightness = try c.decodeIfPresent(Bool.self, forKey: .dimBrightness) ?? d.dimBrightness
+        warmColor = try c.decodeIfPresent(Bool.self, forKey: .warmColor) ?? d.warmColor
+        colorMethod = try c.decodeIfPresent(ColorMethod.self, forKey: .colorMethod) ?? d.colorMethod
+        baseLevels = try c.decodeIfPresent([String: Double].self, forKey: .baseLevels) ?? d.baseLevels
+        location = try c.decodeIfPresent(Coordinate.self, forKey: .location)
+        locationName = try c.decodeIfPresent(String.self, forKey: .locationName)
+        pausedUntil = try c.decodeIfPresent(Date.self, forKey: .pausedUntil)
+        excludedApps = try c.decodeIfPresent([String].self, forKey: .excludedApps) ?? d.excludedApps
+        pauseForFullScreenVideo = try c.decodeIfPresent(Bool.self, forKey: .pauseForFullScreenVideo) ?? d.pauseForFullScreenVideo
+    }
+}
+
+public struct NightTarget: Equatable, Sendable {
+    /// 0 = day … 1 = night.
+    public var night: Double
+    /// Multiplier for each display's base level.
+    public var level: Double
+    public var kelvin: Double
+
+    public init(night: Double, level: Double, kelvin: Double) {
+        self.night = night
+        self.level = level
+        self.kelvin = kelvin
+    }
+}
+
+public enum NightCurve {
+    private static let neutralKelvin = 6500.0
+    private static let sunriseHalfWindow: TimeInterval = 15 * 60
+
+    public static func target(at date: Date, day: SolarDay, settings: NightSettings) -> NightTarget {
+        let night: Double
+        switch day {
+        case .alwaysDay: night = 0
+        case .alwaysNight: night = 1
+        case let .normal(sunrise, sunset):
+            let half = Double(max(settings.transitionMinutes, 0)) * 60 / 2
+            let morningStart = sunrise.addingTimeInterval(-sunriseHalfWindow)
+            let morningEnd = sunrise.addingTimeInterval(sunriseHalfWindow)
+            let eveningStart = sunset.addingTimeInterval(-half)
+            let eveningEnd = sunset.addingTimeInterval(half)
+            if date < morningEnd {
+                night = 1 - progress(date, from: morningStart, to: morningEnd)
+            } else {
+                night = progress(date, from: eveningStart, to: eveningEnd)
+            }
+        }
+        return NightTarget(
+            night: night,
+            level: 1 - night * (1 - settings.nightLevel),
+            kelvin: neutralKelvin - night * (neutralKelvin - settings.nightKelvin))
+    }
+
+    /// Smoothstep of how far `date` is between `start` and `end`.
+    private static func progress(_ date: Date, from start: Date, to end: Date) -> Double {
+        let span = end.timeIntervalSince(start)
+        guard span > 0 else { return date >= end ? 1 : 0 }
+        let x = min(max(date.timeIntervalSince(start) / span, 0), 1)
+        return x * x * (3 - 2 * x)
+    }
+}
