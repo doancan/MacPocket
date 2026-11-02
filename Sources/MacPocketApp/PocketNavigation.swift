@@ -31,6 +31,7 @@ enum PocketTool: String, Identifiable {
     case workspaces = "Masa Düzenleri", snippets = "Metin Kısaltmaları", screenGrab = "Ekrandan Al"
     case mouseScroll = "Fare Kaydırma", audio = "Ses Çıkışı", mixer = "Ses Mikseri"
     case recorder = "Ekran Kaydı", privacy = "Gizlilik Kontrolü"
+    case startupItems = "Başlangıç Öğeleri"
     var id: String { rawValue }
 }
 

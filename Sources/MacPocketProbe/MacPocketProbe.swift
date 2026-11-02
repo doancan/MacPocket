@@ -81,6 +81,10 @@ struct MacPocketProbe {
                 try output(report.targets.map { ["target": $0.id.rawValue, "group": $0.target.group.rawValue, "state": "\($0.state)",
                                                  "items": String($0.items.count), "bytes": String($0.bytes),
                                                  "names": $0.items.prefix(4).map { $0.label ?? $0.name }.joined(separator: ", ")] })
+            case "startup":
+                let snapshot = await StartupItems.load()
+                try output(snapshot.items.map { ["label": $0.label, "class": $0.kind.rawValue, "enabled": String($0.isEnabled),
+                                                 "app": $0.appName ?? "", "stateKnown": String(snapshot.stateKnown)] })
             case "help", "--help", "-h":
                 print("""
                 macpocket-probe — native MacPocket development and validation tool
@@ -91,6 +95,7 @@ struct MacPocketProbe {
                   windows [--all]              Switchable windows on every Space (--all adds windowless apps)
                   focus <windowID|id>          Bring a window to the front (switches Space when needed)
                   thumbnail <windowID> <png>   Capture one window (Screen Recording access required)
+                  startup                      launchd startup items by class (read-only)
                   cleanup                      Read-only cleanup scan summary per target
                   privacy                      Microphone and camera use right now (apps that are listening/recording)
                 Diagnostics: \(SystemDiagnostic.allCases.map(\.rawValue).joined(separator: ", "))

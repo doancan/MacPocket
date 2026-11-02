@@ -189,6 +189,7 @@ extension PocketTool {
         case .mixer: String(localized: "Ses Mikseri")
         case .recorder: String(localized: "Ekran Kaydı")
         case .privacy: String(localized: "Gizlilik Kontrolü")
+        case .startupItems: String(localized: "Başlangıç Öğeleri")
         }
     }
 }

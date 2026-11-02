@@ -2258,3 +2258,23 @@
 "iCloud’dan indirilmiş uygulama ve belge verileri. Silmek iCloud’dan da silebilir; Finder’dan yönet." = "App and document data downloaded from iCloud. Deleting it can remove it from iCloud too; manage it in Finder.";
 "iPhone ve iPad Yedekleri" = "iPhone and iPad Backups";
 "İndirilenler’deki DMG, PKG ve ISO dosyaları; kurulduktan sonra gerekmez. Seçmeden önce incele." = "DMG, PKG and ISO files in Downloads; not needed after installing. Review before selecting.";
+
+/* Başlangıç Öğeleri */
+"Apple’a ait" = "Owned by Apple";
+"Ara" = "Search";
+"Açık/kapalı durumu macOS’tan okunamadı; yalnız dosyaların kendi bilgisi gösteriliyor." = "On/off state couldn’t be read from macOS; only what the files themselves say is shown.";
+"Açılışta" = "At launch";
+"Başlangıç Öğeleri" = "Startup Items";
+"Bu aramayla eşleşen başlangıç öğesi yok." = "No startup item matches this search.";
+"Doğrudan yönetilebilir" = "Directly manageable";
+"Giriş Öğeleri Ayarları" = "Login Items Settings";
+"Gizle" = "Hide";
+"Kendi kullanıcı klasöründeki öğeler." = "Items in your own user folder.";
+"Oturum açıldığında ya da Mac başladığında kendiliğinden çalışan öğeleri gör; kime ait olduklarını ve açık mı kapalı mı olduklarını öğren." = "See what runs by itself at login or startup, who owns it, and whether it’s on or off.";
+"Oturum açılışında ve Mac başlarken kendiliğinden çalışan öğeleri, sahipleriyle ve durumlarıyla gör." = "See what runs by itself at login and startup, with its owner and state.";
+"Sürekli çalışır" = "Keeps running";
+"Tüm kullanıcılar için kurulmuş; değiştirmek yönetici onayı ister." = "Installed for all users; changing it needs administrator approval.";
+"Yönetici gerektirir" = "Needs administrator";
+"macOS bileşenleri; değiştirilmez." = "macOS components; never changed.";
+"Öğe bulunamadı" = "No items found";
+"Öğeleri açıp kapatmak için Giriş Öğeleri ayarlarını kullan; bu sayfa yalnız gösterir." = "Use Login Items settings to turn items on or off; this page only shows them.";
