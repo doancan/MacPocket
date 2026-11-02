@@ -2205,3 +2205,32 @@
 "SSD" = "SSD";
 "Kapalıyken özet, açıkken tüm ayrıntılar gösterilir" = "Off shows a summary; on shows every detail";
 "Son ölçüm %@" = "Last measured %@";
+
+/* Gizlilik Kontrolü */
+"%@ mikrofonu kullanıyor." = "%@ is using the microphone.";
+"Bildirim ayarları…" = "Notification Settings…";
+"Bildirimi kapalı" = "Notifications off";
+"Bildirimi kapalı uygulamalar" = "Apps with notifications off";
+"Bildirimler açık" = "Notifications on";
+"Bildirimler kapalı" = "Notifications off";
+"Bildirimler macOS’ta kapalı. Uyarı alabilmek için Sistem Ayarları’ndan MacPocket bildirimlerine izin ver." = "Notifications are off in macOS. Allow MacPocket notifications in System Settings to receive alerts.";
+"Bilinmeyen uygulama" = "Unknown app";
+"Bir uygulama" = "An app";
+"Bir uygulama kamerayı kullanıyor. macOS hangi uygulama olduğunu bildirmez." = "An app is using the camera. macOS doesn’t say which one.";
+"Bir uygulama mikrofonu kullanıyor." = "An app is using the microphone.";
+"Bu uygulama için bildirme" = "Don’t notify for this app";
+"Gizlilik Kontrolü" = "Privacy Check";
+"Kamera" = "Camera";
+"Kamera için macOS hangi uygulamanın kullandığını bildirmez; bu yüzden uygulama adı gösterilemez." = "macOS doesn’t say which app is using the camera, so no app name can be shown.";
+"Kamera kullanılıyor" = "Camera in use";
+"Kullanım başladığında bildir" = "Notify when use starts";
+"Kullanımda" = "In use";
+"Kullanımda değil" = "Not in use";
+"MacPocket açıkken arka planda izler. Hiçbir ses ya da görüntü okunmaz; yalnız macOS’un “kullanımda” bilgisine bakılır." = "Watches in the background while MacPocket runs. No audio or video is read; only macOS’s “in use” status is checked.";
+"Mikrofon" = "Microphone";
+"Mikrofon kullanılıyor" = "Microphone in use";
+"Mikrofon ya da kamera açıldığında anında gör ve bildirim al; izin listelerine değil, gerçek kullanıma bakar." = "See and get notified the moment the microphone or camera turns on. It checks actual use, not permission lists.";
+"Mikrofon ya da kamera kullanılmaya başladığında bildirim al; hangi uygulamanın dinlediğini gör." = "Get notified when the microphone or camera starts being used, and see which app is listening.";
+"Son etkinlik" = "Recent activity";
+"Tekrar bildir" = "Notify again";
+"Şu an" = "Right now";

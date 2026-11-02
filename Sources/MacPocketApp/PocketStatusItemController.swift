@@ -213,5 +213,6 @@ final class PocketApplicationState: ObservableObject {
         AudioOutputService.shared.start()
         VolumeMixerService.shared.start()
         ScreenRecorderService.shared.start()
+        PrivacyMonitorService.shared.start()
     }
 }

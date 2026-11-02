@@ -148,6 +148,7 @@ struct PocketRootView: View {
             case .audio: AudioOutputView()
             case .mixer: VolumeMixerView()
             case .recorder: ScreenRecorderView()
+            case .privacy: PrivacyCheckView()
             case .none: ToolsHubView(model: model, openTool: openCatalogTool)
             }
         }
@@ -176,6 +177,7 @@ struct PocketRootView: View {
         case "audio": navigation.open(.audio)
         case "mixer": navigation.open(.mixer)
         case "recorder": navigation.open(.recorder)
+        case "privacy-check": navigation.open(.privacy)
         case "disk-info": utility = .diskInfo; navigation.open(.utilities)
         case "spotlight": utility = .spotlight; navigation.open(.utilities)
         case "dns": utility = .dns; navigation.open(.utilities)

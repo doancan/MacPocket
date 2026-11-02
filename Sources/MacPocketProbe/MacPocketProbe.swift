@@ -1,3 +1,4 @@
+import AppKit
 import Foundation
 import MacPocketCore
 import Darwin
@@ -66,6 +67,12 @@ struct MacPocketProbe {
                 }
                 try await WindowPreviewProvider().preview(target).write(to: URL(fileURLWithPath: arguments[2]))
                 try output(["status": "saved", "path": arguments[2]])
+            case "privacy":
+                let apps = NSWorkspace.shared.runningApplications.compactMap { app -> RunningAppInfo? in
+                    app.bundleIdentifier.map { RunningAppInfo(pid: app.processIdentifier, bundleID: $0, name: app.localizedName ?? $0) }
+                }
+                let active = PrivacyProbe.activities(apps: apps).sorted { $0.id < $1.id }
+                try output(active.map { ["device": $0.device.rawValue, "bundleID": $0.bundleID ?? "", "app": $0.appName ?? ""] })
             case "help", "--help", "-h":
                 print("""
                 macpocket-probe — native MacPocket development and validation tool
@@ -76,6 +83,7 @@ struct MacPocketProbe {
                   windows [--all]              Switchable windows on every Space (--all adds windowless apps)
                   focus <windowID|id>          Bring a window to the front (switches Space when needed)
                   thumbnail <windowID> <png>   Capture one window (Screen Recording access required)
+                  privacy                      Microphone and camera use right now (apps that are listening/recording)
                 Diagnostics: \(SystemDiagnostic.allCases.map(\.rawValue).joined(separator: ", "))
                 """)
             default:

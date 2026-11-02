@@ -30,7 +30,7 @@ enum PocketTool: String, Identifiable {
     case freezer = "Uygulama Dondurucu", supportReport = "Destek Raporu", focus = "Odak Oturumu"
     case workspaces = "Masa Düzenleri", snippets = "Metin Kısaltmaları", screenGrab = "Ekrandan Al"
     case mouseScroll = "Fare Kaydırma", audio = "Ses Çıkışı", mixer = "Ses Mikseri"
-    case recorder = "Ekran Kaydı"
+    case recorder = "Ekran Kaydı", privacy = "Gizlilik Kontrolü"
     var id: String { rawValue }
 }
 
