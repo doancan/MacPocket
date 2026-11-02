@@ -2323,3 +2323,45 @@
 
 /* Menü çubuğu sağ tık menüsü */
 "MacPocket’ten çık" = "Quit MacPocket";
+
+/* Gece modu: yedek şehir listesi */
+"Londra" = "London";
+"Roma" = "Rome";
+"Viyana" = "Vienna";
+"Atina" = "Athens";
+"Moskova" = "Moscow";
+"Kahire" = "Cairo";
+"Riyad" = "Riyadh";
+"Tahran" = "Tehran";
+"Bağdat" = "Baghdad";
+"Bakü" = "Baku";
+"Karaçi" = "Karachi";
+"Pekin" = "Beijing";
+"Şanghay" = "Shanghai";
+"Seul" = "Seoul";
+"Singapur" = "Singapore";
+"Cakarta" = "Jakarta";
+"Sidney" = "Sydney";
+"Sao Paulo" = "São Paulo";
+"Varşova" = "Warsaw";
+"Lizbon" = "Lisbon";
+"Paris" = "Paris";
+"Berlin" = "Berlin";
+"Madrid" = "Madrid";
+"Amsterdam" = "Amsterdam";
+"Dubai" = "Dubai";
+"Delhi" = "Delhi";
+"Mumbai" = "Mumbai";
+"Hong Kong" = "Hong Kong";
+"Tokyo" = "Tokyo";
+"Bangkok" = "Bangkok";
+"New York" = "New York";
+"Los Angeles" = "Los Angeles";
+"Chicago" = "Chicago";
+"Toronto" = "Toronto";
+"Mexico City" = "Mexico City";
+"Buenos Aires" = "Buenos Aires";
+"Lagos" = "Lagos";
+"Johannesburg" = "Johannesburg";
+"Nairobi" = "Nairobi";
+"Stockholm" = "Stockholm";

@@ -189,3 +189,15 @@ private final class FakeNightShift: NightShiftControlling {
     func apply(enabled: Bool, strength: Double) { state = NightShiftState(enabled: enabled, strength: strength, mode: 0) }
     func restore(_ state: NightShiftState) { restored.append(state); self.state = state }
 }
+
+extension NightModeTests {
+    func testCityCatalogHasIstanbulAndUniqueNames() {
+        let all = CityCatalog.all
+        XCTAssertTrue(all.contains { $0.name == "İstanbul" })
+        XCTAssertEqual(Set(all.map(\.name)).count, all.count)
+        XCTAssertEqual(CityCatalog.turkishProvinces.count, 81)
+        XCTAssertEqual(CityCatalog.worldCities.count, 40)
+        XCTAssertTrue(all.allSatisfy { (-90...90).contains($0.coordinate.latitude) })
+        XCTAssertTrue(all.allSatisfy { (-180...180).contains($0.coordinate.longitude) })
+    }
+}

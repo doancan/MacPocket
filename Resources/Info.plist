@@ -22,4 +22,6 @@
   <key>NSAudioCaptureUsageDescription</key><string>MacPocket, ses mikserinde seçtiğin uygulamaların sesini yakalayıp ayarladığın seviyede yeniden çalar; ses kaydedilmez ve bu Mac’ten çıkmaz.</string>
   <key>NSMicrophoneUsageDescription</key><string>MacPocket, ekran kaydına mikrofonu eklemeni seçtiğinde sesini kaydeder.</string>
   <key>NSAppleEventsUsageDescription</key><string>MacPocket, hızlı işlemler için Finder’dan Çöp’ü boşaltmasını ve System Events’ten görünümü değiştirmesini ister.</string>
+  <key>NSLocationUsageDescription</key><string>MacPocket, gece modunda gün doğumu ve gün batımı saatlerini hesaplamak için yaklaşık konumunu kullanır; konum bu Mac’ten çıkmaz.</string>
+  <key>NSLocationWhenInUseUsageDescription</key><string>MacPocket, gece modunda gün doğumu ve gün batımı saatlerini hesaplamak için yaklaşık konumunu kullanır; konum bu Mac’ten çıkmaz.</string>
 </dict></plist>
