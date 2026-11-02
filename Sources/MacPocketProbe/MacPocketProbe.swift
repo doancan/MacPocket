@@ -73,6 +73,14 @@ struct MacPocketProbe {
                 }
                 let active = PrivacyProbe.activities(apps: apps).sorted { $0.id < $1.id }
                 try output(active.map { ["device": $0.device.rawValue, "bundleID": $0.bundleID ?? "", "app": $0.appName ?? ""] })
+            case "cleanup":
+                // Read-only: lists what a cleanup scan finds, nothing is moved.
+                let home = URL(fileURLWithPath: NSHomeDirectory(), isDirectory: true)
+                let control = StorageScanControl(maximumDuration: 90, maximumEntries: 4_000_000)
+                let report = try await CleanupScanner().scan(CleanupCatalog.targets(home: home), control: control)
+                try output(report.targets.map { ["target": $0.id.rawValue, "group": $0.target.group.rawValue, "state": "\($0.state)",
+                                                 "items": String($0.items.count), "bytes": String($0.bytes),
+                                                 "names": $0.items.prefix(4).map { $0.label ?? $0.name }.joined(separator: ", ")] })
             case "help", "--help", "-h":
                 print("""
                 macpocket-probe — native MacPocket development and validation tool
@@ -83,6 +91,7 @@ struct MacPocketProbe {
                   windows [--all]              Switchable windows on every Space (--all adds windowless apps)
                   focus <windowID|id>          Bring a window to the front (switches Space when needed)
                   thumbnail <windowID> <png>   Capture one window (Screen Recording access required)
+                  cleanup                      Read-only cleanup scan summary per target
                   privacy                      Microphone and camera use right now (apps that are listening/recording)
                 Diagnostics: \(SystemDiagnostic.allCases.map(\.rawValue).joined(separator: ", "))
                 """)

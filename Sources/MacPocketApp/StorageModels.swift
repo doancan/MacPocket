@@ -258,6 +258,7 @@ final class CleanupModel: ObservableObject {
     @Published var failure: String?
     @Published private(set) var summary: CleanupSummary?
     @Published var downloadsAgeDays = 90
+    @Published private(set) var protection = CleanupProtection.load(from: .standard)
     private(set) var selectedBytes: Int64 = 0
     private(set) var selectedItems: [CleanupItem] = []
     private(set) var targets: [CleanupTarget] = CleanupCatalog.targets(home: URL(fileURLWithPath: NSHomeDirectory()))
@@ -314,11 +315,18 @@ final class CleanupModel: ObservableObject {
     private func apply(_ report: CleanupReport) {
         self.report = report
         itemsByID = Dictionary(report.targets.flatMap(\.items).map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
-        selection = Set(report.targets.filter { !$0.target.isTrash }.flatMap(\.items).filter(\.preselected).map(\.id))
+        selection = Set(report.targets.filter { isSelectable($0.target) }.flatMap(\.items)
+            .filter { $0.preselected && !protection.contains($0.id) }.map(\.id))
     }
 
+    /// Trash and separately managed data are listed but never part of a cleanup selection.
+    private func isSelectable(_ target: CleanupTarget) -> Bool { !target.isTrash && !target.isManagedSeparately }
+
     private func refreshSelection() {
-        selectedItems = selection.compactMap { itemsByID[$0] }.filter { $0.targetID != .trash }
+        selectedItems = selection.compactMap { itemsByID[$0] }.filter { item in
+            guard let target = targets.first(where: { $0.id == item.targetID }) else { return false }
+            return isSelectable(target) && !protection.contains(item.id)
+        }
         selectedBytes = selectedItems.reduce(0) { $0 + $1.bytes }
     }
 
@@ -342,14 +350,21 @@ final class CleanupModel: ObservableObject {
     }
 
     func setTarget(_ target: CleanupTargetReport, selected: Bool) {
-        guard !target.target.isTrash else { return }
-        let ids = Set(target.items.map(\.id))
+        guard isSelectable(target.target) else { return }
+        let ids = Set(target.items.map(\.id).filter { !protection.contains($0) })
         if selected { selection.formUnion(ids) } else { selection.subtract(ids) }
     }
 
     func toggle(_ item: CleanupItem) {
-        guard item.targetID != .trash else { return }
+        guard let target = targets.first(where: { $0.id == item.targetID }), isSelectable(target), !protection.contains(item.id) else { return }
         if selection.contains(item.id) { selection.remove(item.id) } else { selection.insert(item.id) }
+    }
+
+    /// "Keep": a protected item leaves the selection and is skipped by every later scan and cleanup.
+    func toggleProtection(_ item: CleanupItem) {
+        protection.toggle(item.id)
+        protection.save(to: .standard)
+        selection.remove(item.id)
     }
 
     func toggleExpanded(_ id: CleanupTargetID) {
@@ -369,7 +384,7 @@ final class CleanupModel: ObservableObject {
         task = Task { [weak self] in
             guard let self else { return }
             let before = try? VolumeCapacity.read()
-            let results = await service.moveToTrash(items, targets: targets)
+            let results = await service.moveToTrash(items, targets: targets, protectedPaths: protection.paths)
             let after = try? VolumeCapacity.read()
             let moved = Set(results.filter { $0.trashURL != nil }.map(\.id))
             let bytes = items.filter { moved.contains($0.id) }.reduce(Int64(0)) { $0 + $1.bytes }

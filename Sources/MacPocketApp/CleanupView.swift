@@ -22,6 +22,7 @@ extension CleanupGroup {
         case .developer: "hammer.fill"
         case .packages: "shippingbox.fill"
         case .user: "person.crop.circle.fill"
+        case .separate: "externaldrive.fill"
         case .trash: "trash.fill"
         }
     }
@@ -236,7 +237,10 @@ struct CleanupView: View {
                 if !targets.isEmpty {
                     VStack(alignment: .leading, spacing: PocketSpacing.s) {
                         PocketSectionHeader(group.title, icon: group.symbol) {
-                            Text(pocketBytes(targets.reduce(0) { $0 + $1.bytes })).monospacedDigit()
+                            HStack(spacing: PocketSpacing.s) {
+                                if group == .separate { Text("Toplama dahil değil").font(.subheadline).foregroundStyle(.secondary) }
+                                Text(pocketBytes(targets.reduce(0) { $0 + $1.bytes })).monospacedDigit()
+                            }
                         }
                         ForEach(targets) { target in
                             if target.target.isTrash {
@@ -342,6 +346,8 @@ private struct CleanupTargetCard: View {
                 Toggle("", isOn: Binding(get: { state == .all }, set: { model.setTarget(target, selected: $0) }))
                     .toggleStyle(.checkbox).labelsHidden()
                     .disabled(target.items.isEmpty || model.busy)
+                    .opacity(target.target.isManagedSeparately ? 0 : 1)
+                    .allowsHitTesting(!target.target.isManagedSeparately)
                     .overlay {
                         if state == .some {
                             // Mixed state: AppKit draws a dash for NSControl.StateValue.mixed; mimic it.
@@ -401,7 +407,9 @@ private struct CleanupTargetCard: View {
     private var itemList: some View {
         LazyVStack(spacing: 0) {
             ForEach(target.items.prefix(300)) { item in
-                CleanupItemRow(item: item, selected: model.selection.contains(item.id), disabled: model.busy) { model.toggle(item) }
+                CleanupItemRow(item: item, selected: model.selection.contains(item.id), disabled: model.busy,
+                               selectable: !target.target.isManagedSeparately, isProtected: model.protection.contains(item.id),
+                               toggle: { model.toggle(item) }, toggleProtection: { model.toggleProtection(item) })
             }
             if target.items.count > 300 {
                 Text("İlk 300 öğe gösteriliyor; tümünü seçmek için başlıktaki kutuyu kullan.")
@@ -416,13 +424,18 @@ private struct CleanupItemRow: View {
     let item: CleanupItem
     let selected: Bool
     let disabled: Bool
+    let selectable: Bool
+    let isProtected: Bool
     let toggle: () -> Void
+    let toggleProtection: () -> Void
 
     var body: some View {
         let owner = CleanupOwnerCache.application(for: item.name)
         HStack(spacing: PocketSpacing.s) {
             Toggle("", isOn: Binding(get: { selected }, set: { _ in toggle() }))
-                .toggleStyle(.checkbox).labelsHidden().disabled(disabled)
+                .toggleStyle(.checkbox).labelsHidden().disabled(disabled || isProtected)
+                .opacity(selectable ? 1 : 0)
+                .allowsHitTesting(selectable)
                 .accessibilityLabel("\(item.name) seç")
             Group {
                 if let owner {
@@ -434,7 +447,7 @@ private struct CleanupItemRow: View {
             .scaledToFit().frame(width: 20, height: 20).accessibilityHidden(true)
             VStack(alignment: .leading, spacing: 1) {
                 HStack(spacing: PocketSpacing.xs) {
-                    Text(owner.map { FileManager.default.displayName(atPath: $0.path).replacingOccurrences(of: ".app", with: "") } ?? item.name)
+                    Text(owner.map { FileManager.default.displayName(atPath: $0.path).replacingOccurrences(of: ".app", with: "") } ?? item.label ?? item.name)
                         .lineLimit(1).truncationMode(.middle)
                     if item.safety == .review {
                         Image(systemName: "eye").font(.caption2).foregroundStyle(PocketTone.warning.color).help("İncele")
@@ -453,6 +466,14 @@ private struct CleanupItemRow: View {
             }
             Text(pocketBytes(item.bytes)).font(.callout).foregroundStyle(.secondary).monospacedDigit()
                 .frame(minWidth: 70, alignment: .trailing)
+            if selectable {
+                Button(action: toggleProtection) { Image(systemName: isProtected ? "lock.fill" : "lock.open") }
+                    .buttonStyle(.borderless)
+                    .foregroundStyle(isProtected ? PocketTone.success.color : .secondary)
+                    .disabled(disabled)
+                    .help(isProtected ? Text("Korumayı kaldır") : Text("Koru: bu öğe temizlenmesin"))
+                    .accessibilityLabel(isProtected ? Text("\(item.name) korumasını kaldır") : Text("\(item.name) öğesini koru"))
+            }
             Button { NSWorkspace.shared.activateFileViewerSelecting([item.url]) } label: { Image(systemName: "magnifyingglass") }
                 .buttonStyle(.borderless)
                 .help("Finder’da göster")

@@ -2234,3 +2234,27 @@
 "Son etkinlik" = "Recent activity";
 "Tekrar bildir" = "Notify again";
 "Şu an" = "Right now";
+
+/* Temizlik genişletmesi */
+"%@ korumasını kaldır" = "Remove protection from %@";
+"%@ öğesini koru" = "Protect %@";
+"Adobe uygulamalarının ortam önbelleği. Uygulama gerektiğinde yeniden oluşturur." = "Adobe apps’ media cache. The app rebuilds it when needed.";
+"Ayrı Yönet" = "Manage Separately";
+"Bu Mac’e alınmış cihaz yedekleri. Silmek yedeği geri getirilemez yapar; Finder’dan yönet." = "Device backups stored on this Mac. Deleting one makes it unrecoverable; manage them in Finder.";
+"Bu Mac’teki iCloud Dosyaları" = "iCloud Files on This Mac";
+"Bu veri Ayrı Yönet grubunda; burada silinmez." = "This data is under Manage Separately; it isn’t deleted here.";
+"Bu öğeyi korumaya aldın; temizlenmez." = "You protected this item; it won’t be cleaned.";
+"Kod Düzenleyici Önbellekleri" = "Code Editor Caches";
+"Koru: bu öğe temizlenmesin" = "Protect: don’t clean this item";
+"Korumayı kaldır" = "Remove protection";
+"Mesajlaşma Uygulaması Önbellekleri" = "Messaging App Caches";
+"Parallels, UTM ve VMware sanal makineleri. Uygulamasından yönet; burada silinmez." = "Parallels, UTM and VMware virtual machines. Manage them in their app; they aren’t deleted here.";
+"Sanal Makineler" = "Virtual Machines";
+"Slack, Discord, Teams ve Signal’in yalnız önbellek klasörleri. Mesajlar ve ayarlar dokunulmaz." = "Only the cache folders of Slack, Discord, Teams and Signal. Messages and settings are untouched.";
+"Tasarım Uygulaması Önbellekleri" = "Design App Caches";
+"Toplama dahil değil" = "Not in the total";
+"VS Code ve Cursor’ın önbellek klasörleri. Eklentiler ve ayarlar dokunulmaz." = "VS Code and Cursor cache folders. Extensions and settings are untouched.";
+"Yükleyiciler" = "Installers";
+"iCloud’dan indirilmiş uygulama ve belge verileri. Silmek iCloud’dan da silebilir; Finder’dan yönet." = "App and document data downloaded from iCloud. Deleting it can remove it from iCloud too; manage it in Finder.";
+"iPhone ve iPad Yedekleri" = "iPhone and iPad Backups";
+"İndirilenler’deki DMG, PKG ve ISO dosyaları; kurulduktan sonra gerekmez. Seçmeden önce incele." = "DMG, PKG and ISO files in Downloads; not needed after installing. Review before selecting.";
