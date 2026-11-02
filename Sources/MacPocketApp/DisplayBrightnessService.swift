@@ -252,7 +252,7 @@ final class DisplayBrightnessService: ObservableObject {
             } else if active == .hardware {
                 maximums[id] = (100, 100) // write-only monitor: the usual 0…100 scale
             }
-            // Untouched displays keep their ColorSync calibration: gamma is only changed once dimmed.
+            // Untouched displays keep their ColorSync calibration: gamma is only changed once dimmed or warmed.
             if active == .software { applySoftware(id, level: level) } else { softwareScale[id] = nil }
             // Switched away from software dimming: drop its scale (warmth, if any, stays applied).
             applyGamma(id)

@@ -647,7 +647,7 @@ private struct NightScheduleSection: View {
             }
         }
         Divider()
-        BrightnessSettingRow("Tam ekran video oynarken kapat", detail: "Öndeki uygulama tam ekranda video oynatırken ekran normal görünür.") {
+        BrightnessSettingRow("Tam ekran video oynarken kapat", detail: "Öndeki uygulama tam ekranda video oynatırken ekran normal görünür. Bazı tarayıcılarda algılanmayabilir.") {
             Toggle("Tam ekran video oynarken kapat", isOn: binding(\.pauseForFullScreenVideo)).toggleStyle(.switch).labelsHidden()
         }
         Divider()

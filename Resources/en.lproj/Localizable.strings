@@ -2403,7 +2403,7 @@
 "Bir saatliğine kapat" = "Pause for an hour";
 "Parlaklık ve renk hemen normale döner; bir saat sonra gece modu kendiliğinden geri gelir." = "Brightness and color return to normal right away; night mode comes back on its own after an hour.";
 "Tam ekran video oynarken kapat" = "Pause while playing full-screen video";
-"Öndeki uygulama tam ekranda video oynatırken ekran normal görünür." = "The screen looks normal while the front app plays video full screen.";
+"Öndeki uygulama tam ekranda video oynatırken ekran normal görünür. Bazı tarayıcılarda algılanmayabilir." = "The screen looks normal while the front app plays video full screen. May not be detected in some browsers.";
 "Bu uygulamalar öndeyken kapat" = "Pause while these apps are in front";
 "Uygulama öne geldiğinde ekran normale döner, ayrıldığında gece moduna geri geçer." = "When one of these apps comes to the front the screen returns to normal, and goes back to night mode when you leave it.";
 "Ekle…" = "Add…";

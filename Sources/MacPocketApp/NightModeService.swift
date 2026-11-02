@@ -160,9 +160,7 @@ final class NightModeService: ObservableObject {
         settings.nightKelvin = min(max(settings.nightKelvin, 1900), Self.neutralKelvin)
         let day = SolarCalculator.day(containing: now, at: coordinate, timeZone: .current)
         let target = NightCurve.target(at: now, day: day, settings: settings)
-        let front = NSWorkspace.shared.frontmostApplication
-        let video = settings.pauseForFullScreenVideo && front.map { Self.isPlayingFullScreenVideo(pid: $0.processIdentifier) } == true
-        let paused = NightPause.isPaused(now: now, settings: settings, frontmostBundleID: front?.bundleIdentifier, fullScreenVideo: video)
+        let paused = isPaused(now: now, settings: settings)
         let night = paused ? 0 : target.night
         effectiveNight = night
         let warm = settings.warmColor && night > 0
@@ -188,6 +186,13 @@ final class NightModeService: ObservableObject {
         if brightness.schedule.enabled, brightness.schedule.source != .solar { drivingBrightness = false }
         apply(Plan(multiplier: nil, kelvin: Self.neutralKelvin, nightShift: nil),
               baseLevels: brightness.schedule.night?.baseLevels ?? [:], now: now)
+    }
+
+    /// Whether one of the exceptions lifts night mode right now.
+    private func isPaused(now: Date, settings: NightSettings) -> Bool {
+        let front = NSWorkspace.shared.frontmostApplication
+        let video = settings.pauseForFullScreenVideo && front.map { Self.isPlayingFullScreenVideo(front: $0) } == true
+        return NightPause.isPaused(now: now, settings: settings, frontmostBundleID: front?.bundleIdentifier, fullScreenVideo: video)
     }
 
     private func setStatus(_ new: Status) {
@@ -216,8 +221,9 @@ final class NightModeService: ObservableObject {
         drivingBrightness = plan.multiplier != nil
         if driveBrightness {
             if brightness.brightnessHeld(at: now) {
-                // Whatever the user or the focus session set is accepted as ours, so it isn't mistaken for a new base.
-                for display in brightness.displays { lastApplied[display.key] = display.level }
+                // Forget the last write: the held level (a manual or focus-session level) must not be compared against
+                // later, or a session ending after sunrise would look like the user picking a new day base.
+                for display in brightness.displays { lastApplied[display.key] = nil }
             } else {
                 let bases = resolveBases(baseLevels)
                 for display in brightness.displays {
@@ -300,15 +306,27 @@ final class NightModeService: ObservableObject {
     /// at night or in a transition it holds brightness until the current or next transition ends.
     private func manualLevelChanged(key: String, level: Double) -> Date? {
         lastApplied[key] = level
+        // A running ramp would overwrite the user's level on its next step; stop it and let the next evaluation
+        // (after this change is stored) finish the warmth.
+        if ramp != nil {
+            ramp?.cancel()
+            ramp = nil
+            DispatchQueue.main.async { [weak self] in MainActor.assumeIsolated { self?.evaluate() } }
+        }
         let settings = brightness.schedule.night ?? NightSettings()
-        guard effectiveNight > 0, settings.dimBrightness, let coordinate = settings.location else {
+        let now = self.now
+        // Decide from the curve now, not the last evaluation (up to 15 s old).
+        guard let coordinate = settings.location else {
             updateNight { $0.baseLevels[key] = level }
             return nil
         }
-        let now = self.now
+        let today = SolarCalculator.day(containing: now, at: coordinate, timeZone: .current)
+        if NightCurve.manualChangeIsBase(at: now, day: today, settings: settings, paused: isPaused(now: now, settings: settings)) {
+            updateNight { $0.baseLevels[key] = level }
+            return nil
+        }
         let calendar = Calendar.current
-        if let end = NightCurve.transitionEnd(after: now, day: SolarCalculator.day(containing: now, at: coordinate, timeZone: .current),
-                                              settings: settings) {
+        if let end = NightCurve.transitionEnd(after: now, day: today, settings: settings) {
             return end
         }
         let tomorrow = calendar.date(byAdding: .day, value: 1, to: now) ?? now.addingTimeInterval(86_400)
@@ -341,17 +359,27 @@ final class NightModeService: ObservableObject {
         }
     }
 
-    /// Full-screen video: the front app has a normal-layer window covering a whole display, and that same process
-    /// keeps the display awake (`PreventUserIdleDisplaySleep`).
-    private static func isPlayingFullScreenVideo(pid: pid_t) -> Bool {
+    /// Full-screen video: the front app has a normal-layer window covering a whole display, and it (or one of its
+    /// helper processes, as browsers play media in) keeps the display awake (`PreventUserIdleDisplaySleep`).
+    private static func isPlayingFullScreenVideo(front: NSRunningApplication) -> Bool {
+        let pid = front.processIdentifier
         var raw: Unmanaged<CFDictionary>?
         guard IOPMCopyAssertionsByProcess(&raw) == kIOReturnSuccess,
-              let byProcess = raw?.takeRetainedValue() as? [NSNumber: [[String: Any]]],
-              let assertions = byProcess[NSNumber(value: pid)],
-              assertions.contains(where: {
-                  let type = $0[kIOPMAssertionTypeKey] as? String
-                  return type == kIOPMAssertionTypePreventUserIdleDisplaySleep || type == "NoDisplaySleepAssertion"
-              }) else { return false }
+              let byProcess = raw?.takeRetainedValue() as? [NSNumber: [[String: Any]]] else { return false }
+        let ownPID = ProcessInfo.processInfo.processIdentifier
+        let frontBundlePath = front.bundleURL?.path
+        let held = byProcess.contains { holder, assertions in
+            assertions.contains { assertion in
+                let type = assertion[kIOPMAssertionTypeKey] as? String
+                guard type == kIOPMAssertionTypePreventUserIdleDisplaySleep || type == "NoDisplaySleepAssertion" else { return false }
+                let path = executablePath(of: holder.int32Value)
+                return VideoAssertionOwner.belongsToFrontApp(
+                    pid: holder.int32Value, onBehalfOfPID: (assertion["AssertionOnBehalfOfPID"] as? NSNumber)?.int32Value,
+                    path: path, processName: path.map { ($0 as NSString).lastPathComponent },
+                    frontPID: pid, frontBundlePath: frontBundlePath, frontBundleID: front.bundleIdentifier, ownPID: ownPID)
+            }
+        }
+        guard held else { return false }
         var ids = [CGDirectDisplayID](repeating: 0, count: 16)
         var count: UInt32 = 0
         guard CGGetActiveDisplayList(16, &ids, &count) == .success else { return false }
@@ -365,6 +393,13 @@ final class NightModeService: ObservableObject {
                   let rect = CGRect(dictionaryRepresentation: bounds) else { return false }
             return screens.contains { $0 == rect }
         }
+    }
+
+    private static func executablePath(of pid: pid_t) -> String? {
+        var buffer = [UInt8](repeating: 0, count: 4096)
+        let length = proc_pidpath(pid, &buffer, UInt32(buffer.count))
+        guard length > 0 else { return nil }
+        return String(decoding: buffer.prefix(Int(length)), as: UTF8.self)
     }
 
     private nonisolated static func loadSnapshot() -> NightShiftState? {
