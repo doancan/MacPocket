@@ -2278,3 +2278,23 @@
 "macOS bileşenleri; değiştirilmez." = "macOS components; never changed.";
 "Öğe bulunamadı" = "No items found";
 "Öğeleri açıp kapatmak için Giriş Öğeleri ayarlarını kullan; bu sayfa yalnız gösterir." = "Use Login Items settings to turn items on or off; this page only shows them.";
+
+/* Bakım görevleri */
+"Adres çözümleme önbelleğini boşaltır; ağ adresi sorunlarında işe yarar." = "Flushes the address-lookup cache; helps with network address problems.";
+"Atlandı: %@" = "Skipped: %@";
+"Başarısız: %@" = "Failed: %@";
+"Bu macOS sürümünde bu araç yok." = "This tool isn’t available on this version of macOS.";
+"DNS Önbelleği" = "DNS Cache";
+"Kullanıcı yazı tipi veritabanını sıfırlar. Uygulamaları yeniden açman gerekebilir." = "Resets your user font database. You may need to reopen apps.";
+"Kullanılamıyor" = "Unavailable";
+"Periyodik Bakım" = "Periodic Maintenance";
+"Quick Look ve yazı tipi önbelleği gibi küçük düzeltmeleri çalıştır; atlananlar gerekçesiyle gösterilir." = "Run small fixes such as the Quick Look and font caches; skipped ones are shown with the reason.";
+"Quick Look Önbelleği" = "Quick Look Cache";
+"Sonuç" = "Result";
+"Yazı Tipi Önbelleği" = "Font Cache";
+"Yönetici onayı gerektirir; bu sürüm yönetici gerektiren görevleri çalıştırmaz." = "Needs administrator approval; this version doesn’t run tasks that need it.";
+"macOS’un günlük, haftalık ve aylık bakım betiklerini çalıştırır." = "Runs macOS’s daily, weekly and monthly maintenance scripts.";
+"macOS’un önbellek ve hizmetleri için küçük düzeltmeleri tek seferde çalıştır; neyin çalıştığını ve neyin neden atlandığını gör." = "Run small fixes for macOS caches and services in one go; see what ran and why anything was skipped.";
+"Çalıştı · %@ sn" = "Ran · %@ s";
+"Çıkış kodu %d." = "Exit code %d.";
+"Önizleme önbelleğini sıfırlar; bozuk ya da eski önizlemeleri düzeltir." = "Resets the preview cache; fixes broken or stale previews.";

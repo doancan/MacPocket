@@ -150,6 +150,7 @@ struct PocketRootView: View {
             case .recorder: ScreenRecorderView()
             case .privacy: PrivacyCheckView()
             case .startupItems: StartupItemsView()
+            case .maintenance: MaintenanceView()
             case .none: ToolsHubView(model: model, openTool: openCatalogTool)
             }
         }
@@ -180,6 +181,7 @@ struct PocketRootView: View {
         case "recorder": navigation.open(.recorder)
         case "privacy-check": navigation.open(.privacy)
         case "startup-items": navigation.open(.startupItems)
+        case "maintenance": navigation.open(.maintenance)
         case "disk-info": utility = .diskInfo; navigation.open(.utilities)
         case "spotlight": utility = .spotlight; navigation.open(.utilities)
         case "dns": utility = .dns; navigation.open(.utilities)

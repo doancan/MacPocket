@@ -85,6 +85,18 @@ struct MacPocketProbe {
                 let snapshot = await StartupItems.load()
                 try output(snapshot.items.map { ["label": $0.label, "class": $0.kind.rawValue, "enabled": String($0.isEnabled),
                                                  "app": $0.appName ?? "", "stateKnown": String(snapshot.stateKnown)] })
+            case "maintenance":
+                // `maintenance` lists tasks and support; `maintenance run <id>` runs one ready task.
+                let tasks = MaintenanceCatalog.tasks()
+                if arguments.count == 3, arguments[1] == "run" {
+                    guard let task = tasks.first(where: { $0.id.rawValue == arguments[2] }) else {
+                        throw ProbeError.usage("maintenance run <\(tasks.map(\.id.rawValue).joined(separator: "|"))>")
+                    }
+                    let result = await MaintenanceRunner.run([task])
+                    try output(result.map { ["task": $0.task.id.rawValue, "outcome": "\($0.outcome)"] })
+                } else {
+                    try output(tasks.map { ["task": $0.id.rawValue, "support": "\($0.support)"] })
+                }
             case "help", "--help", "-h":
                 print("""
                 macpocket-probe — native MacPocket development and validation tool
@@ -96,6 +108,7 @@ struct MacPocketProbe {
                   focus <windowID|id>          Bring a window to the front (switches Space when needed)
                   thumbnail <windowID> <png>   Capture one window (Screen Recording access required)
                   startup                      launchd startup items by class (read-only)
+                  maintenance [run <id>]       Maintenance tasks and support; run one ready task
                   cleanup                      Read-only cleanup scan summary per target
                   privacy                      Microphone and camera use right now (apps that are listening/recording)
                 Diagnostics: \(SystemDiagnostic.allCases.map(\.rawValue).joined(separator: ", "))
