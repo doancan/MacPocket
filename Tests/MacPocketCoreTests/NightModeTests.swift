@@ -201,3 +201,14 @@ extension NightModeTests {
         XCTAssertTrue(all.allSatisfy { (-180...180).contains($0.coordinate.longitude) })
     }
 }
+
+extension NightModeTests {
+    func testLocationRefreshAtMostOncePerDay() {
+        let now = Date(timeIntervalSince1970: 1_000_000)
+        XCTAssertTrue(LocationRefreshPolicy.shouldFetch(lastFetch: nil, now: now))
+        XCTAssertFalse(LocationRefreshPolicy.shouldFetch(lastFetch: now.addingTimeInterval(-60), now: now))
+        XCTAssertFalse(LocationRefreshPolicy.shouldFetch(lastFetch: now.addingTimeInterval(-86_399), now: now))
+        XCTAssertTrue(LocationRefreshPolicy.shouldFetch(lastFetch: now.addingTimeInterval(-86_400), now: now))
+        XCTAssertTrue(LocationRefreshPolicy.shouldFetch(lastFetch: now.addingTimeInterval(60), now: now))
+    }
+}

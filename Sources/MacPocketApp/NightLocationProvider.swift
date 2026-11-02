@@ -13,6 +13,7 @@ final class NightLocationProvider: NSObject, ObservableObject, CLLocationManager
     private let manager = CLLocationManager()
     private let defaults: UserDefaults
     private var isRequesting = false
+    private var isRequestPending = false
 
     init(defaults: UserDefaults = .standard) {
         self.defaults = defaults
@@ -24,15 +25,15 @@ final class NightLocationProvider: NSObject, ObservableObject, CLLocationManager
 
     /// Asks for authorization if needed, then requests a single location. Refreshes at most once per day.
     func request() {
-        if let last = defaults.object(forKey: Self.fetchedAtKey) as? Date,
-           Date().timeIntervalSince(last) < 24 * 60 * 60 {
+        guard LocationRefreshPolicy.shouldFetch(lastFetch: defaults.object(forKey: Self.fetchedAtKey) as? Date, now: Date()) else {
             return
         }
         authorization = manager.authorizationStatus
         switch authorization {
         case .notDetermined:
+            isRequestPending = true
             manager.requestWhenInUseAuthorization()
-        case .authorizedAlways, .authorized:
+        case .authorizedAlways:
             requestLocation()
         default:
             break
@@ -40,7 +41,9 @@ final class NightLocationProvider: NSObject, ObservableObject, CLLocationManager
     }
 
     private func requestLocation() {
-        guard !isRequesting else { return }
+        guard !isRequesting,
+              LocationRefreshPolicy.shouldFetch(lastFetch: defaults.object(forKey: Self.fetchedAtKey) as? Date, now: Date())
+        else { return }
         isRequesting = true
         manager.requestLocation()
     }
@@ -58,8 +61,12 @@ final class NightLocationProvider: NSObject, ObservableObject, CLLocationManager
         let status = manager.authorizationStatus
         Task { @MainActor in
             self.authorization = status
-            if status == .authorizedAlways || status == .authorized {
+            // Fires once on delegate assignment and on every change; only fetch for a pending request().
+            if self.isRequestPending, status == .authorizedAlways {
+                self.isRequestPending = false
                 self.requestLocation()
+            } else if status != .notDetermined {
+                self.isRequestPending = false
             }
         }
     }
