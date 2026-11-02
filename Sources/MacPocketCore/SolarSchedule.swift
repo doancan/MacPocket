@@ -174,6 +174,13 @@ public enum NightCurve {
         return [sunrise.addingTimeInterval(sunriseHalfWindow), sunset.addingTimeInterval(half)].first { $0 > date }
     }
 
+    /// Whether a manual brightness change at `date` becomes the display's base level (day, paused, or brightness not
+    /// dimmed) rather than holding brightness until the current or next transition ends. Decided from the curve at
+    /// `date` itself, not from the last evaluation.
+    public static func manualChangeIsBase(at date: Date, day: SolarDay, settings: NightSettings, paused: Bool) -> Bool {
+        paused || !settings.dimBrightness || settings.location == nil || target(at: date, day: day, settings: settings).night == 0
+    }
+
     /// Smoothstep of how far `date` is between `start` and `end`.
     private static func progress(_ date: Date, from start: Date, to end: Date) -> Double {
         let span = end.timeIntervalSince(start)
@@ -189,5 +196,30 @@ public enum NightPause {
         if let until = settings.pausedUntil, until > now { return true }
         if let frontmostBundleID, settings.excludedApps.contains(frontmostBundleID) { return true }
         return fullScreenVideo && settings.pauseForFullScreenVideo
+    }
+}
+
+/// Which process's display-sleep assertion counts as the front app playing video. Browsers often take it from a
+/// helper process (Chromium's GPU/renderer helpers inside the app bundle, WebKit's out-of-process helpers for Safari).
+public enum VideoAssertionOwner {
+    /// - Parameters:
+    ///   - pid: the process holding the assertion; `onBehalfOfPID` the process it says it acts for, if any.
+    ///   - path: the holder's executable path; `processName` its name.
+    ///   - frontPID / frontBundlePath / frontBundleID: the frontmost application.
+    ///   - ownPID: MacPocket itself, whose assertions never count.
+    public static func belongsToFrontApp(pid: Int32, onBehalfOfPID: Int32?, path: String?, processName: String?,
+                                         frontPID: Int32, frontBundlePath: String?, frontBundleID: String?,
+                                         ownPID: Int32) -> Bool {
+        guard pid != ownPID, onBehalfOfPID != ownPID else { return false }
+        if pid == frontPID || onBehalfOfPID == frontPID { return true }
+        if let path, let bundle = frontBundlePath, !bundle.isEmpty {
+            let prefix = bundle.hasSuffix("/") ? bundle : bundle + "/"
+            if path.hasPrefix(prefix) { return true }
+        }
+        // Safari's media runs in system WebKit helpers outside its bundle.
+        if frontBundleID?.hasPrefix("com.apple.Safari") == true, let processName, processName.hasPrefix("com.apple.WebKit.") {
+            return true
+        }
+        return false
     }
 }

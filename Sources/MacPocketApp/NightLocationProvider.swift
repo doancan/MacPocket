@@ -6,6 +6,8 @@ import MacPocketCore
 @MainActor
 final class NightLocationProvider: NSObject, ObservableObject, CLLocationManagerDelegate {
     static let fetchedAtKey = "MacPocket.night.locationFetchedAt"
+    /// Farther than this from every catalog city, the location is shown as coordinates instead of a misleading name.
+    static let cityNameRadiusKilometers = 150.0
 
     @Published private(set) var authorization: CLAuthorizationStatus
     var onLocation: (Coordinate, String?) -> Void = { _, _ in }
@@ -50,10 +52,10 @@ final class NightLocationProvider: NSObject, ObservableObject, CLLocationManager
         manager.requestLocation()
     }
 
-    private func handle(location: CLLocation) async {
+    private func handle(location: CLLocation) {
         let coordinate = Coordinate(latitude: location.coordinate.latitude, longitude: location.coordinate.longitude)
-        let placemarks = try? await CLGeocoder().reverseGeocodeLocation(location)
-        let name = placemarks?.first?.locality
+        // Named offline after the nearest catalog city: the location never leaves the Mac (no reverse geocoding).
+        let name = CityCatalog.nearest(to: coordinate, within: Self.cityNameRadiusKilometers)?.name
         defaults.set(Date(), forKey: Self.fetchedAtKey)
         isRequesting = false
         onLocation(coordinate, name)
@@ -75,7 +77,7 @@ final class NightLocationProvider: NSObject, ObservableObject, CLLocationManager
 
     nonisolated func locationManager(_ manager: CLLocationManager, didUpdateLocations locations: [CLLocation]) {
         guard let location = locations.last else { return }
-        Task { @MainActor in await self.handle(location: location) }
+        Task { @MainActor in self.handle(location: location) }
     }
 
     nonisolated func locationManager(_ manager: CLLocationManager, didFailWithError error: Error) {

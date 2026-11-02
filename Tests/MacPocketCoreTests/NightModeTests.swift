@@ -258,3 +258,63 @@ extension NightModeTests {
         XCTAssertNil(NightCurve.transitionEnd(after: at(12, 0), day: .alwaysDay, settings: s))
     }
 }
+
+extension NightModeTests {
+    func testNearestCityIsOfflineGreatCircleMatch() {
+        XCTAssertEqual(CityCatalog.nearest(to: istanbul)?.name, "İstanbul")
+        // Çankaya, central Ankara.
+        XCTAssertEqual(CityCatalog.nearest(to: Coordinate(latitude: 39.90, longitude: 32.85))?.name, "Ankara")
+        // Mid-Pacific, far from every catalog city: a nearest exists, but not within a small radius.
+        let pacific = Coordinate(latitude: -10, longitude: -150)
+        XCTAssertNotNil(CityCatalog.nearest(to: pacific))
+        XCTAssertNil(CityCatalog.nearest(to: pacific, within: 150))
+        XCTAssertEqual(CityCatalog.distance(istanbul, istanbul), 0, accuracy: 1e-9)
+        // İstanbul–Ankara ≈ 350 km great-circle.
+        XCTAssertEqual(CityCatalog.distance(istanbul, Coordinate(latitude: 39.93, longitude: 32.86)), 350, accuracy: 15)
+    }
+
+    func testManualChangeIsBaseByDayHoldsAtNightAndInTransitions() {
+        var s = NightSettings() // evening 17:30–18:30, morning 5:45–6:15
+        s.location = istanbul
+        XCTAssertTrue(NightCurve.manualChangeIsBase(at: at(12, 0), day: normalDay, settings: s, paused: false))
+        // Right after the sunrise transition ends: day again, so a base (even if the last evaluation still saw night).
+        XCTAssertTrue(NightCurve.manualChangeIsBase(at: at(6, 15), day: normalDay, settings: s, paused: false))
+        XCTAssertTrue(NightCurve.manualChangeIsBase(at: at(6, 15).addingTimeInterval(1), day: normalDay, settings: s, paused: false))
+        XCTAssertFalse(NightCurve.manualChangeIsBase(at: at(6, 14), day: normalDay, settings: s, paused: false))
+        // Inside the evening transition (even its first seconds): hold until its end.
+        XCTAssertFalse(NightCurve.manualChangeIsBase(at: at(17, 30).addingTimeInterval(5), day: normalDay, settings: s, paused: false))
+        XCTAssertFalse(NightCurve.manualChangeIsBase(at: at(18, 0), day: normalDay, settings: s, paused: false))
+        XCTAssertEqual(NightCurve.transitionEnd(after: at(18, 0), day: normalDay, settings: s), at(18, 30))
+        XCTAssertFalse(NightCurve.manualChangeIsBase(at: at(23, 0), day: normalDay, settings: s, paused: false))
+        // Paused, brightness not dimmed, or no location: always a base.
+        XCTAssertTrue(NightCurve.manualChangeIsBase(at: at(23, 0), day: normalDay, settings: s, paused: true))
+        var undimmed = s
+        undimmed.dimBrightness = false
+        XCTAssertTrue(NightCurve.manualChangeIsBase(at: at(23, 0), day: normalDay, settings: undimmed, paused: false))
+        var nowhere = s
+        nowhere.location = nil
+        XCTAssertTrue(NightCurve.manualChangeIsBase(at: at(23, 0), day: normalDay, settings: nowhere, paused: false))
+        XCTAssertFalse(NightCurve.manualChangeIsBase(at: at(12, 0), day: .alwaysNight, settings: s, paused: false))
+        XCTAssertTrue(NightCurve.manualChangeIsBase(at: at(0, 0), day: .alwaysDay, settings: s, paused: false))
+    }
+
+    func testVideoAssertionFromFrontAppOrItsHelpers() {
+        func owns(pid: Int32 = 50, behalf: Int32? = nil, path: String? = nil, name: String? = nil,
+                  bundle: String? = "/Applications/Google Chrome.app", id: String? = "com.google.Chrome") -> Bool {
+            VideoAssertionOwner.belongsToFrontApp(pid: pid, onBehalfOfPID: behalf, path: path, processName: name,
+                                                  frontPID: 10, frontBundlePath: bundle, frontBundleID: id, ownPID: 99)
+        }
+        XCTAssertTrue(owns(pid: 10))
+        XCTAssertTrue(owns(behalf: 10))
+        XCTAssertTrue(owns(path: "/Applications/Google Chrome.app/Contents/Frameworks/Google Chrome Framework.framework/Helpers/Google Chrome Helper (GPU).app/Contents/MacOS/Google Chrome Helper (GPU)"))
+        XCTAssertFalse(owns(path: "/Applications/Google Chrome.app.old/x"))
+        XCTAssertFalse(owns(path: "/Applications/Other.app/Contents/MacOS/Other"))
+        let webKit = "/System/Library/Frameworks/WebKit.framework/Versions/A/XPCServices/com.apple.WebKit.GPU.xpc/Contents/MacOS/com.apple.WebKit.GPU"
+        XCTAssertTrue(owns(path: webKit, name: "com.apple.WebKit.GPU", bundle: "/Applications/Safari.app", id: "com.apple.Safari"))
+        XCTAssertFalse(owns(path: webKit, name: "com.apple.WebKit.GPU"))
+        // MacPocket's own assertions never count, even when the front app is MacPocket.
+        XCTAssertFalse(VideoAssertionOwner.belongsToFrontApp(pid: 99, onBehalfOfPID: nil, path: nil, processName: nil,
+                                                             frontPID: 99, frontBundlePath: nil, frontBundleID: nil, ownPID: 99))
+        XCTAssertFalse(owns(behalf: 99))
+    }
+}

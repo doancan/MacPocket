@@ -20,6 +20,23 @@ public enum CityCatalog {
 
     public static let all: [City] = turkishProvinces + worldCities
 
+    /// The catalog city closest to `coordinate` (great-circle distance), or nil when none lies within
+    /// `maxKilometers`. Offline: names a fetched location without reverse geocoding.
+    public static func nearest(to coordinate: Coordinate, within maxKilometers: Double = .infinity) -> City? {
+        guard let city = all.min(by: { distance(coordinate, $0.coordinate) < distance(coordinate, $1.coordinate) }),
+              distance(coordinate, city.coordinate) <= maxKilometers else { return nil }
+        return city
+    }
+
+    /// Haversine distance in kilometres.
+    public static func distance(_ a: Coordinate, _ b: Coordinate) -> Double {
+        let rad = Double.pi / 180
+        let dLat = (b.latitude - a.latitude) * rad
+        let dLon = (b.longitude - a.longitude) * rad
+        let h = sin(dLat / 2) * sin(dLat / 2) + cos(a.latitude * rad) * cos(b.latitude * rad) * sin(dLon / 2) * sin(dLon / 2)
+        return 2 * 6371 * asin(min(1, sqrt(h)))
+    }
+
     public static let turkishProvinces: [City] = [
         city("Adana", 37.00, 35.32),
         city("Adıyaman", 37.76, 38.28),
