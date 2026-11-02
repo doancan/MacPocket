@@ -212,3 +212,49 @@ extension NightModeTests {
         XCTAssertTrue(LocationRefreshPolicy.shouldFetch(lastFetch: now.addingTimeInterval(60), now: now))
     }
 }
+
+// MARK: Pauses and manual hold
+
+extension NightModeTests {
+    private var now: Date { Date(timeIntervalSince1970: 2_000_000_000) }
+
+    func testPauseUntilFutureDate() {
+        var s = NightSettings()
+        XCTAssertFalse(NightPause.isPaused(now: now, settings: s, frontmostBundleID: nil, fullScreenVideo: false))
+        s.pausedUntil = now.addingTimeInterval(60)
+        XCTAssertTrue(NightPause.isPaused(now: now, settings: s, frontmostBundleID: nil, fullScreenVideo: false))
+        s.pausedUntil = now.addingTimeInterval(-1)
+        XCTAssertFalse(NightPause.isPaused(now: now, settings: s, frontmostBundleID: nil, fullScreenVideo: false))
+        s.pausedUntil = now
+        XCTAssertFalse(NightPause.isPaused(now: now, settings: s, frontmostBundleID: nil, fullScreenVideo: false))
+    }
+
+    func testExcludedFrontmostAppPauses() {
+        var s = NightSettings()
+        s.excludedApps = ["com.adobe.Photoshop"]
+        XCTAssertTrue(NightPause.isPaused(now: now, settings: s, frontmostBundleID: "com.adobe.Photoshop", fullScreenVideo: false))
+        XCTAssertFalse(NightPause.isPaused(now: now, settings: s, frontmostBundleID: "com.apple.Safari", fullScreenVideo: false))
+        XCTAssertFalse(NightPause.isPaused(now: now, settings: s, frontmostBundleID: nil, fullScreenVideo: false))
+    }
+
+    func testFullScreenVideoOnlyWhenOptedIn() {
+        var s = NightSettings()
+        XCTAssertFalse(s.pauseForFullScreenVideo)
+        XCTAssertFalse(NightPause.isPaused(now: now, settings: s, frontmostBundleID: nil, fullScreenVideo: true))
+        s.pauseForFullScreenVideo = true
+        XCTAssertTrue(NightPause.isPaused(now: now, settings: s, frontmostBundleID: nil, fullScreenVideo: true))
+        XCTAssertFalse(NightPause.isPaused(now: now, settings: s, frontmostBundleID: nil, fullScreenVideo: false))
+    }
+
+    func testManualHoldEndsWithCurrentOrNextTransition() {
+        let s = NightSettings() // 60 min evening transition: 17:30–18:30; morning 5:45–6:15
+        XCTAssertEqual(NightCurve.transitionEnd(after: at(18, 0), day: normalDay, settings: s), at(18, 30))
+        XCTAssertEqual(NightCurve.transitionEnd(after: at(5, 50), day: normalDay, settings: s), at(6, 15))
+        XCTAssertEqual(NightCurve.transitionEnd(after: at(3, 0), day: normalDay, settings: s), at(6, 15))
+        XCTAssertEqual(NightCurve.transitionEnd(after: at(12, 0), day: normalDay, settings: s), at(18, 30))
+        XCTAssertNil(NightCurve.transitionEnd(after: at(20, 0), day: normalDay, settings: s))
+        XCTAssertNil(NightCurve.transitionEnd(after: at(18, 30), day: normalDay, settings: s))
+        XCTAssertNil(NightCurve.transitionEnd(after: at(12, 0), day: .alwaysNight, settings: s))
+        XCTAssertNil(NightCurve.transitionEnd(after: at(12, 0), day: .alwaysDay, settings: s))
+    }
+}

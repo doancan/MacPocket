@@ -166,11 +166,28 @@ public enum NightCurve {
             kelvin: neutralKelvin - night * (neutralKelvin - settings.nightKelvin))
     }
 
+    /// The end of the transition `date` is in, or of the next one on `day`; nil once the evening transition is over
+    /// (the next one belongs to the following day) and on polar days, which have none.
+    public static func transitionEnd(after date: Date, day: SolarDay, settings: NightSettings) -> Date? {
+        guard case let .normal(sunrise, sunset) = day else { return nil }
+        let half = Double(max(settings.transitionMinutes, 0)) * 60 / 2
+        return [sunrise.addingTimeInterval(sunriseHalfWindow), sunset.addingTimeInterval(half)].first { $0 > date }
+    }
+
     /// Smoothstep of how far `date` is between `start` and `end`.
     private static func progress(_ date: Date, from start: Date, to end: Date) -> Double {
         let span = end.timeIntervalSince(start)
         guard span > 0 else { return date >= end ? 1 : 0 }
         let x = min(max(date.timeIntervalSince(start) / span, 0), 1)
         return x * x * (3 - 2 * x)
+    }
+}
+
+/// Whether night mode is lifted right now by one of the optional exceptions.
+public enum NightPause {
+    public static func isPaused(now: Date, settings: NightSettings, frontmostBundleID: String?, fullScreenVideo: Bool) -> Bool {
+        if let until = settings.pausedUntil, until > now { return true }
+        if let frontmostBundleID, settings.excludedApps.contains(frontmostBundleID) { return true }
+        return fullScreenVideo && settings.pauseForFullScreenVideo
     }
 }

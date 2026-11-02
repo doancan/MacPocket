@@ -192,6 +192,15 @@ final class PocketStatusItemController: NSObject, NSPopoverDelegate {
         let menu = NSMenu()
         menu.addItem(withTitle: String(localized: "MacPocket’ı aç"), action: #selector(openMainWindow), keyEquivalent: "").target = self
         menu.addItem(withTitle: String(localized: "Ayarlar"), action: #selector(openSettings), keyEquivalent: ",").target = self
+        let schedule = DisplayBrightnessService.shared.schedule
+        if schedule.enabled, schedule.source == .solar {
+            menu.addItem(.separator())
+            if case .paused(until: .some) = NightModeService.shared.status {
+                menu.addItem(withTitle: String(localized: "Gece modunu yeniden aç"), action: #selector(resumeNightMode), keyEquivalent: "").target = self
+            } else {
+                menu.addItem(withTitle: String(localized: "Gece modunu 1 saat kapat"), action: #selector(pauseNightMode), keyEquivalent: "").target = self
+            }
+        }
         menu.addItem(.separator())
         menu.addItem(withTitle: String(localized: "MacPocket’ten çık"), action: #selector(quit), keyEquivalent: "q").target = self
         // A menu assigned only for this click keeps the left click opening the popover.
@@ -209,6 +218,10 @@ final class PocketStatusItemController: NSObject, NSPopoverDelegate {
         NSApp.activate(ignoringOtherApps: true)
         model.openSettingsWindow?()
     }
+
+    @objc private func pauseNightMode() { NightModeService.shared.pauseForAnHour() }
+
+    @objc private func resumeNightMode() { NightModeService.shared.resume() }
 
     @objc private func quit() { NSApp.terminate(nil) }
 
@@ -238,6 +251,7 @@ final class PocketApplicationState: ObservableObject {
         WindowLayoutService.shared.start()
         QuitGuardService.shared.start()
         DisplayBrightnessService.shared.start()
+        NightModeService.shared.start()
         MacroService.shared.start()
         AppFreezerService.shared.start()
         FocusSessionService.shared.attach(model)

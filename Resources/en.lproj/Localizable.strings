@@ -2365,3 +2365,7 @@
 "Johannesburg" = "Johannesburg";
 "Nairobi" = "Nairobi";
 "Stockholm" = "Stockholm";
+
+/* Gece modu: menü çubuğu sağ tık menüsü */
+"Gece modunu 1 saat kapat" = "Pause night mode for 1 hour";
+"Gece modunu yeniden aç" = "Resume night mode";

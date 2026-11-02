@@ -95,6 +95,11 @@ final class DisplayBrightnessService: ObservableObject {
     /// Until when a manual change wins over the schedule. A date, not a minute of the day, so a Mac asleep
     /// at that minute still returns to the schedule afterwards.
     @Published private(set) var overrideUntil: Date?
+    /// Displays whose gamma table did not keep the night warmth (read back different, e.g. with HDR on).
+    @Published private(set) var warmthUnsupported: Set<CGDirectDisplayID> = []
+    /// In "follow the sun" mode, told about each manual level change (display key, new level); returns until when
+    /// the manual brightness should win over night mode (nil: no hold).
+    var solarManualChange: ((String, Double) -> Date?)?
     /// Never dim software displays to black: the screen would look off with no way to see the slider.
     private static let softwareFloor = 0.12
 
@@ -146,6 +151,8 @@ final class DisplayBrightnessService: ObservableObject {
     var scheduleHeld = false
 
     func applySchedule() {
+        // In "follow the sun" mode NightModeService drives brightness; the points are not used.
+        guard schedule.source != .solar else { return }
         guard schedule.enabled, !scheduleHeld, let target = schedule.level(at: Self.currentMinute) else { return }
         if let until = overrideUntil {
             if Date() < until { return }
@@ -154,6 +161,15 @@ final class DisplayBrightnessService: ObservableObject {
         for display in displays where abs(display.level - target) > 0.01 {
             setLevel(target, for: display.id, fromSchedule: true)
         }
+    }
+
+    /// Whether brightness must be left alone at `now`: a focus session holds it, or a manual change still wins.
+    func brightnessHeld(at now: Date) -> Bool {
+        if scheduleHeld { return true }
+        guard let until = overrideUntil else { return false }
+        if now < until { return true }
+        overrideUntil = nil
+        return false
     }
 
     /// Restores every gamma table MacPocket changed (called at quit).
@@ -169,6 +185,19 @@ final class DisplayBrightnessService: ObservableObject {
     func setWarmth(_ factors: (red: Double, green: Double, blue: Double)) {
         warmth = (Float(factors.red), Float(factors.green), Float(factors.blue))
         for display in displays { applyGamma(display.id) }
+        // Read the tables back: some displays (e.g. with HDR on) silently ignore the write. A neutral warmth
+        // proves nothing, so the last verdict is kept until the next warm write.
+        guard warmth != (1, 1, 1) else { return }
+        for display in displays {
+            if gammaHolds(display.id) { warmthUnsupported.remove(display.id) } else { warmthUnsupported.insert(display.id) }
+        }
+    }
+
+    /// Whether the display's current gamma table is the one MacPocket last wrote.
+    private func gammaHolds(_ id: CGDirectDisplayID) -> Bool {
+        guard let expected = originalGamma[id]?.composed(warmth: warmth, scale: softwareScale[id] ?? 1),
+              let actual = GammaTable.read(id) else { return false }
+        return expected.matches(actual)
     }
 
     // MARK: Detection
@@ -253,11 +282,15 @@ final class DisplayBrightnessService: ObservableObject {
     // MARK: Changing brightness
 
     func setLevel(_ level: Double, for id: CGDirectDisplayID, fromSchedule: Bool = false) {
-        if !fromSchedule, schedule.enabled, let minute = schedule.nextPoint(after: Self.currentMinute) {
-            overrideUntil = Self.nextDate(atMinute: minute)
+        let clamped = min(1, max(0, level))
+        if !fromSchedule, schedule.enabled {
+            if schedule.source == .solar {
+                if let key = displays.first(where: { $0.id == id })?.key { overrideUntil = solarManualChange?(key, clamped) }
+            } else if let minute = schedule.nextPoint(after: Self.currentMinute) {
+                overrideUntil = Self.nextDate(atMinute: minute)
+            }
         }
         guard let index = displays.firstIndex(where: { $0.id == id }) else { return }
-        let clamped = min(1, max(0, level))
         displays[index].level = clamped
         settings.levels[displays[index].key] = clamped
         switch displays[index].active {
@@ -748,5 +781,17 @@ struct GammaTable {
 
     func apply(to display: CGDirectDisplayID) {
         CGSetDisplayTransferByTable(display, UInt32(red.count), red, green, blue)
+    }
+
+    /// Whether `other` has the same curves within `tolerance`, sampling proportionally if the lengths differ.
+    func matches(_ other: GammaTable, tolerance: CGGammaValue = 0.01) -> Bool {
+        func same(_ a: [CGGammaValue], _ b: [CGGammaValue]) -> Bool {
+            guard !a.isEmpty, !b.isEmpty else { return a.isEmpty == b.isEmpty }
+            return a.indices.allSatisfy { i in
+                let j = a.count > 1 ? i * (b.count - 1) / (a.count - 1) : 0
+                return abs(a[i] - b[j]) <= tolerance
+            }
+        }
+        return same(red, other.red) && same(green, other.green) && same(blue, other.blue)
     }
 }
