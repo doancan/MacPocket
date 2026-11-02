@@ -115,4 +115,77 @@ final class NightModeTests: XCTestCase {
         XCTAssertEqual(result[1], 0.2, accuracy: 1e-6)
         XCTAssertEqual(GammaComposer.compose([0.25, 1], factor: 1, scale: 1), [0.25, 1])
     }
+    // MARK: Night Shift
+
+    func testSessionRestoresPreviousNightShift() {
+        let previous = NightShiftState(enabled: false, strength: 0.3, mode: 1)
+        let fake = FakeNightShift(state: previous)
+        var stored: NightShiftState?
+        let session = NightShiftSession(client: fake, load: { stored }, save: { stored = $0 })
+        session.activate(strength: 0.7)
+        XCTAssertEqual(fake.state.enabled, true)
+        XCTAssertEqual(fake.state.strength, 0.7, accuracy: 1e-9)
+        session.deactivate()
+        XCTAssertEqual(fake.restored, [previous])
+        session.deactivate()
+        XCTAssertEqual(fake.restored, [previous])
+        XCTAssertNil(stored)
+    }
+
+    func testSessionPersistsSnapshotOnFirstActivate() {
+        let previous = NightShiftState(enabled: true, strength: 0.5, mode: 2)
+        let fake = FakeNightShift(state: previous)
+        var stored: NightShiftState?
+        let session = NightShiftSession(client: fake, load: { stored }, save: { stored = $0 })
+        session.activate(strength: 0.4)
+        XCTAssertEqual(stored, previous)
+        session.activate(strength: 0.9)
+        XCTAssertEqual(stored, previous)
+        XCTAssertEqual(fake.snapshots, 1)
+        XCTAssertEqual(fake.state.strength, 0.9, accuracy: 1e-9)
+    }
+
+    func testRecoverRestoresLeftoverSnapshot() {
+        let leftover = NightShiftState(enabled: false, strength: 0.2, mode: 1)
+        let fake = FakeNightShift(state: NightShiftState(enabled: true, strength: 0.8, mode: 0))
+        var stored: NightShiftState? = leftover
+        let session = NightShiftSession(client: fake, load: { stored }, save: { stored = $0 })
+        session.recoverIfNeeded()
+        XCTAssertEqual(fake.restored, [leftover])
+        XCTAssertNil(stored)
+        session.recoverIfNeeded()
+        session.deactivate()
+        XCTAssertEqual(fake.restored, [leftover])
+    }
+
+    func testActivateAfterLeftoverKeepsLeftoverAsPrevious() {
+        let leftover = NightShiftState(enabled: false, strength: 0.2, mode: 1)
+        let fake = FakeNightShift(state: NightShiftState(enabled: true, strength: 0.8, mode: 0))
+        var stored: NightShiftState? = leftover
+        let session = NightShiftSession(client: fake, load: { stored }, save: { stored = $0 })
+        session.activate(strength: 0.6)
+        XCTAssertEqual(stored, leftover)
+        session.deactivate()
+        XCTAssertEqual(fake.restored, [leftover])
+        XCTAssertNil(stored)
+    }
+
+    func testNightShiftStrengthFromKelvin() {
+        XCTAssertEqual(NightShiftStrength.from(kelvin: 6500), 0)
+        XCTAssertEqual(NightShiftStrength.from(kelvin: 1900), 1)
+        XCTAssertEqual(NightShiftStrength.from(kelvin: 4200), 0.5, accuracy: 1e-9)
+        XCTAssertEqual(NightShiftStrength.from(kelvin: 9000), 0)
+        XCTAssertEqual(NightShiftStrength.from(kelvin: 500), 1)
+    }
+}
+
+private final class FakeNightShift: NightShiftControlling {
+    var state: NightShiftState
+    var restored: [NightShiftState] = []
+    var snapshots = 0
+    init(state: NightShiftState) { self.state = state }
+    var isAvailable: Bool { true }
+    func snapshot() -> NightShiftState? { snapshots += 1; return state }
+    func apply(enabled: Bool, strength: Double) { state = NightShiftState(enabled: enabled, strength: strength, mode: 0) }
+    func restore(_ state: NightShiftState) { restored.append(state); self.state = state }
 }
