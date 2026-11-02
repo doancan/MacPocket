@@ -724,7 +724,6 @@
 "Klasörü Seç" = "Choose Folder";
 "Klasörü yeniden tara" = "Scan the folder again";
 "Klavye" = "Keyboard";
-"Klavye ve fare girişleri yalnız bu uygulama içinde tutulur; macOS sistem kısayolları kilitlenmez." = "Keyboard and mouse input is captured only inside this app; macOS system shortcuts stay available.";
 "Kod ve veri" = "Code and data";
 "Komut güvenlik doğrulamasından geçmedi." = "The command failed security validation.";
 "Komut satırı" = "Command Line";
@@ -2298,3 +2297,17 @@
 "Çalıştı · %@ sn" = "Ran · %@ s";
 "Çıkış kodu %d." = "Exit code %d.";
 "Önizleme önbelleğini sıfırlar; bozuk ya da eski önizlemeleri düzeltir." = "Resets the preview cache; fixes broken or stale previews.";
+
+/* Ekran Temizleme: renk ve giriş kilidi */
+"Beyaz" = "White";
+"Beyaz tozu, siyah parmak izlerini daha iyi gösterir." = "White shows dust best, black shows fingerprints best.";
+"Giriş kilidi başlatılamadı. Ekran temizleme modu kapatıldı." = "The input lock couldn’t start. Screen cleaning mode was turned off.";
+"Girişi kilitlemek için Erişilebilirlik izni gerekir. İzin verdikten sonra MacPocket’e dönmen yeterli." = "Locking input needs Accessibility access. After allowing it, just come back to MacPocket.";
+"Girişi kilitlemek için Erişilebilirlik izni gerekir. İzin verip tekrar dene ya da kilidi kapat." = "Locking input needs Accessibility access. Allow it and try again, or turn the lock off.";
+"Gri" = "Gray";
+"Klavye ve fare kilitli · Yalnız Esc ile çık" = "Keyboard and mouse locked · Press Esc to exit";
+"Renk" = "Color";
+"Siyah" = "Black";
+"Temizlerken yanlışlıkla tuşa basmanı ve imleci oynatmanı engeller. Yalnız Esc ile veya süre dolunca çıkılır." = "Keeps you from pressing keys or moving the pointer while cleaning. You can only exit with Esc or when time runs out.";
+"Tüm klavye ve fare girişini kilitle" = "Lock all keyboard and mouse input";
+"Varsayılan olarak klavye ve fare girişleri yalnız bu uygulama içinde tutulur; macOS sistem kısayolları kilitlenmez. İstersen aşağıdan tüm girişi kilitleyebilirsin." = "By default keyboard and mouse input stays inside this app and macOS shortcuts aren’t locked. You can lock all input below.";
