@@ -1,0 +1,61 @@
+feature,area,priority,original,clone,notes
+Uygulama önbelleği + log temizliği (tarayıcı/bulut istemci dahil),Temizlik,must,yes,partial,MEVCUT: CleanupTargets userCaches/userLogs. EKLE: tarayıcı ve bulut istemci önbellek hedefleri
+Geliştirici/iletişim/tasarım aracı önbellekleri,Temizlik,should,yes,partial,MEVCUT: DerivedData npm pip yarn cocoapods gradle homebrew. EKLE: iletişim ve tasarım uygulaması önbellekleri
+Kaldırma artıkları taraması,Temizlik,must,yes,partial,MEVCUT: ApplicationLeftovers (aday tarama). EKLE: kategori sayısını genişlet; başlangıç öğesi ve paket makbuzu çapraz kontrolü
+Sistem Verisi: yerel Time Machine anlık görüntüleri temizliği,Temizlik,should,yes,no,MEVCUT yalnız listeleme (SystemMaintenanceTools.timeMachine). EKLE: seçili snapshot silme (tmutil deletelocalsnapshots) onaylı
+Sistem Verisi: sistem cache/log + eski macOS yükleyicileri + eski duvar kağıdı indirmeleri,Temizlik,should,yes,no,Yükleyici için /Applications/Install macOS*.app boyut+yaş listesi; yönetici yetkisi gerektirir
+"Ayrı Yönet grubu (yedek, yerel iCloud, sanal makine, modeller) toplamdan hariç",Temizlik,should,yes,no,Toplam ve güvenlik modeli: bu grup asla toplu temizliğe girmez
+Çöp kutusu temizliği,Temizlik,must,yes,yes,MEVCUT: CleanupTargets.trash; onaylı kalıcı silme güvenlik doğrulamalı
+Kalıcı silme yerine Çöp'e taşıma ayarı (önbellek için),Temizlik,could,yes,partial,MEVCUT: Çöp'e taşıma var; varsayılan/ayar seçeneği netleştirilecek
+"Temizlik toplamında ""System Data"" rakamını eşleştirme iddiası yok",Temizlik,should,yes,partial,Metin kuralı: sistem sınıflaması klasör değildir; arayüzde belirt (StorageCategory.system açıklaması mevcut)
+Uygulama güncellemeleri: App Store/Sparkle/Electron/Homebrew/GitHub,Yazılım,must,yes,partial,MEVCUT: yalnız Homebrew cask kontrol+upgrade; kaynak tespiti var (AppSource). EKLE: GitHub Releases yedek kanalı; Sparkle appcast sürüm okuma; App Store (mas varsa)
+Başlangıç öğeleri yönetimi (doğrudan/Ayarlar yönetimli/salt okunur ayrımı),Yazılım,must,yes,partial,MEVCUT: macOS ayarına yönlendirme. EKLE: LaunchAgents/LaunchDaemons + SMAppService okuma ve üç sınıfa ayırma; doğrudan kontrol edilenleri aç/kapat
+Kaldırma: 15+ kalıntı kategorisi + giriş öğesi + paket makbuzu + Dock + girdi kaynakları,Yazılım,must,yes,partial,MEVCUT: bundleID tabanlı plan + Çöp. EKLE: kategori genişletme; pkgutil makbuz; Dock girdisi
+Oturum başına tek yönetici doğrulaması,Yazılım,could,yes,no,Yönetici gerektiren işlemler için tek yetkilendirme (SMJobBless/XPC yardımcı) - mimari karar gerekir
+Bakım görünür düzeltme geçişi (self-healing ajanlar),Optimize,should,yes,no,Kapsam dışı değil; önce gerçek ajan listesi araştırılmalı
+Tek dokunuşla bakım: Quick Look önbelleği,Optimize,must,yes,no,qlmanage -r cache. MEVCUT bakım yalnız salt okunur raporlar
+Tek dokunuşla bakım: yazı tipi önbelleği,Optimize,should,yes,no,atsutil databases -remove (yönetici); canlı doğrulama gerekir
+Tek dokunuşla bakım: SQLite vacuum,Optimize,could,yes,no,Yalnız çalışmayan uygulamaların veritabanları; kayıp riski - dikkatli
+Tek dokunuşla bakım: bildirim geçmişi + öksüz Spotlight kuralları + periyodik bakım,Optimize,could,yes,no,macOS sürümüne göre desteklenir; destek durumu gerekçeli gösterilir
+Parallels sanal disk boşluk geri kazanımı,Optimize,could,yes,no,Niş; Parallels kurulu değilse gizle. Ayrı onay + toplu temizlikten hariç
+Hazır işlem: DNS önbelleği boşaltma,Optimize,could,no,no,CleanMyMac referansında var; Mole sayfasında yok - mevcut kapsam notu
+Treemap disk görselleştirme + alt dizine inme,Analiz,must,yes,yes,MEVCUT: SpaceLens
+Sağ tık: Çöp'e taşı / Finder'da göster,Analiz,must,yes,partial,MEVCUT: Çöp var (SpaceLensView). Bağlam menüsü kapsamını doğrula
+CPU/bellek/GPU/disk G-Ç/ağ hızı/pil/sistem gücü/termal/fan devri/çalışma süresi,Durum,must,yes,partial,MEVCUT: SystemMonitor + TemperatureSensors + FanSensors + Power. EKLE: GPU kullanımı ve çalışma süresi karşılaştır
+Sağlık puanı,Durum,should,yes,no,MEVCUT YOK. Ölçülebilir formül tanımla (bellek baskısı+disk doluluk+termal+pil); öğrenilebilir ve şeffaf olsun
+Bento ızgara + 60 sn mini grafik (sparkline),Durum,should,yes,partial,MEVCUT: sparkline PocketDesign/OverviewView. EKLE: 60 sn pencere ve bento düzeni (Overview'a)
+Fan kontrolü (desteklenen Mac'lerde),Durum,could,yes,no,MEVCUT salt okuma. Yazma için ayrıcalıklı yardımcı gerekir; bu Mac Studio'da doğrulanır ama risklidir - ayrı karar
+Sıralanabilir süreç listesi + tıklayıp sabitleme,Durum,should,yes,partial,MEVCUT: TaskManagerView/ProcessNativeTable. EKLE: sabitleme (pin)
+Süreç başına güç ve sıcaklık birimi tutarlılığı (panel = menü çubuğu),Durum,should,yes,partial,MEVCUT: PocketDetailLevel + ProcessEnergy. Birim ayarını tek kaynaktan sür
+Menü çubuğu koşucu animasyonu (duraklatılabilir),Menü Çubuğu,could,yes,no,Özgün karakter/animasyon çiz; hareket CPU yüküne bağlı. Reduce Motion'a uy
+Menü çubuğu HUD: CPU/bellek/ağ hızı + yalnız simge kompakt mod + sağ tık menüsü,Menü Çubuğu,must,yes,partial,MEVCUT: MenuBarModules/Renderer (birleşik veya ayrı). EKLE: yalnız-simge kompakt mod ve sağ tık hızlı menü doğrulaması
+Ekranı Açık Tut,Araçlar,must,yes,yes,MEVCUT: SleepController + FocusSession
+"Ekran Temizleme (düz renk, giriş kilidi, Escape ile çıkış)",Araçlar,must,yes,partial,MEVCUT: ScreenCleaningController (süre sınırlı). EKLE: renk seçimi + isteğe bağlı giriş kilidi
+Ekran Temizleme: şiir kataloğu,Araçlar,could,yes,no,Atla (marka karakteri). İstenirse özgün kısa sözler
+WiFi Düşük Gecikme (AWDL/AirDrop geçici duraklatma),Araçlar,should,yes,no,Arayüzü ifconfig awdl0 down ile yönetici yetkisi gerektirir; uyku/çıkış/ağ değişiminde geri al; hız iddiası yok
+Gizlilik Kontrolü: canlı kamera/mikrofon kullanımı bildirimi,Araçlar,must,yes,partial,"Kod+test tamam (PrivacyMonitor, 11 test). Canlı doğrulanmadı: bu Mac'te mikrofon girişi/kamera yok; arayüz ve bildirim görsel doğrulanamadı"
+Bu uygulama için bildirme listesi + Menü Çubuğu ayarı,Araçlar,should,yes,no,Gizlilik Kontrolü ile birlikte
+Kısayollar: ana pencere ve fan soğutma,Araçlar,could,yes,partial,MEVCUT: PocketGlobalHotKey (ana pencere kısayolu eklenebilir)
+CLI: proje yapıt temizliği (build/bağımlılık klasörleri),Temizlik,should,yes,no,"Mole'da yalnız CLI; biz uygulama içinde ""Proje Artıkları"" olarak sun (node_modules/target/.build/Pods). CleanupTargets'a ek"
+CLI: yükleyici süpürme (DMG/PKG/ZIP),Temizlik,should,yes,no,İndirilenler taraması üzerine tür filtresi
+CLI: sudo için Touch ID,Araçlar,could,yes,no,Atla: sistem yapılandırması dosyası düzenler (/etc/pam.d); riskli
+Tüm yıkıcı işlemlerde önizleme (dry-run),Güvenlik,must,yes,partial,MEVCUT: tarama/onay akışı önizleme işlevi görüyor; bunu açıkça standartlaştır
+"Etkin süreç tarafından açık tutulan dosyaları ""kullanımda"" işaretle",Güvenlik,must,yes,no,lsof/proc_pidfd tabanlı; silmeden önce uyarı
+AI Cleanup & Care (CLI/oturum/Ollama temizliği),Temizlik,skip,yes,skip,KULLANICI KAPSAM DIŞI BIRAKTI (AGENTS.md) - yeniden ekleme
+Lisans/ödeme/2 Mac anahtarı/ücretsiz iki kullanım,İş,skip,yes,skip,Ürün modeli; kullanıcı istemedi
+Windows sürümü,Platform,skip,yes,skip,Kapsam dışı
+Mole'un adları/karakterleri/şiir metinleri/ikonları,Marka,skip,yes,skip,Marka varlığı; kopyalanmaz
+Temizlikte her öğe için temizle / atla / koru kararı (protect),Temizlik,should,yes,no,"Ekran: 'Review each item before choosing what to clean, skip, or protect'. Korunan öğeler kalıcı saklanır, sonraki taramalarda işaretsiz gelir"
+Temizlik özeti: 'N GB bulundu · M öğe · K kategori' + Sonuçları incele + Tekrar tara,Temizlik,should,yes,partial,MEVCUT: CleanupView tarama sonucu. Özet kartı ve alt çubukta 'Temizle · boyut' eylem düğmesi eklenecek
+Hızlı kaldırma (listede tek adım) + uygulama ve kalıntı boyutu önceden gösterilir,Yazılım,should,yes,partial,MEVCUT: kaldırma planı. EKLE: Hızlı kaldırma anahtarı; boyutlar plan öncesi görünür
+Analiz: sistem klasörleri yalnız görüntüleme; yalnız Çöp'teki öğeler kalıcı silmede onay ister,Analiz,must,yes,partial,MEVCUT: SpaceLens Çöp'e taşır. Kural: sistem yolları asla silinemez; test ile sabitle
+Çöp'e taşınanı geri koyma (Put Back),Analiz,should,yes,no,Çöp'e taşırken özgün konum kaydı; geri koy eylemi (NSWorkspace recycle sonucu URL)
+Süreç için sade dille açıklama paneli,Durum,should,yes,no,"Süreç satırında '…' menüsü: ne olduğu, neden yoğun, güvenle kapatılır mı. Yerel kural tablosu; ağ gerektirmez"
+"Süreç satırı '…' menüsü (sabitle, açıkla, Finder'da göster, sonlandır)",Durum,should,yes,partial,MEVCUT: sonlandırma. Menü eklenecek
+Apple silicon frekansı ve gücü,Durum,could,yes,partial,MEVCUT: ProcessEnergy/PowerInspector kısmen. Frekans için IOReport doğrulaması gerekir
+Eşleşmiş iPhone/iPad ve Bluetooth aksesuar pil durumu,Durum,could,yes,no,"IOKit/Bluetooth pil okuma; bu Mac Studio'da pil yok, aksesuar için doğrulanabilir"
+Fan modu: Otomatik / Soğut / Maks,Durum,could,yes,no,Yazma gerektirir; fan spike sonucuna bağlı
+"Sağlık kartı: puan + özellik etiketleri (çip, RAM, macOS, çalışma süresi) + 'tüm kontroller geçti'",Durum,should,yes,no,HealthScore + özet çipleri
+Menü çubuğu paneli: Gizlilik satırı (kamera/mikrofon 'Kullanımda değil') + Uyanık/Ekran kısayol düğmeleri,Menü Çubuğu,must,yes,no,Gizlilik Kontrolü M1'de panele satır olarak eklenir
+Temizlik geçmişi toplamları (temizlenen / kaldırılan / optimize edilen),Menü Çubuğu,could,yes,no,Yerel sayaç; kullanıcıya gösterilen kalıcı toplam
+"Görsel dil: koyu cam pencere, üstte hap şeklinde sekme, bölüm başına renk teması",Tasarım,could,yes,skip,"Marka varlığı; MacPocket kendi Liquid Glass diliyle kalır, kopyalanmaz"
