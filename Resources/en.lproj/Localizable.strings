@@ -501,10 +501,8 @@
 "Eski Dosyalar" = "Old Files";
 "Eski dizüstülerde düşme algılayıcısı." = "Drop detection on older laptops.";
 "Eski indirilenler" = "Old downloads";
-"Eski indirilenler %lld günden eski öğeleri kapsar." = "Old downloads covers items older than %lld days.";
 "Eski modem donanımı için. Modern Mac’lerde etkisizdir." = "For legacy modem hardware. Has no effect on modern Macs.";
 "Eski İndirilenler" = "Old Downloads";
-"Eski İndirilenler bu süreden uzun süredir dokunulmamış öğeleri listeler. Tarama sırasında uygulanır." = "Old Downloads lists items untouched for longer than this. Applied when scanning.";
 "Etiket" = "Label";
 "Etkin" = "Active";
 "Etkin (şarj bekletiliyor)" = "Active (charging paused)";
@@ -735,7 +733,6 @@
 "Kullanıcı %@" = "User %@";
 "Kullanıcı %@ · Sistem %@" = "User %@ · System %@";
 "Kullanıcı %@, Sistem %@" = "User %@, System %@";
-"Kullanıcı Dosyaları" = "User Files";
 "Kullanıcı Günlükleri" = "User Logs";
 "Kullanıcı Library içindeki yedi konumun her birinde en fazla 10.000 doğrudan öğe incelenir; erişilemeyen klasörler atlanır." = "Up to 10,000 top-level items are checked in each of seven locations in your Library folder; inaccessible folders are skipped.";
 "Kullanıcı etkin" = "User active";
@@ -1124,7 +1121,6 @@
 "Tarama zamanı: %@" = "Scanned: %@";
 "Taramak için bir klasör seç. Tarama dosyaları değiştirmez." = "Choose a folder to scan. Scanning never changes files.";
 "Taranacak klasörü seç" = "Choose a folder to scan";
-"Taranacak konumlar" = "Locations to Scan";
 "Taranıyor…" = "Scanning…";
 "Taşımadan önce envanter yeniden doğrulanır; öğeler Çöp’ten geri alınabilir." = "The app inventory is re-verified before anything moves; items can be restored from the Trash.";
 "Taşınacak öğeleri seç. Kullanıcı verisi içeren öğeler ayrıca işaretlenir. Hiçbir öğe henüz değiştirilmedi." = "Choose the items to move. Items with user data are marked. Nothing has been changed yet.";
@@ -1160,7 +1156,6 @@
 "Tüm bağlı ekranlarda siyah bir MacPocket penceresi açılır." = "A black MacPocket window covers every connected display.";
 "Tüm boyutlar" = "All sizes";
 "Tüm ekranlar" = "All displays";
-"Tüm konumları yeniden tara" = "Scan all locations again";
 "Tüm masaüstleri" = "All desktops";
 "Tüm sistem (giriş)" = "Whole system (input)";
 "Tüm uygulamalar" = "All apps";
@@ -1415,7 +1410,6 @@
 "Önbellek ve boş" = "Cached and free";
 "Önbellek ve log adaylarını kategorileriyle incele." = "Review cache and log candidates by category.";
 "Önbellekler" = "Caches";
-"Önbellekler, günlükler, Xcode verileri ve paket yöneticisi indirmeleri. Tarama hiçbir dosyayı değiştirmez." = "Caches, logs, Xcode data and package manager downloads. Scanning never changes any files.";
 "Önbellekleri, günlükleri ve geliştirici artıklarını bul; seçtiklerini Çöp’e taşı." = "Find caches, logs and developer leftovers, and move what you select to the Trash.";
 "Önbellekteki dosyalar" = "Cached files";
 "Öndeki uygulama" = "Front app";
@@ -2439,3 +2433,34 @@
 "Yardımcı kaydedildi; Sistem Ayarları › Genel › Oturum Açma Öğeleri’nde MacPocket’e izin ver." = "Helper registered; allow MacPocket in System Settings › General › Login Items.";
 "Yardımcının durumu bilinmiyor." = "The helper’s status is unknown.";
 "Yardımcıyı etkinleştir" = "Enable helper";
+
+/* Cleanup scan planner */
+"Ne taransın?" = "What to scan?";
+"Profil" = "Profile";
+"Tarama profili" = "Scan profile";
+"Konumlar" = "Locations";
+"%@ konumlarını gizle" = "Hide %@ locations";
+"%@ konumlarını göster" = "Show %@ locations";
+"%lld/%lld konum taranacak" = "%lld of %lld locations will be scanned";
+"Taranmayacak" = "Not scanned";
+"Bu kategoriyi taramadan çıkar" = "Remove this category from the scan";
+"Bu kategoriyi taramaya ekle" = "Add this category to the scan";
+"%lld/%lld konum" = "%lld/%lld locations";
+"%@ · yalnız bilgi" = "%@ · info only";
+"%@ · son: %@" = "%@ · last: %@";
+"Konum listesini kapat" = "Close location list";
+"Eski İndirilenler bu süreden uzun süredir dokunulmamış öğeleri listeler." = "Old Downloads lists items untouched for longer than this.";
+"Son taramada bulunan boyut" = "Size found in the last scan";
+"Kapsamı Değiştir" = "Change Scope";
+"Taranacak kategorileri yeniden seç" = "Choose the categories to scan again";
+"Seçili konumları yeniden tara" = "Scan the selected locations again";
+"Taramak için en az bir kategori seç." = "Choose at least one category to scan.";
+"%lld kategori · %lld konum seçili. Tarama hiçbir dosyayı değiştirmez." = "%lld categories · %lld locations selected. Scanning changes no files.";
+"Seçilenleri Tara" = "Scan Selected";
+"Taranacak konum seçilmedi. Temizlik sayfasından en az bir kategori seç." = "No locations are selected for scanning. Choose at least one category on the Cleanup page.";
+"Önerilen" = "Recommended";
+"Uygulamaların yeniden oluşturduğu önbellekler, günlükler ve Çöp." = "Caches and logs apps rebuild, plus the Trash.";
+"Önerilene ek olarak Xcode ve paket yöneticisi önbellekleri." = "Recommended plus Xcode and package manager caches.";
+"İncelenmesi gerekenler dahil tüm konumlar." = "Every location, including the ones to review.";
+"Konumları kendin seçtin." = "You picked the locations yourself.";
+"Uygulama Önbellekleri" = "App Caches";

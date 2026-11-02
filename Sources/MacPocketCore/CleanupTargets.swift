@@ -12,14 +12,15 @@ public enum CleanupSafety: String, Codable, Sendable {
 }
 
 public enum CleanupGroup: String, Sendable, CaseIterable, Identifiable {
-    case system, developer, packages, user, separate, trash
+    case system, developer, packages, apps, downloads, separate, trash
     public var id: String { rawValue }
     public var title: String {
         switch self {
         case .system: String(localized: "Sistem Çöpü")
         case .developer: String(localized: "Xcode ve Geliştirici")
         case .packages: String(localized: "Paket Yöneticileri")
-        case .user: String(localized: "Kullanıcı Dosyaları")
+        case .apps: String(localized: "Uygulama Önbellekleri")
+        case .downloads: String(localized: "İndirilenler")
         case .separate: String(localized: "Ayrı Yönet")
         case .trash: String(localized: "Çöp Kutusu")
         }
@@ -141,7 +142,7 @@ public enum CleanupCatalog {
                           relatedBundleIDs: ["com.google.android.studio"]),
             CleanupTarget(id: .communicationCaches, title: String(localized: "Mesajlaşma Uygulaması Önbellekleri"),
                           detail: String(localized: "Slack, Discord, Teams ve Signal’in yalnız önbellek klasörleri. Mesajlar ve ayarlar dokunulmaz."),
-                          symbol: "bubble.left.and.bubble.right.fill", group: .user,
+                          symbol: "bubble.left.and.bubble.right.fill", group: .apps,
                           roots: ["Slack", "discord", "Microsoft/Teams", "Signal"].map { h("Library/Application Support/" + $0) },
                           selection: .named(electronCacheNames), safety: .safe, preselected: true, excludedNames: ignoredNames,
                           minimumAgeDays: nil,
@@ -149,7 +150,7 @@ public enum CleanupCatalog {
                                              "org.whispersystems.signal-desktop"]),
             CleanupTarget(id: .designCaches, title: String(localized: "Tasarım Uygulaması Önbellekleri"),
                           detail: String(localized: "Adobe uygulamalarının ortam önbelleği. Uygulama gerektiğinde yeniden oluşturur."),
-                          symbol: "paintpalette.fill", group: .user, roots: [h("Library/Application Support/Adobe/Common")],
+                          symbol: "paintpalette.fill", group: .apps, roots: [h("Library/Application Support/Adobe/Common")],
                           selection: .named(["Media Cache Files", "Media Cache"]), safety: .safe, preselected: true,
                           excludedNames: ignoredNames, minimumAgeDays: nil, relatedBundleIDs: []),
             CleanupTarget(id: .editorCaches, title: String(localized: "Kod Düzenleyici Önbellekleri"),
@@ -161,12 +162,12 @@ public enum CleanupCatalog {
                           relatedBundleIDs: ["com.microsoft.VSCode", "com.todesktop.230313mzl4w4u92"]),
             CleanupTarget(id: .oldDownloads, title: String(localized: "Eski İndirilenler"),
                           detail: String(localized: "\(downloadsAgeDays) günden uzun süredir dokunulmamış indirilen öğeler. Seçmeden önce incele."),
-                          symbol: "arrow.down.circle.fill", group: .user, roots: [h("Downloads")], selection: .children,
+                          symbol: "arrow.down.circle.fill", group: .downloads, roots: [h("Downloads")], selection: .children,
                           safety: .review, preselected: false, excludedNames: ignoredNames, minimumAgeDays: downloadsAgeDays,
                           relatedBundleIDs: []),
             CleanupTarget(id: .installers, title: String(localized: "Yükleyiciler"),
                           detail: String(localized: "İndirilenler’deki DMG, PKG ve ISO dosyaları; kurulduktan sonra gerekmez. Seçmeden önce incele."),
-                          symbol: "shippingbox.and.arrow.backward.fill", group: .user, roots: [h("Downloads")],
+                          symbol: "shippingbox.and.arrow.backward.fill", group: .downloads, roots: [h("Downloads")],
                           selection: .extensions(["dmg", "pkg", "iso", "xip"]), safety: .review, preselected: false,
                           excludedNames: ignoredNames, minimumAgeDays: nil, relatedBundleIDs: []),
             CleanupTarget(id: .phoneBackups, title: String(localized: "iPhone ve iPad Yedekleri"),

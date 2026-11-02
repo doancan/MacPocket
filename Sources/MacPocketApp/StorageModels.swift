@@ -263,11 +263,32 @@ final class CleanupModel: ObservableObject {
     private(set) var selectedBytes: Int64 = 0
     private(set) var selectedItems: [CleanupItem] = []
     private(set) var targets: [CleanupTarget] = CleanupCatalog.targets(home: URL(fileURLWithPath: NSHomeDirectory()))
+    /// What the next scan covers; remembered between launches.
+    @Published var scanSelection: CleanupScanSelection {
+        didSet { if scanSelection != oldValue { scanSelection.save(to: .standard) } }
+    }
+    /// Per-location sizes from earlier scans, shown on the category tiles.
+    @Published private(set) var lastSizes = CleanupLastScanSizes.load(from: .standard)
     private var itemsByID: [String: CleanupItem] = [:]
     private var control: StorageScanControl?
     private var task: Task<Void, Never>?
     private let service = CleanupService()
     private let emptier = TrashEmptier()
+
+    init() {
+        scanSelection = CleanupScanSelection.load(from: .standard, targets: targets)
+    }
+
+    var scanProfile: CleanupProfile { scanSelection.profile(in: targets) }
+
+    func applyProfile(_ profile: CleanupProfile) { scanSelection.apply(profile, targets: targets) }
+
+    /// Back to choosing what to scan; the previous results are dropped.
+    func editScanPlan() {
+        guard !busy else { return }
+        report = nil; summary = nil; failure = nil
+        selection = []; itemsByID = [:]
+    }
 
     /// No new entries for a few seconds: usually a macOS privacy prompt (Downloads, Mail) awaiting an answer.
     @Published private(set) var stalled = false
@@ -289,8 +310,13 @@ final class CleanupModel: ObservableObject {
     func scan() {
         guard !busy else { return }
         let home = URL(fileURLWithPath: NSHomeDirectory(), isDirectory: true)
-        let targets = CleanupCatalog.targets(home: home, downloadsAgeDays: downloadsAgeDays)
-        self.targets = targets
+        let catalog = CleanupCatalog.targets(home: home, downloadsAgeDays: downloadsAgeDays)
+        self.targets = catalog
+        let targets = catalog.filter { scanSelection.contains($0.id) }
+        guard !targets.isEmpty else {
+            failure = String(localized: "Taranacak konum seçilmedi. Temizlik sayfasından en az bir kategori seç.")
+            return
+        }
         let running = NSWorkspace.shared.runningApplications.map {
             RunningApplicationInfo(bundleID: $0.bundleIdentifier, name: $0.localizedName)
         }
@@ -315,6 +341,8 @@ final class CleanupModel: ObservableObject {
 
     private func apply(_ report: CleanupReport) {
         self.report = report
+        lastSizes.record(report)
+        lastSizes.save(to: .standard)
         itemsByID = Dictionary(report.targets.flatMap(\.items).map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
         selection = Set(report.targets.filter { isSelectable($0.target) }.flatMap(\.items)
             .filter { $0.preselected && !protection.contains($0.id) }.map(\.id))

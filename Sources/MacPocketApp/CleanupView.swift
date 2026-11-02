@@ -21,7 +21,8 @@ extension CleanupGroup {
         case .system: "gearshape.2.fill"
         case .developer: "hammer.fill"
         case .packages: "shippingbox.fill"
-        case .user: "person.crop.circle.fill"
+        case .apps: "app.badge.fill"
+        case .downloads: "arrow.down.circle.fill"
         case .separate: "externaldrive.fill"
         case .trash: "trash.fill"
         }
@@ -39,18 +40,11 @@ struct CleanupView: View {
             VStack(alignment: .leading, spacing: PocketSpacing.l) {
                 PocketPageHeading(title: "Temizlik", subtitle: "Önbellekleri, günlükleri ve geliştirici artıklarını bul; seçtiklerini Çöp’e taşı.",
                                   icon: "sparkles") {
-                    HStack(spacing: PocketSpacing.s) {
-                        Picker("Eski indirilenler", selection: $model.downloadsAgeDays) {
-                            Text("30 günden eski").tag(30)
-                            Text("90 günden eski").tag(90)
-                            Text("180 günden eski").tag(180)
-                            Text("1 yıldan eski").tag(365)
-                        }
-                        .fixedSize()
-                        .disabled(model.busy)
-                        .help("Eski İndirilenler bu süreden uzun süredir dokunulmamış öğeleri listeler. Tarama sırasında uygulanır.")
-                        if model.report != nil, !model.busy {
-                            Button("Yeniden Tara") { model.scan() }.help("Tüm konumları yeniden tara")
+                    if model.report != nil, !model.busy {
+                        HStack(spacing: PocketSpacing.s) {
+                            Button("Kapsamı Değiştir") { model.editScanPlan() }
+                                .help("Taranacak kategorileri yeniden seç")
+                            Button("Yeniden Tara") { model.scan() }.help("Seçili konumları yeniden tara")
                         }
                     }
                 }
@@ -60,7 +54,7 @@ struct CleanupView: View {
                 if let report = model.report, !model.scanning {
                     results(report)
                 } else if !model.scanning {
-                    catalogPreview
+                    CleanupScanPlanner(model: model)
                 }
             }
             .padding(PocketSpacing.page)
@@ -86,6 +80,14 @@ struct CleanupView: View {
             text += "\n\n" + String(localized: "\(model.selectedWarnings) öğenin uygulaması açık veya incelenmesi gerekiyor.")
         }
         return text
+    }
+
+    private var planSummary: String {
+        let ids = model.scanSelection.ids
+        let groups = Set(model.targets.filter { ids.contains($0.id) }.map(\.group)).count
+        let locations = model.targets.filter { ids.contains($0.id) }.count
+        if locations == 0 { return String(localized: "Taramak için en az bir kategori seç.") }
+        return String(localized: "\(groups) kategori · \(locations) konum seçili. Tarama hiçbir dosyayı değiştirmez.")
     }
 
     // MARK: Hero
@@ -136,18 +138,20 @@ struct CleanupView: View {
                     Text("Tarama \(report.scannedAt.formatted(date: .omitted, time: .shortened)) · \(Int(report.duration.rounded())) sn")
                         .font(.subheadline).foregroundStyle(.tertiary)
                 } else {
-                    Text("Sistem Çöpü").font(.title.weight(.bold))
-                    Text("Önbellekler, günlükler, Xcode verileri ve paket yöneticisi indirmeleri. Tarama hiçbir dosyayı değiştirmez.")
-                        .font(.callout).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+                    Text(model.scanProfile.localizedTitle).font(.title.weight(.bold))
+                        .contentTransition(.opacity)
+                    Text(planSummary)
+                        .font(.callout).foregroundStyle(.secondary).monospacedDigit().fixedSize(horizontal: false, vertical: true)
                     Button {
                         model.scan()
                     } label: {
-                        Label("Tara", systemImage: "magnifyingglass").padding(.horizontal, PocketSpacing.m)
+                        Label("Seçilenleri Tara", systemImage: "magnifyingglass").padding(.horizontal, PocketSpacing.m)
                     }
                     .buttonStyle(.pocketPrimary)
                     .tint(tint)
                     .controlSize(.large)
                     .keyboardShortcut(.defaultAction)
+                    .disabled(model.scanSelection.ids.isEmpty)
                 }
             }
             Spacer(minLength: 0)
@@ -199,33 +203,6 @@ struct CleanupView: View {
             }
         }
         .pocketCard(padding: PocketSpacing.m)
-    }
-
-    // MARK: Before the first scan
-
-    private var catalogPreview: some View {
-        VStack(alignment: .leading, spacing: PocketSpacing.m) {
-            PocketSectionHeader("Taranacak konumlar", icon: "list.bullet")
-            LazyVGrid(columns: [GridItem(.adaptive(minimum: 260), spacing: PocketSpacing.m, alignment: .top)], spacing: PocketSpacing.m) {
-                ForEach(model.targets.filter { !$0.isTrash }) { target in
-                    HStack(alignment: .top, spacing: PocketSpacing.m) {
-                        PocketIconTile(symbol: target.symbol, tint: tint, size: 30)
-                        VStack(alignment: .leading, spacing: PocketSpacing.xxs) {
-                            HStack(spacing: PocketSpacing.xs) {
-                                Text(target.title).font(.callout.weight(.semibold))
-                                SafetyBadge(safety: target.safety)
-                            }
-                            Text(target.detail).font(.subheadline).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
-                        }
-                        Spacer(minLength: 0)
-                    }
-                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-                    .pocketCard(padding: PocketSpacing.m, radius: PocketRadius.medium)
-                }
-            }
-            Label("Eski indirilenler \(model.downloadsAgeDays) günden eski öğeleri kapsar.", systemImage: "calendar")
-                .font(.subheadline).foregroundStyle(.secondary)
-        }
     }
 
     // MARK: Results
@@ -307,7 +284,7 @@ private func accessMessage(_ message: String) -> some View {
     }
 }
 
-private struct SafetyBadge: View {
+struct CleanupSafetyBadge: View {
     let safety: CleanupSafety
     var body: some View {
         PocketStatusBadge(text: safety.title, systemImage: safety == .safe ? "checkmark.shield" : "eye",
@@ -361,7 +338,7 @@ private struct CleanupTargetCard: View {
                 VStack(alignment: .leading, spacing: PocketSpacing.xxs) {
                     HStack(spacing: PocketSpacing.xs) {
                         Text(target.target.title).font(.headline)
-                        SafetyBadge(safety: target.target.safety)
+                        CleanupSafetyBadge(safety: target.target.safety)
                         if !target.complete {
                             Image(systemName: PocketTone.warning.symbol).font(.subheadline).foregroundStyle(PocketTone.warning.color)
                                 .help("Bazı öğeler tam ölçülemedi.")
