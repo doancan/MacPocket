@@ -28,6 +28,7 @@ final class ScreenTextVisionTests: XCTestCase {
     }
 
     func testRecognizesTurkishTextOnDevice() throws {
+        try XCTSkipIf(TestEnvironment.isVirtualMachine, "Vision text recognition is unavailable in virtual machines")
         let text = try ScreenTextReader.text(in: image("Merhaba Dünya 2026"))
         XCTAssertEqual(text.trimmingCharacters(in: .whitespacesAndNewlines), "Merhaba Dünya 2026")
     }

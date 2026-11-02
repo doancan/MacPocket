@@ -188,7 +188,8 @@ final class PowerLiveSystemTests: XCTestCase {
         XCTAssertGreaterThan(sample.unreadableCount, 0, "root processes should be unreadable without privileges")
         let me = try XCTUnwrap(sample.processes.first { $0.pid == getpid() })
         XCTAssertGreaterThan(me.cpuPercent, 20)
-        XCTAssertGreaterThan(me.milliwatts, 0)
+        // Virtual machines report no energy, so only the ordering can be checked there.
+        if !TestEnvironment.isVirtualMachine { XCTAssertGreaterThan(me.milliwatts, 0) }
         XCTAssertEqual(sample.processes.map(\.milliwatts), sample.processes.map(\.milliwatts).sorted(by: >))
     }
 }
