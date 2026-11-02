@@ -13,7 +13,7 @@ final class SupportReportTests: XCTestCase {
         snapshot.network = NetworkSnapshot(receivedBytesPerSecond: 0, sentBytesPerSecond: 0, primaryInterface: "en1",
                                            localIPv4: "192.168.50.201", totalReceivedBytes: 0, totalSentBytes: 0)
         return SupportReport.Input(
-            generatedAt: Date(timeIntervalSince1970: 1_800_000_000), appVersion: "0.3.0", osVersion: "macOS 27.2",
+            generatedAt: Date(timeIntervalSince1970: 1_800_000_000), appVersion: "0.1.0", osVersion: "macOS 27.2",
             computerName: "Doğancan’s Mac Studio", userName: "dogancan", snapshot: snapshot,
             processes: [.init(name: "/Users/dogancan/bin/tool|x", cpuPercent: 12.34, memoryBytes: 1 << 30)],
             ports: [PortOwner(pid: 1, command: "node", sockets: [ListeningSocket(transport: .tcp, address: "*", port: 3000, isIPv6: false)]),
