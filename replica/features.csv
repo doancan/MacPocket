@@ -1,6 +1,6 @@
 feature,area,priority,original,clone,notes
 Uygulama önbelleği + log temizliği (tarayıcı/bulut istemci dahil),Temizlik,must,yes,partial,MEVCUT: CleanupTargets userCaches/userLogs. EKLE: tarayıcı ve bulut istemci önbellek hedefleri
-Geliştirici/iletişim/tasarım aracı önbellekleri,Temizlik,should,yes,partial,MEVCUT: DerivedData npm pip yarn cocoapods gradle homebrew. EKLE: iletişim ve tasarım uygulaması önbellekleri
+Geliştirici/iletişim/tasarım aracı önbellekleri,Temizlik,should,yes,partial,"M2: Slack/Discord/Teams/Signal, Adobe medya önbelleği, VS Code/Cursor eklendi (gerçek taramada VS Code 188 MB, du ile eşleşti). Figma/Sketch yolları doğrulanamadı"
 Kaldırma artıkları taraması,Temizlik,must,yes,partial,MEVCUT: ApplicationLeftovers (aday tarama). EKLE: kategori sayısını genişlet; başlangıç öğesi ve paket makbuzu çapraz kontrolü
 Sistem Verisi: yerel Time Machine anlık görüntüleri temizliği,Temizlik,should,yes,no,MEVCUT yalnız listeleme (SystemMaintenanceTools.timeMachine). EKLE: seçili snapshot silme (tmutil deletelocalsnapshots) onaylı
 Sistem Verisi: sistem cache/log + eski macOS yükleyicileri + eski duvar kağıdı indirmeleri,Temizlik,should,yes,no,Yükleyici için /Applications/Install macOS*.app boyut+yaş listesi; yönetici yetkisi gerektirir
@@ -9,12 +9,12 @@ Sistem Verisi: sistem cache/log + eski macOS yükleyicileri + eski duvar kağıd
 Kalıcı silme yerine Çöp'e taşıma ayarı (önbellek için),Temizlik,could,yes,partial,MEVCUT: Çöp'e taşıma var; varsayılan/ayar seçeneği netleştirilecek
 "Temizlik toplamında ""System Data"" rakamını eşleştirme iddiası yok",Temizlik,should,yes,partial,Metin kuralı: sistem sınıflaması klasör değildir; arayüzde belirt (StorageCategory.system açıklaması mevcut)
 Uygulama güncellemeleri: App Store/Sparkle/Electron/Homebrew/GitHub,Yazılım,must,yes,partial,MEVCUT: yalnız Homebrew cask kontrol+upgrade; kaynak tespiti var (AppSource). EKLE: GitHub Releases yedek kanalı; Sparkle appcast sürüm okuma; App Store (mas varsa)
-Başlangıç öğeleri yönetimi (doğrudan/Ayarlar yönetimli/salt okunur ayrımı),Yazılım,must,yes,partial,MEVCUT: macOS ayarına yönlendirme. EKLE: LaunchAgents/LaunchDaemons + SMAppService okuma ve üç sınıfa ayırma; doğrudan kontrol edilenleri aç/kapat
+Başlangıç öğeleri yönetimi (doğrudan/Ayarlar yönetimli/salt okunur ayrımı),Yazılım,must,yes,partial,"M2: yalnız okuma, 3 sınıf, açık/kapalı durumu (gerçek Mac ile çapraz kontrol). Açıp kapatma yok"
 Kaldırma: 15+ kalıntı kategorisi + giriş öğesi + paket makbuzu + Dock + girdi kaynakları,Yazılım,must,yes,partial,MEVCUT: bundleID tabanlı plan + Çöp. EKLE: kategori genişletme; pkgutil makbuz; Dock girdisi
 Oturum başına tek yönetici doğrulaması,Yazılım,could,yes,no,Yönetici gerektiren işlemler için tek yetkilendirme (SMJobBless/XPC yardımcı) - mimari karar gerekir
 Bakım görünür düzeltme geçişi (self-healing ajanlar),Optimize,should,yes,no,Kapsam dışı değil; önce gerçek ajan listesi araştırılmalı
 Tek dokunuşla bakım: Quick Look önbelleği,Optimize,must,yes,no,qlmanage -r cache. MEVCUT bakım yalnız salt okunur raporlar
-Tek dokunuşla bakım: yazı tipi önbelleği,Optimize,should,yes,no,atsutil databases -remove (yönetici); canlı doğrulama gerekir
+Tek dokunuşla bakım: yazı tipi önbelleği,Optimize,should,yes,partial,"M2: yalnız kullanıcı önbelleği (atsutil -removeUser) çalışır; sistem düzeyi yönetici ister, M3"
 Tek dokunuşla bakım: SQLite vacuum,Optimize,could,yes,no,Yalnız çalışmayan uygulamaların veritabanları; kayıp riski - dikkatli
 Tek dokunuşla bakım: bildirim geçmişi + öksüz Spotlight kuralları + periyodik bakım,Optimize,could,yes,no,macOS sürümüne göre desteklenir; destek durumu gerekçeli gösterilir
 Parallels sanal disk boşluk geri kazanımı,Optimize,could,yes,no,Niş; Parallels kurulu değilse gizle. Ayrı onay + toplu temizlikten hariç
@@ -28,16 +28,16 @@ Fan kontrolü (desteklenen Mac'lerde),Durum,could,yes,no,MEVCUT salt okuma. Yazm
 Sıralanabilir süreç listesi + tıklayıp sabitleme,Durum,should,yes,partial,MEVCUT: TaskManagerView/ProcessNativeTable. EKLE: sabitleme (pin)
 Süreç başına güç ve sıcaklık birimi tutarlılığı (panel = menü çubuğu),Durum,should,yes,partial,MEVCUT: PocketDetailLevel + ProcessEnergy. Birim ayarını tek kaynaktan sür
 Menü çubuğu koşucu animasyonu (duraklatılabilir),Menü Çubuğu,could,yes,no,Özgün karakter/animasyon çiz; hareket CPU yüküne bağlı. Reduce Motion'a uy
-Menü çubuğu HUD: CPU/bellek/ağ hızı + yalnız simge kompakt mod + sağ tık menüsü,Menü Çubuğu,must,yes,partial,MEVCUT: MenuBarModules/Renderer (birleşik veya ayrı). EKLE: yalnız-simge kompakt mod ve sağ tık hızlı menü doğrulaması
+Menü çubuğu HUD: CPU/bellek/ağ hızı + yalnız simge kompakt mod + sağ tık menüsü,Menü Çubuğu,must,yes,partial,"Kompakt simge modları zaten vardı. M2: sağ tık menüsü eklendi, canlı doğrulanmadı"
 Ekranı Açık Tut,Araçlar,must,yes,yes,MEVCUT: SleepController + FocusSession
-"Ekran Temizleme (düz renk, giriş kilidi, Escape ile çıkış)",Araçlar,must,yes,partial,MEVCUT: ScreenCleaningController (süre sınırlı). EKLE: renk seçimi + isteğe bağlı giriş kilidi
+"Ekran Temizleme (düz renk, giriş kilidi, Escape ile çıkış)",Araçlar,must,yes,partial,M2: renk (siyah/beyaz/gri) + isteğe bağlı sistem geneli kilit kodlandı. Kilit canlı doğrulanmadı (Erişilebilirlik izni yok)
 Ekran Temizleme: şiir kataloğu,Araçlar,could,yes,no,Atla (marka karakteri). İstenirse özgün kısa sözler
 WiFi Düşük Gecikme (AWDL/AirDrop geçici duraklatma),Araçlar,should,yes,no,Arayüzü ifconfig awdl0 down ile yönetici yetkisi gerektirir; uyku/çıkış/ağ değişiminde geri al; hız iddiası yok
 Gizlilik Kontrolü: canlı kamera/mikrofon kullanımı bildirimi,Araçlar,must,yes,partial,"Kod+test tamam (PrivacyMonitor, 11 test). Canlı doğrulanmadı: bu Mac'te mikrofon girişi/kamera yok; arayüz ve bildirim görsel doğrulanamadı"
 Bu uygulama için bildirme listesi + Menü Çubuğu ayarı,Araçlar,should,yes,no,Gizlilik Kontrolü ile birlikte
 Kısayollar: ana pencere ve fan soğutma,Araçlar,could,yes,partial,MEVCUT: PocketGlobalHotKey (ana pencere kısayolu eklenebilir)
 CLI: proje yapıt temizliği (build/bağımlılık klasörleri),Temizlik,should,yes,no,"Mole'da yalnız CLI; biz uygulama içinde ""Proje Artıkları"" olarak sun (node_modules/target/.build/Pods). CleanupTargets'a ek"
-CLI: yükleyici süpürme (DMG/PKG/ZIP),Temizlik,should,yes,no,İndirilenler taraması üzerine tür filtresi
+CLI: yükleyici süpürme (DMG/PKG/ZIP),Temizlik,should,yes,partial,"M2: Yükleyiciler hedefi (DMG/PKG/ISO/XIP, İndirilenler); ZIP bilerek yok"
 CLI: sudo için Touch ID,Araçlar,could,yes,no,Atla: sistem yapılandırması dosyası düzenler (/etc/pam.d); riskli
 Tüm yıkıcı işlemlerde önizleme (dry-run),Güvenlik,must,yes,partial,MEVCUT: tarama/onay akışı önizleme işlevi görüyor; bunu açıkça standartlaştır
 "Etkin süreç tarafından açık tutulan dosyaları ""kullanımda"" işaretle",Güvenlik,must,yes,no,lsof/proc_pidfd tabanlı; silmeden önce uyarı
@@ -45,7 +45,7 @@ AI Cleanup & Care (CLI/oturum/Ollama temizliği),Temizlik,skip,yes,skip,KULLANIC
 Lisans/ödeme/2 Mac anahtarı/ücretsiz iki kullanım,İş,skip,yes,skip,Ürün modeli; kullanıcı istemedi
 Windows sürümü,Platform,skip,yes,skip,Kapsam dışı
 Mole'un adları/karakterleri/şiir metinleri/ikonları,Marka,skip,yes,skip,Marka varlığı; kopyalanmaz
-Temizlikte her öğe için temizle / atla / koru kararı (protect),Temizlik,should,yes,no,"Ekran: 'Review each item before choosing what to clean, skip, or protect'. Korunan öğeler kalıcı saklanır, sonraki taramalarda işaretsiz gelir"
+Temizlikte her öğe için temizle / atla / koru kararı (protect),Temizlik,should,yes,partial,"M2: Koru (kalıcı, politika reddeder) kodlandı+test. Atla = seçimi kaldırmak. Arayüz canlı doğrulanmadı"
 Temizlik özeti: 'N GB bulundu · M öğe · K kategori' + Sonuçları incele + Tekrar tara,Temizlik,should,yes,partial,MEVCUT: CleanupView tarama sonucu. Özet kartı ve alt çubukta 'Temizle · boyut' eylem düğmesi eklenecek
 Hızlı kaldırma (listede tek adım) + uygulama ve kalıntı boyutu önceden gösterilir,Yazılım,should,yes,partial,MEVCUT: kaldırma planı. EKLE: Hızlı kaldırma anahtarı; boyutlar plan öncesi görünür
 Analiz: sistem klasörleri yalnız görüntüleme; yalnız Çöp'teki öğeler kalıcı silmede onay ister,Analiz,must,yes,partial,MEVCUT: SpaceLens Çöp'e taşır. Kural: sistem yolları asla silinemez; test ile sabitle

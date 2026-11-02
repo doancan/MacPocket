@@ -2311,3 +2311,6 @@
 "Temizlerken yanlışlıkla tuşa basmanı ve imleci oynatmanı engeller. Yalnız Esc ile veya süre dolunca çıkılır." = "Keeps you from pressing keys or moving the pointer while cleaning. You can only exit with Esc or when time runs out.";
 "Tüm klavye ve fare girişini kilitle" = "Lock all keyboard and mouse input";
 "Varsayılan olarak klavye ve fare girişleri yalnız bu uygulama içinde tutulur; macOS sistem kısayolları kilitlenmez. İstersen aşağıdan tüm girişi kilitleyebilirsin." = "By default keyboard and mouse input stays inside this app and macOS shortcuts aren’t locked. You can lock all input below.";
+
+/* Menü çubuğu sağ tık menüsü */
+"MacPocket’ten çık" = "Quit MacPocket";

@@ -134,6 +134,7 @@ final class PocketStatusItemController: NSObject, NSPopoverDelegate {
             let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
             item.button?.target = self
             item.button?.action = #selector(togglePopover(_:))
+            item.button?.sendAction(on: [.leftMouseUp, .rightMouseUp])
             item.button?.imagePosition = .imageOnly
             item.button?.title = ""
             item.button?.setAccessibilityRole(.menuButton)
@@ -156,6 +157,11 @@ final class PocketStatusItemController: NSObject, NSPopoverDelegate {
 
     @objc private func togglePopover(_ sender: NSStatusBarButton) {
         let key = items.first { $0.value.button === sender }?.key
+        if NSApp.currentEvent?.type == .rightMouseUp, let key {
+            popover.performClose(nil)
+            showQuickMenu(for: key)
+            return
+        }
         if popover.isShown {
             let sameOwner = key == popoverOwner
             popover.performClose(nil)
@@ -178,7 +184,36 @@ final class PocketStatusItemController: NSObject, NSPopoverDelegate {
         hosting.view.window?.makeKey()
     }
 
+
+    // MARK: Right-click menu
+
+    private func showQuickMenu(for key: String) {
+        guard let item = items[key] else { return }
+        let menu = NSMenu()
+        menu.addItem(withTitle: String(localized: "MacPocket’ı aç"), action: #selector(openMainWindow), keyEquivalent: "").target = self
+        menu.addItem(withTitle: String(localized: "Ayarlar"), action: #selector(openSettings), keyEquivalent: ",").target = self
+        menu.addItem(.separator())
+        menu.addItem(withTitle: String(localized: "MacPocket’ten çık"), action: #selector(quit), keyEquivalent: "q").target = self
+        // A menu assigned only for this click keeps the left click opening the popover.
+        item.menu = menu
+        item.button?.performClick(nil)
+        item.menu = nil
+    }
+
+    @objc private func openMainWindow() {
+        NSApp.activate(ignoringOtherApps: true)
+        model.openMainWindow?()
+    }
+
+    @objc private func openSettings() {
+        NSApp.activate(ignoringOtherApps: true)
+        model.openSettingsWindow?()
+    }
+
+    @objc private func quit() { NSApp.terminate(nil) }
+
     func popoverDidClose(_ notification: Notification) {
+
         // Releasing the hosted view stops all popover rendering while it is hidden.
         popover.contentViewController = nil
         model.menuBarProcessesWanted = false
