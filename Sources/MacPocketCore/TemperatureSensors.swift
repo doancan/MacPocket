@@ -139,3 +139,13 @@ final class TemperatureSensor {
             }
     }
 }
+
+/// The hottest CPU/GPU/SoC sensor right now, for the fan helper's thermal guard.
+public final class HottestTemperatureReader: @unchecked Sendable {
+    private let sensor = TemperatureSensor()
+
+    public init() {}
+
+    /// Nil when no sensor can be read; callers must treat that as "unknown", never as "cool".
+    public func celsius() -> Double? { sensor.sample()?.map(\.celsius).max() }
+}

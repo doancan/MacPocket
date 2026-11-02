@@ -97,6 +97,22 @@ struct MacPocketProbe {
                 } else {
                     try output(tasks.map { ["task": $0.id.rawValue, "support": "\($0.support)"] })
                 }
+            case "fans":
+                guard let transport = AppleSMCTransport() else { throw ProbeError.usage("AppleSMC is not reachable") }
+                try output(try fanReport(FanController(transport: transport)))
+            case "fan-set":
+                guard arguments.count == 3, let fan = Int(arguments[1]), let rpm = Double(arguments[2]) else {
+                    throw ProbeError.usage("fan-set <fan> <rpm> (needs root; ends with fan-release)")
+                }
+                guard let transport = AppleSMCTransport() else { throw ProbeError.usage("AppleSMC is not reachable") }
+                let controller = FanController(transport: transport)
+                try controller.setTarget(fan: fan, rpm: rpm)
+                try output(try fanReport(controller))
+            case "fan-release":
+                guard let transport = AppleSMCTransport() else { throw ProbeError.usage("AppleSMC is not reachable") }
+                let controller = FanController(transport: transport)
+                controller.releaseAll()
+                try output(try fanReport(controller))
             case "help", "--help", "-h":
                 print("""
                 macpocket-probe — native MacPocket development and validation tool
@@ -110,6 +126,9 @@ struct MacPocketProbe {
                   startup                      launchd startup items by class (read-only)
                   maintenance [run <id>]       Maintenance tasks and support; run one ready task
                   cleanup                      Read-only cleanup scan summary per target
+                  fans                         Fan RPM, range and mode (read-only)
+                  fan-set <fan> <rpm>          Set one fan's speed, verified by readback (needs root)
+                  fan-release                  Hand every fan back to the system (needs root)
                   privacy                      Microphone and camera use right now (apps that are listening/recording)
                 Diagnostics: \(SystemDiagnostic.allCases.map(\.rawValue).joined(separator: ", "))
                 """)
@@ -119,6 +138,14 @@ struct MacPocketProbe {
         } catch {
             FileHandle.standardError.write(Data("MacPocket: \(error)\n".utf8))
             exit(1)
+        }
+    }
+
+    static func fanReport(_ controller: FanController) throws -> [[String: Double]] {
+        try (0..<controller.fanCount).map { fan in
+            let range = try controller.range(fan: fan)
+            return ["fan": Double(fan), "rpm": try controller.actualRPM(fan: fan) ?? -1,
+                    "minimum": range.lowerBound, "maximum": range.upperBound]
         }
     }
 

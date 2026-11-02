@@ -53,10 +53,9 @@ enum SMCValue {
     }
 }
 
-/// Reads fan speeds from the AppleSMC user client (read-only; no privileges needed outside the sandbox).
-/// The connection is opened once and reused; key metadata and fan ranges are cached, so a sample costs one
-/// SMC call per fan. Returns nil when the SMC can't be reached, an empty array on Macs without fans.
-final class FanSensor {
+/// The AppleSMC user client: opens the connection once and reads or writes keys. Writing needs root; reading
+/// doesn't. Key metadata is cached, so a read costs one SMC call.
+public final class AppleSMCTransport: SMCTransport, @unchecked Sendable {
     /// Mirrors the kernel's `SMCKeyData_t` (80 bytes). Swift lays a nested struct out by its size, not
     /// its stride, so the key info carries its C tail padding explicitly.
     private struct Parameters {
@@ -80,26 +79,85 @@ final class FanSensor {
 
     private static let handleEventSelector: UInt32 = 2
     private static let readBytesCommand: UInt8 = 5
+    private static let writeBytesCommand: UInt8 = 6
     private static let readKeyInfoCommand: UInt8 = 9
+    private static let maximumPayload = 32
 
+    private let lock = NSLock()
     private var connection: io_connect_t = 0
     private var keyInfo: [UInt32: (size: UInt32, type: String)] = [:]
+
+    /// Nil when the SMC can't be reached.
+    public init?() {
+        let service = IOServiceGetMatchingService(kIOMainPortDefault, IOServiceMatching("AppleSMC"))
+        guard service != 0 else { return nil }
+        defer { IOObjectRelease(service) }
+        guard IOServiceOpen(service, mach_task_self_, 0, &connection) == kIOReturnSuccess else { return nil }
+    }
+
+    deinit { IOServiceClose(connection) }
+
+    public func read(_ key: String) throws -> SMCKeyValue? {
+        lock.lock(); defer { lock.unlock() }
+        let code = SMCValue.fourCharCode(key)
+        guard let info = info(for: code), info.size <= UInt32(Self.maximumPayload) else { return nil }
+        var request = Parameters()
+        request.key = code
+        request.keyInfo.dataSize = info.size
+        request.command = Self.readBytesCommand
+        guard let reply = call(request) else { return nil }
+        let bytes = withUnsafeBytes(of: reply.bytes) { Array($0.prefix(Int(info.size))) }
+        return SMCKeyValue(type: info.type, bytes: bytes)
+    }
+
+    public func write(_ key: String, bytes: [UInt8]) throws {
+        lock.lock(); defer { lock.unlock() }
+        let code = SMCValue.fourCharCode(key)
+        guard let info = info(for: code) else { throw FanControlError.keyMissing(key) }
+        guard Int(info.size) == bytes.count, bytes.count <= Self.maximumPayload else { throw FanControlError.writeRefused(key) }
+        var request = Parameters()
+        request.key = code
+        request.keyInfo.dataSize = info.size
+        request.command = Self.writeBytesCommand
+        withUnsafeMutableBytes(of: &request.bytes) { buffer in
+            for (index, byte) in bytes.enumerated() { buffer[index] = byte }
+        }
+        guard call(request) != nil else { throw FanControlError.writeRefused(key) }
+    }
+
+    private func info(for code: UInt32) -> (size: UInt32, type: String)? {
+        if let cached = keyInfo[code] { return cached }
+        var request = Parameters()
+        request.key = code
+        request.command = Self.readKeyInfoCommand
+        guard let reply = call(request) else { return nil }
+        let info = (reply.keyInfo.dataSize, SMCValue.string(reply.keyInfo.dataType))
+        keyInfo[code] = info
+        return info
+    }
+
+    private func call(_ request: Parameters) -> Parameters? {
+        var input = request
+        var output = Parameters()
+        var outputSize = MemoryLayout<Parameters>.stride
+        let status = IOConnectCallStructMethod(connection, Self.handleEventSelector, &input, MemoryLayout<Parameters>.stride,
+                                               &output, &outputSize)
+        return status == kIOReturnSuccess && output.result == 0 ? output : nil
+    }
+}
+
+/// Reads fan speeds (read-only; no privileges needed outside the sandbox). Fan ranges are cached, so a
+/// sample costs one SMC call per fan. Returns nil when the SMC can't be reached, an empty array on Macs
+/// without fans.
+final class FanSensor {
+    private let transport: AppleSMCTransport?
     private var ranges: [Int: (minimum: Double?, maximum: Double?)] = [:]
     private var fanCount: Int?
 
-    init() {
-        let service = IOServiceGetMatchingService(kIOMainPortDefault, IOServiceMatching("AppleSMC"))
-        guard service != 0 else { return }
-        defer { IOObjectRelease(service) }
-        if IOServiceOpen(service, mach_task_self_, 0, &connection) != kIOReturnSuccess { connection = 0 }
-    }
-
-    deinit {
-        if connection != 0 { IOServiceClose(connection) }
-    }
+    init() { transport = AppleSMCTransport() }
 
     func sample() -> [FanSnapshot]? {
-        guard connection != 0 else { return nil }
+        guard transport != nil else { return nil }
         if fanCount == nil { fanCount = read("FNum").map { Int($0) } }
         guard let count = fanCount else { return nil }
         return (0..<count).compactMap { index in
@@ -112,7 +170,7 @@ final class FanSensor {
     /// Whole-system power in watts on Apple silicon: total draw (PSTR) and DC input (PDTR, which includes
     /// conversion losses). Nil where the SMC does not publish them, e.g. Intel Macs.
     func power() -> (system: Double?, input: Double?) {
-        guard connection != 0 else { return (nil, nil) }
+        guard transport != nil else { return (nil, nil) }
         func watts(_ key: String) -> Double? { read(key).flatMap { Self.plausibleWatts.contains($0) ? $0 : nil } }
         return (watts("PSTR"), watts("PDTR"))
     }
@@ -120,30 +178,7 @@ final class FanSensor {
     static let plausibleWatts = 0.01...2000.0
 
     private func read(_ key: String) -> Double? {
-        let code = SMCValue.fourCharCode(key)
-        if keyInfo[code] == nil {
-            var request = Parameters()
-            request.key = code
-            request.command = Self.readKeyInfoCommand
-            guard let reply = call(request) else { return nil }
-            keyInfo[code] = (reply.keyInfo.dataSize, SMCValue.string(reply.keyInfo.dataType))
-        }
-        guard let info = keyInfo[code], info.size <= 32 else { return nil }
-        var request = Parameters()
-        request.key = code
-        request.keyInfo.dataSize = info.size
-        request.command = Self.readBytesCommand
-        guard let reply = call(request) else { return nil }
-        let bytes = withUnsafeBytes(of: reply.bytes) { Array($0.prefix(Int(info.size))) }
-        return SMCValue.decode(type: info.type, bytes: bytes)
-    }
-
-    private func call(_ request: Parameters) -> Parameters? {
-        var input = request
-        var output = Parameters()
-        var outputSize = MemoryLayout<Parameters>.stride
-        let status = IOConnectCallStructMethod(connection, Self.handleEventSelector, &input, MemoryLayout<Parameters>.stride,
-                                               &output, &outputSize)
-        return status == kIOReturnSuccess && output.result == 0 ? output : nil
+        guard let value = try? transport?.read(key) else { return nil }
+        return SMCValue.decode(type: value.type, bytes: value.bytes)
     }
 }
