@@ -1,7 +1,7 @@
 import MacPocketCore
 import SwiftUI
 
-/// Basic or advanced view of a metrics page or menu bar tab. Each page remembers its own choice.
+/// Basic or advanced view of a menu bar tab. Each tab remembers its own choice; the main window is always advanced.
 enum PocketDetailLevel: String, CaseIterable, Identifiable {
     case basic, advanced
     var id: String { rawValue }
@@ -11,7 +11,7 @@ enum PocketDetailLevel: String, CaseIterable, Identifiable {
     static func key(_ scope: String) -> String { "MacPocket.detail.\(scope)" }
 }
 
-/// "Gelişmiş" on/off switch for the top-right corner of a page or tab. Flipping it animates the
+/// "Gelişmiş" on/off switch for the top-right corner of a menu bar tab. Flipping it animates the
 /// advanced sections in and out (they fade while the layout around them resizes).
 struct PocketDetailLevelSwitch: View {
     @Binding var level: PocketDetailLevel

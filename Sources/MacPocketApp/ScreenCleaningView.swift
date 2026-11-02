@@ -69,7 +69,7 @@ struct ScreenCleaningView: View {
                     PocketMessage(failure, error: true)
                 }
             }
-            .frame(maxWidth: 640, alignment: .leading)
+            .frame(maxWidth: .infinity, alignment: .leading)
             .pocketCard()
             Label("Fiziksel temizlikte üreticinin önerdiği yöntemi kullan.", systemImage: "hand.raised")
                 .font(.subheadline)

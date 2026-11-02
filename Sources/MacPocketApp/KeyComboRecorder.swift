@@ -23,7 +23,7 @@ struct KeyComboRecorder: View {
                     if isRecording {
                         Text("Kısayola bas…")
                     } else if let combo {
-                        Text(verbatim: combo.displayName).monospaced()
+                        Text(verbatim: combo.displayName)
                     } else {
                         Text("Kapalı").foregroundStyle(.secondary)
                     }

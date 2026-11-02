@@ -192,7 +192,7 @@ struct PrivacyCheckView: View {
                     if !service.recent.isEmpty { recentCard }
                     if !service.settings.ignoredApps.isEmpty { ignoredCard }
                 }
-                .frame(maxWidth: 640, alignment: .leading)
+                .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(.bottom, PocketSpacing.l)
             }
         }

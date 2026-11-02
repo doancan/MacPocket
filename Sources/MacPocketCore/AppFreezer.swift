@@ -20,6 +20,9 @@ public struct AppFreezerSettings: Codable, Equatable, Sendable {
     public var rules: [AppFreezeRule] = []
     public static let storageKey = "MacPocket.freezer.settings"
 
+    /// False when nothing can ever be frozen, so the app list needs no periodic scan.
+    public var hasWork: Bool { enabled && !rules.isEmpty }
+
     public init() {}
 
     public static func load(from defaults: UserDefaults) -> AppFreezerSettings {

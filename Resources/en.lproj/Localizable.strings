@@ -2,7 +2,6 @@
 
 "%%%lld" = "%lld%%";
 "%@ %lld" = "%@ %lld";
-"%@ (%@): %@ olarak ayarlandı." = "%1$@ (%2$@) set to %3$@.";
 "%@ (bağlı değil)" = "%@ (not connected)";
 "%@ / %@ kullanılıyor" = "%@ of %@ in use";
 "%@ Finder’da göster" = "Show %@ in Finder";
@@ -300,8 +299,6 @@
 "Bildirim Ayarlarını Aç…" = "Open Notification Settings…";
 "Bildirimler yalnız paketlenmiş MacPocket uygulamasında çalışır." = "Notifications work only in the packaged MacPocket app.";
 "Bileşen" = "Component";
-"Bilinmeyen güç ayarı: %@." = "Unknown power setting: %@.";
-"Bilinmeyen hata" = "Unknown error";
 "Bilinmiyor" = "Unknown";
 "Bir daha sorma" = "Don’t ask again";
 "Bir görsel çifti karşılaştırılamadı: %@" = "Couldn’t compare an image pair: %@";
@@ -349,7 +346,6 @@
 "Bu kapsamda süreç yok" = "No Processes in This Scope";
 "Bu klasör tam ölçülemedi." = "This folder couldn’t be fully measured.";
 "Bu konum bir sembolik bağlantı; güvenlik için takip edilmez." = "This location is a symbolic link and isn’t followed, for safety.";
-"Bu macOS sürümünde sistem materyalleri kullanılır. Liquid Glass macOS 26 ve üzerinde etkinleşir." = "This version of macOS uses system materials. Liquid Glass is available on macOS 26 and later.";
 "Bu macOS sürümünde trackpad hareket verisine erişilemiyor." = "Trackpad gesture data isn’t available on this version of macOS.";
 "Bu oturumda alınan" = "Received this session";
 "Bu oturumda gönderilen" = "Sent this session";
@@ -484,7 +480,6 @@
 "En çok" = "At most";
 "En çok CPU kullananlar" = "Top CPU Users";
 "En çok bellek kullananlar" = "Top Memory Users";
-"En çok enerji kullanan süreçler grafiği" = "Chart of processes using the most energy";
 "En çok enerji kullananlar" = "Top Energy Users";
 "Enerji Ayarları" = "Energy Settings";
 "Enerji Kullanımı" = "Energy Use";
@@ -606,7 +601,6 @@
 "Güvenlik" = "Security";
 "Güvenlik göstergesi" = "Security indicator";
 "Güç" = "Power";
-"Güç (mW)" = "Power (mW)";
 "Güç Geçmişini Temizle…" = "Clear Power History…";
 "Güç Merkezi" = "Power Center";
 "Güç Merkezi bölümü" = "Power Center section";
@@ -725,11 +719,9 @@
 "Klasörü yeniden tara" = "Scan the folder again";
 "Klavye" = "Keyboard";
 "Kod ve veri" = "Code and data";
-"Komut güvenlik doğrulamasından geçmedi." = "The command failed security validation.";
 "Komut satırı" = "Command Line";
 "Komut sıfır dışında bir çıkış kodu döndürdü. Ayrıntılar ham çıktıda bulunur." = "The command returned a nonzero exit code. See the raw output for details.";
 "Komut tamamlanamadı" = "Command didn’t complete";
-"Komut çalıştı ancak %@ değeri %@ görünüyor. Bu Mac bu ayarı desteklemiyor olabilir." = "The command ran, but %1$@ still shows %2$@. This Mac may not support the setting.";
 "Konum" = "Location";
 "Kopyala" = "Copy";
 "Korunan süreç" = "Protected process";
@@ -782,6 +774,8 @@
 "Kısmi rapor · boyut sınırı" = "Partial report · size limit";
 "Kısmi rapor · süre sınırı" = "Partial report · time limit";
 "Kısmi sonuç" = "Partial result";
+"Ölçüm güncel değil" = "Measurement out of date";
+"Disk doluluğu son ölçümden bu yana çok değişti. Kategori boyutlarını güncellemek için Yenile’ye bas." = "Disk usage has changed a lot since the last measurement. Press Refresh to update the category sizes.";
 "Kısmi tarama" = "Partial Scan";
 "Library konumlarını tara" = "Scan Library locations";
 "Liquid Glass; kenar çubuğu, araç çubuğu ve hızlı kontrollerde kullanılır. Saydamlığı azalt tercihin macOS Erişilebilirlik ayarlarından takip edilir." = "Liquid Glass is used in the sidebar, toolbar and quick controls. The Reduce Transparency setting in macOS Accessibility is respected.";
@@ -1319,7 +1313,6 @@
 "Yinelenen grup yok" = "No Duplicate Groups";
 "Yinelenenler" = "Duplicates";
 "Yönet" = "Manage";
-"Yönetici onayı iptal edildi; ayar değişmedi." = "Administrator approval was cancelled; the setting didn’t change.";
 "Yük ortalaması" = "Load average";
 "Yüklü sistem güncellemelerini incele ve sistem ayarlarına git." = "Review installed system updates and jump to System Settings.";
 "Yüksek" = "High";
@@ -1365,7 +1358,6 @@
 "macpocket-probe windows · macpocket-probe focus <windowID> · macpocket-probe thumbnail <windowID> <dosya.png>" = "macpocket-probe windows · macpocket-probe focus <windowID> · macpocket-probe thumbnail <windowID> <file.png>";
 "npm Önbelleği" = "npm Cache";
 "npm’in indirdiği paket önbelleği (_cacache)." = "npm’s downloaded package cache (_cacache).";
-"okunamadı" = "unreadable";
 "pip Önbelleği" = "pip Cache";
 "pmset -g assertions okunuyor…" = "Reading pmset -g assertions…";
 "pmset -g custom okunuyor…" = "Reading pmset -g custom…";
@@ -1510,8 +1502,6 @@
 "Şu an engelleyenler: %@" = "Currently prevented by: %@";
 "Şu an kullanılan değer farklı (ör. başka bir güç kaynağı veya uygulama tarafından)" = "The value currently in use differs (for example, set by another power source or app)";
 "Şu anki" = "Current";
-"“%@” ayarı MacPocket’ten değiştirilemez." = "The “%@” setting can’t be changed from MacPocket.";
-"“%@” için %lld geçerli bir değer değil." = "%2$lld isn’t a valid value for “%1$@”.";
 "“Üretici uygulaması kurulu” işaretli öğeler aynı üreticinin başka bir uygulaması tarafından kullanılıyor olabilir." = "Items marked “Developer app installed” may be used by another app from the same developer.";
 "↩ seç" = "↩ choose";
 "⇥ / ⇧⇥ / oklar gezinir · yazmak arar · ⌘W kapat · ⌘M küçült · ⌘F tam ekran · ⌘H gizle · ⌘Q çık · esc vazgeç" = "⇥ / ⇧⇥ / arrows navigate · type to search · ⌘W close · ⌘M minimize · ⌘F full screen · ⌘H hide · ⌘Q quit · esc cancel";
@@ -2172,7 +2162,6 @@
 "Sesi aç" = "Unmute";
 "Sessiz" = "Silent";
 "Sessize al" = "Mute";
-"Uygulama başına ses, macOS 14.2 veya sonrası gerektirir." = "Per-app volume needs macOS 14.2 or later.";
 "Çalıyor" = "Playing";
 "İlk ayarlamada macOS, MacPocket’in sistem sesini kaydetmesine izin isteyebilir: ses yalnız bu Mac’te, seçtiğin seviyeyle yeniden çalınır ve hiçbir yere kaydedilmez. %100’deki uygulamalara dokunulmaz." = "On the first change macOS may ask to let MacPocket record system audio: the sound is only played back on this Mac at the level you choose and is never saved. Apps at 100% aren’t touched.";
 "%lld kare/sn" = "%lld fps";
@@ -2191,7 +2180,6 @@
 "Kayıt kaydedildi: %@" = "Recording saved: %@";
 "Kayıt klasörü" = "Recording folder";
 "Mikrofonu kaydet" = "Record the microphone";
-"Ses dahil kayıt macOS 15 veya sonrası gerektirir. Bu sürümde ⇧⌘5 ile sessiz kayıt alabilirsin." = "Recording with sound needs macOS 15 or later. On this version you can record without sound with ⇧⌘5.";
 "Sistem sesini kaydet" = "Record system audio";
 "İmleci göster" = "Show the pointer";
 "İmlecin bulunduğu ekranı sistem sesi ve istersen mikrofonla birlikte kaydet; ⇧⌘5’in kaydedemediği sesi de alır." = "Record the display under the pointer with system audio and, if you like, the microphone; it captures the sound ⇧⌘5 can’t.";
@@ -2420,3 +2408,34 @@
 "Elle saatler" = "Manual times";
 "Güneşe göre" = "Follow the sun";
 "macOS Night Shift" = "macOS Night Shift";
+"%@ altındakileri göster" = "Show below %@";
+"İşlemci kullanımı çok düşük olan süreçleri de listeler (%lld süreç gizli)." = "Also lists processes with very low CPU use (%lld hidden).";
+"Daha fazla göster (%lld)" = "Show more (%lld)";
+"Daha az göster" = "Show less";
+"%@ (%@): %@ olarak ayarlandı." = "%1$@ (%2$@) set to %3$@.";
+"Bilinmeyen güç ayarı: %@." = "Unknown power setting: %@.";
+"Bilinmeyen hata" = "Unknown error";
+"Komut güvenlik doğrulamasından geçmedi." = "The command failed security validation.";
+"Komut çalıştı ancak %@ değeri %@ görünüyor. Bu Mac bu ayarı desteklemiyor olabilir." = "The command ran, but %1$@ still shows %2$@. This Mac may not support the setting.";
+"Yönetici onayı iptal edildi; ayar değişmedi." = "Administrator approval was cancelled; the setting didn’t change.";
+"okunamadı" = "unreadable";
+"“%@” ayarı MacPocket’ten değiştirilemez." = "The “%@” setting can’t be changed from MacPocket.";
+"“%@” için %lld geçerli bir değer değil." = "%2$lld isn’t a valid value for “%1$@”.";
+"%lld rpm" = "%lld rpm";
+"Bu Mac’te denetlenebilir fan yok." = "This Mac has no controllable fans.";
+"Fan hızı" = "Fan speed";
+"Fan hızı ayarlanamadı; sistem denetimine bırakıldı. (%@)" = "Couldn’t set the fan speed; fans were returned to the system. (%@)";
+"Fan hızını değiştirmek için MacPocket’in yönetici yetkili bir yardımcıya ihtiyacı var." = "MacPocket needs a privileged helper to change fan speed.";
+"Fan modu" = "Fan mode";
+"Fan yardımcısı kaydedilemedi: %@ Bu özellik yalnızca imzalı sürümde çalışır." = "The fan helper couldn’t be registered: %@ This feature only works in a signed build.";
+"Fanlar seçili oranda sabit; MacPocket kapanırsa ya da Mac çok ısınırsa sistem denetimine döner." = "Fans are held at the chosen level; they return to system control if MacPocket quits or the Mac gets too hot.";
+"Fanları macOS yönetiyor." = "macOS is managing the fans.";
+"Hız sıcaklığa göre ayarlanır; MacPocket kapanırsa ya da Mac çok ısınırsa sistem denetimine döner." = "Speed follows temperature; fans return to system control if MacPocket quits or the Mac gets too hot.";
+"Manuel" = "Manual";
+"Sabit" = "Fixed";
+"Sistem Ayarları’nı aç" = "Open System Settings";
+"Sıcaklık okunamadığı için fanlar sistemde bırakıldı." = "Fans were left to the system because temperature couldn’t be read.";
+"Sıcaklığa göre" = "By temperature";
+"Yardımcı kaydedildi; Sistem Ayarları › Genel › Oturum Açma Öğeleri’nde MacPocket’e izin ver." = "Helper registered; allow MacPocket in System Settings › General › Login Items.";
+"Yardımcının durumu bilinmiyor." = "The helper’s status is unknown.";
+"Yardımcıyı etkinleştir" = "Enable helper";

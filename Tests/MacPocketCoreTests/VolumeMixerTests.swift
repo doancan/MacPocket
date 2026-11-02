@@ -48,4 +48,17 @@ final class VolumeMixerSettingsTests: XCTestCase {
         XCTAssertEqual(VolumeMixerSettings.Entry(volume: 0.7, muted: true).gain, 0)
         XCTAssertEqual(VolumeMixerSettings().entry(for: "unknown"), VolumeMixerSettings.Entry())
     }
+
+    func testHasActiveEntriesIgnoresNeutralOnes() {
+        var settings = VolumeMixerSettings()
+        XCTAssertFalse(settings.hasActiveEntries)
+        settings.entries["a"] = .init(volume: 1)
+        XCTAssertFalse(settings.hasActiveEntries, "a neutral entry needs no tap")
+        settings.entries["b"] = .init(volume: 0.5)
+        XCTAssertTrue(settings.hasActiveEntries)
+        settings.entries["b"] = .init(muted: true)
+        XCTAssertTrue(settings.hasActiveEntries)
+        settings.entries["b"] = nil
+        XCTAssertFalse(settings.hasActiveEntries)
+    }
 }

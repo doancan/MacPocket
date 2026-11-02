@@ -81,7 +81,7 @@ struct CleanupView: View {
     }
 
     private var cleanConfirmationText: String {
-        var text = String(localized: "\(model.selectedItems.count) öğe · \(pocketBytes(model.selectedBytes)). Öğeler Çöp’e taşınır; Finder’daki Çöp’ten geri alabilirsin. Alan, Çöp boşaltılınca açılır.")
+        var text = String(localized: "\(model.selectedItems.count) öğe · \(pocketDiskBytes(model.selectedBytes)). Öğeler Çöp’e taşınır; Finder’daki Çöp’ten geri alabilirsin. Alan, Çöp boşaltılınca açılır.")
         if model.selectedWarnings > 0 {
             text += "\n\n" + String(localized: "\(model.selectedWarnings) öğenin uygulaması açık veya incelenmesi gerekiyor.")
         }
@@ -112,14 +112,14 @@ struct CleanupView: View {
                     Text("Temizleniyor…").font(.title.weight(.bold))
                     Text("Her öğe taşınmadan hemen önce yeniden doğrulanıyor.").font(.callout).foregroundStyle(.secondary)
                 } else if let report = model.report {
-                    Text(pocketBytes(report.bytes)).font(.system(size: 40, weight: .bold)).monospacedDigit()
-                    Text("\(report.itemCount) öğe bulundu · \(pocketBytes(model.selectedBytes)) seçili")
+                    Text(pocketDiskBytes(report.bytes)).font(.system(size: 40, weight: .bold)).monospacedDigit()
+                    Text("\(report.itemCount) öğe bulundu · \(pocketDiskBytes(model.selectedBytes)) seçili")
                         .font(.callout).foregroundStyle(.secondary).monospacedDigit()
                     HStack(spacing: PocketSpacing.s) {
                         Button {
                             confirmClean = true
                         } label: {
-                            Label(model.selectedBytes > 0 ? ("Temizle · \(pocketBytes(model.selectedBytes))" as LocalizedStringKey) : "Temizle", systemImage: "sparkles")
+                            Label(model.selectedBytes > 0 ? ("Temizle · \(pocketDiskBytes(model.selectedBytes))" as LocalizedStringKey) : "Temizle", systemImage: "sparkles")
                                 .padding(.horizontal, PocketSpacing.s)
                         }
                         .buttonStyle(.pocketPrimary)
@@ -171,15 +171,15 @@ struct CleanupView: View {
                 VStack(alignment: .leading, spacing: PocketSpacing.xxs) {
                     switch summary.kind {
                     case .movedToTrash:
-                        Text("\(summary.itemCount) öğe Çöp’e taşındı · \(pocketBytes(summary.bytes))").font(.headline)
+                        Text("\(summary.itemCount) öğe Çöp’e taşındı · \(pocketDiskBytes(summary.bytes))").font(.headline)
                         Text("Geri alınabilir: Finder’daki Çöp’ten geri koyabilirsin. Disk alanı Çöp boşaltılınca açılır.")
                             .font(.callout).foregroundStyle(.secondary)
                     case .emptiedTrash:
-                        Text("Çöp boşaltıldı: \(summary.itemCount) öğe · \(pocketBytes(summary.bytes))").font(.headline)
+                        Text("Çöp boşaltıldı: \(summary.itemCount) öğe · \(pocketDiskBytes(summary.bytes))").font(.headline)
                         Text("Bu öğeler kalıcı olarak silindi ve geri alınamaz.").font(.callout).foregroundStyle(.secondary)
                     }
                     if let delta = summary.availableDelta {
-                        (delta > 0 ? Text("Boş alan ölçümü: +\(pocketBytes(delta))") : Text("Boş alan ölçümü: değişmedi"))
+                        (delta > 0 ? Text("Boş alan ölçümü: +\(pocketDiskBytes(delta))") : Text("Boş alan ölçümü: değişmedi"))
                             .font(.subheadline).foregroundStyle(.secondary).monospacedDigit()
                             .help("İşlemden önce ve sonra okunan boş disk alanı farkı. APFS anlık görüntüleri alanı bir süre tutabilir.")
                     }
@@ -219,7 +219,7 @@ struct CleanupView: View {
                         }
                         Spacer(minLength: 0)
                     }
-                    .frame(maxWidth: .infinity, alignment: .topLeading)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
                     .pocketCard(padding: PocketSpacing.m, radius: PocketRadius.medium)
                 }
             }
@@ -239,7 +239,7 @@ struct CleanupView: View {
                         PocketSectionHeader(group.title, icon: group.symbol) {
                             HStack(spacing: PocketSpacing.s) {
                                 if group == .separate { Text("Toplama dahil değil").font(.subheadline).foregroundStyle(.secondary) }
-                                Text(pocketBytes(targets.reduce(0) { $0 + $1.bytes })).monospacedDigit()
+                                Text(pocketDiskBytes(targets.reduce(0) { $0 + $1.bytes })).monospacedDigit()
                             }
                         }
                         ForEach(targets) { target in
@@ -270,7 +270,7 @@ struct CleanupView: View {
                 }
                 Spacer(minLength: PocketSpacing.s)
                 VStack(alignment: .trailing, spacing: PocketSpacing.xxs) {
-                    Text(pocketBytes(target.bytes)).font(.title3.weight(.semibold)).monospacedDigit()
+                    Text(pocketDiskBytes(target.bytes)).font(.title3.weight(.semibold)).monospacedDigit()
                     Text("\(target.items.count) öğe").font(.subheadline).foregroundStyle(.secondary)
                 }
                 Button("Çöpü Boşalt…", role: .destructive) { confirmEmptyTrash = true }
@@ -371,7 +371,7 @@ private struct CleanupTargetCard: View {
                 }
                 Spacer(minLength: PocketSpacing.s)
                 VStack(alignment: .trailing, spacing: PocketSpacing.xxs) {
-                    Text(pocketBytes(target.bytes)).font(.title3.weight(.semibold)).monospacedDigit()
+                    Text(pocketDiskBytes(target.bytes)).font(.title3.weight(.semibold)).monospacedDigit()
                     Text(detailLine).font(.subheadline).foregroundStyle(.secondary).monospacedDigit()
                 }
                 Button { withAnimation(reduceMotion ? nil : .easeOut(duration: 0.18)) { model.toggleExpanded(target.id) } } label: {
@@ -401,7 +401,7 @@ private struct CleanupTargetCard: View {
     private var detailLine: String {
         let selected = model.selectedBytes(in: target)
         let base = String(localized: "\(target.items.count) öğe · \(target.fileCount) dosya")
-        return selected > 0 && selected != target.bytes ? String(localized: "\(pocketBytes(selected)) seçili · \(base)") : base
+        return selected > 0 && selected != target.bytes ? String(localized: "\(pocketDiskBytes(selected)) seçili · \(base)") : base
     }
 
     private var itemList: some View {
@@ -464,7 +464,7 @@ private struct CleanupItemRow: View {
             if let warning = item.warning {
                 Text(warning).font(.caption2).foregroundStyle(PocketTone.warning.color).lineLimit(1).frame(maxWidth: 220, alignment: .trailing)
             }
-            Text(pocketBytes(item.bytes)).font(.callout).foregroundStyle(.secondary).monospacedDigit()
+            Text(pocketDiskBytes(item.bytes)).font(.callout).foregroundStyle(.secondary).monospacedDigit()
                 .frame(minWidth: 70, alignment: .trailing)
             if selectable {
                 Button(action: toggleProtection) { Image(systemName: isProtected ? "lock.fill" : "lock.open") }
@@ -501,7 +501,7 @@ private struct EmptyTrashConfirmation: View {
                 PocketIconTile(symbol: "trash.fill", tint: .red, size: 44)
                 VStack(alignment: .leading, spacing: PocketSpacing.xxs) {
                     Text("Çöp kalıcı olarak boşaltılsın mı?").font(.title3.weight(.semibold))
-                    Text("\(itemCount) öğe · \(pocketBytes(bytes))").foregroundStyle(.secondary).monospacedDigit()
+                    Text("\(itemCount) öğe · \(pocketDiskBytes(bytes))").foregroundStyle(.secondary).monospacedDigit()
                 }
             }
             Text("Bu işlem geri alınamaz. Yalnız listede gördüğün, ev klasöründeki Çöp öğeleri silinir; her öğe silinmeden hemen önce yeniden doğrulanır. Diğer disklerin Çöp’ü etkilenmez.")

@@ -74,7 +74,7 @@ private struct SpinningArc: View {
 @MainActor
 func pocketScanProgressText(_ snapshot: StorageScanControl.Snapshot?) -> String {
     guard let snapshot, snapshot.visitedEntries > 0 else { return String(localized: "Hazırlanıyor…") }
-    var text = String(localized: "\(snapshot.visitedEntries) öğe · \(pocketBytes(snapshot.measuredBytes))")
+    var text = String(localized: "\(snapshot.visitedEntries) öğe · \(pocketDiskBytes(snapshot.measuredBytes))")
     if !snapshot.currentName.isEmpty { text += " · \(snapshot.currentName)" }
     return text
 }
@@ -149,21 +149,29 @@ struct StorageOverviewPanel: View {
 
     // MARK: Capacity
 
+    /// Used space now; a category scan can be days old, so its remainder is computed against this.
+    private func currentUsedBytes(_ report: StorageOverviewReport) -> Int64 { model.volume?.usedBytes ?? report.volume.usedBytes }
+
+    /// True when the disk has changed so much since the scan that its category sizes no longer describe it.
+    private func isOutdated(_ report: StorageOverviewReport) -> Bool {
+        abs(currentUsedBytes(report) - report.volume.usedBytes) > report.volume.totalBytes / 10
+    }
+
     private var capacityCard: some View {
-        let volume = model.report?.volume ?? model.volume
+        let volume = model.volume ?? model.report?.volume
         return VStack(alignment: .leading, spacing: PocketSpacing.m) {
             HStack(alignment: .firstTextBaseline, spacing: PocketSpacing.m) {
                 VStack(alignment: .leading, spacing: PocketSpacing.xxs) {
                     Text(volume?.name ?? "Disk").font(.headline)
                     if let volume {
-                        Text("\(pocketBytes(volume.usedBytes)) kullanımda · \(pocketBytes(volume.totalBytes)) toplam")
+                        Text("\(pocketDiskBytes(volume.usedBytes)) kullanımda · \(pocketDiskBytes(volume.totalBytes)) toplam")
                             .font(.callout).foregroundStyle(.secondary).monospacedDigit()
                     }
                 }
                 Spacer(minLength: PocketSpacing.m)
                 if let volume {
                     VStack(alignment: .trailing, spacing: PocketSpacing.xxs) {
-                        Text(pocketBytes(volume.availableBytes)).font(.title.weight(.bold)).monospacedDigit()
+                        Text(pocketDiskBytes(volume.availableBytes)).font(.title.weight(.bold)).monospacedDigit()
                         Text("boş").font(.callout).foregroundStyle(.secondary)
                     }
                 }
@@ -180,7 +188,7 @@ struct StorageOverviewPanel: View {
     private func capacityBar(_ volume: VolumeCapacity?) -> some View {
         GeometryReader { proxy in
             let total = Double(max(1, volume?.totalBytes ?? 1))
-            let segments: [(StorageCategory?, Int64)] = model.report.map { report in report.segments.map { ($0.category, $0.bytes) } }
+            let segments: [(StorageCategory?, Int64)] = model.report.map { report in report.segments(usedBytes: currentUsedBytes(report)).map { ($0.category, $0.bytes) } }
                 ?? [(nil, volume?.usedBytes ?? 0)]
             // Measured sizes can exceed used space (APFS clones are counted per copy); scale to fit.
             let used = max(Double(segments.reduce(0) { $0 + $1.1 }), 1)
@@ -194,7 +202,7 @@ struct StorageOverviewPanel: View {
                             .fill(segment.0?.color ?? PocketPage.storage.tint)
                             .opacity(hovered == nil || hovered == segment.0 ? 1 : 0.35)
                             .frame(width: width)
-                            .help(segment.0.map { Text(verbatim: "\($0.title): \(pocketBytes(segment.1))") } ?? Text("Kullanılan: \(pocketBytes(segment.1))"))
+                            .help(segment.0.map { Text(verbatim: "\($0.title): \(pocketDiskBytes(segment.1))") } ?? Text("Kullanılan: \(pocketDiskBytes(segment.1))"))
                             .onHover { inside in if inside { hovered = segment.0 } else if hovered == segment.0 { hovered = nil } }
                     }
                 }
@@ -207,19 +215,19 @@ struct StorageOverviewPanel: View {
         }
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("Disk doluluğu")
-        .accessibilityValue(volume.map { Text("\(pocketBytes($0.usedBytes)) kullanımda, \(pocketBytes($0.availableBytes)) boş") } ?? Text(verbatim: ""))
+        .accessibilityValue(volume.map { Text("\(pocketDiskBytes($0.usedBytes)) kullanımda, \(pocketDiskBytes($0.availableBytes)) boş") } ?? Text(verbatim: ""))
     }
 
     private func legend(_ report: StorageOverviewReport) -> some View {
         // Wide enough for the longest category name ("Diğer Kullanıcı Dosyaları") plus its size.
         LazyVGrid(columns: [GridItem(.adaptive(minimum: 250), spacing: PocketSpacing.l, alignment: .leading)],
                   alignment: .leading, spacing: PocketSpacing.xs) {
-            ForEach(report.segments, id: \.category) { segment in
+            ForEach(report.segments(usedBytes: currentUsedBytes(report)), id: \.category) { segment in
                 HStack(spacing: PocketSpacing.s) {
                     Circle().fill(segment.category.color).frame(width: 9, height: 9)
                     Text(segment.category.title).lineLimit(1).layoutPriority(1)
                     Spacer(minLength: PocketSpacing.xs)
-                    Text(pocketBytes(segment.bytes)).foregroundStyle(.secondary).monospacedDigit()
+                    Text(pocketDiskBytes(segment.bytes)).foregroundStyle(.secondary).monospacedDigit()
                 }
                 .font(.callout)
                 .padding(.vertical, 2).padding(.horizontal, PocketSpacing.xs)
@@ -244,6 +252,10 @@ struct StorageOverviewPanel: View {
                     Label("Son ölçüm \(report.scannedAt.formatted(.relative(presentation: .named).locale(pocketLocale)))",
                           systemImage: "clock")
                         .help(Text("\(report.scannedAt.formatted(date: .complete, time: .standard)) · \(Int(report.duration.rounded())) sn"))
+                    if isOutdated(report) {
+                        PocketStatusBadge(text: "Ölçüm güncel değil", systemImage: PocketTone.warning.symbol, tone: .warning)
+                            .help("Disk doluluğu son ölçümden bu yana çok değişti. Kategori boyutlarını güncellemek için Yenile’ye bas.")
+                    }
                     if report.isPartial {
                         PocketStatusBadge(text: "Kısmi sonuç", systemImage: PocketTone.warning.symbol, tone: .warning)
                             .help(partialHelp(report))
@@ -252,7 +264,7 @@ struct StorageOverviewPanel: View {
                     Label("Kategoriler henüz ölçülmedi", systemImage: "clock")
                 }
                 if let volume, volume.purgeableBytes > 0 {
-                    Text("· \(pocketBytes(volume.purgeableBytes)) temizlenebilir alan macOS tarafından gerektiğinde boşaltılır")
+                    Text("· \(pocketDiskBytes(volume.purgeableBytes)) temizlenebilir alan macOS tarafından gerektiğinde boşaltılır")
                         .lineLimit(1).truncationMode(.tail)
                         .help("Boşaltılabilir (purgeable) veri: iCloud’da da bulunan dosyalar, anlık görüntüler ve önbellekler.")
                 }
@@ -277,7 +289,7 @@ struct StorageOverviewPanel: View {
     // MARK: Categories
 
     private func categoryGrid(_ report: StorageOverviewReport) -> some View {
-        let used = Double(max(1, report.volume.usedBytes))
+        let used = Double(max(1, currentUsedBytes(report)))
         let measured = report.categories.filter { $0.bytes > 0 }.sorted { $0.bytes > $1.bytes }
         return VStack(alignment: .leading, spacing: PocketSpacing.m) {
             PocketSectionHeader("Kategoriler", icon: "square.grid.2x2") {
@@ -290,7 +302,7 @@ struct StorageOverviewPanel: View {
                                         openInLens: openInLens)
                         .onHover { inside in if inside { hovered = usage.category } else if hovered == usage.category { hovered = nil } }
                 }
-                systemCard(report, share: Double(report.systemAndOtherBytes) / used)
+                systemCard(report, share: Double(report.systemAndOtherBytes(usedBytes: currentUsedBytes(report))) / used)
             }
         }
     }
@@ -304,12 +316,12 @@ struct StorageOverviewPanel: View {
                     Text("\(pocketPercent(share * 100)) kullanılan alanın").font(.subheadline).foregroundStyle(.secondary)
                 }
                 Spacer()
-                Text(pocketBytes(report.systemAndOtherBytes)).font(.title3.weight(.semibold)).monospacedDigit()
+                Text(pocketDiskBytes(report.systemAndOtherBytes(usedBytes: currentUsedBytes(report)))).font(.title3.weight(.semibold)).monospacedDigit()
             }
             Text(verbatim: StorageCategory.system.detail + " " + String(localized: "Kullanılan alandan ölçülen kategoriler çıkarılarak hesaplanır."))
                 .font(.callout).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
         }
-        .frame(maxWidth: .infinity, alignment: .topLeading)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .pocketCard(padding: PocketSpacing.m)
     }
 }
@@ -338,7 +350,7 @@ private struct StorageCategoryCard: View {
                         .font(.subheadline).foregroundStyle(.secondary).monospacedDigit()
                 }
                 Spacer(minLength: PocketSpacing.s)
-                Text(pocketBytes(usage.bytes)).font(.title3.weight(.semibold)).monospacedDigit()
+                Text(pocketDiskBytes(usage.bytes)).font(.title3.weight(.semibold)).monospacedDigit()
             }
             ProgressView(value: min(1, max(0, share))).tint(usage.category.color)
                 .accessibilityHidden(true)
@@ -367,7 +379,7 @@ private struct StorageCategoryCard: View {
             .controlSize(.small)
             .buttonStyle(.borderless)
         }
-        .frame(maxWidth: .infinity, alignment: .topLeading)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .pocketCard(padding: PocketSpacing.m)
         .overlay {
             RoundedRectangle(cornerRadius: PocketRadius.large, style: .continuous)
@@ -387,7 +399,7 @@ private struct StorageItemRow: View {
                 .accessibilityHidden(true)
             Text(FileManager.default.displayName(atPath: item.path)).lineLimit(1).truncationMode(.middle)
             Spacer(minLength: PocketSpacing.s)
-            Text(pocketBytes(item.allocatedBytes)).foregroundStyle(.secondary).monospacedDigit()
+            Text(pocketDiskBytes(item.allocatedBytes)).foregroundStyle(.secondary).monospacedDigit()
         }
         .font(.callout)
         .contentShape(Rectangle())

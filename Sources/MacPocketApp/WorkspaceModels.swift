@@ -210,7 +210,7 @@ final class FileWorkspaceModel: ObservableObject {
             defer { busy = false; operation = nil }
             do {
                 report = try await scanner.scan(root) { [weak self] value in
-                    await MainActor.run { self?.progress = String(localized: "\(value.fileCount) dosya · \(pocketBytes(value.bytes))") }
+                    await MainActor.run { self?.progress = String(localized: "\(value.fileCount) dosya · \(pocketDiskBytes(value.bytes))") }
                 }
                 if scope == .duplicates { try await compareDuplicates() }
             } catch is CancellationError { progress = String(localized: "Tarama iptal edildi.") }

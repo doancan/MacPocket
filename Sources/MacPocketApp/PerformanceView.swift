@@ -5,29 +5,23 @@ import SwiftUI
 struct PerformanceView: View {
     @ObservedObject var model: PocketModel
     @Environment(\.pocketTint) private var tint
-    @AppStorage(PocketDetailLevel.key("performance")) private var level = PocketDetailLevel.defaultValue
 
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: PocketSpacing.xl) {
                 PocketPageHeading(title: "Sistem İzleme", subtitle: "İşlemci, bellek, disk ve termal durumun canlı ölçümü.",
                                   icon: "waveform.path.ecg") {
-                    HStack(spacing: PocketSpacing.s) {
-                        PocketStatusBadge(text: model.paused ? "Duraklatıldı" : "Canlı · \(Int(model.refreshSeconds)) sn",
-                                          systemImage: model.paused ? "pause.circle" : "dot.radiowaves.left.and.right",
-                                          tone: model.paused ? .warning : .success)
-                        PocketDetailLevelSwitch(level: $level)
-                    }
+                    PocketStatusBadge(text: model.paused ? "Duraklatıldı" : "Canlı · \(Int(model.refreshSeconds)) sn",
+                                      systemImage: model.paused ? "pause.circle" : "dot.radiowaves.left.and.right",
+                                      tone: model.paused ? .warning : .success)
                 }
                 ResourceStrip(model: model)
                 cpuChart
-                if level == .advanced {
-                    ViewThatFits(in: .horizontal) {
-                        HStack(alignment: .top, spacing: PocketSpacing.l) { memoryCard; systemCard }
-                        VStack(spacing: PocketSpacing.l) { memoryCard; systemCard }
-                    }
-                    PocketSensorsCard(system: model.system)
+                ViewThatFits(in: .horizontal) {
+                    HStack(alignment: .top, spacing: PocketSpacing.l) { memoryCard; systemCard }
+                    VStack(spacing: PocketSpacing.l) { memoryCard; systemCard }
                 }
+                PocketSensorsCard(system: model.system)
                 Text("Grafikler yalnız bu oturumda toplanan son \(PocketModel.sampleCapacity) örneği gösterir. Bellek değerleri Activity Monitor’ün “Kullanılan Bellek” hesabıyla aynı bileşenlerden oluşur.")
                     .font(.subheadline).foregroundStyle(.secondary)
             }
@@ -136,7 +130,7 @@ struct PerformanceView: View {
                     row("Güç kaynağı", pocketPowerSourceTitle(system.power.source))
                     row("Düşük güç modu", system.power.lowPowerMode ? String(localized: "Açık") : String(localized: "Kapalı"))
                     ForEach(system.volumes, id: \.path) { volume in
-                        row("\(volume.name)", "\(pocketBytes(volume.availableBytes)) boş / \(pocketBytes(volume.totalBytes))")
+                        row("\(volume.name)", "\(pocketDiskBytes(volume.availableBytes)) boş / \(pocketDiskBytes(volume.totalBytes))")
                     }
                 }
                 .font(.callout)

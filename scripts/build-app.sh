@@ -10,17 +10,22 @@ case "$macpocket_configuration" in debug|release) ;; *) echo "debug veya release
 # Accessibility and Screen Recording grants to the signing identity, while ad-hoc grants reset on every build.
 if [ -z "${MACPOCKET_SIGN_IDENTITY:-}" ]; then
     macpocket_valid_identities="$(security find-identity -v -p codesigning 2>/dev/null | grep -v REVOKED || true)"
-    MACPOCKET_SIGN_IDENTITY="$( { grep '"Developer ID Application:' <<<"$macpocket_valid_identities"; grep '"Apple Development:' <<<"$macpocket_valid_identities"; } | head -1 | awk '{print $2}')"
+    MACPOCKET_SIGN_IDENTITY="$( { grep '"Developer ID Application:' <<<"$macpocket_valid_identities"; grep '"Apple Development:' <<<"$macpocket_valid_identities"; } | head -1 | awk '{print $2}' || true)"
 fi
 macpocket_identity="${MACPOCKET_SIGN_IDENTITY:--}"
 echo "İmza kimliği: $macpocket_identity" >&2
 swift build -c "$macpocket_configuration" --product MacPocket
+swift build -c "$macpocket_configuration" --product MacPocketFanHelper
 macpocket_binary_dir="$(swift build -c "$macpocket_configuration" --show-bin-path)"
 macpocket_app_dir="$macpocket_root/.build/MacPocket.app"
 rm -rf "$macpocket_app_dir"
 mkdir -p "$macpocket_app_dir/Contents/MacOS"
 mkdir -p "$macpocket_app_dir/Contents/Resources"
 install -m 755 "$macpocket_binary_dir/MacPocket" "$macpocket_app_dir/Contents/MacOS/MacPocket"
+install -m 755 "$macpocket_binary_dir/MacPocketFanHelper" "$macpocket_app_dir/Contents/MacOS/MacPocketFanHelper"
+mkdir -p "$macpocket_app_dir/Contents/Library/LaunchDaemons"
+install -m 644 Resources/Daemons/com.doancan.MacPocket.FanHelper.plist "$macpocket_app_dir/Contents/Library/LaunchDaemons/"
+plutil -lint "$macpocket_app_dir/Contents/Library/LaunchDaemons/com.doancan.MacPocket.FanHelper.plist" >/dev/null
 install -m 644 Resources/Info.plist "$macpocket_app_dir/Contents/Info.plist"
 install -m 644 Resources/AppIcon.icns "$macpocket_app_dir/Contents/Resources/AppIcon.icns"
 for macpocket_lproj in Resources/*.lproj; do
@@ -35,6 +40,11 @@ for macpocket_lproj in Resources/*.lproj; do
     done
 done
 plutil -lint "$macpocket_app_dir/Contents/Info.plist" >/dev/null
+# The helper is signed on its own, before the app seals it into the bundle.
+macpocket_helper_flags=(--force --identifier com.doancan.MacPocket.FanHelper --sign "$macpocket_identity")
+if [ "$macpocket_configuration" = release ]; then macpocket_helper_flags+=(--options runtime); fi
+if [ "$macpocket_configuration" = release ] && [ "$macpocket_identity" != "-" ]; then macpocket_helper_flags+=(--timestamp); fi
+codesign "${macpocket_helper_flags[@]}" "$macpocket_app_dir/Contents/MacOS/MacPocketFanHelper"
 if [ "$macpocket_configuration" = debug ]; then
     codesign --force --sign "$macpocket_identity" --entitlements Resources/MacPocket.entitlements "$macpocket_app_dir"
 else

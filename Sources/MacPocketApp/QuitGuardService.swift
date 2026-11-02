@@ -240,14 +240,10 @@ private struct QuitGuardHUDView: View {
     }
 }
 
-/// Functional layer floating over any app: Liquid Glass on macOS 26+, a material capsule before.
+/// Functional layer floating over any app: Liquid Glass.
 private struct QuitGuardHUDSurface: ViewModifier {
     @ViewBuilder
     func body(content: Content) -> some View {
-        if #available(macOS 26.0, *) {
-            content.glassEffect(.regular, in: .capsule)
-        } else {
-            content.background(.regularMaterial, in: Capsule()).overlay { Capsule().strokeBorder(PocketTheme.line) }
-        }
+        content.glassEffect(.regular, in: .capsule)
     }
 }

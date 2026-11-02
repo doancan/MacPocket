@@ -26,31 +26,16 @@ struct WindowSwitcherOverlayView: View {
             .accessibilityLabel("Pencere geçişi")
     }
 
-    /// macOS 26+: the panel is a Liquid Glass HUD that materializes over the desktop; the selection frame,
-    /// hover fills and search pill on it are plain fills (no glass on glass). Earlier systems: a thick material
-    /// that fades and scales in.
+    /// The panel is a Liquid Glass HUD that materializes over the desktop; the selection frame,
+    /// hover fills and search pill on it are plain fills (no glass on glass).
     @ViewBuilder private func surface(_ layout: SwitcherLayout) -> some View {
         let shape = RoundedRectangle(cornerRadius: Self.radius, style: .continuous)
-        if #available(macOS 26.0, *) {
-            GlassEffectContainer {
-                if appeared {
-                    panel(layout)
-                        .glassEffect(.regular, in: shape)
-                        .glassEffectTransition(.materialize)
-                }
+        GlassEffectContainer {
+            if appeared {
+                panel(layout)
+                    .glassEffect(.regular, in: shape)
+                    .glassEffectTransition(.materialize)
             }
-        } else {
-            panel(layout)
-                .background {
-                    if reduceTransparency {
-                        shape.fill(Color(nsColor: .windowBackgroundColor))
-                    } else {
-                        shape.fill(.ultraThickMaterial)
-                    }
-                }
-                .overlay { shape.strokeBorder(.primary.opacity(0.10), lineWidth: 0.75) }
-                .opacity(appeared ? 1 : 0)
-                .scaleEffect(appeared || reduceMotion ? 1 : 0.96)
         }
     }
 

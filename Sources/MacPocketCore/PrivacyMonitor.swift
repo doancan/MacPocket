@@ -97,7 +97,7 @@ public enum PrivacyProbe {
     // MARK: Microphone
 
     static func microphoneActivities(apps: [RunningAppInfo], ownPID: pid_t) -> Set<PrivacyActivity> {
-        guard #available(macOS 14.2, *), let processes = audioProcessObjects() else { return deviceLevelMicrophone(ownApp: false) }
+        guard let processes = audioProcessObjects() else { return deviceLevelMicrophone(ownApp: false) }
         var result = Set<PrivacyActivity>()
         for object in processes {
             guard (value(object, kAudioProcessPropertyIsRunningInput, as: UInt32.self) ?? 0) != 0,
@@ -114,14 +114,13 @@ public enum PrivacyProbe {
         return result
     }
 
-    /// macOS 14.0–14.1 have no per-process list: only "an input device is running", owner unknown.
+    /// Fallback when the per-process list cannot be read: only "an input device is running", owner unknown.
     private static func deviceLevelMicrophone(ownApp: Bool) -> Set<PrivacyActivity> {
         guard !ownApp, inputDeviceIsRunning() else { return [] }
         return [PrivacyActivity(device: .microphone, bundleID: nil, appName: nil)]
     }
 
     private static func audioProcessObjects() -> [AudioObjectID]? {
-        guard #available(macOS 14.2, *) else { return nil }
         var address = AudioObjectPropertyAddress(mSelector: kAudioHardwarePropertyProcessObjectList,
                                                  mScope: kAudioObjectPropertyScopeGlobal, mElement: kAudioObjectPropertyElementMain)
         var size: UInt32 = 0

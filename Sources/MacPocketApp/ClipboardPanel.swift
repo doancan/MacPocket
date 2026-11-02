@@ -255,22 +255,13 @@ struct ClipboardPanelView: View {
     }
 }
 
-/// macOS 26+: a Liquid Glass HUD (functional layer over whatever is on screen); rows on it use fills.
+/// A Liquid Glass HUD (functional layer over whatever is on screen); rows on it use fills.
 private struct ClipboardPanelSurface: ViewModifier {
     let radius: CGFloat
-    @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
-
     @ViewBuilder
     func body(content: Content) -> some View {
         let shape = RoundedRectangle(cornerRadius: radius, style: .continuous)
-        if #available(macOS 26.0, *) {
-            content.glassEffect(.regular, in: shape)
-        } else {
-            content
-                .background { shape.fill(reduceTransparency ? AnyShapeStyle(Color(nsColor: .windowBackgroundColor)) : AnyShapeStyle(.ultraThickMaterial)) }
-                .overlay { shape.strokeBorder(.primary.opacity(0.1), lineWidth: 0.75) }
-                .clipShape(shape)
-        }
+        content.glassEffect(.regular, in: shape)
     }
 }
 

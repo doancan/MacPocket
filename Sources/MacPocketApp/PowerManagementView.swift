@@ -6,7 +6,6 @@ import SwiftUI
 struct PowerManagementView: View {
     @ObservedObject var model: PocketModel
     @StateObject private var center = PowerCenterModel()
-    @AppStorage(PocketDetailLevel.key("power")) private var level = PocketDetailLevel.defaultValue
 
     var body: some View {
         ScrollView {
@@ -23,14 +22,13 @@ struct PowerManagementView: View {
                             Label("Güç Raporları", systemImage: "doc.text.magnifyingglass")
                         }
                         .help("Uykuyu engelleyen süreçleri ve güç ayarlarını gösteren salt okunur raporlar")
-                        PocketDetailLevelSwitch(level: $level)
                     }
                 }
                 PowerHeroCard(center: center, model: model)
                 tabPicker
                 Group {
                     switch center.tab {
-                    case .overview: PowerOverviewPanel(center: center, model: model, advanced: level == .advanced)
+                    case .overview: PowerOverviewPanel(center: center, model: model)
                     case .battery: PowerBatteryPanel(center: center, model: model)
                     case .blockers: PowerBlockersPanel(center: center)
                     case .energy: PowerEnergyPanel(center: center)
@@ -144,7 +142,7 @@ struct PowerHeroCard: View {
                              color: percent < 20 ? .red : (percent < 40 ? .orange : PocketTheme.disk), size: 110)
         } else if let watts = center.wattHistory.last?.watts {
             let peak = max(1, center.wattHistory.map(\.watts).max() ?? 1)
-            PocketRingMetric(title: "Sistem gücü", value: "\(powerWatts(watts))",
+            PocketRingMetric(title: "Sistem girişi", value: "\(powerWatts(watts))",
                              fraction: watts / (peak * 1.25), color: tint, size: 110)
         } else if let energy = center.energy {
             // Desktop Macs often stop publishing whole-system telemetry; fall back to what is measurable
@@ -247,31 +245,24 @@ struct PowerHeroCard: View {
 
 // MARK: - Overview
 
-/// Basic: keeping awake and the top energy users. Advanced adds thermal limits, sensors and schedules.
+/// Keeping awake, thermal limits, sensors, top energy users and schedules.
 struct PowerOverviewPanel: View {
     @ObservedObject var center: PowerCenterModel
     @ObservedObject var model: PocketModel
-    let advanced: Bool
 
     var body: some View {
         VStack(alignment: .leading, spacing: PocketSpacing.l) {
-            if advanced {
-                ViewThatFits(in: .horizontal) {
-                    HStack(alignment: .top, spacing: PocketSpacing.l) { PowerKeepAwakeCard(model: model); statusCard }
-                    VStack(spacing: PocketSpacing.l) { PowerKeepAwakeCard(model: model); statusCard }
-                }
-                PocketSensorsCard(system: model.system)
-                ViewThatFits(in: .horizontal) {
-                    HStack(alignment: .top, spacing: PocketSpacing.l) { topEnergy; scheduleCard }
-                    VStack(spacing: PocketSpacing.l) { topEnergy; scheduleCard }
-                }
-                if let ups = center.overview?.upsSources, !ups.isEmpty { upsCard(ups) }
-            } else {
-                ViewThatFits(in: .horizontal) {
-                    HStack(alignment: .top, spacing: PocketSpacing.l) { PowerKeepAwakeCard(model: model); topEnergy }
-                    VStack(spacing: PocketSpacing.l) { PowerKeepAwakeCard(model: model); topEnergy }
-                }
+            ViewThatFits(in: .horizontal) {
+                HStack(alignment: .top, spacing: PocketSpacing.l) { PowerKeepAwakeCard(model: model); statusCard }
+                VStack(spacing: PocketSpacing.l) { PowerKeepAwakeCard(model: model); statusCard }
             }
+            PocketSensorsCard(system: model.system)
+            if model.system?.fans?.isEmpty == false { FanControlCard() }
+            ViewThatFits(in: .horizontal) {
+                HStack(alignment: .top, spacing: PocketSpacing.l) { topEnergy; scheduleCard }
+                VStack(spacing: PocketSpacing.l) { topEnergy; scheduleCard }
+            }
+            if let ups = center.overview?.upsSources, !ups.isEmpty { upsCard(ups) }
         }
     }
 

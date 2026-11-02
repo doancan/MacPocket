@@ -135,10 +135,7 @@ LabeledContent("Stil") {
                         .frame(maxWidth: 420)
                 }
                 Toggle("Otomatik boyut (pencere sayısına göre küçült)", isOn: $autoSize)
-                LabeledContent("Boyut") {
-                    Slider(value: $size, in: 0.6...1.4, step: 0.1) { Text("Boyut") } minimumValueLabel: { Text("Küçük") } maximumValueLabel: { Text("Büyük") }
-                        .frame(maxWidth: 280)
-                }
+                Slider(value: $size, in: 0.6...1.4, step: 0.1) { Text("Boyut") } minimumValueLabel: { Text("Küçük") } maximumValueLabel: { Text("Büyük") }
                 Toggle("Canlı küçük resimler (panel açıkken yenilenir)", isOn: $liveThumbnails)
                 Toggle("Seçili pencereyi yerinde tam boy göster", isOn: $previewSelected)
                 Picker("Sıralama", selection: $sort) {
@@ -180,6 +177,7 @@ LabeledContent("Stil") {
             }
         }
         .formStyle(.grouped)
+        .scrollContentBackground(.hidden)
     }
 
     private func replace(_ index: Int, with shortcut: SwitcherShortcut) {

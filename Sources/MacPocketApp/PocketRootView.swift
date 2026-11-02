@@ -70,9 +70,7 @@ struct PocketRootView: View {
                         ToolbarItem(id: "pause", placement: .primaryAction) { PocketPauseButton(model: model) }
                         ToolbarItem(id: "interval", placement: .primaryAction) { PocketIntervalMenu(model: model) }
                         // Monitoring controls share one glass group; Settings sits in its own.
-                        if #available(macOS 26.0, *) {
-                            ToolbarSpacer(.fixed, placement: .primaryAction)
-                        }
+                        ToolbarSpacer(.fixed, placement: .primaryAction)
                         ToolbarItem(id: "settings", placement: .primaryAction) {
                             SettingsLink { Label("Ayarlar", systemImage: "gearshape") }.help("Ayarlar (⌘,)")
                         }
@@ -265,14 +263,14 @@ private struct PocketRefreshButton: View {
     }
 }
 
-/// One clockwise turn of the refresh glyph per click (macOS 15+).
+/// One clockwise turn of the refresh glyph per click .
 private struct PocketRefreshSpin: ViewModifier {
     let trigger: Int
     let enabled: Bool
 
     @ViewBuilder
     func body(content: Content) -> some View {
-        if #available(macOS 15.0, *), enabled {
+        if enabled {
             content.symbolEffect(.rotate.clockwise, options: .speed(1.6), value: trigger)
         } else {
             content
@@ -348,12 +346,8 @@ struct PocketCommands: Commands {
 
 private struct PocketToolbarChrome: ViewModifier {
     func body(content: Content) -> some View {
-        if #available(macOS 15.0, *) {
-            content
-                .toolbar(removing: .title)
-                .toolbarBackgroundVisibility(.hidden, for: .windowToolbar)
-        } else {
-            content.toolbarBackground(.hidden, for: .windowToolbar)
-        }
+        content
+            .toolbar(removing: .title)
+            .toolbarBackgroundVisibility(.hidden, for: .windowToolbar)
     }
 }

@@ -564,17 +564,13 @@ private struct FanRow: View {
     }
 }
 
-/// Continuous rotation of the fan glyph (macOS 15+).
+/// Continuous rotation of the fan glyph.
 private struct FanSpin: ViewModifier {
     let active: Bool
 
     @ViewBuilder
     func body(content: Content) -> some View {
-        if #available(macOS 15.0, *) {
-            content.symbolEffect(.rotate.byLayer, options: .repeat(.continuous), isActive: active)
-        } else {
-            content
-        }
+        content.symbolEffect(.rotate.byLayer, options: .repeat(.continuous), isActive: active)
     }
 }
 

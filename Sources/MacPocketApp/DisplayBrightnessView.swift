@@ -34,7 +34,7 @@ struct DisplayBrightnessView: View {
                             .frame(maxWidth: .infinity, minHeight: 200)
                             .pocketCard()
                     }
-                    LazyVGrid(columns: [GridItem(.adaptive(minimum: 380), spacing: PocketSpacing.l, alignment: .top)],
+                    LazyVGrid(columns: Array(repeating: GridItem(.flexible(minimum: 380), spacing: PocketSpacing.l, alignment: .top), count: service.displays.count > 1 ? 2 : 1),
                               alignment: .leading, spacing: PocketSpacing.l) {
                         ForEach(service.displays) { display in DisplayCard(display: display, service: service) }
                     }
@@ -91,10 +91,8 @@ struct DisplayBrightnessView: View {
             VStack(alignment: .leading, spacing: PocketSpacing.m) {
                 Text("Gösterge stili")
                 IndicatorStylePicker(selection: indicatorStyle)
-                if !(indicatorStyle.wrappedValue == .classic && BrightnessIndicator.classicIsSystemBezel) {
-                    Text("Gösterge konumu").padding(.top, PocketSpacing.s)
-                    IndicatorPositionPicker(selection: indicatorPosition, style: indicatorStyle.wrappedValue)
-                }
+                Text("Gösterge konumu").padding(.top, PocketSpacing.s)
+                IndicatorPositionPicker(selection: indicatorPosition, style: indicatorStyle.wrappedValue)
             }
             .padding(.vertical, PocketSpacing.m)
             .disabled(!service.settings.keysEnabled || !service.settings.showIndicator)

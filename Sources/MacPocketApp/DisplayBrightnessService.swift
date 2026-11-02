@@ -492,47 +492,18 @@ final class BrightnessKeyTap: @unchecked Sendable {
     }
 }
 
-/// The brightness indicator shown for key presses, in the chosen style. The classic style is macOS's own bezel (the
-/// private OSD framework the system uses for the built-in screen) before macOS 26; from macOS 26 that framework
-/// accepts the call but no longer draws it, so MacPocket draws the classic bezel itself. The modern style is always
-/// MacPocket's glass slider.
+/// The brightness indicator shown for key presses, in the chosen style. MacPocket draws every style itself: the
+/// system's private OSD framework accepts the call but no longer draws the classic bezel.
 @MainActor
 enum BrightnessIndicator {
-    @objc private protocol OSDManaging {
-        func showImage(_ image: Int64, onDisplayID display: UInt32, priority: UInt32, msecUntilFade: UInt32,
-                       filledChiclets: UInt32, totalChiclets: UInt32, locked: Bool)
-    }
-
-    private static let systemManager: AnyObject? = {
-        if #available(macOS 26.0, *) { return nil }
-        _ = dlopen("/System/Library/PrivateFrameworks/OSD.framework/OSD", RTLD_LAZY)
-        guard let type = NSClassFromString("OSDManager") as? NSObject.Type,
-              type.responds(to: NSSelectorFromString("sharedManager")),
-              let shared = type.perform(NSSelectorFromString("sharedManager"))?.takeUnretainedValue() as? NSObject,
-              shared.responds(to: NSSelectorFromString("showImage:onDisplayID:priority:msecUntilFade:filledChiclets:totalChiclets:locked:"))
-        else { return nil }
-        return shared
-    }()
-
     /// One indicator per display, so "all external displays" shows each screen its own level at the same time.
     private static var huds: [CGDirectDisplayID: BrightnessHUD] = [:]
 
-    /// Whether the classic style is drawn by macOS itself (which then also decides where it appears).
-    static var classicIsSystemBezel: Bool { systemManager != nil }
-
     static func show(level: Double, on display: CGDirectDisplayID, position: DisplayBrightnessService.IndicatorPosition,
                      style: DisplayBrightnessService.IndicatorStyle) {
-        if style == .classic, let systemManager {
-            let chiclets = BrightnessStep.chiclets(level)
-            let osd = unsafeBitCast(systemManager, to: OSDManaging.self)
-            // Image 1 is the brightness sun; priority 0x1F4 is what the system uses for key presses.
-            osd.showImage(1, onDisplayID: display, priority: 0x1F4, msecUntilFade: 1000,
-                          filledChiclets: chiclets.filled, totalChiclets: chiclets.total, locked: false)
-        } else {
-            let hud = huds[display] ?? BrightnessHUD()
-            huds[display] = hud
-            hud.show(level: level, on: display, position: position, style: style)
-        }
+        let hud = huds[display] ?? BrightnessHUD()
+        huds[display] = hud
+        hud.show(level: level, on: display, position: position, style: style)
     }
 }
 
@@ -663,11 +634,7 @@ private struct CapsuleBrightnessHUD: View {
 private struct CapsuleHUDSurface: ViewModifier {
     @ViewBuilder
     func body(content: Content) -> some View {
-        if #available(macOS 26.0, *) {
-            content.glassEffect(.regular, in: .capsule)
-        } else {
-            content.background(.regularMaterial, in: Capsule()).overlay { Capsule().strokeBorder(PocketTheme.line) }
-        }
+        content.glassEffect(.regular, in: .capsule)
     }
 }
 
@@ -744,17 +711,13 @@ private struct ModernBrightnessHUD: View {
     }
 }
 
-/// Liquid Glass on macOS 26+, a material panel before (only reached there when the system bezel is missing).
+/// Liquid Glass panel behind the modern indicator.
 private struct BrightnessHUDSurface: ViewModifier {
     private let shape = RoundedRectangle(cornerRadius: 22, style: .continuous)
 
     @ViewBuilder
     func body(content: Content) -> some View {
-        if #available(macOS 26.0, *) {
-            content.glassEffect(.regular, in: shape)
-        } else {
-            content.background(.regularMaterial, in: shape).overlay { shape.strokeBorder(PocketTheme.line) }
-        }
+        content.glassEffect(.regular, in: shape)
     }
 }
 

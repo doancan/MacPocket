@@ -65,6 +65,8 @@ final class AppFreezerService: ObservableObject {
     }
 
     func evaluate() {
+        // Nothing to freeze and nothing frozen: skip scanning every running app.
+        guard settings.hasWork || !frozen.isEmpty else { return }
         let now = Date()
         let front = NSWorkspace.shared.frontmostApplication?.processIdentifier
         for app in NSWorkspace.shared.runningApplications where app.activationPolicy == .regular && !app.isTerminated {

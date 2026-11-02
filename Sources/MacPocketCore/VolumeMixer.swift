@@ -26,6 +26,9 @@ public struct VolumeMixerSettings: Codable, Equatable, Sendable {
 
     public func entry(for bundleID: String) -> Entry { entries[bundleID] ?? Entry() }
 
+    /// True when at least one app needs a tap, so the mixer has to keep watching for audio apps.
+    public var hasActiveEntries: Bool { entries.values.contains { !$0.isNeutral } }
+
     public static func load(from defaults: UserDefaults) -> VolumeMixerSettings {
         defaults.data(forKey: storageKey).flatMap { try? JSONDecoder().decode(VolumeMixerSettings.self, from: $0) } ?? VolumeMixerSettings()
     }

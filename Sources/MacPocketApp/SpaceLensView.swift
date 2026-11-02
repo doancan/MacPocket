@@ -61,7 +61,7 @@ struct SpaceLensView: View {
             Button("Vazgeç", role: .cancel) {}
             Button("Çöp’e Taşı", role: .destructive) { model.trashSelection() }
         } message: {
-            Text("\(model.selectedNodes.count) öğe · \(pocketBytes(model.selectedBytes)). Finder’daki Çöp’ten geri alabilirsin; alan Çöp boşaltılınca açılır.")
+            Text("\(model.selectedNodes.count) öğe · \(pocketDiskBytes(model.selectedBytes)). Finder’daki Çöp’ten geri alabilirsin; alan Çöp boşaltılınca açılır.")
         }
     }
 
@@ -162,7 +162,7 @@ struct SpaceLensView: View {
 
     private func summary(_ node: SpaceLensNode) -> some View {
         HStack(spacing: PocketSpacing.m) {
-            Text(pocketBytes(node.allocatedBytes)).font(.title2.weight(.bold)).monospacedDigit()
+            Text(pocketDiskBytes(node.allocatedBytes)).font(.title2.weight(.bold)).monospacedDigit()
             Text("\(node.fileCount) dosya").foregroundStyle(.secondary).monospacedDigit()
             if model.working {
                 ProgressView().controlSize(.small)
@@ -209,7 +209,7 @@ struct SpaceLensView: View {
             legend
             Spacer(minLength: PocketSpacing.s)
             if !model.selection.isEmpty {
-                Text("\(model.selectedNodes.count) seçili · \(pocketBytes(model.selectedBytes))")
+                Text("\(model.selectedNodes.count) seçili · \(pocketDiskBytes(model.selectedBytes))")
                     .font(.callout).foregroundStyle(.secondary).monospacedDigit()
                 Button("Seçimi Temizle") { model.selection = [] }.buttonStyle(.borderless)
             }
@@ -285,7 +285,7 @@ private struct SpaceLensTreemap: View {
             .clipShape(RoundedRectangle(cornerRadius: PocketRadius.medium, style: .continuous))
             .accessibilityElement(children: .ignore)
             .accessibilityLabel("Alan haritası")
-            .accessibilityValue(tiles.prefix(5).map { "\($0.node.name) \(pocketBytes($0.node.allocatedBytes))" }.joined(separator: ", "))
+            .accessibilityValue(tiles.prefix(5).map { "\($0.node.name) \(pocketDiskBytes($0.node.allocatedBytes))" }.joined(separator: ", "))
         }
     }
 
@@ -340,8 +340,8 @@ private struct SpaceLensTreemap: View {
         // Tiles with nested children have no room below the name, so their size rides on the same line.
         let label = tile.nested.isEmpty
             ? Text(tile.node.name).font(.system(size: 11, weight: .semibold)).foregroundStyle(.white)
-            : Text("\(Text(tile.node.name).font(.system(size: 11, weight: .semibold)))  \(Text(pocketBytes(tile.node.allocatedBytes)).font(.system(size: 10, weight: .medium)).foregroundStyle(.white.opacity(0.85)))").foregroundStyle(.white)
-        let size = Text(pocketBytes(tile.node.allocatedBytes)).font(.system(size: 10, weight: .medium)).foregroundStyle(.white.opacity(0.85))
+            : Text("\(Text(tile.node.name).font(.system(size: 11, weight: .semibold)))  \(Text(pocketDiskBytes(tile.node.allocatedBytes)).font(.system(size: 10, weight: .medium)).foregroundStyle(.white.opacity(0.85)))").foregroundStyle(.white)
+        let size = Text(pocketDiskBytes(tile.node.allocatedBytes)).font(.system(size: 10, weight: .medium)).foregroundStyle(.white.opacity(0.85))
         var clipped = context
         clipped.clip(to: Path(rect.insetBy(dx: 5, dy: 3)))
         clipped.draw(label, at: CGPoint(x: rect.minX + 6, y: rect.minY + 4), anchor: .topLeading)
@@ -356,7 +356,7 @@ private struct SpaceLensTreemap: View {
                 Image(systemName: node.kind.symbol).foregroundStyle(node.kind == .folder ? PocketTheme.accent : node.kind.color)
                 Text(node.name).font(.callout.weight(.semibold)).lineLimit(1)
             }
-            (node.fileCount > 1 ? Text("\(pocketBytes(node.allocatedBytes)) · \(node.kind.title) · \(node.fileCount) dosya") : Text(verbatim: "\(pocketBytes(node.allocatedBytes)) · \(node.kind.title)"))
+            (node.fileCount > 1 ? Text("\(pocketDiskBytes(node.allocatedBytes)) · \(node.kind.title) · \(node.fileCount) dosya") : Text(verbatim: "\(pocketDiskBytes(node.allocatedBytes)) · \(node.kind.title)"))
                 .font(.subheadline).foregroundStyle(.secondary).monospacedDigit()
             if node.kind == .folder {
                 (node.needsExpansion ? Text("Tıkla: içini tara ve aç") : Text("Tıkla: içine gir")).font(.caption2).foregroundStyle(.tertiary)
@@ -451,7 +451,7 @@ private struct SpaceLensList: View {
                 }
                 .frame(height: 3)
             }
-            Text(pocketBytes(child.allocatedBytes)).font(.callout).foregroundStyle(.secondary).monospacedDigit()
+            Text(pocketDiskBytes(child.allocatedBytes)).font(.callout).foregroundStyle(.secondary).monospacedDigit()
             if child.kind == .folder {
                 Button { model.open(child) } label: { Image(systemName: "chevron.right") }
                     .buttonStyle(.borderless)

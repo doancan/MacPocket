@@ -215,6 +215,15 @@ final class StorageOverviewTests: StorageFixtureCase {
         XCTAssertFalse(report.isPartial)
     }
 
+    func testSystemAndOtherCanBeRecomputedAgainstLiveUsedSpace() async throws {
+        let home = try fixture()
+        let report = try await StorageOverviewScanner().scan(options(home: home, volumeUsed: 10_000_000), control: control())
+        XCTAssertEqual(report.systemAndOtherBytes(usedBytes: 10_000_000), report.systemAndOtherBytes)
+        XCTAssertEqual(report.systemAndOtherBytes(usedBytes: report.measuredBytes + 5), 5)
+        XCTAssertEqual(report.systemAndOtherBytes(usedBytes: 0), 0, "never negative")
+        XCTAssertEqual(report.segments(usedBytes: report.measuredBytes + 5).last?.bytes, 5)
+    }
+
     func testCategoryRootThatIsSymlinkIsSkipped() async throws {
         let home = try fixture()
         let elsewhere = try fixture()

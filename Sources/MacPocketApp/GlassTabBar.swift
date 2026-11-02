@@ -25,9 +25,8 @@ struct GlassTab<ID: Hashable>: Identifiable {
 /// - Click a tab, or press and drag: the lens lifts and grows, follows the pointer continuously, stretches
 ///   with the drag speed like a liquid drop, switches the selection (with a trackpad tick) as it crosses a
 ///   tab's midpoint, and on release springs onto the selected tab.
-/// - macOS 26+: the lens is an interactive `.glassEffect` inside a `GlassEffectContainer` with a
+/// - The lens is an interactive `.glassEffect` inside a `GlassEffectContainer` with a
 ///   `glassEffectID`: tinted at rest, clear while held so the labels read through it as through a lens.
-///   Earlier systems use materials with the same geometry.
 /// - Reduce Motion: no lens travel or scaling, the selection jumps. Reduce Transparency: solid fills.
 /// - Each tab is a real button (keyboard focus, VoiceOver "selected" trait); arrow keys and ⌘1… are
 ///   handled by the owner through `GlassTabBar.keyboardShortcuts`.
@@ -91,8 +90,8 @@ struct GlassTabBar<ID: Hashable>: View {
     }
 
     @ViewBuilder private var content: some View {
-        if #available(macOS 26.0, *), !reduceTransparency {
-            // The popover is already glass on macOS 26, so the track is a quiet fill and only the
+        if !reduceTransparency {
+            // The popover is already glass, so the track is a quiet fill and only the
             // selection lens is (interactive, tinted) glass — no glass-on-glass.
             ZStack(alignment: .leading) {
                 GlassEffectContainer {
@@ -112,7 +111,7 @@ struct GlassTabBar<ID: Hashable>: View {
         } else {
             ZStack(alignment: .leading) {
                 lens
-                    .background(fallbackLensFill, in: Capsule())
+                    .background(PocketTheme.panel, in: Capsule())
                     .overlay { Capsule().strokeBorder(tinted ? selectedTint.opacity(0.35) : PocketTheme.line, lineWidth: 0.75) }
                     .shadow(color: .black.opacity(dragX == nil ? 0.12 : 0.22), radius: dragX == nil ? 2 : 6, y: 1)
                     .scaleEffect(x: lensScale.width, y: lensScale.height)
@@ -122,20 +121,11 @@ struct GlassTabBar<ID: Hashable>: View {
             }
             .padding(.horizontal, inset)
             .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .background(fallbackTrackFill, in: Capsule())
+            .background(PocketTheme.raised, in: Capsule())
             .overlay { Capsule().strokeBorder(PocketTheme.line) }
         }
     }
 
-    private var fallbackTrackFill: AnyShapeStyle {
-        reduceTransparency ? AnyShapeStyle(PocketTheme.raised) : AnyShapeStyle(.regularMaterial)
-    }
-
-    private var fallbackLensFill: AnyShapeStyle {
-        reduceTransparency ? AnyShapeStyle(PocketTheme.panel) : AnyShapeStyle(.thickMaterial)
-    }
-
-    @available(macOS 26.0, *)
     private var lensGlass: Glass {
         if lifted { return .clear.interactive() }
         return tinted ? .regular.tint(selectedTint.opacity(colorScheme == .dark ? 0.32 : 0.2)).interactive() : .regular.interactive()

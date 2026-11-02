@@ -53,11 +53,7 @@ enum PocketToast {
     private struct ToastSurface: ViewModifier {
         @ViewBuilder
         func body(content: Content) -> some View {
-            if #available(macOS 26.0, *) {
-                content.glassEffect(.regular, in: .capsule)
-            } else {
-                content.background(.regularMaterial, in: Capsule()).overlay { Capsule().strokeBorder(PocketTheme.line) }
-            }
+            content.glassEffect(.regular, in: .capsule)
         }
     }
 }

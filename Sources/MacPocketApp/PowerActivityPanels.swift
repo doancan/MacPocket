@@ -179,12 +179,25 @@ struct PowerEnergyRow: View {
 struct PowerEnergyPanel: View {
     @ObservedObject var center: PowerCenterModel
     @State private var totals: [PowerWattSample] = []
+    @State private var showMinor = false
+    @State private var visibleCount = Self.pageSize
+
+    private static let pageSize = 12
+    private static let chartRowCount = 8
+    /// CPU share below which a process is "idle" for this list.
+    private static let minorCPUPercent = 0.1
+    private static let minorCPULabel = (minorCPUPercent / 100).formatted(.percent.precision(.fractionLength(1)).locale(pocketLocale))
 
     var body: some View {
         VStack(alignment: .leading, spacing: PocketSpacing.l) {
             if let sample = center.energy {
-                chart(sample)
-                list(sample)
+                let processes = sample.processes.filter { showMinor || $0.cpuPercent >= Self.minorCPUPercent }
+                HStack(alignment: .top, spacing: PocketSpacing.l) {
+                    topCard(processes)
+                    trendCard(sample)
+                }
+                .fixedSize(horizontal: false, vertical: true)
+                list(sample, processes)
             } else if let error = center.energyError {
                 PocketMessage(error, error: true)
             } else {
@@ -196,41 +209,27 @@ struct PowerEnergyPanel: View {
             totals.append(PowerWattSample(date: sample.capturedAt, watts: sample.totalMilliwatts / 1000))
             if totals.count > 60 { totals.removeFirst(totals.count - 60) }
         }
+        .onChange(of: showMinor) { _, _ in visibleCount = Self.pageSize }
     }
 
-    private func chart(_ sample: ProcessEnergySample) -> some View {
-        let top = Array(sample.processes.prefix(8))
-        return ViewThatFits(in: .horizontal) {
-            HStack(alignment: .top, spacing: PocketSpacing.l) { barChart(top); trendChart(sample) }
-            VStack(spacing: PocketSpacing.l) { barChart(top); trendChart(sample) }
-        }
-    }
-
-    private func barChart(_ top: [ProcessEnergyUsage]) -> some View {
-        VStack(alignment: .leading, spacing: PocketSpacing.m) {
+    private func topCard(_ processes: [ProcessEnergyUsage]) -> some View {
+        let top = Array(processes.prefix(Self.chartRowCount))
+        return VStack(alignment: .leading, spacing: PocketSpacing.m) {
             PocketSectionHeader("Enerji etkisi", icon: "chart.bar.xaxis") { Text("Ortalama güç") }
             if top.isEmpty {
                 Text("Bu aralıkta ölçülebilir enerji kullanımı yok.").font(.callout).foregroundStyle(.secondary)
             } else {
-                Chart(top) { process in
-                    BarMark(x: .value(Text("Güç (mW)"), process.milliwatts), y: .value(Text("Süreç"), "\(process.name) (\(process.pid))"))
-                        .foregroundStyle(PocketTheme.power.gradient)
-                        .cornerRadius(3)
-                        .annotation(position: .trailing) {
-                            Text(powerMilliwatts(process.milliwatts)).font(.caption2).foregroundStyle(.secondary)
-                        }
+                ForEach(top) { process in
+                    PowerEnergyRow(process: process, maximum: top.first?.milliwatts ?? 1, compact: true)
                 }
-                .chartXAxis { AxisMarks { _ in AxisGridLine() } }
-                .chartYAxis { AxisMarks { value in AxisValueLabel { if let text = value.as(String.self) { Text(text).lineLimit(1) } } } }
-                .frame(height: CGFloat(max(120, top.count * 26)))
-                .accessibilityLabel("En çok enerji kullanan süreçler grafiği")
             }
+            Spacer(minLength: 0)
         }
-        .frame(maxWidth: .infinity, alignment: .topLeading)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .pocketCard()
     }
 
-    private func trendChart(_ sample: ProcessEnergySample) -> some View {
+    private func trendCard(_ sample: ProcessEnergySample) -> some View {
         VStack(alignment: .leading, spacing: PocketSpacing.m) {
             PocketSectionHeader("Toplam süreç gücü", icon: "waveform.path.ecg") {
                 Text(powerMilliwatts(sample.totalMilliwatts))
@@ -247,24 +246,32 @@ struct PowerEnergyPanel: View {
                 .chartYAxis { AxisMarks { value in
                     AxisGridLine(); AxisValueLabel { if let watts = value.as(Double.self) { Text(powerWatts(watts)) } }
                 } }
-                .frame(height: 150)
+                .frame(minHeight: 150, maxHeight: .infinity)
                 .accessibilityLabel("Toplam süreç gücü grafiği")
             } else {
                 Text("Eğilim birkaç ölçümden sonra görünür.").font(.callout).foregroundStyle(.secondary)
             }
+            Spacer(minLength: 0)
             if let system = center.wattHistory.last?.watts {
                 PowerFactRow(title: "Tüm sistem (giriş)", value: "\(powerWatts(system))",
                              help: "Ekran, GPU ve çevre birimleri dahil Mac’in çektiği toplam güç")
             }
         }
-        .frame(maxWidth: .infinity, alignment: .topLeading)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .pocketCard()
     }
 
-    private func list(_ sample: ProcessEnergySample) -> some View {
-        VStack(alignment: .leading, spacing: PocketSpacing.m) {
+    private func list(_ sample: ProcessEnergySample, _ processes: [ProcessEnergyUsage]) -> some View {
+        let shown = processes.prefix(visibleCount)
+        let hiddenMinor = sample.processes.count - sample.processes.filter { $0.cpuPercent >= Self.minorCPUPercent }.count
+        return VStack(alignment: .leading, spacing: PocketSpacing.m) {
             PocketSectionHeader("Süreçler", icon: "list.number") {
-                Text("\(Int(sample.interval.rounded())) sn aralık · \(sample.processes.count) süreç")
+                HStack(spacing: PocketSpacing.m) {
+                    Text("\(Int(sample.interval.rounded())) sn aralık · \(processes.count) süreç")
+                    Toggle(isOn: $showMinor) { Text("\(Self.minorCPULabel) altındakileri göster") }
+                        .toggleStyle(.switch).controlSize(.small)
+                        .help("İşlemci kullanımı çok düşük olan süreçleri de listeler (\(hiddenMinor) süreç gizli).")
+                }
             }
             HStack(spacing: PocketSpacing.m) {
                 Text("Süreç").frame(maxWidth: .infinity, alignment: .leading)
@@ -274,12 +281,19 @@ struct PowerEnergyPanel: View {
             }
             .font(.caption.weight(.semibold)).foregroundStyle(.secondary)
             Divider()
-            if sample.processes.isEmpty {
+            if processes.isEmpty {
                 Text("Ölçüm aralığında enerji kullanan süreç yok.").font(.callout).foregroundStyle(.secondary)
             }
-            ForEach(sample.processes) { process in
-                PowerEnergyRow(process: process, maximum: sample.processes.first?.milliwatts ?? 1)
+            ForEach(shown) { process in
+                PowerEnergyRow(process: process, maximum: processes.first?.milliwatts ?? 1)
                 Divider()
+            }
+            if processes.count > visibleCount {
+                Button("Daha fazla göster (\(processes.count - visibleCount))") { visibleCount += Self.pageSize }
+                    .buttonStyle(.pocketSecondary).frame(maxWidth: .infinity)
+            } else if visibleCount > Self.pageSize && processes.count > Self.pageSize {
+                Button("Daha az göster") { visibleCount = Self.pageSize }
+                    .buttonStyle(.pocketSecondary).frame(maxWidth: .infinity)
             }
             PocketMessage("Güç, çekirdeğin süreç başına tuttuğu enerji sayacından (ri_energy_nj) hesaplanır. Sistem süreçlerinin \(sample.unreadableCount) tanesi yönetici izni gerektirdiği için okunamadı; yalnızca senin süreçlerin gösterilir.",
                           tone: .neutral)

@@ -24,15 +24,11 @@ struct FileWorkspaceView: View {
                     Label("Büyük, eski ve yinelenen dosyaları bul", systemImage: "doc.text.magnifyingglass")
                 } description: {
                     if let root = model.root {
-                        Text("\(root.lastPathComponent) klasörünü tara. Taşınacak öğeleri sonuçlardan sen seçersin.")
+                        Text("\(FileManager.default.displayName(atPath: root.path)) klasörünü tara. Taşınacak öğeleri sonuçlardan sen seçersin.")
                     } else {
                         Text("Taramak için bir klasör seç. Tarama dosyaları değiştirmez.")
                     }
                 } actions: {
-                    HStack {
-                        Button("Klasör Seç…") { model.chooseFolder() }
-                        if model.root != nil { Button("Tara") { model.scan() }.buttonStyle(.pocketPrimary) }
-                    }
                     quickRoots
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -46,7 +42,7 @@ struct FileWorkspaceView: View {
             Button("Vazgeç", role: .cancel) {}
             Button("Çöp’e Taşı", role: .destructive) { model.trashSelection() }
         } message: {
-            Text("\(model.selectedRows.count) öğe · \(pocketBytes(model.selectedBytes)) mantıksal boyut. Gerekirse Finder’daki Çöp’ten geri alabilirsin.")
+            Text("\(model.selectedRows.count) öğe · \(pocketDiskBytes(model.selectedBytes)) mantıksal boyut. Gerekirse Finder’daki Çöp’ten geri alabilirsin.")
         }
     }
 
@@ -130,7 +126,7 @@ struct FileWorkspaceView: View {
         VStack(alignment: .leading, spacing: PocketSpacing.s) {
             HStack(spacing: PocketSpacing.xl) {
                 Label("\(report.fileCount) tekil dosya", systemImage: "doc.on.doc")
-                Label(pocketBytes(report.bytes), systemImage: "externaldrive").monospacedDigit()
+                Label(pocketDiskBytes(report.bytes), systemImage: "externaldrive").monospacedDigit()
                 if model.hasTrashedItems {
                     PocketStatusBadge(text: "Çöp’e taşınanlar gizlendi", systemImage: "trash", tone: .neutral)
                         .help("Toplamlar bir sonraki taramada güncellenir.")
@@ -262,7 +258,7 @@ struct FileWorkspaceView: View {
     private var selectionSummary: String {
         let listed = String(localized: "\(model.rows.count) listelenen")
         guard !model.selectedRows.isEmpty else { return listed }
-        return String(localized: "\(listed) · \(model.selectedRows.count) seçili (\(pocketBytes(model.selectedBytes)))")
+        return String(localized: "\(listed) · \(model.selectedRows.count) seçili (\(pocketDiskBytes(model.selectedBytes)))")
     }
 }
 
@@ -287,7 +283,7 @@ private struct FileResultsTable: View {
             }
             .width(min: 260, ideal: 480)
             TableColumn("Boyut") { row in
-                Text(pocketBytes(row.bytes)).monospacedDigit()
+                Text(pocketDiskBytes(row.bytes)).monospacedDigit()
             }
             .width(min: 80, ideal: 110)
             TableColumn("Değiştirilme") { row in

@@ -282,20 +282,14 @@ private struct HiddenSettingCommand: View {
     }
 }
 
-/// Floating summary + Discard/Apply. On macOS 26+ it is glass (functional layer over the scrolling list):
+/// Floating summary + Discard/Apply. Glass (functional layer over the scrolling list):
 /// one container, so the summary capsule and buttons blend and materialize together.
 private struct HiddenSettingsApplyBar: View {
     @ObservedObject var model: HiddenSettingsModel
     let motion: Animation?
 
     var body: some View {
-        Group {
-            if #available(macOS 26.0, *) {
-                GlassEffectContainer(spacing: PocketSpacing.s) { content }
-            } else {
-                content
-            }
-        }
+        GlassEffectContainer(spacing: PocketSpacing.s) { content }
         .animation(motion, value: model.drafts.isEmpty)
     }
 
@@ -343,12 +337,6 @@ private struct HiddenSettingsApplyBar: View {
 private struct HiddenSettingsSummarySurface: ViewModifier {
     @ViewBuilder
     func body(content: Content) -> some View {
-        if #available(macOS 26.0, *) {
-            content.glassEffect(.regular, in: .capsule)
-        } else {
-            content
-                .background(.regularMaterial, in: Capsule())
-                .overlay { Capsule().strokeBorder(PocketTheme.line) }
-        }
+        content.glassEffect(.regular, in: .capsule)
     }
 }

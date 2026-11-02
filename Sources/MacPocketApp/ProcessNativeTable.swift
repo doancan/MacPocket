@@ -24,7 +24,7 @@ struct ProcessNativeTable: NSViewRepresentable {
         table.setAccessibilityLabel(String(localized: "Süreç listesi"))
         table.allowsColumnReordering = true
         table.allowsMultipleSelection = false
-        table.columnAutoresizingStyle = .lastColumnOnlyAutoresizingStyle
+        table.columnAutoresizingStyle = .uniformColumnAutoresizingStyle
         table.autosaveName = "MacPocket.ProcessTable"
         table.autosaveTableColumns = true
         scroll.documentView = table
@@ -61,6 +61,9 @@ struct ProcessNativeTable: NSViewRepresentable {
                 column.title = title
                 column.width = width
                 column.minWidth = key == "name" ? 120 : 45
+                // Extra width goes to the name column; number headers line up with their right-aligned values.
+                column.resizingMask = key == "name" ? [.autoresizingMask, .userResizingMask] : .userResizingMask
+                if ["pid", "cpu", "memory", "threads"].contains(key) { column.headerCell.alignment = .right }
                 column.headerToolTip = key == "cpu" ? String(localized: "Tek mantıksal çekirdeğe göre")
                     : key == "memory" ? String(localized: "Yerleşik bellek (RSS)") : nil
                 if key != "threads" {

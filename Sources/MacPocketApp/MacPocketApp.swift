@@ -314,8 +314,8 @@ struct ResourceStrip: View {
                              icon: "memorychip", color: PocketTheme.memory,
                              history: model.samples.compactMap(\.memoryUsedFraction).map { $0 * 100 })
         case 2:
-            PocketMetricTile(title: "Disk · Boş", value: "\(volume.map { pocketBytes($0.availableBytes) } ?? "—")",
-                             detail: volume.map { "\($0.name) · \(pocketBytes($0.totalBytes)) toplam" } ?? "—",
+            PocketMetricTile(title: "Disk · Boş", value: "\(volume.map { pocketDiskBytes($0.availableBytes) } ?? "—")",
+                             detail: volume.map { "\($0.name) · \(pocketDiskBytes($0.totalBytes)) toplam" } ?? "—",
                              icon: "internaldrive", color: PocketTheme.disk)
         default:
             PocketMetricTile(title: "Termal durum", value: "\(pocketThermalTitle(system?.thermalState))",

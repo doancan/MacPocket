@@ -103,15 +103,11 @@ struct PocketBackdrop: View {
     }
 }
 
-/// macOS 26+: mirrors the module wash under the floating glass sidebar so the window reads as one surface.
+/// Mirrors the module wash under the floating glass sidebar so the window reads as one surface.
 private struct PocketBackgroundExtension: ViewModifier {
     @ViewBuilder
     func body(content: Content) -> some View {
-        if #available(macOS 26.0, *) {
-            content.backgroundExtensionEffect()
-        } else {
-            content
-        }
+        content.backgroundExtensionEffect()
     }
 }
 
@@ -127,7 +123,7 @@ struct PocketIconTile: View {
             .foregroundStyle(.white)
             .frame(width: size, height: size)
             .background {
-                // Tint plus a white sheen at the top (Color.mix needs macOS 15).
+                // Tint plus a white sheen at the top.
                 RoundedRectangle(cornerRadius: size * 0.27, style: .continuous).fill(tint)
                     .overlay {
                         RoundedRectangle(cornerRadius: size * 0.27, style: .continuous)
@@ -152,10 +148,8 @@ private struct PocketGlass: ViewModifier {
         if reduceTransparency {
             content.background(PocketTheme.panel, in: RoundedRectangle(cornerRadius: radius))
                 .overlay(RoundedRectangle(cornerRadius: radius).stroke(PocketTheme.line))
-        } else if #available(macOS 26.0, *) {
-            content.glassEffect(.regular, in: .rect(cornerRadius: radius))
         } else {
-            content.background(.regularMaterial, in: RoundedRectangle(cornerRadius: radius))
+            content.glassEffect(.regular, in: .rect(cornerRadius: radius))
         }
     }
 }

@@ -4,7 +4,7 @@ import MacPocketCore
 import ScreenCaptureKit
 import SwiftUI
 
-/// Records the display under the pointer with ScreenCaptureKit (macOS 15+), including system audio and the
+/// Records the display under the pointer with ScreenCaptureKit including system audio and the
 /// microphone if wanted, which the system's ⇧⌘5 recorder can't capture. MacPocket's own windows are left out.
 @MainActor
 final class ScreenRecorderService: NSObject, ObservableObject {
@@ -22,23 +22,18 @@ final class ScreenRecorderService: NSObject, ObservableObject {
     @Published private(set) var message: String?
     var recordingShortcut = false { didSet { registerShortcut() } }
 
-    private var stream: AnyObject?
-    private var output: AnyObject?
+    private var stream: SCStream?
+    private var output: SCRecordingOutput?
     private var file: URL?
     private lazy var hotKey = PocketGlobalHotKey { [weak self] in Task { await self?.toggle() } }
     private let hud = RecordingHUD()
-
-    static var isSupported: Bool {
-        if #available(macOS 15.0, *) { return true }
-        return false
-    }
 
     var isRecording: Bool { startedAt != nil }
 
     func start() { registerShortcut() }
 
     private func registerShortcut() {
-        if let shortcut = settings.shortcut, !recordingShortcut, Self.isSupported { hotKey.register(shortcut) } else { hotKey.unregister() }
+        if let shortcut = settings.shortcut, !recordingShortcut { hotKey.register(shortcut) } else { hotKey.unregister() }
     }
 
     var folder: URL {
@@ -51,7 +46,7 @@ final class ScreenRecorderService: NSObject, ObservableObject {
     }
 
     func begin() async {
-        guard #available(macOS 15.0, *), !isRecording else { return }
+        guard !isRecording else { return }
         guard CGPreflightScreenCaptureAccess() else {
             CGRequestScreenCaptureAccess()
             message = String(localized: "Kayıt için MacPocket’e Ekran Kaydı izni ver; sonra tekrar dene.")
@@ -103,7 +98,7 @@ final class ScreenRecorderService: NSObject, ObservableObject {
     }
 
     func stop() async {
-        guard #available(macOS 15.0, *), let stream = stream as? SCStream else { return }
+        guard let stream else { return }
         hud.hide()
         do { try await stream.stopCapture() } catch { message = error.localizedDescription }
         self.stream = nil
@@ -126,7 +121,6 @@ final class ScreenRecorderService: NSObject, ObservableObject {
     }
 }
 
-@available(macOS 15.0, *)
 extension ScreenRecorderService: SCRecordingOutputDelegate {
     nonisolated func recordingOutput(_ recordingOutput: SCRecordingOutput, didFailWithError error: any Error) {
         let text = error.localizedDescription
@@ -186,11 +180,7 @@ private struct RecordingHUDView: View {
 private struct RecordingHUDSurface: ViewModifier {
     @ViewBuilder
     func body(content: Content) -> some View {
-        if #available(macOS 26.0, *) {
-            content.glassEffect(.regular, in: .capsule)
-        } else {
-            content.background(.regularMaterial, in: Capsule()).overlay { Capsule().strokeBorder(PocketTheme.line) }
-        }
+        content.glassEffect(.regular, in: .capsule)
     }
 }
 
@@ -203,16 +193,11 @@ struct ScreenRecorderView: View {
             PocketPageHeading(title: "Ekran Kaydı",
                               subtitle: "İmlecin bulunduğu ekranı sistem sesi ve istersen mikrofonla birlikte kaydet; ⇧⌘5’in kaydedemediği sesi de alır.",
                               icon: "record.circle") {
-                if ScreenRecorderService.isSupported {
-                    Button { Task { await service.toggle() } } label: {
-                        Label(service.isRecording ? "Durdur" : "Kaydı başlat", systemImage: service.isRecording ? "stop.fill" : "record.circle")
-                    }
-                    .buttonStyle(.pocketPrimary)
-                    .controlSize(.large)
+                Button { Task { await service.toggle() } } label: {
+                    Label(service.isRecording ? "Durdur" : "Kaydı başlat", systemImage: service.isRecording ? "stop.fill" : "record.circle")
                 }
-            }
-            if !ScreenRecorderService.isSupported {
-                PocketMessage("Ses dahil kayıt macOS 15 veya sonrası gerektirir. Bu sürümde ⇧⌘5 ile sessiz kayıt alabilirsin.", tone: .warning)
+                .buttonStyle(.pocketPrimary)
+                .controlSize(.large)
             }
             if let message = service.message { PocketMessage(message, tone: .warning) }
             if let start = service.startedAt {

@@ -37,7 +37,7 @@ public actor WindowPreviewProvider {
         configuration.height = max(1, Int(target.frame.height * scale))
         configuration.showsCursor = false
         configuration.scalesToFit = true
-        if #available(macOS 14.2, *) { configuration.ignoreShadowsSingleWindow = true }
+        configuration.ignoreShadowsSingleWindow = true
         let image = try await SCScreenshotManager.captureImage(contentFilter: SCContentFilter(desktopIndependentWindow: target),
                                                                configuration: configuration)
         return WindowImage(cgImage: image, capturedAt: Date())

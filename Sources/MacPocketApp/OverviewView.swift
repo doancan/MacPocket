@@ -247,8 +247,8 @@ private struct DiskTile: View {
         let volume = model.system?.volumes.first { $0.path == "/" } ?? model.system?.volumes.first
         let used = volume.map { Double(max(0, $0.totalBytes - $0.availableBytes)) / Double(max(1, $0.totalBytes)) }
         DashboardTile(title: "Disk", icon: "internaldrive", tint: PocketTheme.disk, open: open) {
-            TileValue(value: volume.map { pocketBytes($0.availableBytes) } ?? "—",
-                      caption: volume.map { String(localized: "\($0.name) · \(pocketBytes($0.totalBytes)) içinde boş") } ?? String(localized: "Okunuyor…"))
+            TileValue(value: volume.map { pocketDiskBytes($0.availableBytes) } ?? "—",
+                      caption: volume.map { String(localized: "\($0.name) · \(pocketDiskBytes($0.totalBytes)) içinde boş") } ?? String(localized: "Okunuyor…"))
         } bottom: {
             VStack(alignment: .leading, spacing: PocketSpacing.xs) {
                 TileBar(fraction: used ?? 0, tint: PocketTheme.disk)
@@ -440,9 +440,9 @@ private struct CleanupTile: View {
     var body: some View {
         DashboardTile(title: "Temizlik", icon: "sparkles", tint: PocketPage.cleanup.tint, open: open) {
             if cleanup.scanning {
-                TileValue(value: cleanup.progress.map { pocketBytes($0.measuredBytes) } ?? "…", caption: String(localized: "Taranıyor…"), rolls: true)
+                TileValue(value: cleanup.progress.map { pocketDiskBytes($0.measuredBytes) } ?? "…", caption: String(localized: "Taranıyor…"), rolls: true)
             } else if let report = cleanup.report {
-                TileValue(value: pocketBytes(report.bytes), caption: String(localized: "\(report.itemCount.formatted()) öğe temizlenebilir"), rolls: true)
+                TileValue(value: pocketDiskBytes(report.bytes), caption: String(localized: "\(report.itemCount.formatted()) öğe temizlenebilir"), rolls: true)
             } else {
                 TileValue(value: "—", caption: String(localized: "Önbellek ve günlükleri tara"), rolls: true)
             }

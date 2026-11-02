@@ -474,6 +474,24 @@ let pocketLocale = Locale(identifier: Bundle.main.preferredLocalizations.first ?
     return formatter
 }()
 
+/// Disk and file sizes: macOS (Finder, System Settings) reports them in decimal units. Memory keeps `pocketBytes`.
+@MainActor private let pocketDiskByteFormatter: ByteCountFormatter = {
+    let formatter = ByteCountFormatter()
+    formatter.countStyle = .file
+    formatter.allowsNonnumericFormatting = false
+    return formatter
+}()
+
+@MainActor
+func pocketDiskBytes(_ value: UInt64) -> String {
+    pocketDiskByteFormatter.string(fromByteCount: Int64(clamping: value))
+}
+
+@MainActor
+func pocketDiskBytes(_ value: Int64) -> String {
+    pocketDiskByteFormatter.string(fromByteCount: max(0, value))
+}
+
 @MainActor
 func pocketBytes(_ value: UInt64) -> String {
     pocketByteFormatter.string(fromByteCount: Int64(clamping: value))
@@ -558,7 +576,6 @@ struct PocketSearchField: View {
     @Binding var text: String
     var focus: FocusState<Bool>.Binding?
     @FocusState private var ownFocus: Bool
-    @State private var hovering = false
 
     init(_ prompt: LocalizedStringKey, text: Binding<String>, focus: FocusState<Bool>.Binding? = nil) {
         self.prompt = prompt; _text = text; self.focus = focus
@@ -585,8 +602,7 @@ struct PocketSearchField: View {
         }
         .padding(.horizontal, 9)
         .frame(height: 30)
-        .modifier(PocketSearchFieldSurface(isFocused: isFocused, hovering: hovering))
-        .onHover { hovering = $0 }
+        .modifier(PocketSearchFieldSurface(isFocused: isFocused))
         .animation(.easeOut(duration: 0.12), value: isFocused)
     }
 
@@ -599,102 +615,32 @@ struct PocketSearchField: View {
     }
 }
 
-/// macOS 26+: an interactive glass capsule, tinted with the accent color while focused.
-/// Earlier systems: a panel fill with a hairline that turns into an accent focus ring.
+/// An interactive glass capsule, tinted with the accent color while focused.
 private struct PocketSearchFieldSurface: ViewModifier {
     let isFocused: Bool
-    let hovering: Bool
 
     @ViewBuilder
     func body(content: Content) -> some View {
-        if #available(macOS 26.0, *) {
-            content
-                .contentShape(Capsule())
-                .glassEffect(isFocused ? .regular.tint(Color.accentColor.opacity(0.18)).interactive() : .regular.interactive(),
-                             in: .capsule)
-        } else {
-            let shape = RoundedRectangle(cornerRadius: 8, style: .continuous)
-            content
-                .background(shape.fill(PocketTheme.panel))
-                .overlay {
-                    shape.strokeBorder(isFocused ? Color.accentColor.opacity(0.85) : (hovering ? PocketTheme.line.opacity(2) : PocketTheme.line.opacity(1.4)),
-                                       lineWidth: isFocused ? 1.5 : 0.75)
-                }
-                .contentShape(shape)
-        }
+        content
+            .contentShape(Capsule())
+            .glassEffect(isFocused ? .regular.tint(Color.accentColor.opacity(0.18)).interactive() : .regular.interactive(),
+                         in: .capsule)
     }
 }
 
 /// Primary and secondary buttons, applied app-wide as the default button style.
-/// - macOS 26+: the system Liquid Glass styles (`.glassProminent` for the primary action, `.glass`
-///   otherwise), which bring their own press, hover and shimmer feedback.
-/// - Earlier systems: a filled accent / surface + hairline look with one height per control size.
+/// The system Liquid Glass styles (`.glassProminent` for the primary action, `.glass` otherwise), which
+/// bring their own press, hover and shimmer feedback.
 struct PocketButtonStyle: PrimitiveButtonStyle {
     enum Kind { case primary, secondary }
     let kind: Kind
 
     @ViewBuilder
     func makeBody(configuration: Configuration) -> some View {
-        if #available(macOS 26.0, *) {
-            switch kind {
-            case .primary: Button(configuration).buttonStyle(.glassProminent)
-            case .secondary: Button(configuration).buttonStyle(.glass)
-            }
-        } else {
-            Button(configuration).buttonStyle(PocketLegacyButtonStyle(kind: kind))
+        switch kind {
+        case .primary: Button(configuration).buttonStyle(.glassProminent)
+        case .secondary: Button(configuration).buttonStyle(.glass)
         }
-    }
-}
-
-private struct PocketLegacyButtonStyle: ButtonStyle {
-    let kind: PocketButtonStyle.Kind
-
-    func makeBody(configuration: Configuration) -> some View {
-        PocketButtonBody(configuration: configuration, kind: kind)
-    }
-}
-
-private struct PocketButtonBody: View {
-    let configuration: ButtonStyle.Configuration
-    let kind: PocketButtonStyle.Kind
-    @Environment(\.isEnabled) private var isEnabled
-    @Environment(\.controlSize) private var controlSize
-    @Environment(\.colorScheme) private var colorScheme
-    @State private var hovering = false
-
-    private var metrics: (height: CGFloat, padding: CGFloat, font: CGFloat) {
-        switch controlSize {
-        case .mini, .small: (24, 10, 12)
-        case .large, .extraLarge: (34, 16, 14)
-        default: (28, 13, 13)
-        }
-    }
-
-    var body: some View {
-        let shape = RoundedRectangle(cornerRadius: 8, style: .continuous)
-        let primary = kind == .primary
-        configuration.label
-            .font(.system(size: metrics.font, weight: primary ? .semibold : .medium))
-            .lineLimit(1)
-            .foregroundStyle(primary ? AnyShapeStyle(.white) : AnyShapeStyle(.primary))
-            .padding(.horizontal, metrics.padding)
-            .frame(minHeight: metrics.height)
-            .background {
-                if primary {
-                    shape.fill(Color.accentColor.gradient.shadow(.drop(color: .black.opacity(0.15), radius: 1.5, y: 1)))
-                } else {
-                    shape.fill(PocketTheme.panel.shadow(.drop(color: .black.opacity(colorScheme == .dark ? 0.3 : 0.06), radius: 1, y: 0.5)))
-                }
-            }
-            .overlay {
-                shape.fill(Color.primary.opacity(configuration.isPressed ? 0.12 : (hovering ? 0.05 : 0)))
-                shape.strokeBorder(primary ? Color.white.opacity(0.18) : PocketTheme.line.opacity(1.6), lineWidth: 0.75)
-            }
-            .contentShape(shape)
-            .opacity(isEnabled ? 1 : 0.45)
-            .scaleEffect(configuration.isPressed ? 0.98 : 1)
-            .animation(.easeOut(duration: 0.1), value: configuration.isPressed)
-            .onHover { hovering = $0 && isEnabled }
     }
 }
 

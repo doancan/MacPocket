@@ -52,7 +52,7 @@ struct MacrosView: View {
                 } else {
                     ContentUnavailableView("Bir makro seç", systemImage: "wand.and.stars",
                                            description: Text("Soldan bir makro seç ya da yenisini oluştur."))
-                        .frame(maxWidth: .infinity, minHeight: 300)
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
                         .pocketCard()
                 }
             }
@@ -666,10 +666,6 @@ private struct LauncherSurface: ViewModifier {
     @ViewBuilder
     func body(content: Content) -> some View {
         let shape = RoundedRectangle(cornerRadius: 22, style: .continuous)
-        if #available(macOS 26.0, *) {
-            content.glassEffect(.regular, in: shape)
-        } else {
-            content.background(.ultraThickMaterial, in: shape).overlay { shape.strokeBorder(.primary.opacity(0.1)) }.clipShape(shape)
-        }
+        content.glassEffect(.regular, in: shape)
     }
 }

@@ -48,4 +48,15 @@ final class AppFreezerTests: XCTestCase {
         stored.save(to: defaults)
         XCTAssertEqual(AppFreezerSettings.load(from: defaults).rules.map(\.bundleID), ["com.google.Chrome"])
     }
+
+    func testHasWorkNeedsEnabledAndRules() {
+        XCTAssertFalse(AppFreezerSettings().hasWork)
+        var enabledWithoutRules = AppFreezerSettings()
+        enabledWithoutRules.enabled = true
+        XCTAssertFalse(enabledWithoutRules.hasWork)
+        XCTAssertTrue(settings.hasWork)
+        var disabled = settings
+        disabled.enabled = false
+        XCTAssertFalse(disabled.hasWork)
+    }
 }

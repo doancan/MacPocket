@@ -15,7 +15,6 @@ final class GainBox: @unchecked Sendable {
 /// current output through a private aggregate device with the chosen gain. Private objects disappear with
 /// MacPocket's process, so the app's normal sound returns even after a crash.
 /// Created and invalidated only on `VolumeMixerService`'s setup queue; `gain` is the one thing touched elsewhere.
-@available(macOS 14.2, *)
 final class AppAudioTap: @unchecked Sendable {
     struct Failure: Error, LocalizedError {
         let step: String
@@ -132,13 +131,15 @@ final class VolumeMixerService: ObservableObject {
             guard settings != oldValue else { return }
             settings.save(to: .standard)
             apply()
+            updatePolling()
         }
     }
     @Published private(set) var apps: [AudioApp] = []
     @Published private(set) var failure: String?
-    private var taps: [String: AnyObject] = [:]
+    private var taps: [String: AppAudioTap] = [:]
     private var tappedOutput: String?
     private var timer: Timer?
+    private var viewVisible = false
     /// Core Audio calls that can block for as long as coreaudiod likes (the first one waits on the system-audio
     /// permission prompt) run here, never on the main thread.
     private let setupQueue = DispatchQueue(label: "MacPocket.mixer.setup", qos: .userInitiated)
@@ -146,16 +147,28 @@ final class VolumeMixerService: ObservableObject {
     /// Bumped when the output changes, so a tap finished for the old output is thrown away.
     private var outputGeneration = 0
 
-    static var isSupported: Bool {
-        if #available(macOS 14.2, *) { return true }
-        return false
-    }
-
     private init() {}
 
     func start() {
-        guard Self.isSupported else { return }
         refresh()
+        updatePolling()
+    }
+
+    func setViewVisible(_ visible: Bool) {
+        viewVisible = visible
+        if visible { refresh() }
+        updatePolling()
+    }
+
+    /// The process list is only worth reading while the page shows it or an app has a tap to keep in line.
+    private func updatePolling() {
+        let needed = viewVisible || settings.hasActiveEntries
+        if !needed {
+            timer?.invalidate()
+            timer = nil
+            return
+        }
+        guard timer == nil else { return }
         let timer = Timer(timeInterval: 3, repeats: true) { [weak self] _ in MainActor.assumeIsolated { self?.refresh() } }
         timer.tolerance = 1
         RunLoop.main.add(timer, forMode: .common)
@@ -169,17 +182,15 @@ final class VolumeMixerService: ObservableObject {
     }
 
     func stopAll() {
-        if #available(macOS 14.2, *) { for tap in taps.values { if let tap = tap as? AppAudioTap { release(tap) } } }
+        for tap in taps.values { release(tap) }
         taps = [:]
     }
 
-    @available(macOS 14.2, *)
     private func release(_ tap: AppAudioTap) {
         setupQueue.async { tap.invalidate() }
     }
 
     private func apply() {
-        guard #available(macOS 14.2, *) else { return }
         let output = AudioOutputSystem.defaultOutput.flatMap { id in AudioOutputSystem.outputDevices().first { $0.objectID == id }?.uid }
         if output != tappedOutput { // the output changed: rebuild on the new one
             stopAll()
@@ -191,12 +202,12 @@ final class VolumeMixerService: ObservableObject {
             settings.entry(for: app.bundleID).isNeutral ? nil : (app.bundleID, app)
         })
         for (bundleID, tap) in taps where wanted[bundleID] == nil {
-            if let tap = tap as? AppAudioTap { release(tap) }
+            release(tap)
             taps[bundleID] = nil
         }
         for (bundleID, app) in wanted {
             let gain = settings.entry(for: bundleID).gain
-            if let tap = taps[bundleID] as? AppAudioTap {
+            if let tap = taps[bundleID] {
                 tap.gain.value = gain
                 continue
             }
@@ -212,7 +223,6 @@ final class VolumeMixerService: ObservableObject {
     }
 
     /// Keeps a finished tap only if it is still wanted on the same output, with the gain as it is now.
-    @available(macOS 14.2, *)
     private func finish(_ bundleID: String, _ result: Result<AppAudioTap, Error>, generation: Int) {
         pending.remove(bundleID)
         switch result {
@@ -229,7 +239,6 @@ final class VolumeMixerService: ObservableObject {
 
     /// Core Audio's process list, grouped by app (helper bundle IDs share the app's prefix).
     private static func audioApps() -> [AudioApp] {
-        guard #available(macOS 14.2, *) else { return [] }
         var address = AudioObjectPropertyAddress(mSelector: kAudioHardwarePropertyProcessObjectList,
                                                  mScope: kAudioObjectPropertyScopeGlobal, mElement: kAudioObjectPropertyElementMain)
         var size: UInt32 = 0
@@ -284,9 +293,6 @@ struct VolumeMixerView: View {
                               icon: "slider.vertical.3") {
                 Button { service.refresh() } label: { Label("Yenile", systemImage: "arrow.clockwise") }
             }
-            if !VolumeMixerService.isSupported {
-                PocketMessage("Uygulama başına ses, macOS 14.2 veya sonrası gerektirir.", tone: .warning)
-            }
             if let failure = service.failure { PocketMessage(failure, tone: .warning) }
             ScrollView {
                 VStack(spacing: PocketSpacing.s) {
@@ -305,7 +311,8 @@ struct VolumeMixerView: View {
             }
         }
         .pocketPage()
-        .onAppear { service.refresh() }
+        .onAppear { service.setViewVisible(true) }
+        .onDisappear { service.setViewVisible(false) }
     }
 }
 

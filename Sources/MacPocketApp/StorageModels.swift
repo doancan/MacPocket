@@ -30,9 +30,10 @@ final class StorageOverviewModel: ObservableObject {
     private let cache = StorageOverviewCache.standard
 
     func loadIfNeeded() {
+        // Free space is cheap to read and changes between visits; only the cached category scan is loaded once.
+        if let current = try? VolumeCapacity.read() { volume = current }
         guard !loaded else { return }
         loaded = true
-        volume = try? VolumeCapacity.read()
         let cache = cache
         Task { [weak self] in
             let cached = await Task.detached(priority: .utility) { cache.load() }.value
@@ -227,7 +228,7 @@ final class SpaceLensModel: ObservableObject {
             selection = []
             let errors = results.compactMap(\.error)
             resultMessage = moved.isEmpty ? nil
-                : String(localized: "\(moved.count) öğe Çöp’e taşındı (\(pocketBytes(freed))). Finder’daki Çöp’ten geri alabilirsin; alan Çöp boşaltılınca açılır.")
+                : String(localized: "\(moved.count) öğe Çöp’e taşındı (\(pocketDiskBytes(freed))). Finder’daki Çöp’ten geri alabilirsin; alan Çöp boşaltılınca açılır.")
             failure = errors.isEmpty ? nil : errors.prefix(3).joined(separator: "\n")
             working = false
         }

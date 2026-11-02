@@ -190,13 +190,8 @@ LabeledContent("Kart yoğunluğu") {
 
             Section {
                 Label("Sistemle bütünleşik gezinme ve kontroller", systemImage: "rectangle.3.group")
-                if #available(macOS 26.0, *) {
-                    Text("Liquid Glass; kenar çubuğu, araç çubuğu ve hızlı kontrollerde kullanılır. Saydamlığı azalt tercihin macOS Erişilebilirlik ayarlarından takip edilir.")
-                        .foregroundStyle(.secondary)
-                } else {
-                    Text("Bu macOS sürümünde sistem materyalleri kullanılır. Liquid Glass macOS 26 ve üzerinde etkinleşir.")
-                        .foregroundStyle(.secondary)
-                }
+                Text("Liquid Glass; kenar çubuğu, araç çubuğu ve hızlı kontrollerde kullanılır. Saydamlığı azalt tercihin macOS Erişilebilirlik ayarlarından takip edilir.")
+                    .foregroundStyle(.secondary)
             } header: { Text("Materyaller") }
         }
         .formStyle(.grouped)

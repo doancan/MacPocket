@@ -116,13 +116,18 @@ public struct StorageOverviewReport: Codable, Sendable, Equatable {
 
     public var measuredBytes: Int64 { categories.reduce(0) { $0 + $1.bytes } }
     /// Used space not attributed to a measured category.
-    public var systemAndOtherBytes: Int64 { max(0, volume.usedBytes - measuredBytes) }
+    public var systemAndOtherBytes: Int64 { systemAndOtherBytes(usedBytes: volume.usedBytes) }
     public var isPartial: Bool { limitReached || categories.contains { !$0.measurement.complete } }
 
+    /// The same remainder against another used-space figure, e.g. the live volume when this scan is old.
+    public func systemAndOtherBytes(usedBytes: Int64) -> Int64 { max(0, usedBytes - measuredBytes) }
+
     /// Measured categories plus the derived "Sistem ve Diğer" slice, largest first except system last.
-    public var segments: [(category: StorageCategory, bytes: Int64)] {
+    public var segments: [(category: StorageCategory, bytes: Int64)] { segments(usedBytes: volume.usedBytes) }
+
+    public func segments(usedBytes: Int64) -> [(category: StorageCategory, bytes: Int64)] {
         categories.filter { $0.bytes > 0 }.sorted { $0.bytes > $1.bytes }.map { ($0.category, $0.bytes) }
-            + [(StorageCategory.system, systemAndOtherBytes)]
+            + [(StorageCategory.system, systemAndOtherBytes(usedBytes: usedBytes))]
     }
 }
 

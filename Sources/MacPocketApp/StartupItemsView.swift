@@ -54,7 +54,7 @@ struct StartupItemsView: View {
             $0.label.localizedCaseInsensitiveContains(query) || ($0.appName ?? "").localizedCaseInsensitiveContains(query)
         }
         return VStack(alignment: .leading, spacing: PocketSpacing.m) {
-            TextField("Ara", text: $search).textFieldStyle(.roundedBorder).frame(maxWidth: 320)
+            PocketSearchField("Ara", text: $search).frame(maxWidth: 320)
             ScrollView {
                 VStack(alignment: .leading, spacing: PocketSpacing.l) {
                     ForEach(StartupClass.allCases) { kind in
