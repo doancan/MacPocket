@@ -41,14 +41,17 @@ final class FanHelperService: NSObject, FanHelperXPC, NSXPCListenerDelegate, @un
     func listener(_ listener: NSXPCListener, shouldAcceptNewConnection connection: NSXPCConnection) -> Bool {
         connection.exportedInterface = NSXPCInterface(with: FanHelperXPC.self)
         connection.exportedObject = self
-        connection.invalidationHandler = { [weak self] in self?.queue.async { self?.releaseNow() } }
+        connection.invalidationHandler = { [weak self] in
+            guard let self else { return }
+            self.queue.async { self.releaseNow() }
+        }
         connection.resume()
         return true
     }
 
     // MARK: FanHelperXPC
 
-    func status(reply: @escaping ([[NSNumber]], String?) -> Void) {
+    func status(reply: @escaping @Sendable ([[NSNumber]], String?) -> Void) {
         queue.async {
             do {
                 let fans = try (0..<self.controller.fanCount).map { fan -> [NSNumber] in
@@ -61,7 +64,7 @@ final class FanHelperService: NSObject, FanHelperXPC, NSXPCListenerDelegate, @un
         }
     }
 
-    func setTarget(fan: Int, rpm: Double, reply: @escaping (String?) -> Void) {
+    func setTarget(fan: Int, rpm: Double, reply: @escaping @Sendable (String?) -> Void) {
         queue.async {
             do {
                 let ranges = try (0..<self.controller.fanCount).map { try self.controller.range(fan: $0) }
@@ -77,11 +80,11 @@ final class FanHelperService: NSObject, FanHelperXPC, NSXPCListenerDelegate, @un
         }
     }
 
-    func heartbeat(reply: @escaping () -> Void) {
+    func heartbeat(reply: @escaping @Sendable () -> Void) {
         queue.async { self.lastHeartbeat = Date(); reply() }
     }
 
-    func releaseAll(reply: @escaping () -> Void) {
+    func releaseAll(reply: @escaping @Sendable () -> Void) {
         queue.async { self.releaseNow(); reply() }
     }
 }

@@ -96,7 +96,7 @@ struct TaskManagerView: View {
         } message: {
             if let entry = pendingEntry {
                 let note: LocalizedStringKey = pendingForce ? "Kaydedilmemiş değişiklikler kaybolabilir." : "Normal sonlandırma isteği gönderilecek."
-                Text(verbatim: "\(entry.name) · PID \(entry.pid)\n") + Text(note)
+                Text("\(entry.name) · PID \(String(entry.pid))\n\(Text(note))")
             }
         }
     }

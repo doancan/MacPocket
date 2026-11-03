@@ -3,11 +3,11 @@ import Foundation
 /// What the privileged helper exposes to MacPocket. Replies carry an error message on failure, nil on success.
 @objc public protocol FanHelperXPC {
     /// One entry per fan: actual RPM, minimum, maximum.
-    func status(reply: @escaping ([[NSNumber]], String?) -> Void)
-    func setTarget(fan: Int, rpm: Double, reply: @escaping (String?) -> Void)
+    func status(reply: @escaping @Sendable ([[NSNumber]], String?) -> Void)
+    func setTarget(fan: Int, rpm: Double, reply: @escaping @Sendable (String?) -> Void)
     /// Keeps manual speeds alive; without one every 15 s the helper hands the fans back to the system.
-    func heartbeat(reply: @escaping () -> Void)
-    func releaseAll(reply: @escaping () -> Void)
+    func heartbeat(reply: @escaping @Sendable () -> Void)
+    func releaseAll(reply: @escaping @Sendable () -> Void)
 }
 
 public enum FanHelperConstants {

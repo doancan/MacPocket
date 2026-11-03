@@ -175,7 +175,7 @@ struct GlassTabBar<ID: Hashable>: View {
                 .accessibilityLabel(tab.title)
                 .accessibilityAddTraits(isSelected ? [.isSelected, .isButton] : .isButton)
                 .accessibilityHint("Sekmeyi göster")
-                .help(showsShortcutHints ? tab.title + Text(verbatim: " (⌘\(index + 1))") : tab.title)
+                .help(showsShortcutHints ? Text("\(tab.title) (⌘\(index + 1))") : tab.title)
             }
         }
     }

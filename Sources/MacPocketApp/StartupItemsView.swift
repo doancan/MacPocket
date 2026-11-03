@@ -28,7 +28,7 @@ struct StartupItemsView: View {
                               subtitle: "Oturum açıldığında ya da Mac başladığında kendiliğinden çalışan öğeleri gör; kime ait olduklarını ve açık mı kapalı mı olduklarını öğren.",
                               icon: "power") {
                 HStack(spacing: PocketSpacing.s) {
-                    Button { try? SMAppService.openSystemSettingsLoginItems() } label: {
+                    Button { SMAppService.openSystemSettingsLoginItems() } label: {
                         Label("Giriş Öğeleri Ayarları", systemImage: "gearshape")
                     }
                     Button { Task { await model.load() } } label: { Label("Yenile", systemImage: "arrow.clockwise") }

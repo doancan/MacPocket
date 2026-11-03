@@ -90,7 +90,7 @@ final class NetworkTrafficModel: ObservableObject {
         let running = NSRunningApplication(processIdentifier: sample.pid)
         var buffer = [CChar](repeating: 0, count: 4 * Int(MAXPATHLEN))
         let length = proc_pidpath(sample.pid, &buffer, UInt32(buffer.count))
-        let path = length > 0 ? String(cString: buffer) : nil
+        let path = length > 0 ? String(decoding: buffer.prefix { $0 != 0 }.map { UInt8(bitPattern: $0) }, as: UTF8.self) : nil
         let appPath = path.flatMap(outermostApp)
         let appName = appPath.map { FileManager.default.displayName(atPath: $0).replacingOccurrences(of: ".app", with: "") }
         let name = running?.localizedName ?? path.map { ($0 as NSString).lastPathComponent } ?? sample.name

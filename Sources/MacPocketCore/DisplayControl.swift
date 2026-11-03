@@ -243,7 +243,7 @@ public enum DisplayRegistry {
             defer { IOObjectRelease(entry) }
             var className = [CChar](repeating: 0, count: 128)
             IOObjectGetClass(entry, &className)
-            let name = String(cString: className)
+            let name = String(decoding: className.prefix { $0 != 0 }.map { UInt8(bitPattern: $0) }, as: UTF8.self)
             if name == "AppleCLCD2" || name == "IOMobileFramebufferShim" {
                 if let pending { displays.append(RegistryDisplay(vendor: pending.vendor, product: pending.product, serial: pending.serial, avServiceID: nil)) }
                 pending = productAttributes(entry)

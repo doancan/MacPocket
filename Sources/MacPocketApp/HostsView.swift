@@ -174,7 +174,7 @@ private struct HostsGroupCard: View {
                 Text(String(localized: "\(group.entries.count) satır")).font(.caption).foregroundStyle(.secondary)
                 Spacer()
                 if !group.editable.isEmpty {
-                    Toggle(isOn: Binding(get: { group.anyEnabled }, set: setGroup)) { Text("Grubu aç/kapat") }
+                    Toggle(isOn: Binding(get: { group.anyEnabled }, set: { setGroup($0) })) { Text("Grubu aç/kapat") }
                         .toggleStyle(.switch).labelsHidden()
                         .help(group.anyEnabled ? "Gruptaki tüm satırları kapat" : "Gruptaki tüm satırları aç")
                 }

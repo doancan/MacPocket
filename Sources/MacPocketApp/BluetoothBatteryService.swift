@@ -52,7 +52,7 @@ final class BluetoothBatteryService: NSObject, ObservableObject {
         guard timer == nil else { return }
         updateStatusItem()
         Task { await refresh() }
-        let timer = Timer(timeInterval: 60, repeats: true) { [weak self] _ in MainActor.assumeIsolated { Task { await self?.refresh() } } }
+        let timer = Timer(timeInterval: 60, repeats: true) { [weak self] _ in Task { @MainActor in await self?.refresh() } }
         timer.tolerance = 15
         RunLoop.main.add(timer, forMode: .common)
         self.timer = timer

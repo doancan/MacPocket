@@ -23,6 +23,7 @@
   <a href="#öne-çıkanlar">Öne çıkanlar</a> ·
   <a href="#araçlar">Araçlar</a> ·
   <a href="#derleme">Derleme</a> ·
+  <a href="CHANGELOG.md">Değişiklikler</a> ·
   <a href="docs/PRODUCT.md">Yol haritası</a>
 </p>
 

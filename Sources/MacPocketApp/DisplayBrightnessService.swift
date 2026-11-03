@@ -111,7 +111,7 @@ final class DisplayBrightnessService: ObservableObject {
     func start() {
         observers.append(NotificationCenter.default.addObserver(forName: NSApplication.didChangeScreenParametersNotification,
                                                                 object: nil, queue: .main) { [weak self] _ in
-            MainActor.assumeIsolated { Task { await self?.refreshDisplays() } }
+            Task { @MainActor in await self?.refreshDisplays() }
         })
         observers.append(NotificationCenter.default.addObserver(forName: NSApplication.didBecomeActiveNotification,
                                                                 object: nil, queue: .main) { [weak self] _ in

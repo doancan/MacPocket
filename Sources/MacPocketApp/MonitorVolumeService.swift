@@ -65,12 +65,12 @@ final class MonitorVolumeService: ObservableObject {
             var address = AudioObjectPropertyAddress(mSelector: selector, mScope: kAudioObjectPropertyScopeGlobal,
                                                      mElement: kAudioObjectPropertyElementMain)
             AudioObjectAddPropertyListenerBlock(system, &address, .main) { [weak self] _, _ in
-                MainActor.assumeIsolated { Task { await self?.refresh() } }
+                Task { @MainActor in await self?.refresh() }
             }
         }
         observers.append(NotificationCenter.default.addObserver(forName: NSApplication.didChangeScreenParametersNotification,
                                                                 object: nil, queue: .main) { [weak self] _ in
-            MainActor.assumeIsolated { Task { await self?.refresh() } }
+            Task { @MainActor in await self?.refresh() }
         })
         observers.append(NotificationCenter.default.addObserver(forName: NSApplication.didBecomeActiveNotification,
                                                                 object: nil, queue: .main) { [weak self] _ in

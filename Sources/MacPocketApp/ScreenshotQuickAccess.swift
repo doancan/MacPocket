@@ -73,7 +73,7 @@ final class QuickAccessCard {
         NSAnimationContext.runAnimationGroup({ context in
             context.duration = 0.18
             panel.animator().alphaValue = 0
-        }, completionHandler: { panel.orderOut(nil) })
+        }, completionHandler: { MainActor.assumeIsolated { panel.orderOut(nil) } })
     }
 
     private func scheduleAutoClose(paused: Bool) {

@@ -106,7 +106,7 @@ final class ClipboardService: ObservableObject {
 
     private func observeSleepAndLock() {
         guard observers.isEmpty else { return }
-        let clear: (Notification) -> Void = { [weak self] _ in
+        let clear: @Sendable (Notification) -> Void = { [weak self] _ in
             MainActor.assumeIsolated {
                 guard let self, self.settings.clearClipboardOnSleepOrLock else { return }
                 self.clearSystemClipboard()

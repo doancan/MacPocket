@@ -1533,7 +1533,7 @@
 "Menü çubuğunda tek, kompakt bir simge; tıklayınca her modül kendi sekmesinde açılır." = "A single compact icon in the menu bar; click it to open each module in its own tab.";
 "Pil bilgileri yalnız pili olan Mac’lerde, fan hızı yalnız fanlı Mac’lerde gösterilir. Sığmayan öğeleri macOS ekran alanına göre gizleyebilir." = "Battery details appear only on Macs with a battery, fan speed only on Macs with fans. macOS may hide items that don’t fit on screen.";
 "Sabit simge" = "Static icon";
-"azami hızın %@" = "%@ of maximum speed";
+"%@, azami hızın %@" = "%@, %@ of maximum speed";
 "%@ sn" = "%@ s";
 "%@ yeniden başlatılamadı." = "Couldn’t restart %@.";
 "%@ yeniden başlatılınca" = "When %@ restarts";
@@ -2771,3 +2771,4 @@
 "Son %lld dk · en düşük %lld · ort. %lld · en yüksek %lld dBm" = "Last %lld min · low %lld · avg %lld · high %lld dBm";
 "Sırala" = "Sort";
 "macOS, ağ adlarını ve BSSID’leri yalnız konum izni olan uygulamalara gösterir. İzin vermeden de sinyal ve kanal analizi çalışır." = "macOS only shows network names and BSSIDs to apps with Location access. Signal and channel analysis work without it.";
+"%@ · PID %@\n%@" = "%@ · PID %@\n%@";

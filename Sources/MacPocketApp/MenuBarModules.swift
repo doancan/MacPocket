@@ -559,7 +559,7 @@ private struct FanRow: View {
         }
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(Text("Fan \(number)"))
-        .accessibilityValue(fan.fraction.map { Text(verbatim: "\(speed), ") + Text("azami hızın \(percentText($0 * 100))") }
+        .accessibilityValue(fan.fraction.map { Text("\(speed), azami hızın \(percentText($0 * 100))") }
                             ?? Text(speed))
     }
 }

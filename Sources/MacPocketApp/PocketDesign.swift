@@ -314,7 +314,7 @@ struct PocketMetricTile: View {
         .pocketCard(padding: PocketSpacing.m)
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(Text(title))
-        .accessibilityValue(Text(value) + Text(verbatim: ". ") + Text(detail))
+        .accessibilityValue(Text("\(Text(value)). \(Text(detail))"))
     }
 }
 
