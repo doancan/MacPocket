@@ -34,6 +34,7 @@ public enum MenuBarModule: String, CaseIterable, Codable, Sendable, Identifiable
         switch value {
         case .powerFanSpeed, .powerFanPercent: String(localized: "MenuBar.shortLabel.fan", defaultValue: "FAN")
         case .powerThermal: String(localized: "MenuBar.shortLabel.thermal", defaultValue: "ISI")
+        case .powerTemperature: "°C"
         default: shortLabel
         }
     }
@@ -55,7 +56,7 @@ public enum MenuBarModule: String, CaseIterable, Codable, Sendable, Identifiable
         case .memory: [.memoryUsedPercent, .memoryUsedBytes, .memoryFreeBytes, .memoryPressure]
         case .disk: [.diskFreeBytes, .diskUsedPercent, .diskFreePercent, .diskActivity]
         case .network: [.networkUpDown, .networkCombined, .networkDownload, .networkUpload]
-        case .power: [.powerBattery, .powerTimeRemaining, .powerSource, .powerFanSpeed, .powerFanPercent, .powerThermal]
+        case .power: [.powerBattery, .powerTimeRemaining, .powerSource, .powerFanSpeed, .powerFanPercent, .powerThermal, .powerTemperature]
         }
     }
 
@@ -74,7 +75,7 @@ public enum MenuBarValue: String, Codable, Sendable, CaseIterable, Identifiable 
     case diskFreeBytes, diskUsedPercent, diskFreePercent, diskActivity
     case networkUpDown, networkCombined, networkDownload, networkUpload
     case powerBattery, powerTimeRemaining, powerSource
-    case powerFanSpeed, powerFanPercent, powerThermal
+    case powerFanSpeed, powerFanPercent, powerThermal, powerTemperature
 
     public var id: String { rawValue }
 
@@ -83,6 +84,7 @@ public enum MenuBarValue: String, Codable, Sendable, CaseIterable, Identifiable 
         switch self {
         case .powerFanSpeed, .powerFanPercent: "fan"
         case .powerThermal: "thermometer.medium"
+        case .powerTemperature: "thermometer.high"
         default: nil
         }
     }
@@ -110,6 +112,7 @@ public enum MenuBarValue: String, Codable, Sendable, CaseIterable, Identifiable 
         case .powerFanSpeed: String(localized: "Fan hızı (rpm)")
         case .powerFanPercent: String(localized: "Fan hızı (%)")
         case .powerThermal: String(localized: "Isı durumu")
+        case .powerTemperature: String(localized: "En sıcak sensör (°C)")
         }
     }
 }
@@ -586,6 +589,16 @@ public enum MenuBarFormatter {
             // widest one (which left a wide gap after short states like "Normal").
             return MenuBarReading(lines: [text], reserve: [text], fraction: level, magnitude: level.map { $0 * 100 },
                                   accessibility: String(localized: "Isı durumu: \(text)"))
+        case .powerTemperature:
+            guard let readings = s.temperatures else { return pending("100°") }
+            guard let hottest = TemperatureSummary.hottest(readings) else {
+                return MenuBarReading(lines: ["—"], reserve: ["100°"], fraction: nil, magnitude: nil,
+                                      accessibility: String(localized: "Bu Mac sıcaklık sensörü yayınlamıyor."))
+            }
+            let text = number(hottest.celsius, fractionDigits: 0) + "°"
+            return MenuBarReading(lines: [text], reserve: ["100°"], fraction: min(1, max(0, hottest.celsius / 100)),
+                                  magnitude: hottest.celsius,
+                                  accessibility: String(localized: "En sıcak sensör: \(text)C"))
         case .powerBattery, .powerTimeRemaining, .powerSource:
             let power = s.power
             let charging = power.isCharging == true

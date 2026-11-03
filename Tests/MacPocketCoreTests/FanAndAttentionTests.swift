@@ -159,3 +159,32 @@ final class FanAndThermalReadingTests: XCTestCase {
                        ["Disk alanı azaldı", "Isı yüksek", "Bellek baskısı kritik"])
     }
 }
+
+final class HottestSensorTests: XCTestCase {
+    func testHottestIgnoresCalibrationSensors() {
+        let readings = [TemperatureReading(name: "PMU tdie1", celsius: 48.2),
+                        TemperatureReading(name: "PMU tcal", celsius: 51.5),
+                        TemperatureReading(name: "NAND CH0 temp", celsius: 39)]
+        XCTAssertEqual(TemperatureSummary.hottest(readings)?.name, "PMU tdie1")
+        XCTAssertNil(TemperatureSummary.hottest([TemperatureReading(name: "PMU tcal", celsius: 51.5)]))
+    }
+
+    func testMenuBarShowsHottestInCelsius() {
+        var snapshot = SystemSnapshot(
+            capturedAt: Date(), hardwareModel: "fixture", logicalCPUCount: 2,
+            cpuUserPercent: 8, cpuSystemPercent: 4, cpuIdlePercent: 88,
+            physicalMemoryBytes: 16 << 30, freeMemoryBytes: 1 << 30, wiredMemoryBytes: 2 << 30,
+            compressedMemoryBytes: 1 << 30, appMemoryBytes: 5 << 30, swapUsedBytes: 0, uptimeSeconds: 100,
+            thermalState: "nominal", volumes: [],
+            power: PowerSnapshot(source: "AC Power", batteryPresent: false, chargePercent: nil, isCharging: nil, lowPowerMode: false))
+        let settings = MenuBarModuleSettings(value: .powerTemperature)
+        XCTAssertTrue(MenuBarModule.power.valueOptions.contains(.powerTemperature))
+        snapshot.temperatures = [TemperatureReading(name: "PMU tdie3", celsius: 61.6), TemperatureReading(name: "PMU tdev1", celsius: 44)]
+        let reading = MenuBarFormatter.reading(.power, settings: settings, snapshot: snapshot)
+        XCTAssertEqual(reading.lines, ["62°"])
+        XCTAssertEqual(reading.fraction ?? 0, 0.616, accuracy: 0.001)
+        snapshot.temperatures = []
+        XCTAssertEqual(MenuBarFormatter.reading(.power, settings: settings, snapshot: snapshot).lines, ["—"])
+        XCTAssertEqual(MenuBarModule.power.shortLabel(for: .powerTemperature), "°C")
+    }
+}

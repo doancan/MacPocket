@@ -56,6 +56,11 @@ public struct TemperatureGroupSummary: Sendable, Equatable, Identifiable {
 }
 
 public enum TemperatureSummary {
+    /// The hottest sensor that measures the Mac (calibration constants and implausible values left out).
+    public static func hottest(_ readings: [TemperatureReading]) -> TemperatureReading? {
+        readings.filter { TemperatureGroup.classify($0.name) != nil }.max { $0.celsius < $1.celsius }
+    }
+
     /// Per-group maximum and average, in `TemperatureGroup` order; groups without readings are left out.
     public static func groups(_ readings: [TemperatureReading]) -> [TemperatureGroupSummary] {
         let grouped = Dictionary(grouping: readings) { TemperatureGroup.classify($0.name) }

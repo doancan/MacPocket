@@ -2609,3 +2609,31 @@
 "Ölçekle" = "Scale";
 "Emiş" = "Suck";
 "“Ölçekle” en hafif efekttir; “Emiş” Sistem Ayarları’nda bulunmaz." = "“Scale” is the lightest effect; “Suck” isn’t available in System Settings.";
+
+/* Network traffic */
+"Ağ Trafiği" = "Network Traffic";
+"nettop başarısız oldu (%d)." = "nettop failed (%d).";
+"Hangi uygulamanın şu an ne kadar indirip yüklediğini ve bu sayfa açıldığından beri toplam trafiğini gör." = "See how much each app is downloading and uploading right now, and its total traffic since this page opened.";
+"Toplamları sıfırla" = "Reset totals";
+"%@ kapatılsın mı?" = "Quit %@?";
+"Zorla kapat" = "Force Quit";
+"Toplam" = "Total";
+"%@ itibarıyla" = "since %@";
+"Uygulama, süreç veya PID ara…" = "Search apps, processes or PIDs…";
+"Yalnız şu an trafiği olanlar" = "Only with current traffic";
+"Yardımcı süreçleri uygulamada topla" = "Combine helper processes into their app";
+"Eşleşen süreç yok" = "No matching processes";
+"Aramayı veya filtreyi değiştir." = "Change the search or filter.";
+"İlk ölçüm birkaç saniye sürer." = "The first measurement takes a few seconds.";
+"Hızlar %lld saniyede bir ölçülür ve yalnız bu sayfa açıkken izlenir; yerel ağ trafiği de dahildir." = "Rates are measured every %lld seconds, only while this page is open; local network traffic is included.";
+"Süreçleri gizle" = "Hide processes";
+"Süreçleri göster" = "Show processes";
+"Uygulamayı kapat" = "Quit app";
+"%lld süreç" = "%lld processes";
+"Hangi uygulamanın şu an ne kadar indirip yüklediğini canlı gör; yardımcı süreçler uygulamada toplanır." = "Watch live how much each app downloads and uploads; helper processes are combined into their app.";
+
+/* Hottest sensor */
+"En sıcak sensör" = "Hottest sensor";
+"Son %lld dk · en düşük %@ · en yüksek %@" = "Last %lld min · low %@ · high %@";
+"En sıcak sensör (°C)" = "Hottest sensor (°C)";
+"En sıcak sensör: %@C" = "Hottest sensor: %@C";

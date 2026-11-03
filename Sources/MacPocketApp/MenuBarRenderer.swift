@@ -19,6 +19,8 @@ struct MenuBarSample: Identifiable, Sendable {
     /// Fastest fan as a share of its maximum speed.
     let fan: Double?
     let thermal: Double?
+    /// Hottest sensor in °C.
+    var temperature: Double? = nil
     var id: Date { date }
     var cpuTotal: Double? { cpuUser.flatMap { user in cpuSystem.map { min(100, user + $0) } } }
 }
@@ -41,7 +43,8 @@ final class MenuBarHistory: ObservableObject {
             diskRead: snapshot.diskIO?.readBytesPerSecond, diskWrite: snapshot.diskIO?.writeBytesPerSecond,
             battery: snapshot.power.chargePercent,
             fan: snapshot.fans?.compactMap(\.fraction).max(),
-            thermal: MenuBarFormatter.thermalLevel(snapshot.thermalState)))
+            thermal: MenuBarFormatter.thermalLevel(snapshot.thermalState),
+            temperature: snapshot.temperatures.flatMap(TemperatureSummary.hottest)?.celsius))
         if samples.count > Self.capacity { samples.removeFirst(samples.count - Self.capacity) }
     }
 
@@ -81,6 +84,7 @@ final class MenuBarHistory: ObservableObject {
                 switch settings.value {
                 case .powerFanSpeed, .powerFanPercent: sample.fan ?? 0
                 case .powerThermal: sample.thermal ?? 0
+                case .powerTemperature: min(1, (sample.temperature ?? 0) / 100)
                 default: (sample.battery ?? 0) / 100
                 }
             }

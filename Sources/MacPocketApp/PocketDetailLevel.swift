@@ -41,6 +41,7 @@ func pocketCelsius(_ celsius: Double) -> String {
 /// Main-window card: temperature groups, every raw sensor on demand, and SMC power readings.
 struct PocketSensorsCard: View {
     let system: SystemSnapshot?
+    @ObservedObject private var history = MenuBarHistory.shared
 
     var body: some View {
         VStack(alignment: .leading, spacing: PocketSpacing.m) {
@@ -71,6 +72,7 @@ struct PocketSensorsCard: View {
                     }
                 }
                 .font(.callout)
+                hottestTrend
                 if let readings = system.temperatures {
                     DisclosureGroup("Tüm sensörler") {
                         PocketRawSensorList(readings: readings).padding(.top, PocketSpacing.xs)
@@ -85,6 +87,33 @@ struct PocketSensorsCard: View {
         }
         .frame(maxWidth: .infinity, alignment: .topLeading)
         .pocketCard()
+    }
+
+    /// The hottest sensor over the samples the menu bar history keeps (about three minutes).
+    @ViewBuilder private var hottestTrend: some View {
+        let points = history.samples.compactMap { sample in sample.temperature.map { (sample.date, $0) } }
+        if points.count >= 2, let first = points.first, let last = points.last,
+           let low = points.map(\.1).min(), let high = points.map(\.1).max() {
+            let minutes = max(1, Int((last.0.timeIntervalSince(first.0) / 60).rounded()))
+            VStack(alignment: .leading, spacing: PocketSpacing.xs) {
+                HStack(alignment: .firstTextBaseline) {
+                    Text("En sıcak sensör").foregroundStyle(.secondary)
+                    Spacer()
+                    Text(verbatim: pocketCelsius(last.1)).monospacedDigit().fontWeight(.semibold)
+                }
+                PocketSparkline(values: points.map(\.1), color: Self.tint(last.1),
+                                ceiling: max(high + 5, low + 15), floor: max(0, low - 5))
+                    .frame(height: 44)
+                Text("Son \(minutes) dk · en düşük \(pocketCelsius(low)) · en yüksek \(pocketCelsius(high))")
+                    .font(.caption).foregroundStyle(.secondary).monospacedDigit()
+            }
+            .font(.callout)
+            .accessibilityElement(children: .combine)
+        }
+    }
+
+    private static func tint(_ celsius: Double) -> Color {
+        celsius >= 90 ? .red : celsius >= 75 ? .orange : .green
     }
 
     private func groupValue(_ summary: TemperatureGroupSummary) -> String {

@@ -204,3 +204,18 @@ onay penceresi LG ekranında göründü, Esc geri aldı. Doğrulanmayan: çözü
 - [Özel görünümlerde Liquid Glass](https://developer.apple.com/documentation/swiftui/applying-liquid-glass-to-custom-views)
 - [SMAppService](https://developer.apple.com/documentation/servicemanagement/smappservice)
 - [Ana uygulamanın giriş kaydı](https://developer.apple.com/documentation/servicemanagement/smappservice/mainapp)
+
+## Ağ Trafiği ve en sıcak sensör
+
+**Statik:** `nettop -P -L 1 -n -x -J bytes_in,bytes_out` yönetici izni olmadan her süreç için toplam baytı verir;
+adlar ~15 karakterde kesildiği için tam ad `NSRunningApplication` / `proc_pidpath` ile alınır. Yardımcı süreçler
+yolundaki en dıştaki `.app` paketine toplanır (`/System/Library` altındakiler hariç). Hız, iki saniyelik iki örnek
+arasındaki farktır; sayaç geriye giderse (PID yeniden kullanıldı) süreç sıfırdan başlar. Okuma yalnız sayfa açıkken yapılır.
+En sıcak sensör, kalibrasyon (`tcal`) dışındaki sıcaklık okumalarının en yükseğidir.
+
+**Canlı (Mac mini, 3 Kasım 2026):** 57 süreç listelendi; toplam indirme (117 KB/s) Genel Bakış ağ kartıyla
+(114 KB/s) uyumlu. VS Code'un 7 süreci tek satırda toplandı, Chrome/Telegram/Slack simgeleriyle göründü.
+Sensör kartında en sıcak sensör grafiği çizildi (SoC en yüksek 58,2 °C ile aynı değer).
+
+**Doğrulanmadı:** Kapat/Zorla kapat düğmesi denenmedi; menü çubuğundaki "En sıcak sensör (°C)" modülü kullanıcı
+ayarı değiştirilmeden yalnız birim testleriyle doğrulandı.

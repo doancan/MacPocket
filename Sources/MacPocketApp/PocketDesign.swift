@@ -322,11 +322,12 @@ struct PocketSparkline: View {
     let values: [Double]
     let color: Color
     var ceiling: Double? = 100
+    var floor: Double = 0
 
     var body: some View {
         Chart {
             ForEach(Array(values.enumerated()), id: \.offset) { index, value in
-                AreaMark(x: .value(Text("Örnek"), index), y: .value(Text("Değer"), value))
+                AreaMark(x: .value(Text("Örnek"), index), yStart: .value(Text("Değer"), floor), yEnd: .value(Text("Değer"), value))
                     .foregroundStyle(LinearGradient(colors: [color.opacity(0.28), color.opacity(0.02)], startPoint: .top, endPoint: .bottom))
                     .interpolationMethod(.monotone)
                 LineMark(x: .value(Text("Örnek"), index), y: .value(Text("Değer"), value))
@@ -338,7 +339,7 @@ struct PocketSparkline: View {
         .chartXAxis(.hidden)
         .chartYAxis(.hidden)
         .chartLegend(.hidden)
-        .chartYScale(domain: 0...(ceiling ?? max(1, values.max() ?? 1)))
+        .chartYScale(domain: floor...max(floor + 1, ceiling ?? max(1, values.max() ?? 1)))
         .accessibilityHidden(true)
     }
 }
