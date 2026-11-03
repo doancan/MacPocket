@@ -190,6 +190,7 @@ extension PocketTool {
         case .recorder: String(localized: "Ekran Kaydı")
         case .screenshot: String(localized: "Ekran Görüntüsü")
         case .bluetoothBattery: String(localized: "Bluetooth Pilleri")
+        case .displays: String(localized: "Ekran Ayarları")
         case .privacy: String(localized: "Gizlilik Kontrolü")
         case .startupItems: String(localized: "Başlangıç Öğeleri")
         case .maintenance: String(localized: "Bakım")

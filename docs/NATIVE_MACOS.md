@@ -180,6 +180,24 @@ kartından başka uygulamaya sürükle-bırak, önceki alan, HEIC/JPG ile gerçe
 iki ekran arasında taşan seçim, Retina olmayan ekran, saydam arka planlı pencerenin
 JPG'de beyaza basılması (birim testiyle).
 
+## Bluetooth pilleri ve ekran ayarları
+
+Bluetooth Pilleri (statik): Magic aygıtlar I/O Registry'den (`BatteryPercent`), adlar ve
+AirPods sol/sağ/kutu `system_profiler`'dan, Logitech Bluetooth aygıtları HID++ 2.0 ile
+(0x1004 / 0x1000 / 0x1001) okunur; Logitech için Giriş İzleme izni gerekir. Düşük pil
+bildirimi aygıt başına bir kez, eşiğin 10 puan üstüne şarjla yeniden kurulur.
+Canlı (3 Kasım 2026): Magic Keyboard %65, Magic Trackpad 2 %4, MX Master %50 (HID++
+0x1000, dizin 6). Doğrulanmayan: AirPods (bağlı değildi), diğer Logitech modelleri,
+bildirimin ekranda görünmesi.
+
+Ekran Ayarları (statik): `CGDisplayCopyAllDisplayModes` (düşük çözünürlüklü kopyalar
+dahil) ile gizli HiDPI modları; çözünürlük, yenileme hızı, ana ekran ve yansıtma. Değişiklik
+önce oturum için uygulanır, değişen ekranda 15 sn'lik "kalsın mı?" sorulur; yanıt yoksa
+geri alınır, onaylanınca kalıcı yazılır.
+Canlı (3 Kasım 2026): LG HDR 4K 60 → 50 Hz uygulandı, onaysız 15 sn sonra 60 Hz'e döndü;
+onay penceresi LG ekranında göründü, Esc geri aldı. Doğrulanmayan: çözünürlük değişikliğini
+"Kalsın" ile kalıcı yapma, ana ekran değiştirme, yansıtma, dahili ekranlı Mac.
+
 ## Apple kaynakları
 
 - [SwiftUI ile yeni tasarım](https://developer.apple.com/videos/play/wwdc2025/323/)

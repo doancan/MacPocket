@@ -2557,3 +2557,30 @@
 "Sağ" = "Right";
 "Kutu" = "Case";
 "Klavye, trackpad, fare (Logitech dahil) ve AirPods pillerini gör; azalınca bildirim al." = "See keyboard, trackpad, mouse (Logitech too) and AirPods batteries; get notified when low.";
+
+/* Display settings */
+"Ekranlar yansıtılıyor" = "Displays mirrored";
+"Yansıtma kapalı" = "Mirroring off";
+"Ekran ayarı değiştirilemedi." = "Couldn’t change the display setting.";
+"Ekran ayarı değiştirilemedi (%d)." = "Couldn’t change the display setting (%d).";
+"Bu ekran ayarı kalsın mı?" = "Keep this display setting?";
+"Geri Al (%lld)" = "Revert (%lld)";
+"Kalsın" = "Keep";
+"Ekran Ayarları" = "Display Settings";
+"Çözünürlüğü, yenileme hızını ve ana ekranı değiştir; Sistem Ayarları’nın gizlediği keskin HiDPI modları dahil." = "Change resolution, refresh rate and the main display, including sharp HiDPI modes System Settings hides.";
+"%@ — %lld sn içinde onaylamazsan eski ayara döner." = "%@ — reverts to the previous setting unless confirmed within %lld s.";
+"Geri Al" = "Revert";
+"Düşük çözünürlüklü modları da göster" = "Show low-resolution modes too";
+"Ekranları yansıt" = "Mirror displays";
+"Bu ekran ana ekranı yansıtıyor." = "This display mirrors the main display.";
+"panel %@ × %@" = "panel %@ × %@";
+"Ana Ekran Yap" = "Make Main Display";
+"Menü çubuğu ve Dock bu ekrana taşınır" = "Moves the menu bar and Dock to this display";
+"Çözünürlük" = "Resolution";
+"Daha büyük metin" = "Larger text";
+"Daha fazla alan" = "More space";
+"Önerilen: %@" = "Recommended: %@";
+"Yenileme hızı" = "Refresh rate";
+"%lld Hz" = "%lld Hz";
+"(düşük çözünürlük)" = "(low resolution)";
+"Çözünürlük, yenileme hızı, ana ekran ve yansıtma; gizli keskin HiDPI modları dahil, 15 sn onaylı." = "Resolution, refresh rate, main display and mirroring; hidden sharp HiDPI modes included, confirmed within 15 s.";
