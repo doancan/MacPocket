@@ -295,6 +295,8 @@ struct VolumeMixerView: View {
             }
             if let failure = service.failure { PocketMessage(failure, tone: .warning) }
             ScrollView {
+                MonitorVolumeCard()
+                    .padding(.bottom, PocketSpacing.m)
                 VStack(spacing: PocketSpacing.s) {
                     if service.apps.isEmpty {
                         ContentUnavailableView("Ses kullanan uygulama yok", systemImage: "speaker.slash",

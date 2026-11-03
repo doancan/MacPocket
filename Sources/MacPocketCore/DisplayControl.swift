@@ -18,6 +18,8 @@ public enum VCPCode: UInt8, Sendable {
     case brightness = 0x10
     case contrast = 0x12
     case volume = 0x62
+    /// 1 = muted, 2 = unmuted.
+    case audioMute = 0x8D
 }
 
 /// Builds and checks DDC/CI messages. The host writes to I2C address 0x37 (0x6E on the wire) with
@@ -161,6 +163,20 @@ public final class DDCChannel: @unchecked Sendable {
     private let service: CFTypeRef
     /// I2C transactions to one display must not overlap.
     private let queue: DispatchQueue
+
+    nonisolated(unsafe) private static var sharedChannels: [UInt64: DDCChannel] = [:]
+    private static let sharedLock = NSLock()
+
+    /// The one channel for this registry entry in this process. Brightness and volume share it, so their I2C
+    /// transactions to the same monitor run on one queue instead of interleaving and garbling each other's replies.
+    public static func shared(registryID: UInt64) -> DDCChannel? {
+        sharedLock.withLock {
+            if let existing = sharedChannels[registryID] { return existing }
+            let channel = DDCChannel(registryID: registryID)
+            sharedChannels[registryID] = channel
+            return channel
+        }
+    }
 
     /// `registryID` is the DCPAVServiceProxy entry found by `DisplayRegistry.scan()`.
     public init?(registryID: UInt64) {

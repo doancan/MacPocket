@@ -2464,3 +2464,19 @@
 "İncelenmesi gerekenler dahil tüm konumlar." = "Every location, including the ones to review.";
 "Konumları kendin seçtin." = "You picked the locations yourself.";
 "Uygulama Önbellekleri" = "App Caches";
+
+/* Monitor speaker volume */
+"Monitör hoparlörü" = "Monitor speaker";
+"macOS’un sesini değiştiremediği HDMI ve DisplayPort monitörlerde ses tuşları monitörün kendi sesini ayarlar." = "On HDMI and DisplayPort monitors whose volume macOS can’t change, the volume keys set the monitor’s own volume.";
+"Ses tuşları monitör hoparlörünü kontrol etsin" = "Volume keys control the monitor speaker";
+"Ses tuşlarını yakalamak için Erişilebilirlik izni gerekir. İzin verdikten sonra MacPocket’e dönmen yeterli." = "Capturing the volume keys requires Accessibility permission. After allowing it, just return to MacPocket.";
+"Gösterge, Ekran Parlaklığı’ndaki stil ve konum ayarını kullanır." = "The indicator uses the style and position set in Display Brightness.";
+"Tuşlar MacPocket’te" = "Keys handled by MacPocket";
+"Tuşlar kapalı" = "Keys off";
+"Sesi kapat" = "Mute";
+"%@ ses seviyesi" = "%@ volume";
+"Bu monitörün kendi sessiz komutu yok; sessiz tuşu sesi 0’a indirir ve tekrar basınca eski seviyeye döner." = "This monitor has no mute command of its own; the mute key sets the volume to 0 and pressing it again returns to the previous level.";
+"Şu anki ses çıkışı: %@. Sesini macOS ayarlıyor; ses tuşları macOS’ta kalır." = "Current sound output: %@. macOS controls its volume; the volume keys stay with macOS.";
+"Şu anki ses çıkışı: %@. Bu monitör sesi DDC ile değiştirmeye izin vermiyor." = "Current sound output: %@. This monitor doesn’t allow changing its volume over DDC.";
+"Ses çıkışı algılanıyor…" = "Detecting sound output…";
+"Ses çıkışı bulunamadı." = "No sound output found.";

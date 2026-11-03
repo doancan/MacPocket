@@ -102,6 +102,17 @@ public enum AudioOutputSystem {
         return nil
     }
 
+    /// Whether macOS itself can change this device's output volume (monitors over HDMI/DisplayPort usually cannot).
+    public static func isVolumeSettable(_ id: AudioObjectID) -> Bool {
+        for element in [kAudioObjectPropertyElementMain, 1] {
+            var volumeAddress = address(kAudioDevicePropertyVolumeScalar, scope: kAudioDevicePropertyScopeOutput, element: element)
+            var settable = DarwinBoolean(false)
+            if AudioObjectHasProperty(id, &volumeAddress), AudioObjectIsPropertySettable(id, &volumeAddress, &settable) == noErr,
+               settable.boolValue { return true }
+        }
+        return false
+    }
+
     @discardableResult
     public static func setVolume(_ level: Double, of id: AudioObjectID) -> Bool {
         var changed = false

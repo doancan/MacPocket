@@ -113,10 +113,34 @@ struct MacPocketProbe {
                 let controller = FanController(transport: transport)
                 controller.releaseAll()
                 try output(try fanReport(controller))
+            case "ddc":
+                // Read-only: brightness, speaker volume and mute of every external display that answers DDC/CI.
+                try output(DisplayRegistry.scan().map { display -> [String: String] in
+                    var row = ["vendor": String(display.vendor), "product": String(display.product)]
+                    guard let id = display.avServiceID, let channel = DDCChannel(registryID: id) else { row["ddc"] = "none"; return row }
+                    for (name, code) in [("brightness", VCPCode.brightness), ("volume", .volume), ("mute", .audioMute)] {
+                        row[name] = channel.get(code).map { "\($0.current)/\($0.maximum)" } ?? "no reply"
+                    }
+                    return row
+                })
+            case "ddc-set":
+                // Development aid: ddc-set <display index> <brightness|volume|mute> <value>
+                guard arguments.count == 4, let index = Int(arguments[1]), let value = UInt16(arguments[3]),
+                      let code = ["brightness": VCPCode.brightness, "volume": .volume, "mute": .audioMute][arguments[2]] else {
+                    throw ProbeError.usage("ddc-set <display index> <brightness|volume|mute> <value>")
+                }
+                let displays = DisplayRegistry.scan().filter { $0.avServiceID != nil }
+                guard displays.indices.contains(index), let id = displays[index].avServiceID, let channel = DDCChannel(registryID: id) else {
+                    throw ProbeError.usage("no DDC display at index \(index)")
+                }
+                let written = channel.set(code, value: value)
+                usleep(100_000)
+                try output(["written": "\(written)", "readBack": channel.get(code).map { "\($0.current)/\($0.maximum)" } ?? "no reply"])
             case "help", "--help", "-h":
                 print("""
                 macpocket-probe — native MacPocket development and validation tool
                   system                       Live CPU, RAM, volumes and power snapshot
+                  ddc                          External displays: DDC brightness, speaker volume and mute (read-only)
                   processes                    Live process snapshot (interval CPU)
                   diagnostic <name> [PID]      Fixed read-only diagnostic; PID/self for openFiles
                   terminate <PID> [--force]    Signal an eligible same-user process

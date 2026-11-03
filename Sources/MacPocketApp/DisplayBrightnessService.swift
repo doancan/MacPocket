@@ -226,7 +226,7 @@ final class DisplayBrightnessService: ObservableObject {
             if let serviceID = matches[id], DDCChannel.isAvailable {
                 if let existing = channels[id], existing.serviceID == serviceID {
                     channel = existing.channel
-                } else if let opened = DDCChannel(registryID: serviceID) {
+                } else if let opened = DDCChannel.shared(registryID: serviceID) {
                     channels[id] = (serviceID, opened)
                     channel = opened
                 }
@@ -391,71 +391,36 @@ final class DisplayBrightnessService: ObservableObject {
     }
 }
 
-/// The brightness-key event tap. It sees every key press (desktop Macs send brightness as ordinary keys), so it runs
-/// on its own thread and never waits for the main thread: other keys pass straight through, and only brightness keys
-/// aimed at a managed display are swallowed and handed over with `onKey`.
+/// The brightness keys on top of a `KeyEventTap`: other keys pass straight through, and only brightness keys aimed at
+/// a managed display are swallowed and handed over with `onKey`.
 final class BrightnessKeyTap: @unchecked Sendable {
     private let lock = NSLock()
     private var managed: [CGDirectDisplayID] = []
     private var target = DisplayBrightnessService.Target.underPointer
-    private var port: CFMachPort?
-    private var runLoop: CFRunLoop?
+    private var tap: KeyEventTap?
     private let onKey: @Sendable (BrightnessKey, Bool, [CGDirectDisplayID]) -> Void
 
     /// `onKey` gets the key, whether ⌥⇧ asked for fine steps, and the target displays. It is called on the tap thread.
     init(onKey: @escaping @Sendable (BrightnessKey, Bool, [CGDirectDisplayID]) -> Void) {
         self.onKey = onKey
-        let mask = CGEventMask((1 << CGEventType.keyDown.rawValue) | (1 << CGEventType.keyUp.rawValue) | (1 << 14)) // 14: NX_SYSDEFINED
-        let callback: CGEventTapCallBack = { _, type, event, context in
-            guard let context else { return Unmanaged.passUnretained(event) }
-            let tap = Unmanaged<BrightnessKeyTap>.fromOpaque(context).takeUnretainedValue()
-            return tap.handle(type, event) ? Unmanaged.passUnretained(event) : nil
-        }
-        guard let created = CGEvent.tapCreate(tap: .cgSessionEventTap, place: .headInsertEventTap, options: .defaultTap,
-                                              eventsOfInterest: mask, callback: callback,
-                                              userInfo: Unmanaged.passUnretained(self).toOpaque()) else { return }
-        port = created
-        let ready = DispatchSemaphore(value: 0)
-        let thread = Thread { [weak self] in
-            guard let self, let port = lock.withLock({ self.port }) else { ready.signal(); return }
-            CFRunLoopAddSource(CFRunLoopGetCurrent(), CFMachPortCreateRunLoopSource(nil, port, 0), .commonModes)
-            lock.withLock { runLoop = CFRunLoopGetCurrent() }
-            CGEvent.tapEnable(tap: port, enable: true)
-            ready.signal()
-            CFRunLoopRun()
-        }
-        thread.name = "MacPocket brightness keys"
-        thread.qualityOfService = .userInteractive
-        thread.start()
-        ready.wait()
+        tap = KeyEventTap(name: "MacPocket brightness keys") { [weak self] type, event in self?.handle(type, event) ?? true }
     }
 
     deinit { stop() }
 
-    var isRunning: Bool { lock.withLock { port != nil } }
+    var isRunning: Bool { tap != nil }
 
     func update(managed: [CGDirectDisplayID], target: DisplayBrightnessService.Target) {
         lock.withLock { self.managed = managed; self.target = target }
     }
 
     func stop() {
-        let (port, runLoop) = lock.withLock { () -> (CFMachPort?, CFRunLoop?) in
-            defer { self.port = nil; self.runLoop = nil }
-            return (self.port, self.runLoop)
-        }
-        if let port {
-            CGEvent.tapEnable(tap: port, enable: false)
-            CFMachPortInvalidate(port) // otherwise the disabled tap stays registered and a later one is added beside it
-        }
-        if let runLoop { CFRunLoopStop(runLoop) }
+        tap?.stop()
+        tap = nil
     }
 
     /// Returns false to swallow the event (it was used for an external display).
     private func handle(_ type: CGEventType, _ event: CGEvent) -> Bool {
-        if type == .tapDisabledByTimeout || type == .tapDisabledByUserInput {
-            if let port = lock.withLock({ port }) { CGEvent.tapEnable(tap: port, enable: true) }
-            return true
-        }
         let key: BrightnessKey
         let isDown: Bool
         switch type {
@@ -496,14 +461,20 @@ final class BrightnessKeyTap: @unchecked Sendable {
 /// system's private OSD framework accepts the call but no longer draws the classic bezel.
 @MainActor
 enum BrightnessIndicator {
+    /// What the indicator shows: a screen's brightness, or a monitor speaker's volume (with the speaker's name).
+    enum Kind: Equatable {
+        case brightness
+        case volume(muted: Bool, name: String)
+    }
+
     /// One indicator per display, so "all external displays" shows each screen its own level at the same time.
     private static var huds: [CGDirectDisplayID: BrightnessHUD] = [:]
 
     static func show(level: Double, on display: CGDirectDisplayID, position: DisplayBrightnessService.IndicatorPosition,
-                     style: DisplayBrightnessService.IndicatorStyle) {
+                     style: DisplayBrightnessService.IndicatorStyle, kind: Kind = .brightness) {
         let hud = huds[display] ?? BrightnessHUD()
         huds[display] = hud
-        hud.show(level: level, on: display, position: position, style: style)
+        hud.show(level: level, on: display, position: position, style: style, kind: kind)
     }
 }
 
@@ -515,11 +486,12 @@ private final class BrightnessHUD {
     private let state = BrightnessHUDState()
     private var hideWork: DispatchWorkItem?
     func show(level: Double, on display: CGDirectDisplayID, position: DisplayBrightnessService.IndicatorPosition,
-              style: DisplayBrightnessService.IndicatorStyle) {
+              style: DisplayBrightnessService.IndicatorStyle, kind: BrightnessIndicator.Kind) {
         guard let screen = NSScreen.screens.first(where: {
             ($0.deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] as? NSNumber)?.uint32Value == display
         }) ?? NSScreen.main else { return }
-        state.name = screen.localizedName
+        if case .volume(_, let name) = kind { state.name = name } else { state.name = screen.localizedName }
+        state.kind = kind
         state.style = style
         if panel?.isVisible == true && panel?.alphaValue == 1 {
             withAnimation(.snappy(duration: 0.18)) { state.level = level }
@@ -589,6 +561,24 @@ private final class BrightnessHUDState: ObservableObject {
     @Published var level = 1.0
     @Published var name = ""
     @Published var style = DisplayBrightnessService.IndicatorStyle.modern
+    @Published var kind = BrightnessIndicator.Kind.brightness
+
+    var symbol: String {
+        switch kind {
+        case .brightness: BrightnessHUDSymbol.brightness(level: level)
+        case .volume(let muted, _): BrightnessHUDSymbol.volume(muted: muted, level: level)
+        }
+    }
+    var label: Text { kind == .brightness ? Text("Parlaklık") : Text("Ses") }
+}
+
+/// SF Symbols for the indicator, shared with the pages that show the same levels.
+enum BrightnessHUDSymbol {
+    static func brightness(level: Double) -> String { level < 0.5 ? "sun.min.fill" : "sun.max.fill" }
+
+    static func volume(muted: Bool, level: Double) -> String {
+        muted || level <= 0 ? "speaker.slash.fill" : level < 0.34 ? "speaker.wave.1.fill" : level < 0.67 ? "speaker.wave.2.fill" : "speaker.wave.3.fill"
+    }
 }
 
 /// Laid out like the system's Control Center sliders: the screen's name and percentage above a thick filled track
@@ -599,20 +589,22 @@ private struct BrightnessHUDView: View {
     var body: some View {
         switch state.style {
         case .modern: ModernBrightnessHUD(state: state)
-        case .capsule: CapsuleBrightnessHUD(level: state.level)
-        case .classic: ClassicBrightnessHUD(level: state.level)
+        case .capsule: CapsuleBrightnessHUD(state: state)
+        case .classic: ClassicBrightnessHUD(state: state)
         }
     }
 }
 
 /// A compact one-line glass capsule: the sun, a level bar and the percentage.
 private struct CapsuleBrightnessHUD: View {
-    let level: Double
+    @ObservedObject var state: BrightnessHUDState
+    private var level: Double { state.level }
 
     var body: some View {
         HStack(spacing: PocketSpacing.m) {
-            Image(systemName: level < 0.5 ? "sun.min.fill" : "sun.max.fill")
+            Image(systemName: state.symbol)
                 .font(.system(size: 17, weight: .semibold))
+                .contentTransition(.symbolEffect(.replace))
                 .frame(width: 22)
             ProgressView(value: level)
                 .progressViewStyle(.linear)
@@ -626,7 +618,7 @@ private struct CapsuleBrightnessHUD: View {
         .modifier(CapsuleHUDSurface())
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel(Text("Parlaklık"))
+        .accessibilityLabel(state.label)
         .accessibilityValue(Text(level, format: .percent.precision(.fractionLength(0))))
     }
 }
@@ -640,12 +632,14 @@ private struct CapsuleHUDSurface: ViewModifier {
 
 /// The classic macOS bezel: a rounded square with the large sun and a row of 16 segments.
 private struct ClassicBrightnessHUD: View {
-    let level: Double
+    @ObservedObject var state: BrightnessHUDState
+    private var level: Double { state.level }
 
     var body: some View {
         VStack(spacing: 22) {
             Spacer(minLength: 0)
-            Image(systemName: "sun.max.fill")
+            Image(systemName: state.kind == .brightness ? "sun.max.fill" : state.symbol)
+                .contentTransition(.symbolEffect(.replace))
                 .font(.system(size: 76, weight: .regular))
                 .foregroundStyle(.primary.opacity(0.85))
             HStack(spacing: 2) {
@@ -661,7 +655,7 @@ private struct ClassicBrightnessHUD: View {
         .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel(Text("Parlaklık"))
+        .accessibilityLabel(state.label)
         .accessibilityValue(Text(level, format: .percent.precision(.fractionLength(0))))
     }
 }
@@ -690,7 +684,7 @@ private struct ModernBrightnessHUD: View {
         .modifier(BrightnessHUDSurface())
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel(Text("Parlaklık"))
+        .accessibilityLabel(state.label)
         .accessibilityValue(Text(state.level, format: .percent.precision(.fractionLength(0))))
     }
 
@@ -701,8 +695,9 @@ private struct ModernBrightnessHUD: View {
             ZStack(alignment: .leading) {
                 Capsule().fill(.primary.opacity(0.12))
                 Capsule().fill(.primary.opacity(0.88)).frame(width: fill)
-                Image(systemName: state.level < 0.5 ? "sun.min.fill" : "sun.max.fill")
+                Image(systemName: state.symbol)
                     .font(.system(size: 13, weight: .bold))
+                    .contentTransition(.symbolEffect(.replace))
                     .foregroundStyle(Color(nsColor: .windowBackgroundColor))
                     .frame(width: trackHeight, height: trackHeight)
             }

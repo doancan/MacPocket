@@ -123,6 +123,32 @@ kaçırılabilir), uygulama istisnası, menü çubuğu hızlı menüsünden kapa
 izni hiç verilmeden şehirle çalışma (izin istemi testte yanıtlandı) ve gerçek gün
 batımının saat taklidi olmadan izlenmesi.
 
+## Monitör hoparlörü (ses tuşları)
+
+Araçlar → Ses Mikseri → Monitör hoparlörü.
+
+Uygulanan (statik): ses çıkışı HDMI/DisplayPort monitörse ve macOS o çıkışın sesini
+değiştiremiyorsa, ses aç/kıs/sessiz tuşlarını MacPocket yakalar ve monitörün sesini
+DDC/CI (VCP 0x62) ile 16 adımda (⌥⇧ ile 64) değiştirir. Monitör, ses aygıtının adı
+ekran adıyla eşleştirilerek bulunur. Kendi sessiz komutu (VCP 0x8D) olan monitörde o
+kullanılır; olmayanda sessiz sesi 0'a indirir ve seviyeyi saklar. Diğer tüm çıkışlarda
+(Mac hoparlörü, kulaklık, USB, Bluetooth) tuşlar macOS'ta kalır. Gösterge parlaklık
+göstergesinin stil ve konum ayarını kullanır. Parlaklık ve ses aynı monitöre tek DDC
+kanalından yazar (aynı anda okuma yanıtları karıştırıyordu).
+
+### Canlı kontrol — 3 Kasım 2026
+
+Ses çıkışı MateView (DisplayPort, macOS ses ayarı yok), macOS 27. Tuş basışları
+`NX_SYSDEFINED` medya olayı olarak sentezlendi; seviye ayrı bir süreçten DDC ile
+geri okundu. Başlangıç %20: aç → 25, sessiz → 0, sessiz → 25, kıs → 19, kıs → 13.
+Gösterge Modern stilde "MateView %25" olarak seçili konumda göründü. MateView sessiz
+komutuna yanıt vermiyor (sessiz = ses 0); LG HDR 4K yanıt veriyor.
+
+Doğrulanmayanlar: gerçek klavyenin ses tuşları (yalnız sentezlenmiş olay denendi),
+LG'nin kendi sessiz komutuyla sessize alma (LG o sırada ses çıkışı değildi), çıkış
+Mac hoparlörüne geçince tuşların macOS'a kalması (birim testiyle), aynı adlı iki
+monitör, Kapsül ve Klasik stillerde ses göstergesi.
+
 ## Apple kaynakları
 
 - [SwiftUI ile yeni tasarım](https://developer.apple.com/videos/play/wwdc2025/323/)

@@ -251,6 +251,7 @@ final class PocketApplicationState: ObservableObject {
         WindowLayoutService.shared.start()
         QuitGuardService.shared.start()
         DisplayBrightnessService.shared.start()
+        MonitorVolumeService.shared.start()
         NightModeService.shared.start()
         MacroService.shared.start()
         AppFreezerService.shared.start()
