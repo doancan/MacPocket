@@ -2539,3 +2539,21 @@
 "%@ kısayolu" = "%@ shortcut";
 "Tıkla ve yeni kısayola bas; kapatmak için kayıt sırasında ⌫." = "Click, then press the new shortcut; press ⌫ while recording to turn it off.";
 "Kısayol ekle" = "Add shortcut";
+
+/* Bluetooth batteries */
+"%@ pili azaldı" = "%@ battery is low";
+"Pil %%%lld seviyesinde. Şarj etmeyi unutma." = "Battery is at %lld%%. Remember to charge it.";
+"Bluetooth Pilleri" = "Bluetooth Batteries";
+"Klavye, trackpad, fare ve kulaklıkların pil durumu; azalınca bildirim." = "Battery levels of keyboards, trackpads, mice and headphones; get notified when low.";
+"Logitech aygıtlarının pilini okumak için Giriş İzleme izni gerekir. MacPocket yalnız pil sorusu gönderir; tuş ya da hareket kaydetmez." = "Reading Logitech devices’ battery requires Input Monitoring permission. MacPocket only asks for the battery level; it records no keys or movement.";
+"Aygıtlar okunuyor…" = "Reading devices…";
+"Bağlı Bluetooth aygıtı yok" = "No Bluetooth devices connected";
+"Bir klavye, fare ya da kulaklık bağlanınca burada görünür." = "Keyboards, mice and headphones appear here once connected.";
+"Son okuma %@ · her dakika yenilenir" = "Last read %@ · refreshed every minute";
+"Pil azalınca bildir" = "Notify when battery is low";
+"Her aygıt için bir kez bildirilir; eşiğin 10 puan üstüne şarj edilince yeniden kurulur." = "Each device notifies once; it re-arms after charging 10 points above the threshold.";
+"Pil bilgisi alınamıyor" = "Battery level unavailable";
+"Sol" = "Left";
+"Sağ" = "Right";
+"Kutu" = "Case";
+"Klavye, trackpad, fare (Logitech dahil) ve AirPods pillerini gör; azalınca bildirim al." = "See keyboard, trackpad, mouse (Logitech too) and AirPods batteries; get notified when low.";

@@ -30,7 +30,7 @@ enum PocketTool: String, Identifiable {
     case freezer = "Uygulama Dondurucu", supportReport = "Destek Raporu", focus = "Odak Oturumu"
     case workspaces = "Masa Düzenleri", snippets = "Metin Kısaltmaları", screenGrab = "Ekrandan Al"
     case mouseScroll = "Fare Kaydırma", audio = "Ses Çıkışı", mixer = "Ses Mikseri"
-    case recorder = "Ekran Kaydı", privacy = "Gizlilik Kontrolü", screenshot = "Ekran Görüntüsü"
+    case recorder = "Ekran Kaydı", privacy = "Gizlilik Kontrolü", screenshot = "Ekran Görüntüsü", bluetoothBattery = "Bluetooth Pilleri"
     case startupItems = "Başlangıç Öğeleri", maintenance = "Bakım"
     var id: String { rawValue }
 }

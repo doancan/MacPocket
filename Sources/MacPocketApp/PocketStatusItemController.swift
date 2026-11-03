@@ -260,6 +260,7 @@ final class PocketApplicationState: ObservableObject {
         SnippetService.shared.start()
         ScreenGrabService.shared.start()
         ScreenshotService.shared.start()
+        BluetoothBatteryService.shared.start()
         MouseScrollService.shared.start()
         AudioOutputService.shared.start()
         VolumeMixerService.shared.start()
