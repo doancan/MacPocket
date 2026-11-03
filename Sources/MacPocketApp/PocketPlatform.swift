@@ -45,7 +45,7 @@ extension PocketPage {
         case .overview: PocketTheme.brand
         case .performance: Color(hex: 0x00A6C8)
         case .power: PocketTheme.power
-        case .cleanup: Color(hex: 0xE8458B)
+        case .cleanup: Color(hex: 0xF2545B)
         case .storage: PocketTheme.disk
         case .applications: Color(hex: 0x7B5CFF)
         case .tools: Color(hex: 0x5F6B7E)

@@ -34,6 +34,8 @@ struct CleanupView: View {
     @Environment(\.pocketTint) private var tint
     @State private var confirmClean = false
     @State private var confirmEmptyTrash = false
+    @State private var celebration = 0
+    @PocketReduceMotion private var reduceMotion
 
     var body: some View {
         ScrollView {
@@ -94,10 +96,15 @@ struct CleanupView: View {
 
     private var hero: some View {
         HStack(spacing: PocketSpacing.xl) {
-            PocketScanRing(tint: tint, symbol: model.summary != nil ? "checkmark" : "sparkles", size: 128, active: model.busy)
+            CleanupVacuumRing(tint: tint, symbol: model.summary != nil ? "checkmark" : "sparkles",
+                              bytes: model.scanning ? (model.progress?.measuredBytes ?? 0) : (model.report?.bytes ?? 0),
+                              scanning: model.scanning, working: model.working, celebration: celebration)
             VStack(alignment: .leading, spacing: PocketSpacing.s) {
                 if model.scanning {
-                    Text("Taranıyor…").font(.title.weight(.bold))
+                    Text(pocketDiskBytes(model.progress?.measuredBytes ?? 0)).font(.system(size: 40, weight: .bold)).monospacedDigit()
+                        .contentTransition(.numericText(value: Double(model.progress?.measuredBytes ?? 0)))
+                        .animation(reduceMotion ? nil : .snappy(duration: 0.3), value: model.progress?.measuredBytes)
+                    Text("Taranıyor…").font(.headline)
                     Text(pocketScanProgressText(model.progress)).font(.callout).foregroundStyle(.secondary).monospacedDigit()
                         .lineLimit(1)
                     if model.stalled {
@@ -115,6 +122,8 @@ struct CleanupView: View {
                     Text("Her öğe taşınmadan hemen önce yeniden doğrulanıyor.").font(.callout).foregroundStyle(.secondary)
                 } else if let report = model.report {
                     Text(pocketDiskBytes(report.bytes)).font(.system(size: 40, weight: .bold)).monospacedDigit()
+                        .contentTransition(.numericText(value: Double(report.bytes)))
+                        .animation(reduceMotion ? nil : .snappy(duration: 0.4), value: report.bytes)
                     Text("\(report.itemCount) öğe bulundu · \(pocketDiskBytes(model.selectedBytes)) seçili")
                         .font(.callout).foregroundStyle(.secondary).monospacedDigit()
                     HStack(spacing: PocketSpacing.s) {
@@ -162,7 +171,10 @@ struct CleanupView: View {
             RoundedRectangle(cornerRadius: 18, style: .continuous)
                 .fill(LinearGradient(colors: [tint.opacity(0.16), tint.opacity(0.04)], startPoint: .topLeading, endPoint: .bottomTrailing))
         }
+        .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
         .overlay { RoundedRectangle(cornerRadius: 18, style: .continuous).strokeBorder(tint.opacity(0.2), lineWidth: 0.75) }
+        .onChange(of: model.scanning) { _, scanning in if !scanning, model.report != nil { celebration += 1 } }
+        .onChange(of: model.summary) { _, summary in if summary != nil { celebration += 1 } }
     }
 
     // MARK: Summary

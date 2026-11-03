@@ -225,7 +225,7 @@ extension QuickAction {
         case .toggleDarkMode: Color(hex: 0x2C2C34)
         case .toggleDesktopIcons: Color(hex: 0x00A6C8)
         case .ejectDisks: PocketTheme.disk
-        case .emptyTrash: Color(hex: 0xE8458B)
+        case .emptyTrash: Color(hex: 0xF2545B)
         }
     }
 }
