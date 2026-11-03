@@ -188,6 +188,7 @@ extension PocketTool {
         case .audio: String(localized: "Ses Çıkışı")
         case .mixer: String(localized: "Ses Mikseri")
         case .recorder: String(localized: "Ekran Kaydı")
+        case .screenshot: String(localized: "Ekran Görüntüsü")
         case .privacy: String(localized: "Gizlilik Kontrolü")
         case .startupItems: String(localized: "Başlangıç Öğeleri")
         case .maintenance: String(localized: "Bakım")

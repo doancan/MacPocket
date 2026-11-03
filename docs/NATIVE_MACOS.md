@@ -149,6 +149,37 @@ LG'nin kendi sessiz komutuyla sessize alma (LG o sırada ses çıkışı değild
 Mac hoparlörüne geçince tuşların macOS'a kalması (birim testiyle), aynı adlı iki
 monitör, Kapsül ve Klasik stillerde ses göstergesi.
 
+## Ekran görüntüsü (1. aşama)
+
+Araçlar → Ekran Görüntüsü. CleanShot X ile tam eşdeğerlik iddiası yok; özellik listesi
+resmî sayfalarından çıkarıldı, kodu incelenmedi. Tasarım:
+[2026-11-03-screenshot-tool-design.md](superpowers/specs/2026-11-03-screenshot-tool-design.md).
+
+Uygulanan (statik): alan, pencere, tam ekran ve önceki alan çekimi; ⇧⌘5 hepsi bir arada
+mod çubuğu. Alan seçiminde ekranlar dondurulur (ScreenCaptureKit ile yerel çözünürlükte),
+artı imleç, piksel ızgaralı büyüteç ve piksel boyutu gösterilir; Boşluk pencere moduna
+geçer, Esc iptal eder. Pencere, gölgesiyle ve saydam arka planla çekilir. Çekimden sonra
+panoya kopyalama, klasöre kaydetme (PNG/JPG/HEIC) ve sol altta önizleme kartı (kopyala,
+kaydet/göster, düzenle, sürükle-bırak, isteğe bağlı otomatik kapanma). Son 30 günün
+geçmişi. Düzenleyici: ok, vurgulayıcı, pikselleştirme, metin; geri al/yinele, kopyala,
+kaydet, farklı kaydet. macOS'un kendi ekran görüntüsü kısayolları açıksa ya da CleanShot X
+çalışıyorsa sayfada uyarı gösterilir (`RegisterEventHotKey` başka uygulamanın tuttuğu
+kısayolu reddetmiyor).
+
+### Canlı kontrol — 3 Kasım 2026
+
+İki harici ekran (5120 piksel genişlik), macOS 27; tıklama ve sürüklemeler sentezlendi.
+Tam ekran 5120 × 3414 PNG; 400 × 300 noktalık alan 800 × 600 piksel ve doğru bölge,
+katman görüntüye girmedi; pencere modu vurguladı, MacPocket penceresi saydam PNG olarak
+çekildi; önizleme kartı göründü (kullanıcı gördü, kapattı); geçmiş küçük resimleri;
+düzenleyicide dört araç ve kaydet (ok, pikselleştirme, metin dosyaya işlendi); mod çubuğu
+ve Esc ile iptal. CleanShot X açıkken uyarı çıktı.
+
+Doğrulanmayanlar: kısayollarla çekim (CleanShot X ⇧⌘3/4/5'i tutuyordu), önizleme
+kartından başka uygulamaya sürükle-bırak, önceki alan, HEIC/JPG ile gerçek çekim,
+iki ekran arasında taşan seçim, Retina olmayan ekran, saydam arka planlı pencerenin
+JPG'de beyaza basılması (birim testiyle).
+
 ## Apple kaynakları
 
 - [SwiftUI ile yeni tasarım](https://developer.apple.com/videos/play/wwdc2025/323/)

@@ -259,6 +259,7 @@ final class PocketApplicationState: ObservableObject {
         WorkspaceService.shared.start()
         SnippetService.shared.start()
         ScreenGrabService.shared.start()
+        ScreenshotService.shared.start()
         MouseScrollService.shared.start()
         AudioOutputService.shared.start()
         VolumeMixerService.shared.start()
