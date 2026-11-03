@@ -2589,3 +2589,23 @@
 "En düşük pil ve aygıtın simgesi; tıklayınca tüm aygıtlar listelenir." = "The lowest battery with its device’s icon; click to list every device.";
 "Bluetooth aygıtı" = "Bluetooth device";
 "Menü Çubuğu" = "Menu Bar";
+
+/* Hidden settings: performance */
+"Performans" = "Performance";
+"Yumuşak kaydırma animasyonu" = "Smooth scrolling animation";
+"Kapatınca Page Up/Down, boşluk tuşu ve kaydırma çubuğuna tıklama sayfayı kaydırarak değil, anında taşır." = "When off, Page Up/Down, the space bar and clicks in the scroll bar jump instantly instead of scrolling.";
+"Quick Look açılış süresi" = "Quick Look opening time";
+"Boşluk tuşuyla açılan önizleme penceresinin büyüme animasyonu; 0 anında açar." = "The zoom animation of the preview opened with the space bar; 0 opens it instantly.";
+"Tam ekran araç çubuğu süresi" = "Full-screen toolbar duration";
+"Tam ekranda araç çubuğunun görünüp kaybolma animasyonunun süresi." = "How long the toolbar takes to slide in and out in full screen.";
+"App Nap’i kapat" = "Turn off App Nap";
+"Görünmeyen uygulamalar yavaşlatılmaz; arka plandaki işler hızlı sürer ama enerji tüketimi artar." = "Hidden apps aren’t slowed down; background work runs at full speed but uses more energy.";
+"Açılırken simge zıplasın" = "Bounce icons when opening";
+"Kapatınca Dock’tan açılan uygulamaların simgesi zıplamaz." = "When off, app icons don’t bounce when opened from the Dock.";
+"Mission Control animasyon süresi" = "Mission Control animation duration";
+"Mission Control ve Uygulama Pencereleri açılıp kapanırken geçen süre." = "How long Mission Control and App Exposé take to open and close.";
+"Küçültme efekti" = "Minimize effect";
+"Cin" = "Genie";
+"Ölçekle" = "Scale";
+"Emiş" = "Suck";
+"“Ölçekle” en hafif efekttir; “Emiş” Sistem Ayarları’nda bulunmaz." = "“Scale” is the lightest effect; “Suck” isn’t available in System Settings.";

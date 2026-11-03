@@ -72,11 +72,12 @@ public enum HiddenSettingValue: Equatable, Sendable {
 }
 
 public enum HiddenSettingGroup: String, CaseIterable, Identifiable, Sendable {
-    case dock, finder, screenshots, windows, files
+    case performance, dock, finder, screenshots, windows, files
     public var id: String { rawValue }
 
     public var title: String {
         switch self {
+        case .performance: String(localized: "Performans")
         case .dock: "Dock"
         case .finder: "Finder"
         case .screenshots: String(localized: "Ekran Görüntüleri")
@@ -87,6 +88,7 @@ public enum HiddenSettingGroup: String, CaseIterable, Identifiable, Sendable {
 
     public var symbol: String {
         switch self {
+        case .performance: "gauge.with.dots.needle.67percent"
         case .dock: "dock.rectangle"
         case .finder: "folder"
         case .screenshots: "camera.viewfinder"
@@ -179,6 +181,39 @@ public struct HiddenSetting: Identifiable, Equatable, Sendable {
 extension HiddenSetting {
     /// Settings verified to have no control in System Settings on macOS 14–27.
     public static let catalog: [HiddenSetting] = [
+        // Performance: shorter or no animations, no App Nap
+        HiddenSetting(id: "global.NSScrollAnimationEnabled", group: .performance, domain: .global, key: "NSScrollAnimationEnabled",
+                      kind: .toggle(systemDefault: true), effect: .reopenApps,
+                      title: String(localized: "Yumuşak kaydırma animasyonu"),
+                      detail: String(localized: "Kapatınca Page Up/Down, boşluk tuşu ve kaydırma çubuğuna tıklama sayfayı kaydırarak değil, anında taşır.")),
+        HiddenSetting(id: "global.QLPanelAnimationDuration", group: .performance, domain: .global, key: "QLPanelAnimationDuration",
+                      kind: .seconds(range: 0...1, step: 0.05, systemDefault: 0.2), effect: .reopenApps,
+                      title: String(localized: "Quick Look açılış süresi"),
+                      detail: String(localized: "Boşluk tuşuyla açılan önizleme penceresinin büyüme animasyonu; 0 anında açar.")),
+        HiddenSetting(id: "global.NSToolbarFullScreenAnimationDuration", group: .performance, domain: .global,
+                      key: "NSToolbarFullScreenAnimationDuration", kind: .seconds(range: 0...1, step: 0.05, systemDefault: 0.5),
+                      effect: .reopenApps,
+                      title: String(localized: "Tam ekran araç çubuğu süresi"),
+                      detail: String(localized: "Tam ekranda araç çubuğunun görünüp kaybolma animasyonunun süresi.")),
+        HiddenSetting(id: "global.NSAppSleepDisabled", group: .performance, domain: .global, key: "NSAppSleepDisabled",
+                      kind: .toggle(systemDefault: false), effect: .reopenApps,
+                      title: String(localized: "App Nap’i kapat"),
+                      detail: String(localized: "Görünmeyen uygulamalar yavaşlatılmaz; arka plandaki işler hızlı sürer ama enerji tüketimi artar.")),
+        HiddenSetting(id: "dock.launchanim", group: .performance, domain: .dock, key: "launchanim",
+                      kind: .toggle(systemDefault: true), effect: .restarts(.dock),
+                      title: String(localized: "Açılırken simge zıplasın"),
+                      detail: String(localized: "Kapatınca Dock’tan açılan uygulamaların simgesi zıplamaz.")),
+        HiddenSetting(id: "dock.expose-animation-duration", group: .performance, domain: .dock, key: "expose-animation-duration",
+                      kind: .seconds(range: 0...1, step: 0.05, systemDefault: 0.2), effect: .restarts(.dock),
+                      title: String(localized: "Mission Control animasyon süresi"),
+                      detail: String(localized: "Mission Control ve Uygulama Pencereleri açılıp kapanırken geçen süre.")),
+        HiddenSetting(id: "dock.mineffect", group: .performance, domain: .dock, key: "mineffect",
+                      kind: .choice(options: [HiddenSettingOption("genie", String(localized: "Cin")),
+                                              HiddenSettingOption("scale", String(localized: "Ölçekle")),
+                                              HiddenSettingOption("suck", String(localized: "Emiş"))], systemDefault: "genie"),
+                      effect: .restarts(.dock),
+                      title: String(localized: "Küçültme efekti"),
+                      detail: String(localized: "“Ölçekle” en hafif efekttir; “Emiş” Sistem Ayarları’nda bulunmaz.")),
         // Dock
         HiddenSetting(id: "dock.autohide-delay", group: .dock, domain: .dock, key: "autohide-delay",
                       kind: .seconds(range: 0...2, step: 0.05, systemDefault: 0.5), effect: .restarts(.dock),

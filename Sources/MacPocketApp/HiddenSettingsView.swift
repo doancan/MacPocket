@@ -100,7 +100,7 @@ final class HiddenSettingsModel: ObservableObject {
 /// Tools → Gizli Ayarlar: macOS preferences that exist only as Terminal `defaults` commands.
 struct HiddenSettingsView: View {
     @StateObject private var model = HiddenSettingsModel()
-    @State private var group = HiddenSettingGroup.dock
+    @State private var group = HiddenSettingGroup.performance
     @PocketReduceMotion private var reduceMotion
 
     private var settings: [HiddenSetting] { HiddenSetting.catalog.filter { $0.group == group } }
@@ -118,7 +118,7 @@ struct HiddenSettingsView: View {
             GlassTabBar(tabs: HiddenSettingGroup.allCases.map { GlassTab(id: $0, title: $0.title, symbol: $0.symbol) },
                         selection: $group)
                 .accessibilityLabel("Ayar grubu")
-                .frame(maxWidth: 720)
+                .frame(maxWidth: 840)
             if let message = model.message {
                 PocketMessage(message.text, tone: message.tone)
             }
