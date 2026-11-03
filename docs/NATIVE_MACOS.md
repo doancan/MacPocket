@@ -219,3 +219,22 @@ Sensör kartında en sıcak sensör grafiği çizildi (SoC en yüksek 58,2 °C i
 
 **Doğrulanmadı:** Kapat/Zorla kapat düğmesi denenmedi; menü çubuğundaki "En sıcak sensör (°C)" modülü kullanıcı
 ayarı değiştirilmeden yalnız birim testleriyle doğrulandı.
+
+## USB/Thunderbolt, Disk Sağlığı, Wi-Fi Analizi ve Hosts Dosyası
+
+**Uygulanan kod**
+- `Peripherals.swift`: `IOUSBHostDevice` ağacı (ad, üretici, `UsbLinkSpeed`, `UsbPowerSinkAllocation`, arayüz sınıfları), hub gizleme, USB 2 hızındaki depolama uyarısı; Thunderbolt/USB4 portları `system_profiler SPThunderboltDataType -json` ile.
+- `DiskHealth.swift`: NVMeSMARTLib eklentisi (`IONVMeSMARTInterface.SMARTReadData`) ile NVMe SMART günlüğü; yönetici izni gerekmez. Değerlendirme: kritik uyarı bitleri, yedek blok eşiği, kullanılan ömür %80/%100, veri hataları.
+- `WiFiAnalysis.swift` + `WiFiView.swift`: CoreWLAN bağlantı bilgisi ve tarama; kanal yükü (2,4 GHz taşma, 5/6 GHz geniş kanal blokları), DFS’siz kanal önerisi. Kendi ağın ve yalnız BSSID’si aynı radyodan geldiğini gösteren ek SSID’ler hesaptan çıkar; ayrı cihazlar sayılır, bir cihazın birden çok SSID’si yükte bir kez sayılır. Ağ listesinde BSSID, güvenlik, standart, “Bağlı/Aynı modem” etiketi, arama, bant filtresi, sıralama ve 30 sn otomatik tarama var. Ağ adları ve BSSID konum izni ister.
+- `HostsFile.swift` + `HostsView.swift`: `/etc/hosts` ayrıştırma (dokunulmayan satırlar bayt bayt korunur), `## Ad - Start/End ##` grupları, satır/grup aç-kapa (# ile), ekleme doğrulaması, sistem satırları kilitli. Kaydetme `do shell script … with administrator privileges` ile: önce `/etc/hosts.macpocket-backup`, sonra `cat >` ve DNS önbelleği temizliği.
+
+**Canlı doğrulama (Mac mini, macOS 27)**
+- Disk Sağlığı: APPLE SSD AP1024Z, %97 ömür, 47,18 TB yazılmış, 2.744 saat, 47 °C — bağımsız SMART okumasıyla aynı.
+- USB: Magic Trackpad (12 Mb/s, 1.300 mA) ve VIA Billboard ioreg ile aynı; 3 Thunderbolt portu boş, en fazla 120 Gb/s.
+- Wi-Fi: −40 dBm, gürültü −90, kanal 48 / 5 GHz / 80 MHz, 1200 Mb/s, 18–20 ağ; adlar ve BSSID’ler göründü. KM WiFi/KM Office (1a:/1e:27:f5:db:d0:31) “Aynı modem” işaretlendi; ayrı cihaz 0a:a6:f7:98:91:ba/bb/bc tek cihaz sayıldı (kanal başına 3 cihaz).
+- Hosts: mevcut dosya ve `Local` grubu doğru okundu; satır kapatma ve Vazgeç denendi, dosya değişmedi.
+
+**Doğrulanmadı**
+- Hosts kaydetme ve yedekten geri yükleme (yönetici parolası gerektirir; birim testleri komutu ve dosya içeriğini kapsar).
+- Thunderbolt’a bağlı aygıt listesi (bu makinede bağlı aygıt yok; ayrıştırma birim testiyle).
+- USB 2 hızındaki depolama uyarısı (bağlı harici disk yok).
