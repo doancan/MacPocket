@@ -819,7 +819,6 @@
 "MenuBar.shortLabel.memory" = "RAM";
 "MenuBar.shortLabel.network" = "NET";
 "MenuBar.shortLabel.power" = "PWR";
-"Menü Çubuğu" = "Menu Bar";
 "Menü Çubuğunda Göster" = "Show in Menu Bar";
 "Menü çubuğu ve ana pencere aynı ölçümleri kullanır. İzleme duraklatıldığında son değer korunur." = "The menu bar and the main window share the same measurements. When monitoring is paused, the last value is kept.";
 "Menü çubuğu öğesi gizliyken Dock simgesi her zaman gösterilir; böylece MacPocket’a ulaşabilirsin." = "While the menu bar item is hidden, the Dock icon is always shown so you can still reach MacPocket.";
@@ -2584,3 +2583,9 @@
 "%lld Hz" = "%lld Hz";
 "(düşük çözünürlük)" = "(low resolution)";
 "Çözünürlük, yenileme hızı, ana ekran ve yansıtma; gizli keskin HiDPI modları dahil, 15 sn onaylı." = "Resolution, refresh rate, main display and mirroring; hidden sharp HiDPI modes included, confirmed within 15 s.";
+
+/* Bluetooth battery menu bar item */
+"Bluetooth Pilleri…" = "Bluetooth Batteries…";
+"En düşük pil ve aygıtın simgesi; tıklayınca tüm aygıtlar listelenir." = "The lowest battery with its device’s icon; click to list every device.";
+"Bluetooth aygıtı" = "Bluetooth device";
+"Menü Çubuğu" = "Menu Bar";

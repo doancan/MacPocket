@@ -73,6 +73,14 @@ struct BluetoothBatteryView: View {
             .pickerStyle(.segmented)
             .fixedSize()
             .disabled(!service.settings.lowBatteryAlerts)
+            Divider().padding(.vertical, PocketSpacing.xs)
+            Toggle(isOn: $service.settings.showInMenuBar) {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Menü çubuğunda göster").font(.headline)
+                    Text("En düşük pil ve aygıtın simgesi; tıklayınca tüm aygıtlar listelenir.").font(.subheadline).foregroundStyle(.secondary)
+                }
+            }
+            .toggleStyle(.switch)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .pocketCard()

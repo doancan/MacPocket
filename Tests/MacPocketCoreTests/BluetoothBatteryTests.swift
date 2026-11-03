@@ -27,12 +27,28 @@ final class BluetoothBatteryTests: XCTestCase {
 
     func testRegistryLevelsAreMatchedByNormalizedAddress() {
         XCTAssertEqual(BluetoothBatteryParser.normalize("64-a5-c3-f1-7b-96"), "64:A5:C3:F1:7B:96")
-        let merged = BluetoothBatteryParser.merge(BluetoothBatteryParser.connectedDevices(fromSystemProfiler: profiler),
-                                                  registryLevels: [BluetoothBatteryParser.normalize("64-a5-c3-f1-7b-96"): 4,
-                                                                   "88:4D:7C:EE:50:D6": 65])
+        let merged = BluetoothBatteryParser.merge(BluetoothBatteryParser.connectedDevices(fromSystemProfiler: profiler), registry: [
+            BluetoothBatteryParser.normalize("64-a5-c3-f1-7b-96"): RegistryBattery(level: 4, productID: 0x0265, wired: false),
+            "88:4D:7C:EE:50:D6": RegistryBattery(level: 65, productID: 0x029F, wired: false),
+        ])
         XCTAssertEqual(merged.first { $0.kind == .trackpad }?.levels.main, 4)
         XCTAssertEqual(merged.first { $0.kind == .keyboard }?.levels.lowest, 65)
         XCTAssertNil(merged.first { $0.kind == .mouse }?.levels.lowest)
+    }
+
+    /// Charging over its cable, the trackpad is a USB device that the Bluetooth list doesn't show as connected.
+    func testCabledAccessoryStaysListedAsCharging() {
+        let keyboardOnly = BluetoothBatteryParser.connectedDevices(fromSystemProfiler: profiler).filter { $0.kind == .keyboard }
+        let merged = BluetoothBatteryParser.merge(keyboardOnly, registry: [
+            "64:A5:C3:F1:7B:96": RegistryBattery(level: 13, productID: 0x0265, wired: true),
+            "88:4D:7C:EE:50:D6": RegistryBattery(level: 65, productID: 0x029F, wired: false),
+        ])
+        let trackpad = merged.first { $0.address == "64:A5:C3:F1:7B:96" }
+        XCTAssertEqual(trackpad?.name, "Magic Trackpad")
+        XCTAssertEqual(trackpad?.kind, .trackpad)
+        XCTAssertEqual(trackpad?.levels.main, 13)
+        XCTAssertEqual(trackpad?.charging, true)
+        XCTAssertEqual(merged.count, 2)
     }
 
     func testLogitechLevelsAreMatchedByName() {

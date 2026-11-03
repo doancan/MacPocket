@@ -96,12 +96,44 @@ public enum BluetoothBatteryParser {
     }
 
     /// The profiler's devices with the registry's levels filled in (the registry wins for the main level: it updates
-    /// live, the profiler's snapshot may be minutes old).
-    public static func merge(_ devices: [BluetoothBatteryDevice], registryLevels: [String: Int]) -> [BluetoothBatteryDevice] {
-        devices.map { device in
+    /// live, the profiler's snapshot may be minutes old). Registry devices the profiler doesn't list as connected — a
+    /// Magic accessory charging over its cable is a USB device then — are added under their product's name.
+    public static func merge(_ devices: [BluetoothBatteryDevice], registry: [String: RegistryBattery]) -> [BluetoothBatteryDevice] {
+        var result = devices.map { device in
             var device = device
-            if let level = registryLevels[device.address] { device.levels.main = level }
+            if let entry = registry[device.address] {
+                device.levels.main = entry.level
+                if entry.wired { device.charging = true }
+            }
             return device
+        }
+        let listed = Set(devices.map(\.address))
+        for (address, entry) in registry.sorted(by: { $0.key < $1.key }) where !listed.contains(address) {
+            let product = AppleAccessory.named(productID: entry.productID)
+            result.append(BluetoothBatteryDevice(address: address, name: product.name, kind: product.kind,
+                                                 levels: .init(main: entry.level), charging: entry.wired))
+        }
+        return result
+    }
+}
+
+/// One accessory's battery as the I/O Registry reports it.
+public struct RegistryBattery: Equatable, Sendable {
+    public var level: Int
+    public var productID: Int
+    /// Connected by cable (USB): it is charging.
+    public var wired: Bool
+    public init(level: Int, productID: Int, wired: Bool) { self.level = level; self.productID = productID; self.wired = wired }
+}
+
+/// Names for Apple's Magic accessories by USB/Bluetooth product ID, for when nothing else names them.
+public enum AppleAccessory {
+    public static func named(productID: Int) -> (name: String, kind: BluetoothBatteryDevice.Kind) {
+        switch productID {
+        case 0x0265, 0x0314, 0x0324: ("Magic Trackpad", .trackpad)
+        case 0x0269, 0x030D, 0x0323: ("Magic Mouse", .mouse)
+        case 0x0267, 0x026C, 0x029A, 0x029C, 0x029F, 0x0320, 0x0321, 0x0322: ("Magic Keyboard", .keyboard)
+        default: (String(localized: "Bluetooth aygıtı"), .other)
         }
     }
 }

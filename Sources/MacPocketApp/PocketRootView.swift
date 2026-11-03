@@ -55,6 +55,9 @@ struct PocketRootView: View {
                     .buttonStyle(.pocketSecondary)
                     .background(PocketBackdrop(tint: navigation.page.tint))
                     .environment(\.pocketTint, navigation.page.tint)
+                    .onReceive(NotificationCenter.default.publisher(for: .pocketOpenTool)) { note in
+                        if let id = note.object as? String { openCatalogTool(id) }
+                    }
                     .navigationTitle(navigation.title)
                     // The page heading already names the page; the toolbar keeps only its buttons and the
                     // backdrop flows under it, so there is no separator line to misalign with the sidebar.
