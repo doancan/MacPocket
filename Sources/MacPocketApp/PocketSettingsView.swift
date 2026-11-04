@@ -38,6 +38,7 @@ private struct PocketGeneralSettings: View {
     @AppStorage("MacPocket.menuBarCPU") private var menuBarCPU = true
     @AppStorage(PocketPreferenceKey.showInDock) private var showInDock = true
     @AppStorage(PocketPreferenceKey.showWindowAtLaunch) private var showWindowAtLaunch = true
+    @Environment(\.openWindow) private var openWindow
     @AppStorage(PocketPreferenceKey.launchPage) private var launchPage = PocketPage.overview
     @AppStorage(PocketPreferenceKey.confirmQuitWhileAwake) private var confirmQuitWhileAwake = true
 
@@ -110,6 +111,9 @@ private struct PocketGeneralSettings: View {
                         model.navigation.open(.windowSwitcher)
                         model.openMainWindow?()
                     }
+                }
+                LabeledContent("İzinler ve kurulum") {
+                    Button("Kurulum Sihirbazını Aç…") { openWindow(id: "onboarding"); NSApp.activate(ignoringOtherApps: true) }
                 }
                 LabeledContent("Sürüm") { Text(verbatim: Self.versionDescription) }
                 Text("MacPocket tüm ölçümleri bu Mac’te tutar; veri göndermez.").font(.callout).foregroundStyle(.secondary)

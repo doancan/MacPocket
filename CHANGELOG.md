@@ -2,6 +2,8 @@
 
 ## Yayımlanmamış
 
+- 👋 **Kurulum sihirbazı**: ilk açılışta karşılama, canlı izin durumu, Sistem Ayarları’nın yanında sürükle-bırak kartı ve tercihler; Ayarlar › Genel’den yeniden açılır
+- 🧰 **Bakım** yenilendi: Launch Services, disk doğrulama, bellek, Spotlight ve Dock/Finder görevleri; yönetici görevleri tek parolayla, görev başına canlı durum ve son çalıştırma bilgisi
 - 🛠 Release derlemesindeki tüm uyarılar temizlendi
 
 ## 0.1.2 — 3 Kasım 2026

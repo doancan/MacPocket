@@ -238,4 +238,7 @@ enum PocketLaunch {
     static var showsWindow: Bool { UserDefaults.standard.object(forKey: PocketPreferenceKey.showWindowAtLaunch) as? Bool ?? true }
     /// The main window is created by SwiftUI at launch; when hidden at launch it is closed on first appearance.
     static var handledFirstWindow = false
+    /// Set once termination is approved (also when macOS quits the app to apply a permission), so windows closing
+    /// during shutdown aren't mistaken for the user closing them.
+    static var terminating = false
 }

@@ -232,7 +232,6 @@ public enum HostsWriteError: Error, LocalizedError, Equatable, Sendable {
 
 public enum HostsWriter {
     public static let backupPath = "/etc/hosts.macpocket-backup"
-    private static let queue = DispatchQueue(label: "MacPocket.hosts.privileged", qos: .userInitiated)
 
     /// The shell command run as root. `cat >` keeps the file's owner and mode; the previous file is backed up first
     /// and the DNS cache flushed so the change applies at once. `source` is a path MacPocket created.
@@ -249,25 +248,18 @@ public enum HostsWriter {
             .appendingPathComponent("macpocket-hosts-\(UUID().uuidString).txt")
         try text.write(to: source, atomically: true, encoding: .utf8)
         defer { try? FileManager.default.removeItem(at: source) }
-        let script = "do shell script \"\(try command(source: source.path))\" with administrator privileges"
-        try await run(script)
+        try await run(try command(source: source.path))
     }
 
     public static var backupText: String? { try? String(contentsOfFile: backupPath, encoding: .utf8) }
 
-    private static func run(_ source: String) async throws {
-        try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
-            queue.async {
-                var errorInfo: NSDictionary?
-                _ = NSAppleScript(source: source)?.executeAndReturnError(&errorInfo)
-                if let errorInfo {
-                    let code = (errorInfo[NSAppleScript.errorNumber] as? NSNumber)?.intValue ?? -1
-                    let message = errorInfo[NSAppleScript.errorMessage] as? String ?? String(localized: "Bilinmeyen hata")
-                    continuation.resume(throwing: code == -128 ? HostsWriteError.cancelled : HostsWriteError.failed(code: code, message: message))
-                } else {
-                    continuation.resume()
-                }
-            }
+    private static func run(_ command: String) async throws {
+        do {
+            _ = try await AdministratorShell.run(command)
+        } catch AdministratorShell.Failure.cancelled {
+            throw HostsWriteError.cancelled
+        } catch let AdministratorShell.Failure.failed(code, message) {
+            throw HostsWriteError.failed(code: code, message: message)
         }
     }
 }

@@ -89,6 +89,11 @@ struct PocketRootView: View {
             model.mainWindowVisible = true
             if !PocketLaunch.handledFirstWindow {
                 PocketLaunch.handledFirstWindow = true
+                // First run (or a relaunch in the middle of granting permissions): the setup wizard comes first.
+                if OnboardingRecord.needsPresentation() {
+                    openWindow(id: "onboarding")
+                    NSApp.activate(ignoringOtherApps: true)
+                }
                 // "Show main window at launch" off: SwiftUI always creates the window, so close it right away.
                 // The open action captured above keeps working for the menu bar and the Dock icon.
                 if !PocketLaunch.showsWindow { dismissWindow(id: "main"); return }
@@ -330,6 +335,9 @@ struct PocketCommands: Commands {
         ToolbarCommands()
         CommandGroup(replacing: .newItem) {
             Button("MacPocket Penceresini Göster") { showPocketWindow(openWindow) }.keyboardShortcut("0", modifiers: .command)
+        }
+        CommandGroup(after: .appSettings) {
+            Button("Kurulum Sihirbazı…") { openWindow(id: "onboarding"); NSApp.activate(ignoringOtherApps: true) }
         }
         CommandGroup(after: .textEditing) {
             Button("Ara…") { NotificationCenter.default.post(name: .pocketFind, object: nil) }

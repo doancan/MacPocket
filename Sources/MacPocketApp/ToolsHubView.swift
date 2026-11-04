@@ -494,7 +494,7 @@ private struct HubTool: Identifiable {
 
     static let catalog: [HubTool] = [
         .init(id: "mac-utilities", title: String(localized: "macOS Araçları"), description: String(localized: "Sistem raporları ve macOS ayarlarına hızlı erişim."), icon: "hammer", category: .system),
-        .init(id: "maintenance", title: String(localized: "Bakım"), description: String(localized: "Quick Look ve yazı tipi önbelleği gibi küçük düzeltmeleri çalıştır; atlananlar gerekçesiyle gösterilir."), icon: "wrench.and.screwdriver", category: .system),
+        .init(id: "maintenance", title: String(localized: "Bakım"), description: String(localized: "Önbellekleri sıfırla, başlangıç diskini doğrula, DNS’i temizle; yönetici gerektirenler tek parolayla çalışır."), icon: "wrench.and.screwdriver", category: .system),
         .init(id: "startup-items", title: String(localized: "Başlangıç Öğeleri"), description: String(localized: "Oturum açılışında ve Mac başlarken kendiliğinden çalışan öğeleri, sahipleriyle ve durumlarıyla gör."), icon: "power", category: .system),
         .init(id: "launch-jobs", title: String(localized: "Başlatma Görevleri"), description: String(localized: "Kullanıcı oturumunun launchd görevlerini incele."), icon: "list.bullet", category: .system),
         .init(id: "speed-test", title: String(localized: "Ağ Hız Testi"), description: String(localized: "İndirme, yükleme ve yanıt verme hızını macOS’un yerleşik aracıyla ölç; sonuçları karşılaştır."), icon: "speedometer", category: .system),

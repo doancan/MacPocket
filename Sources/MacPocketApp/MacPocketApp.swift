@@ -23,6 +23,15 @@ struct MacPocketApplication: App {
         .windowToolbarStyle(.unified)
         .commands { PocketCommands(model: state.model) }
 
+        Window("MacPocket’a Hoş Geldin", id: "onboarding") {
+            OnboardingView(loginItem: state.loginItem)
+                .pocketAppearanceRoot(rebuildsOnTokenChange: false)
+        }
+        .windowStyle(.hiddenTitleBar)
+        .windowResizability(.contentSize)
+        .defaultPosition(.center)
+        .restorationBehavior(.disabled)
+
         Settings {
             PocketSettingsView(model: state.model, loginItem: state.loginItem)
                 .pocketAppearanceRoot(rebuildsOnTokenChange: false)
@@ -77,6 +86,7 @@ final class PocketAppDelegate: NSObject, NSApplicationDelegate {
             if alert.suppressionButton?.state == .on { defaults.set(false, forKey: PocketPreferenceKey.confirmQuitWhileAwake) }
             if response != .alertFirstButtonReturn { return .terminateCancel }
         }
+        PocketLaunch.terminating = true
         return .terminateNow
     }
 

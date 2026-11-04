@@ -238,3 +238,17 @@ ayarı değiştirilmeden yalnız birim testleriyle doğrulandı.
 - Hosts kaydetme ve yedekten geri yükleme (yönetici parolası gerektirir; birim testleri komutu ve dosya içeriğini kapsar).
 - Thunderbolt’a bağlı aygıt listesi (bu makinede bağlı aygıt yok; ayrıştırma birim testiyle).
 - USB 2 hızındaki depolama uyarısı (bağlı harici disk yok).
+
+## Bakım aracı
+
+**Uygulanan kod:** `MaintenanceTasks.swift` sekiz görev tanımlar (Quick Look, Launch Services `lsregister -gc`, yazı tipi önbelleği, DNS, `diskutil verifyVolume /`, `purge`, Dock/Finder/SystemUIServer yeniden başlatma, `mdutil -E /`). Kullanıcı düzeyindeki görevler sırayla çalışır; yönetici görevleri `AdministratorShell` üzerinden tek parola sorusunda toplanır ve her görevin çıkış kodu ayrı işaretle okunur. Komutlar katalogda sabittir ve kabuğa gitmeden önce katı karakter denetiminden geçer. Periyodik Bakım, macOS 27’de `periodic` bulunmadığı için kaldırıldı. Hosts yazıcısı da aynı `AdministratorShell` yardımcısını kullanır.
+
+**Canlı doğrulama:** Bakım sayfasında “Başlangıç Diskini Doğrula” tek başına çalıştırıldı: “Tamamlandı · 7,4 sn · Dosya sisteminde hata bulunmadı”; son çalıştırma bilgisi uygulama yeniden açıldıktan sonra korundu.
+
+**Doğrulanmadı:** Yönetici görevlerinin (DNS, bellek, Spotlight) gerçek parola sorusuyla çalışması; Launch Services, Quick Look ve Dock/Finder görevlerinin uygulamadan çalıştırılması (yalnız birim testleri).
+
+## Kurulum sihirbazı
+
+- **Uygulanan:** İlk açılışta (ve `OnboardingRecord.currentVersion` artınca bir kez) açılan 4 adımlı pencere: karşılama, izinler, tercihler, hazır. İzinler: Erişilebilirlik, Ekran Kaydı, Tam Disk Erişimi (korunan dosya okunarak denetlenir), Giriş İzleme, Konum, Bildirimler; durum saniyede bir yoklanır. Liste tabanlı panellerde Sistem Ayarları penceresinin yanında uygulama simgesini sürüklemek için yüzen kart çıkar. macOS izni uygulamak için uygulamayı kapatırsa sihirbaz kaldığı adımdan sürer; pencereyi kullanıcı kapatırsa tamamlanmış sayılır. Ayarlar › Genel ve uygulama menüsünden yeniden açılır.
+- **Canlı doğrulanan:** İlk açılışta otomatik açılma; karşılama animasyonu; 6 iznin gerçek durumu (5/6 verildi); Tam Disk Erişimi panelinin açılması ve kartın pencerenin sağına yerleşmesi; Sistem Ayarları kapanınca kartın gizlenmesi; izin verilince yeniden açılışta İzinler adımından devam ve iznin “Verildi” görünmesi; tercihler ve bitiş adımı, tamamlanma kaydı.
+- **Doğrulanmayan:** Simgenin listeye gerçekten sürüklenip bırakılması; Bildirim ve Konum için macOS istem penceresi; Ekran Kaydı/Giriş İzleme için “Yeniden Başlat” kartı.
