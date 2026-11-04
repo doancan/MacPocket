@@ -2977,3 +2977,14 @@
 "Eşiğe göre" = "By threshold";
 "altına düşünce" = "dropping below";
 "üstüne çıkınca" = "rising above";
+
+/* Updates (Sparkle) */
+"Güncellemeleri otomatik denetle" = "Check for updates automatically";
+"Günde bir kez GitHub’daki imzalı sürüm listesine bakar; Mac hakkında bilgi gönderilmez." = "Looks at the signed release list on GitHub once a day; nothing about your Mac is sent.";
+"Güncellemeleri Denetle…" = "Check for Updates…";
+"Güncellemeleri otomatik indir ve kur" = "Download and install updates automatically";
+"Son denetim" = "Last checked";
+"Henüz denetlenmedi" = "Not checked yet";
+"Şimdi Denetle" = "Check Now";
+"Denetim yalnız GitHub’daki son sürümün imzalı listesini indirir; bu Mac hakkında bilgi gönderilmez. Güncellemeler kurulmadan önce imzası doğrulanır." = "A check only downloads the signed list for the latest release on GitHub; nothing about this Mac is sent. Updates are verified against their signature before installing.";
+"Otomatik güncelleme yalnız paketlenmiş MacPocket uygulamasında çalışır." = "Automatic updates work only in the packaged MacPocket app.";

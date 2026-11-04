@@ -10,10 +10,13 @@ let package = Package(
         .executable(name: "MacPocket", targets: ["MacPocketApp"]),
         .executable(name: "MacPocketFanHelper", targets: ["MacPocketFanHelper"]),
     ],
+    dependencies: [
+        .package(url: "https://github.com/sparkle-project/Sparkle", from: "2.10.1"),
+    ],
     targets: [
         .target(name: "MacPocketCore"),
         .executableTarget(name: "MacPocketProbe", dependencies: ["MacPocketCore"]),
-        .executableTarget(name: "MacPocketApp", dependencies: ["MacPocketCore"]),
+        .executableTarget(name: "MacPocketApp", dependencies: ["MacPocketCore", .product(name: "Sparkle", package: "Sparkle")]),
         .executableTarget(name: "MacPocketFanHelper", dependencies: ["MacPocketCore"]),
         .testTarget(name: "MacPocketCoreTests", dependencies: ["MacPocketCore"]),
     ]

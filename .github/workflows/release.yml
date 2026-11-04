@@ -88,10 +88,18 @@ jobs:
           ditto -c -k --keepParent "$app" "dist/MacPocket-$VERSION-macOS-arm64.zip"
           cd dist
           shasum -a 256 *.zip > SHA256SUMS
+      - name: Sign update and build appcast
+        env:
+          SPARKLE_ED_PRIVATE_KEY: ${{ secrets.SPARKLE_ED_PRIVATE_KEY }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ -n "$SPARKLE_ED_PRIVATE_KEY" ]] || { echo "SPARKLE_ED_PRIVATE_KEY secret is missing" >&2; exit 1; }
+          scripts/make-appcast.sh "dist/MacPocket-$VERSION-macOS-arm64.zip" dist/appcast.xml
       - name: Publish GitHub release
         shell: bash
         run: |
-          gh release create "$GITHUB_REF_NAME" dist/*.zip dist/SHA256SUMS \
+          gh release create "$GITHUB_REF_NAME" dist/*.zip dist/SHA256SUMS dist/appcast.xml \
             --verify-tag --title "MacPocket $VERSION" --generate-notes
       - name: Remove signing material
         if: always()

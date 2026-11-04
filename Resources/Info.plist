@@ -19,6 +19,11 @@
   <key>NSHumanReadableCopyright</key><string>© 2026 Doğancan</string>
   <key>NSSupportsAutomaticTermination</key><false/>
   <key>NSSupportsSuddenTermination</key><false/>
+  <key>SUFeedURL</key><string>https://github.com/doancan/MacPocket/releases/latest/download/appcast.xml</string>
+  <key>SUPublicEDKey</key><string>MuuM3vPVr12fsO7/rZ9i1YZ5AAGXUu+f2Vmb4YFaApo=</string>
+  <key>SUEnableAutomaticChecks</key><true/>
+  <key>SUScheduledCheckInterval</key><integer>86400</integer>
+  <key>SUEnableSystemProfiling</key><false/>
   <key>NSAudioCaptureUsageDescription</key><string>MacPocket, ses mikserinde seçtiğin uygulamaların sesini yakalayıp ayarladığın seviyede yeniden çalar; ses kaydedilmez ve bu Mac’ten çıkmaz.</string>
   <key>NSMicrophoneUsageDescription</key><string>MacPocket, ekran kaydına mikrofonu eklemeni seçtiğinde sesini kaydeder.</string>
   <key>NSAppleEventsUsageDescription</key><string>MacPocket, hızlı işlemler için Finder’dan Çöp’ü boşaltmasını ve System Events’ten görünümü değiştirmesini ister.</string>

@@ -750,6 +750,7 @@ private struct OnboardingPreferences: View {
     @AppStorage("MacPocket.menuBarCPU") private var menuBarCPU = true
     @AppStorage(PocketPreferenceKey.showInDock) private var showInDock = true
     @AppStorage(PocketPreferenceKey.showWindowAtLaunch) private var showWindowAtLaunch = true
+    @ObservedObject private var updates = UpdateService.shared
 
     var body: some View {
         ScrollView {
@@ -780,6 +781,12 @@ private struct OnboardingPreferences: View {
                     Divider().padding(.leading, 52)
                     row("macwindow", tint: Color(hex: 0x30B0C7), title: "Açılışta ana pencereyi göster",
                         detail: "Kapalıysa MacPocket yalnız menü çubuğunda başlar.", isOn: $showWindowAtLaunch)
+                    if updates.isAvailable {
+                        Divider().padding(.leading, 52)
+                        row("arrow.down.circle", tint: PocketTheme.disk, title: "Güncellemeleri otomatik denetle",
+                            detail: "Günde bir kez GitHub’daki imzalı sürüm listesine bakar; Mac hakkında bilgi gönderilmez.",
+                            isOn: Binding(get: { updates.automaticallyChecks }, set: { updates.automaticallyChecks = $0 }))
+                    }
                 }
                 .pocketCard(padding: PocketSpacing.m)
                 if let error = loginItem.error {

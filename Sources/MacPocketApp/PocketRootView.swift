@@ -338,6 +338,10 @@ struct PocketCommands: Commands {
         CommandGroup(replacing: .newItem) {
             Button("MacPocket Penceresini Göster") { showPocketWindow(openWindow) }.keyboardShortcut("0", modifiers: .command)
         }
+        CommandGroup(after: .appInfo) {
+            Button("Güncellemeleri Denetle…") { UpdateService.shared.checkForUpdates() }
+                .disabled(!UpdateService.shared.isAvailable)
+        }
         CommandGroup(after: .appSettings) {
             Button("Kurulum Sihirbazı…") { openWindow(id: "onboarding"); NSApp.activate(ignoringOtherApps: true) }
         }

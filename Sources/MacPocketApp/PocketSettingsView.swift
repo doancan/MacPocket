@@ -105,6 +105,8 @@ private struct PocketGeneralSettings: View {
                     .font(.callout).foregroundStyle(.secondary)
             } header: { Text("Çıkış") }
 
+            UpdateSettingsSection()
+
             Section {
                 LabeledContent("Pencere Geçişi") {
                     Button("Pencere Geçişi Ayarlarını Aç…") {

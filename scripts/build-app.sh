@@ -27,6 +27,10 @@ mkdir -p "$macpocket_app_dir/Contents/Library/LaunchDaemons"
 install -m 644 Resources/Daemons/com.doancan.MacPocket.FanHelper.plist "$macpocket_app_dir/Contents/Library/LaunchDaemons/"
 plutil -lint "$macpocket_app_dir/Contents/Library/LaunchDaemons/com.doancan.MacPocket.FanHelper.plist" >/dev/null
 install -m 644 Resources/Info.plist "$macpocket_app_dir/Contents/Info.plist"
+# Sparkle (auto-update) ships as a framework next to the binary; the app loads it from Contents/Frameworks.
+mkdir -p "$macpocket_app_dir/Contents/Frameworks"
+ditto "$macpocket_binary_dir/Sparkle.framework" "$macpocket_app_dir/Contents/Frameworks/Sparkle.framework"
+install_name_tool -add_rpath "@executable_path/../Frameworks" "$macpocket_app_dir/Contents/MacOS/MacPocket"
 install -m 644 Resources/AppIcon.icns "$macpocket_app_dir/Contents/Resources/AppIcon.icns"
 for macpocket_lproj in Resources/*.lproj; do
     [ -d "$macpocket_lproj" ] || continue
@@ -45,6 +49,16 @@ macpocket_helper_flags=(--force --identifier com.doancan.MacPocket.FanHelper --s
 if [ "$macpocket_configuration" = release ]; then macpocket_helper_flags+=(--options runtime); fi
 if [ "$macpocket_configuration" = release ] && [ "$macpocket_identity" != "-" ]; then macpocket_helper_flags+=(--timestamp); fi
 codesign "${macpocket_helper_flags[@]}" "$macpocket_app_dir/Contents/MacOS/MacPocketFanHelper"
+# Sparkle's nested code is signed inside out, as its documentation describes, before the app seals it.
+macpocket_sparkle="$macpocket_app_dir/Contents/Frameworks/Sparkle.framework"
+macpocket_sparkle_flags=(--force --sign "$macpocket_identity")
+if [ "$macpocket_configuration" = release ]; then macpocket_sparkle_flags+=(--options runtime); fi
+if [ "$macpocket_configuration" = release ] && [ "$macpocket_identity" != "-" ]; then macpocket_sparkle_flags+=(--timestamp); fi
+codesign "${macpocket_sparkle_flags[@]}" "$macpocket_sparkle/Versions/B/XPCServices/Installer.xpc"
+codesign "${macpocket_sparkle_flags[@]}" --preserve-metadata=entitlements "$macpocket_sparkle/Versions/B/XPCServices/Downloader.xpc"
+codesign "${macpocket_sparkle_flags[@]}" "$macpocket_sparkle/Versions/B/Autoupdate"
+codesign "${macpocket_sparkle_flags[@]}" "$macpocket_sparkle/Versions/B/Updater.app"
+codesign "${macpocket_sparkle_flags[@]}" "$macpocket_sparkle"
 if [ "$macpocket_configuration" = debug ]; then
     codesign --force --sign "$macpocket_identity" --entitlements Resources/MacPocket.entitlements "$macpocket_app_dir"
 else
