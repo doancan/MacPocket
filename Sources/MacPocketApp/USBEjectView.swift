@@ -30,10 +30,11 @@ final class USBEjectModel: ObservableObject {
         do {
             let latest = try await USBEject.load()
             guard !Task.isCancelled else { return }
-            let unchanged = Set(latest.filter { disk in drives.contains { $0.identity == disk.identity } }.map(\.id))
+            let previous = Set(drives.map(\.identity))
+            let unchanged = Set(latest.filter { previous.contains($0.identity) }.map(\.id))
             usage = usage.filter { unchanged.contains($0.key) }
             failures = failures.filter { unchanged.contains($0.key) }
-            drives = latest
+            if drives != latest { drives = latest }
             // A replugged drive can reuse the same BSD id; it must not inherit the user's previous selection.
             selection.formIntersection(unchanged)
             expanded.formIntersection(unchanged)

@@ -2,6 +2,8 @@
 
 ## Yayımlanmamış
 
+- **Araç performansı:** Ağ trafiği gruplarının toplamları tek geçişte hesaplanır; sıfırlama artık ek `nettop` başlatmaz ve bekleyen eski sonuçlar yeni oturuma karışmaz. Harici disk yokken USB çıkarma listesi üç yerine tek `diskutil` sorgusu yapar. Hava durumu, dakikalık kontrol döngüsü yerine doğrudan saatlik yenileme zamanını bekler; konum seçilmediyse zamanlayıcı başlatmaz.
+
 - **Menü çubuğunda hava durumu:** Sıcaklık ve koşul simgesi, hissedilen sıcaklık seçeneği, saatlik ve beş günlük tahmin paneli eklendi. Kullanıcı şehir/ilçe arayıp konumunu seçebilir; seçim uygulama yeniden açıldığında korunur. Konum değişikliği panelden veya Menü Çubuğu ayarlarından yapılabilir. Saatlik otomatik yenileme ve bağlantı hatasında son başarılı veriyi koruma bulunur.
 
 - ⏏️ **USB Çıkarma Yöneticisi**: harici fiziksel diskleri ve bölümlerini listeleme, tekli/toplu güvenli çıkarma, diski kullanan süreçler ve açık dosyalar, Finder ve uygulamaya geçiş. Dahili/başlangıç diskleri korunur; yeniden takılan disk eski seçimi devralmaz.

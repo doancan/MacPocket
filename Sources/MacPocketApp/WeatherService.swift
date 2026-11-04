@@ -11,10 +11,9 @@ final class WeatherService: ObservableObject {
     @Published private(set) var loading = false
     @Published private(set) var error: String?
     private var enabled = false
-    private var loop: Task<Void, Never>?
+    private var refreshTimer: Task<Void, Never>?
     private var fetch: Task<Void, Never>?
     private var generation = UUID()
-    private var nextRefresh = Date.distantPast
     private var lastAttempt = Date.distantPast
 
     private init() {
@@ -25,23 +24,27 @@ final class WeatherService: ObservableObject {
     func setEnabled(_ enabled: Bool) {
         guard self.enabled != enabled else { return }
         self.enabled = enabled
-        loop?.cancel(); loop = nil
-        if !enabled { generation = UUID(); fetch?.cancel(); loading = false; nextRefresh = .distantPast; return }
-        loop = Task { [weak self] in
-            while !Task.isCancelled {
-                guard let self else { return }
-                if Date() >= self.nextRefresh { self.refresh() }
-                do { try await Task.sleep(for: .seconds(60)) } catch { return }
-            }
+        refreshTimer?.cancel(); refreshTimer = nil
+        if !enabled { generation = UUID(); fetch?.cancel(); loading = false; return }
+        refresh()
+    }
+
+    /// No polling while idle: one cancellable wakeup at the next actual refresh deadline.
+    private func scheduleRefresh() {
+        refreshTimer?.cancel()
+        refreshTimer = Task { [weak self] in
+            do { try await Task.sleep(for: .seconds(3600)) } catch { return }
+            guard !Task.isCancelled else { return }
+            self?.refresh()
         }
     }
 
     func select(_ location: WeatherLocation) {
         guard location.isValid else { return }
-        generation = UUID(); fetch?.cancel(); loading = false
+        generation = UUID(); fetch?.cancel(); refreshTimer?.cancel(); loading = false
         self.location = location; snapshot = nil; error = nil
         if let data = try? JSONEncoder().encode(location) { UserDefaults.standard.set(data, forKey: Self.locationKey) }
-        nextRefresh = .distantPast; lastAttempt = .distantPast
+        lastAttempt = .distantPast
         refresh()
     }
 
@@ -50,7 +53,8 @@ final class WeatherService: ObservableObject {
         guard !manual || Date().timeIntervalSince(lastAttempt) >= 60 else { return }
         let token = generation
         loading = true; error = nil
-        lastAttempt = Date(); nextRefresh = lastAttempt.addingTimeInterval(3600)
+        lastAttempt = Date()
+        scheduleRefresh()
         fetch = Task { [weak self] in
             do {
                 let language = Bundle.main.preferredLocalizations.first?.hasPrefix("en") == true ? "en" : "tr"

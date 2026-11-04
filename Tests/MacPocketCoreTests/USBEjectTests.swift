@@ -47,6 +47,24 @@ final class USBEjectTests: XCTestCase {
                                         "MacPocketMediaIdentity": mediaID]))
     }
 
+    func testEmptyExternalListSkipsUnneededTopologyQueries() async throws {
+        actor Commands {
+            var arguments: [[String]] = []
+            func record(_ value: [String]) { arguments.append(value) }
+        }
+        let commands = Commands()
+        let empty = try plist(["AllDisksAndPartitions": []])
+        let root = try plist(["DeviceIdentifier": "disk0s1"])
+        let drives = try await USBEject.load { _, arguments, _ in
+            await commands.record(arguments)
+            return .init(status: 0, output: arguments.first == "info" ? root : empty, errorOutput: "")
+        }
+        XCTAssertTrue(drives.isEmpty)
+        let arguments = await commands.arguments
+        print("EMPTY_USB_DISKUTIL_COMMANDS: \(arguments.count)")
+        XCTAssertEqual(arguments, [["list", "-plist", "external", "physical"]])
+    }
+
     func testPhysicalDriveGroupsPartitionsAndAPFSVolumesWithoutDoubleCounting() async throws {
         let disks = try await USBEject.load(execute: fixture().execute)
         let disk = try XCTUnwrap(disks.first)
@@ -133,11 +151,14 @@ final class USBEjectTests: XCTestCase {
         XCTAssertTrue(report.users.isEmpty)
     }
 
-    func testInvalidDiscoveryResponseIsNotAnEmptySuccessfulList() async {
-        do {
-            _ = try await USBEject.load { _, _, _ in .init(status: 0, output: "not a plist", errorOutput: "") }
-            XCTFail("Expected discovery failure")
-        } catch { XCTAssertEqual(error as? USBEjectError, .invalidResponse) }
+    func testInvalidDiscoveryResponseIsNotAnEmptySuccessfulList() async throws {
+        let responses = ["not a plist", try plist([:]), try plist(["AllDisksAndPartitions": "unreadable"])]
+        for response in responses {
+            do {
+                _ = try await USBEject.load { _, _, _ in .init(status: 0, output: response, errorOutput: "") }
+                XCTFail("Expected discovery failure")
+            } catch { XCTAssertEqual(error as? USBEjectError, .invalidResponse) }
+        }
     }
 
     func testNativeEjectionOfOwnedDiskImageWhenEnabled() async throws {

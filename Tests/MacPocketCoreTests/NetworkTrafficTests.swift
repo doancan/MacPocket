@@ -55,6 +55,38 @@ final class NetworkTrafficTests: XCTestCase {
 }
 
 final class NetworkTrafficGroupingTests: XCTestCase {
+    func testLargeHelperGroupsPreserveTotalsAndOrdering() {
+        let rows: [NetworkTrafficRow] = (1...24_000).map { (index: Int) -> NetworkTrafficRow in
+            NetworkTrafficRow(pid: Int32(index), name: "helper", downloadRate: Double(index % 17),
+                              uploadRate: Double(index % 7), sessionDownload: UInt64(index), sessionUpload: 1)
+        }
+        let start = ContinuousClock.now
+        var groups: [NetworkTrafficGroup] = []
+        for _ in 0..<20 {
+            groups = NetworkTraffic.group(rows) { row in
+                let app = row.pid % 240
+                return ("app:\(app)", "App \(app)")
+            }
+        }
+        print("TRAFFIC_GROUPING_20_ITERATIONS: \(start.duration(to: .now))")
+        XCTAssertEqual(groups.count, 240)
+        XCTAssertTrue(groups.allSatisfy { $0.rows.count == 100 })
+        XCTAssertEqual(groups.reduce(0) { $0 + $1.downloadRate }, rows.reduce(0) { $0 + $1.downloadRate })
+        XCTAssertEqual(groups.reduce(UInt64(0)) { $0 + $1.sessionTotal }, rows.reduce(UInt64(0)) { $0 + $1.sessionTotal })
+        XCTAssertTrue(zip(groups, groups.dropFirst()).allSatisfy { $0.totalRate >= $1.totalRate })
+    }
+
+    func testIdleGroupsSortBySessionTotalsThenName() {
+        let rows = [NetworkTrafficRow(pid: 1, name: "A", downloadRate: 0, uploadRate: 0, sessionDownload: 40, sessionUpload: 10),
+                    NetworkTrafficRow(pid: 2, name: "Z", downloadRate: 0, uploadRate: 0, sessionDownload: 90, sessionUpload: 10),
+                    NetworkTrafficRow(pid: 3, name: "B", downloadRate: 0, uploadRate: 0, sessionDownload: 20, sessionUpload: 30)]
+        let groups = NetworkTraffic.group(rows) { _ in nil }
+        XCTAssertEqual(groups.map(\.name), ["Z", "A", "B"])
+        XCTAssertTrue(groups.allSatisfy { !$0.isActive })
+        XCTAssertEqual(groups.first?.sessionDownload, 90)
+        XCTAssertEqual(groups.first?.sessionUpload, 10)
+    }
+
     func testHelpersSumIntoTheirApp() {
         let rows = [
             NetworkTrafficRow(pid: 1, name: "Google Chrome", downloadRate: 100, uploadRate: 10, sessionDownload: 1_000, sessionUpload: 100),

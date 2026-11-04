@@ -36,11 +36,24 @@ public struct NetworkTrafficGroup: Identifiable, Equatable, Sendable {
     public let name: String
     public let rows: [NetworkTrafficRow]
 
-    public var downloadRate: Double { rows.reduce(0) { $0 + $1.downloadRate } }
-    public var uploadRate: Double { rows.reduce(0) { $0 + $1.uploadRate } }
+    // Rows are immutable: calculate their sums once, rather than on every sort comparison and UI read.
+    public let downloadRate: Double
+    public let uploadRate: Double
+    public let sessionDownload: UInt64
+    public let sessionUpload: UInt64
     public var totalRate: Double { downloadRate + uploadRate }
-    public var sessionDownload: UInt64 { rows.reduce(0) { $0 &+ $1.sessionDownload } }
-    public var sessionUpload: UInt64 { rows.reduce(0) { $0 &+ $1.sessionUpload } }
+
+    init(id: String, name: String, rows: [NetworkTrafficRow]) {
+        self.id = id; self.name = name; self.rows = rows
+        var download = 0.0, upload = 0.0
+        var received: UInt64 = 0, sent: UInt64 = 0
+        for row in rows {
+            download += row.downloadRate; upload += row.uploadRate
+            received = received &+ row.sessionDownload; sent = sent &+ row.sessionUpload
+        }
+        downloadRate = download; uploadRate = upload
+        sessionDownload = received; sessionUpload = sent
+    }
     public var sessionTotal: UInt64 { sessionDownload &+ sessionUpload }
     public var isActive: Bool { totalRate > 0 }
 }

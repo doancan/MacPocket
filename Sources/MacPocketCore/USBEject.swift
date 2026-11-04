@@ -50,18 +50,22 @@ public enum USBEject {
 
     public static func load(execute: Execute? = nil) async throws -> [EjectDrive] {
         let reader = execute ?? Self.execute
-        async let external = plist(["list", "-plist", "external", "physical"], execute: reader)
+        let externalList = try dictionary(await plist(["list", "-plist", "external", "physical"], execute: reader))
+        guard let candidates = externalList["AllDisksAndPartitions"] as? [[String: Any]] else {
+            throw USBEjectError.invalidResponse
+        }
+        // The usual empty state needs no APFS topology or startup-volume query.
+        guard !candidates.isEmpty else { return [] }
         async let all = plist(["list", "-plist"], execute: reader)
         async let root = plist(["info", "-plist", "/"], execute: reader)
-        let (externalData, allData, rootData) = try await (external, all, root)
-        let externalList = try dictionary(externalData)
         var info: [String: [String: Any]] = [:]
-        for node in externalList["AllDisksAndPartitions"] as? [[String: Any]] ?? [] {
+        for node in candidates {
             guard let id = node["DeviceIdentifier"] as? String, isWholeDisk(id) else { continue }
             var details = try dictionary(await plist(["info", "-plist", id], execute: reader))
             if execute == nil { details["MacPocketMediaIdentity"] = registryIdentity(id) }
             info[id] = details
         }
+        let (allData, rootData) = try await (all, root)
         return try parse(external: externalList, all: dictionary(allData), root: dictionary(rootData), info: info)
     }
 

@@ -14,6 +14,8 @@ final class NetworkTrafficModel: ObservableObject {
     }
 
     static let interval: Duration = .seconds(2)
+    private var sampling = false
+    private var generation = UUID()
     private var tracker = NetworkTrafficTracker()
     private var rows: [NetworkTrafficRow] = []
     private var identities: [Int32: ProcessIdentity] = [:]
@@ -32,21 +34,26 @@ final class NetworkTrafficModel: ObservableObject {
     func run() async {
         while !Task.isCancelled {
             await sample()
-            try? await Task.sleep(for: Self.interval)
+            do { try await Task.sleep(for: Self.interval) } catch { return }
         }
     }
 
     func resetSession() {
+        generation = UUID()
         tracker.reset()
         rows = []
         groups = []
         startedAt = Date()
-        Task { await sample() }
     }
 
     private func sample() async {
+        guard !sampling, !Task.isCancelled else { return }
+        sampling = true
+        let token = generation
+        defer { sampling = false }
         do {
             let result = try await BoundedProcess.run(NetworkTraffic.nettopPath, NetworkTraffic.nettopArguments, timeout: 10)
+            guard !Task.isCancelled, token == generation else { return }
             guard result.status == 0 else {
                 error = String(localized: "nettop başarısız oldu (\(result.status)).")
                 return
@@ -63,15 +70,16 @@ final class NetworkTrafficModel: ObservableObject {
         } catch is CancellationError {
         } catch BoundedProcess.Failure.cancelled {
         } catch {
-            self.error = error.localizedDescription
+            if !Task.isCancelled, token == generation { self.error = error.localizedDescription }
         }
     }
 
     private func regroup() {
-        groups = NetworkTraffic.group(rows) { [identities, groupByApp] row in
+        let latest = NetworkTraffic.group(rows) { [identities, groupByApp] row in
             guard groupByApp, let identity = identities[row.pid], let path = identity.appPath else { return nil }
             return (path, identity.appName ?? row.name)
         }
+        if latest != groups { groups = latest }
     }
 
     func appPath(of group: NetworkTrafficGroup) -> String? {
