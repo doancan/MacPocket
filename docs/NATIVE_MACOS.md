@@ -260,3 +260,9 @@ ayarı değiştirilmeden yalnız birim testleriyle doğrulandı.
 - **Canlı doğrulanan:** Ayrı düzende CPU çekirdek çubukları, GPU grafik + değer, disk O/Y ayna grafik, sıcaklık pasta + 59°, ping 16 ms gerçek değerlerle çizildi; erişilebilirlik etiketleri doğru (ör. “GPU: %23 kullanım”, “Gecikme: 33 ms”).
 - **Doğrulanmayan:** GPU ve ağ ayrıntı panelleri (ekran kilitlendi), VPN bağlıyken kilit simgesi (Tailscale bağlı değildi), çevrimdışı görünümü, ayarlardaki sensör seçici ve görünüm sekmeleri.
 
+## Ekran Süresi
+
+- **Uygulanan:** Kullanıcı açınca başlayan takip (`MacPocket.screenTime.enabled`). Öndeki uygulama `NSWorkspace` bildirimleriyle izlenir; kilit, uyku ve ekran uykusunda durur; `CGEventSource` boşta süresi eşiği (2/5/10 dk) aşılınca son girdiye kadar sayılır. Ekran uykusunu engelleyen (video) uygulama boşta sayılmaz (`IOPMCopyAssertionsByProcess`). Kayıt saat ve gün sınırında bölünür, `~/Library/Application Support/MacPocket/screen-time.json` içinde 30 gün tutulur, 20 sn’de bir ve çıkışta yazılır. Sayfa: Bugün/Dün/7/30 gün, özet kutuları, saatlik/günlük grafik, uygulama listesi, uygulama kaydı silme, tüm verileri silme.
+- **Canlı doğrulanan:** Takibi başlatma, Finder/Safari/MacPocket arasında geçiş sonrası süre, pay, geçiş sayısı (4) ve en yoğun saat; 7 gün görünümü ve okunur eksen; sayfanın sonuna kadar kaydırma.
+- **Doğrulanmayan:** Boşta duraklatma, kilit/uyku duraklatması, video uygulamasının sayılmaya devam etmesi, gece yarısını geçen kayıt (yalnız birim testi), silme onayı.
+

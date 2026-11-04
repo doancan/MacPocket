@@ -92,6 +92,7 @@ final class PocketAppDelegate: NSObject, NSApplicationDelegate {
 
     func applicationWillTerminate(_ notification: Notification) {
         ClipboardService.shared.flushSave()
+        ScreenTimeService.shared.flush()
         NightModeService.shared.prepareForQuit()
         DisplayBrightnessService.shared.restoreSoftwareDimming()
         AppFreezerService.shared.thawAll()

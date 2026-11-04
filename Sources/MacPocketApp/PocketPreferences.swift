@@ -196,6 +196,7 @@ extension PocketTool {
         case .diskHealth: String(localized: "Disk Sağlığı")
         case .wifi: String(localized: "Wi-Fi Analizi")
         case .hosts: String(localized: "Hosts Dosyası")
+        case .screenTime: String(localized: "Ekran Süresi")
         case .privacy: String(localized: "Gizlilik Kontrolü")
         case .startupItems: String(localized: "Başlangıç Öğeleri")
         case .maintenance: String(localized: "Bakım")

@@ -2,6 +2,7 @@
 
 ## Yayımlanmamış
 
+- ⏳ **Ekran Süresi**: uygulama başına günlük/saatlik süre, 7 ve 30 günlük grafik; boşta, kilitli ve uykuda sayılmaz, veriler bu Mac’te kalır
 - 📊 **Menü çubuğu**: GPU modülü, ping, Wi-Fi sinyali, VPN kilidi ve çevrimdışı uyarısı; disk okuma/yazma, pasta ve çekirdek çubukları; sıcaklık için sensör seçimi
 - 👋 **Kurulum sihirbazı**: ilk açılışta karşılama, canlı izin durumu, Sistem Ayarları’nın yanında sürükle-bırak kartı ve tercihler; Ayarlar › Genel’den yeniden açılır
 - 🧰 **Bakım** yenilendi: Launch Services, disk doğrulama, bellek, Spotlight ve Dock/Finder görevleri; yönetici görevleri tek parolayla, görev başına canlı durum ve son çalıştırma bilgisi
