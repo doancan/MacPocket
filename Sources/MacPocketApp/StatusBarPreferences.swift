@@ -13,6 +13,7 @@ extension MenuBarModule {
         case .disk: PocketTheme.disk
         case .network: Color(hex: 0x00A6C8)
         case .power: PocketTheme.power
+        case .weather: .orange
         }
     }
 
@@ -32,7 +33,12 @@ final class MenuBarSettingsStore: ObservableObject {
     private var subscription: AnyCancellable?
 
     private init() {
+        let needsWeather = UserDefaults.standard.object(forKey: MenuBarModule.weather.enabledKey) == nil
         preferences = MenuBarPreferences.load()
+        if needsWeather {
+            preferences.enabled.insert(.weather)
+            preferences.save()
+        }
         subscription = NotificationCenter.default.publisher(for: UserDefaults.didChangeNotification)
             .receive(on: RunLoop.main)
             .sink { [weak self] _ in MainActor.assumeIsolated { self?.reload() } }
@@ -112,7 +118,7 @@ struct StatusBarPreferencesView: View {
                         .frame(maxWidth: 220)
                 }
                 Text(store.preferences.layout == .grouped
-                     ? "Menü çubuğunda tek, kompakt bir simge; tıklayınca her modül kendi sekmesinde açılır."
+                     ? "Sistem modülleri tek simgede toplanır; hava durumu etkinse ayrı gösterilir. Tıklayınca modülün ayrıntıları açılır."
                      : "Her etkin modül kendi menü çubuğu öğesini ve kendi ayarlarını kullanır. Gerçek menü çubuğunda öğeler ⌘ basılıyken de sürüklenebilir.")
                     .font(.subheadline).foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
@@ -142,7 +148,7 @@ struct StatusBarPreferencesView: View {
         }
         if store.preferences.groupedStyle.isLive {
             Picker("Göstergenin izlediği", selection: $store.preferences.groupedMetric) {
-                ForEach(MenuBarModule.allCases) { module in
+                ForEach(MenuBarModule.allCases.filter { $0 != .weather }) { module in
                     Label(module.title, systemImage: module.symbol).tag(module)
                 }
             }
@@ -167,6 +173,7 @@ private struct ModuleSettingsEditor: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: PocketSpacing.s) {
+            if module == .weather { WeatherLocationPicker() }
             Picker("Değer", selection: $settings.value) {
                 ForEach(module.valueOptions) { Text($0.title).tag($0) }
             }
@@ -219,7 +226,10 @@ private struct ModuleSettingsEditor: View {
             }
             .disabled(settings.style == .icon)
             .toggleStyle(.checkbox)
-            if layout == .grouped {
+            if module == .weather {
+                Text("Hava durumu her düzende kendi menü çubuğu öğesinde gösterilir.")
+                    .font(.subheadline).foregroundStyle(.secondary)
+            } else if layout == .grouped {
                 Text("Gruplu düzende bu modül açılır pencerede kendi sekmesinde gösterilir; seçili değer canlı göstergeyi de besler. Görünüm seçenekleri Ayrı düzende uygulanır.")
                     .font(.subheadline).foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)

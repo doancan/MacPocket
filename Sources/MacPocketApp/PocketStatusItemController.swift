@@ -44,9 +44,14 @@ final class PocketStatusItemController: NSObject, NSPopoverDelegate {
             MainActor.assumeIsolated {
                 self?.refresh()
                 self?.updatePing()
+                self?.updateWeather()
             }
         }.store(in: &subscriptions)
         updatePing()
+        updateWeather()
+        WeatherService.shared.objectWillChange.receive(on: RunLoop.main).sink { [weak self] _ in
+            MainActor.assumeIsolated { self?.refresh() }
+        }.store(in: &subscriptions)
         model.$paused.removeDuplicates().receive(on: RunLoop.main).sink { [weak self] _ in
             MainActor.assumeIsolated { self?.updateTooltips() }
         }.store(in: &subscriptions)
@@ -69,6 +74,10 @@ final class PocketStatusItemController: NSObject, NSPopoverDelegate {
         Task { await monitor.setPingEnabled(wanted) }
     }
 
+    private func updateWeather() {
+        WeatherService.shared.setEnabled(store.preferences.visible && store.preferences.enabled.contains(.weather))
+    }
+
     private func updateAppearance() {
         let name = UserDefaults.standard.string(forKey: "MacPocket.appearance")
         guard name != appearanceName else { return }
@@ -87,7 +96,7 @@ final class PocketStatusItemController: NSObject, NSPopoverDelegate {
         let enabled = preferences.enabledModules
         // With nothing enabled the grouped glyph stays, so MacPocket is always reachable.
         if preferences.layout == .separate && !enabled.isEmpty { return enabled.map(\.rawValue) }
-        return [Self.groupedKey]
+        return [Self.groupedKey] + (preferences.enabled.contains(.weather) ? [MenuBarModule.weather.rawValue] : [])
     }
 
     private func refresh() {
@@ -103,14 +112,14 @@ final class PocketStatusItemController: NSObject, NSPopoverDelegate {
             if let module = MenuBarModule(rawValue: key) {
                 let settings = preferences.settings(for: module)
                 let reading = MenuBarFormatter.reading(module, settings: settings, snapshot: snapshot,
-                                                       binaryUnits: preferences.binaryUnits)
+                                                       binaryUnits: preferences.binaryUnits, weather: WeatherService.shared.snapshot)
                 renderKey = MenuBarRenderer.moduleKey(module, settings: settings, reading: reading, snapshot: snapshot, history: history)
                 image = { MenuBarRenderer.module(module, settings: settings, reading: reading, snapshot: snapshot, history: self.history) }
                 spoken = reading.accessibility
             } else {
                 let readings = preferences.enabledModules.map {
                     ($0, MenuBarFormatter.reading($0, settings: preferences.settings(for: $0), snapshot: snapshot,
-                                                  binaryUnits: preferences.binaryUnits))
+                                                  binaryUnits: preferences.binaryUnits, weather: WeatherService.shared.snapshot))
                 }
                 let reasons = MenuBarAttention.reasons(snapshot, diskFreeThreshold: diskFreeThreshold)
                 let state = MenuBarRenderer.groupedState(preferences: preferences, snapshot: snapshot, history: history,
@@ -197,6 +206,18 @@ final class PocketStatusItemController: NSObject, NSPopoverDelegate {
         hosting.view.window?.makeKey()
     }
 
+
+    #if DEBUG
+    func showWeatherForDiagnostics() -> [String: Any] {
+        showPopover(for: MenuBarModule.weather.rawValue)
+        let image = items[MenuBarModule.weather.rawValue]?.button?.image
+        return ["weatherItem": items[MenuBarModule.weather.rawValue] != nil,
+                "hasImage": image != nil, "imageWidth": image?.size.width ?? 0,
+                "popoverShown": popover.isShown, "popoverWidth": popover.contentSize.width,
+                "popoverHeight": popover.contentSize.height,
+                "hasSelectedLocation": WeatherService.shared.location != nil]
+    }
+    #endif
 
     // MARK: Right-click menu
 

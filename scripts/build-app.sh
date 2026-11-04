@@ -15,14 +15,15 @@ fi
 macpocket_identity="${MACPOCKET_SIGN_IDENTITY:--}"
 echo "İmza kimliği: $macpocket_identity" >&2
 swift build -c "$macpocket_configuration" --product MacPocket
-swift build -c "$macpocket_configuration" --product MacPocketFanHelper
+swift build -c "$macpocket_configuration" --product MacPocketHelper
 macpocket_binary_dir="$(swift build -c "$macpocket_configuration" --show-bin-path)"
 macpocket_app_dir="$macpocket_root/.build/MacPocket.app"
 rm -rf "$macpocket_app_dir"
 mkdir -p "$macpocket_app_dir/Contents/MacOS"
 mkdir -p "$macpocket_app_dir/Contents/Resources"
 install -m 755 "$macpocket_binary_dir/MacPocket" "$macpocket_app_dir/Contents/MacOS/MacPocket"
-install -m 755 "$macpocket_binary_dir/MacPocketFanHelper" "$macpocket_app_dir/Contents/MacOS/MacPocketFanHelper"
+# Keep the installed executable and daemon identities used by the original setup wizard.
+install -m 755 "$macpocket_binary_dir/MacPocketHelper" "$macpocket_app_dir/Contents/MacOS/MacPocketFanHelper"
 mkdir -p "$macpocket_app_dir/Contents/Library/LaunchDaemons"
 install -m 644 Resources/Daemons/com.doancan.MacPocket.FanHelper.plist "$macpocket_app_dir/Contents/Library/LaunchDaemons/"
 plutil -lint "$macpocket_app_dir/Contents/Library/LaunchDaemons/com.doancan.MacPocket.FanHelper.plist" >/dev/null
@@ -32,6 +33,9 @@ mkdir -p "$macpocket_app_dir/Contents/Frameworks"
 ditto "$macpocket_binary_dir/Sparkle.framework" "$macpocket_app_dir/Contents/Frameworks/Sparkle.framework"
 install_name_tool -add_rpath "@executable_path/../Frameworks" "$macpocket_app_dir/Contents/MacOS/MacPocket"
 install -m 644 Resources/AppIcon.icns "$macpocket_app_dir/Contents/Resources/AppIcon.icns"
+# Offline IEEE and MACLookup manufacturer databases (refresh: see docs/NATIVE_MACOS.md).
+install -m 644 Resources/oui.tsv.lzfse "$macpocket_app_dir/Contents/Resources/oui.tsv.lzfse"
+install -m 644 Resources/maclookup.json.lzfse "$macpocket_app_dir/Contents/Resources/maclookup.json.lzfse"
 for macpocket_lproj in Resources/*.lproj; do
     [ -d "$macpocket_lproj" ] || continue
     macpocket_lproj_dest="$macpocket_app_dir/Contents/Resources/$(basename "$macpocket_lproj")"

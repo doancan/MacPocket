@@ -1,4 +1,5 @@
 import AppKit
+import Combine
 import ApplicationServices
 import CoreGraphics
 import CoreLocation
@@ -641,6 +642,7 @@ private struct OnboardingPermissions: View {
                                                 requested: model.requested.contains(permission),
                                                 request: { model.request(permission) })
                     }
+                    OnboardingHelperCard()
                     if model.relaunchSuggested {
                         HStack(spacing: PocketSpacing.m) {
                             Image(systemName: "arrow.clockwise.circle.fill").font(.title2).foregroundStyle(.orange)
@@ -859,5 +861,45 @@ private struct OnboardingFinish: View {
 
     private func tip(_ symbol: String, _ text: LocalizedStringKey) -> some View {
         Label(text, systemImage: symbol).font(.caption).foregroundStyle(.secondary)
+    }
+}
+
+/// Installs MacPocket's privileged helper (fan control today) from the wizard: one administrator approval in
+/// System Settings › Login Items, then no further prompts for the features it serves.
+private struct OnboardingHelperCard: View {
+    @ObservedObject private var fans = FanControlService.shared
+
+    var body: some View {
+        HStack(alignment: .center, spacing: PocketSpacing.m) {
+            PocketIconTile(symbol: "gearshape.2.fill", tint: Color(hex: 0x636366), size: 38)
+            VStack(alignment: .leading, spacing: 3) {
+                Text("Yardımcı servis").font(.headline)
+                Text("Fan kontrolü ve otomatik MAC taraması gibi yönetici yetkisi gereken işler için. Bir kez kurulur ve onaylanır.")
+                    .font(.callout).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+                if case .unavailable(let reason) = fans.availability {
+                    Text(reason).font(.caption).foregroundStyle(.orange).fixedSize(horizontal: false, vertical: true)
+                } else if fans.availability == .needsApproval {
+                    Label("Sistem Ayarları › Giriş Öğeleri’nde MacPocket’ın arka plan öğesini aç.", systemImage: "hand.point.right")
+                        .font(.caption).foregroundStyle(.orange)
+                }
+            }
+            Spacer(minLength: PocketSpacing.m)
+            Group {
+                switch fans.availability {
+                case .ready:
+                    Label("Kuruldu", systemImage: "checkmark.circle.fill").font(.callout.weight(.semibold)).foregroundStyle(PocketTheme.disk)
+                case .needsApproval:
+                    Button("Onayla") { fans.openApproval() }.buttonStyle(.pocketPrimary)
+                case .notInstalled:
+                    Button("Kur") { fans.installHelper() }.buttonStyle(.pocketPrimary)
+                case .unavailable:
+                    PocketStatusBadge(text: "Kullanılamıyor", tone: .neutral)
+                }
+            }
+            .frame(minWidth: 112, alignment: .trailing)
+        }
+        .pocketCard(padding: PocketSpacing.m)
+        .onAppear { fans.refreshAvailability() }
+        .onReceive(Timer.publish(every: 1, on: .main, in: .common).autoconnect()) { _ in fans.refreshAvailability() }
     }
 }

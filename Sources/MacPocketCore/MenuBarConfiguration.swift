@@ -4,7 +4,7 @@ import Foundation
 
 /// One monitoring module shown in the menu bar (a status item, or a tab of the grouped popover).
 public enum MenuBarModule: String, CaseIterable, Codable, Sendable, Identifiable {
-    case cpu, gpu, memory, disk, network, power
+    case cpu, gpu, memory, disk, network, power, weather
 
     public var id: String { rawValue }
 
@@ -16,6 +16,7 @@ public enum MenuBarModule: String, CaseIterable, Codable, Sendable, Identifiable
         case .disk: String(localized: "Disk")
         case .network: String(localized: "Ağ")
         case .power: String(localized: "Güç ve Fan")
+        case .weather: String(localized: "Hava durumu")
         }
     }
 
@@ -28,6 +29,7 @@ public enum MenuBarModule: String, CaseIterable, Codable, Sendable, Identifiable
         case .disk: String(localized: "MenuBar.shortLabel.disk", defaultValue: "DİSK")
         case .network: String(localized: "MenuBar.shortLabel.network", defaultValue: "AĞ")
         case .power: String(localized: "MenuBar.shortLabel.power", defaultValue: "GÜÇ")
+        case .weather: String(localized: "MenuBar.shortLabel.weather", defaultValue: "HAVA")
         }
     }
 
@@ -51,6 +53,7 @@ public enum MenuBarModule: String, CaseIterable, Codable, Sendable, Identifiable
         case .disk: "internaldrive"
         case .network: "arrow.up.arrow.down"
         case .power: "bolt.fill"
+        case .weather: "cloud.sun.fill"
         }
     }
 
@@ -63,6 +66,7 @@ public enum MenuBarModule: String, CaseIterable, Codable, Sendable, Identifiable
         case .disk: [.diskFreeBytes, .diskUsedPercent, .diskFreePercent, .diskActivity, .diskReadWrite]
         case .network: [.networkUpDown, .networkCombined, .networkDownload, .networkUpload, .networkPing, .networkWifiSignal]
         case .power: [.powerBattery, .powerTimeRemaining, .powerSource, .powerFanSpeed, .powerFanPercent, .powerThermal, .powerTemperature]
+        case .weather: [.weatherTemperature, .weatherApparent]
         }
     }
 
@@ -75,7 +79,8 @@ public enum MenuBarModule: String, CaseIterable, Codable, Sendable, Identifiable
 
     /// Display styles that make sense for this module; per-core bars exist only for the CPU.
     public var styleOptions: [MenuBarDisplayStyle] {
-        self == .cpu ? MenuBarDisplayStyle.allCases : MenuBarDisplayStyle.allCases.filter { $0 != .cores }
+        if self == .weather { return [.value, .icon] }
+        return self == .cpu ? MenuBarDisplayStyle.allCases : MenuBarDisplayStyle.allCases.filter { $0 != .cores }
     }
 }
 
@@ -88,6 +93,7 @@ public enum MenuBarValue: String, Codable, Sendable, CaseIterable, Identifiable 
     case networkUpDown, networkCombined, networkDownload, networkUpload, networkPing, networkWifiSignal
     case powerBattery, powerTimeRemaining, powerSource
     case powerFanSpeed, powerFanPercent, powerThermal, powerTemperature
+    case weatherTemperature, weatherApparent
 
     public var id: String { rawValue }
 
@@ -133,6 +139,8 @@ public enum MenuBarValue: String, Codable, Sendable, CaseIterable, Identifiable 
         case .powerFanPercent: String(localized: "Fan hızı (%)")
         case .powerThermal: String(localized: "Isı durumu")
         case .powerTemperature: String(localized: "Sıcaklık sensörü (°C)")
+        case .weatherTemperature: String(localized: "Hava sıcaklığı (°C)")
+        case .weatherApparent: String(localized: "Hissedilen sıcaklık (°C)")
         }
     }
 }
@@ -247,7 +255,7 @@ extension MenuBarValue {
         case .powerTemperature: .celsius
         case .networkPing: .milliseconds
         case .networkWifiSignal: .dBm
-        case .diskActivity, .diskReadWrite, .networkUpDown, .networkCombined, .networkDownload, .networkUpload, .powerSource: nil
+        case .diskActivity, .diskReadWrite, .networkUpDown, .networkCombined, .networkDownload, .networkUpload, .powerSource, .weatherTemperature, .weatherApparent: nil
         }
     }
 
@@ -337,6 +345,7 @@ public struct MenuBarModuleSettings: Codable, Equatable, Sendable {
         switch module {
         case .network: Self(showLabel: false, showIcon: false, value: .networkUpDown)
         case .power: Self(showLabel: false, showIcon: true, value: .powerBattery)
+        case .weather: Self(showLabel: false, showIcon: true, value: .weatherTemperature)
         default: Self(value: module.valueOptions[0])
         }
     }
@@ -532,8 +541,8 @@ public struct MenuBarPreferences: Equatable, Sendable {
                 settings.volumePath = defaults.string(forKey: "MacPocket.bar.volume") ?? ""
             case .power:
                 settings.value = battery ? .powerBattery : .powerSource
-            case .network:
-                settings = .defaults(for: .network)
+            case .network, .weather:
+                settings = .defaults(for: module)
             case .cpu, .gpu:
                 break
             }
@@ -628,7 +637,16 @@ public enum MenuBarFormatter {
     }
 
     public static func reading(_ module: MenuBarModule, settings raw: MenuBarModuleSettings,
-                               snapshot: SystemSnapshot?, binaryUnits: Bool = true) -> MenuBarReading {
+                               snapshot: SystemSnapshot?, binaryUnits: Bool = true, weather: WeatherSnapshot? = nil) -> MenuBarReading {
+        if module == .weather {
+            let settings = raw.normalized(for: module)
+            let value = settings.value == .weatherApparent ? weather?.current.apparent : weather?.current.temperature
+            let text = value.map { number($0, fractionDigits: settings.decimals ? 1 : 0) + "°" } ?? "—°"
+            let spoken = weather.map { String(localized: "Hava durumu, \($0.location.name): \(settings.value.title), \(text)") }
+                ?? String(localized: "Hava durumu: bir konum seç")
+            return MenuBarReading(lines: [text], reserve: [settings.decimals ? "−88.8°" : "−88°"], fraction: nil,
+                                  magnitude: value, accessibility: spoken)
+        }
         var reading = baseReading(module, settings: raw, snapshot: snapshot, binaryUnits: binaryUnits)
         let value = raw.normalized(for: module).value
         switch value.thresholdUnit {
@@ -662,6 +680,7 @@ public enum MenuBarFormatter {
                                   accessibility: String(localized: "Ağ: internet bağlantısı yok"))
         }
         switch settings.value {
+        case .weatherTemperature, .weatherApparent: return pending()
         case .gpuUtilization, .gpuRenderer:
             guard let gpu = s.gpu else { return pending() }
             let value = settings.value == .gpuRenderer ? (gpu.rendererPercent ?? gpu.utilizationPercent) : gpu.utilizationPercent

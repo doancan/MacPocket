@@ -104,7 +104,7 @@ final class MenuBarExtrasTests: XCTestCase {
         let decoded = try JSONDecoder().decode(MenuBarModuleSettings.self, from: legacy)
         XCTAssertEqual(decoded.sensorName, "")
         XCTAssertTrue(decoded.showVPN)
-        XCTAssertEqual(MenuBarPreferences.completeOrder([.network, .cpu]).last, .power)
+        XCTAssertEqual(MenuBarPreferences.completeOrder([.network, .cpu]).last, .weather)
         XCTAssertTrue(MenuBarPreferences.completeOrder([.network, .cpu]).contains(.gpu), "Existing orders gain the GPU module")
     }
 

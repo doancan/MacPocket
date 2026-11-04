@@ -4,3 +4,4 @@
 "NSMicrophoneUsageDescription" = "MacPocket records your voice when you choose to add the microphone to a screen recording.";
 "NSLocationUsageDescription" = "MacPocket uses your approximate location to work out sunrise and sunset times for night mode; your location never leaves this Mac.";
 "NSLocationWhenInUseUsageDescription" = "MacPocket uses your approximate location to work out sunrise and sunset times for night mode; your location never leaves this Mac.";
+"NSLocalNetworkUsageDescription" = "MacPocket scans the local network in the Local Network tool to find the devices in your home and show their names; this information is never sent to the internet.";

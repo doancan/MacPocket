@@ -2,18 +2,21 @@ import Foundation
 import MacPocketCore
 import Security
 
-/// Root helper behind Güç Merkezi's fan control. It owns the SMC writes, checks every request itself, and
-/// gives the fans back to macOS when the app stops talking to it or the machine runs hot.
-final class FanHelperService: NSObject, FanHelperXPC, NSXPCListenerDelegate, @unchecked Sendable {
-    private let queue = DispatchQueue(label: "MacPocket.FanHelper")
-    private let controller: FanController
+/// MacPocket's privileged helper, installed once (setup wizard or Güç Merkezi). Owns fan control and LAN MAC discovery: the SMC
+/// writes, its own check of every request, and handing the fans back to macOS when the app stops talking to it or
+/// the machine runs hot. Future privileged features belong here too, each validating its own input.
+final class MacPocketHelperService: NSObject, MacPocketHelperXPC, NSXPCListenerDelegate, @unchecked Sendable {
+    private let queue = DispatchQueue(label: "MacPocket.Helper")
+    private let controller: FanController?
+    private let networkQueue = DispatchQueue(label: "MacPocket.Helper.network")
+    private var networkScan: Task<Void, Never>?
     private let temperatures = HottestTemperatureReader()
     private var thermalGuard = ThermalGuard()
     private var lastHeartbeat = Date()
     private var manual = false
     private var watchdog: DispatchSourceTimer?
 
-    init(controller: FanController) {
+    init(controller: FanController?) {
         self.controller = controller
         super.init()
         let timer = DispatchSource.makeTimerSource(queue: queue)
@@ -27,19 +30,19 @@ final class FanHelperService: NSObject, FanHelperXPC, NSXPCListenerDelegate, @un
 
     private func watchdogTick() {
         guard manual else { return }
-        if Date().timeIntervalSince(lastHeartbeat) > FanHelperConstants.heartbeatTimeout { releaseNow() }
+        if Date().timeIntervalSince(lastHeartbeat) > MacPocketHelperConstants.heartbeatTimeout { releaseNow() }
         else if let hottest = temperatures.celsius(), !thermalGuard.allowsManual(hottestCelsius: hottest) { releaseNow() }
     }
 
     private func releaseNow() {
-        controller.releaseAll()
+        controller?.releaseAll()
         manual = false
     }
 
     // MARK: NSXPCListenerDelegate
 
     func listener(_ listener: NSXPCListener, shouldAcceptNewConnection connection: NSXPCConnection) -> Bool {
-        connection.exportedInterface = NSXPCInterface(with: FanHelperXPC.self)
+        connection.exportedInterface = NSXPCInterface(with: MacPocketHelperXPC.self)
         connection.exportedObject = self
         connection.invalidationHandler = { [weak self] in
             guard let self else { return }
@@ -49,14 +52,15 @@ final class FanHelperService: NSObject, FanHelperXPC, NSXPCListenerDelegate, @un
         return true
     }
 
-    // MARK: FanHelperXPC
+    // MARK: MacPocketHelperXPC
 
     func status(reply: @escaping @Sendable ([[NSNumber]], String?) -> Void) {
         queue.async {
             do {
-                let fans = try (0..<self.controller.fanCount).map { fan -> [NSNumber] in
-                    let range = try self.controller.range(fan: fan)
-                    return [NSNumber(value: try self.controller.actualRPM(fan: fan) ?? 0),
+                guard let controller = self.controller else { throw FanControlError.keyMissing("AppleSMC") }
+                let fans = try (0..<controller.fanCount).map { fan -> [NSNumber] in
+                    let range = try controller.range(fan: fan)
+                    return [NSNumber(value: try controller.actualRPM(fan: fan) ?? 0),
                             NSNumber(value: range.lowerBound), NSNumber(value: range.upperBound)]
                 }
                 reply(fans, nil)
@@ -67,12 +71,13 @@ final class FanHelperService: NSObject, FanHelperXPC, NSXPCListenerDelegate, @un
     func setTarget(fan: Int, rpm: Double, reply: @escaping @Sendable (String?) -> Void) {
         queue.async {
             do {
-                let ranges = try (0..<self.controller.fanCount).map { try self.controller.range(fan: $0) }
+                guard let controller = self.controller else { throw FanControlError.keyMissing("AppleSMC") }
+                let ranges = try (0..<controller.fanCount).map { try controller.range(fan: $0) }
                 try FanRequestValidator(fans: ranges).validate(fan: fan, rpm: rpm)
                 // Without a readable temperature the guard can't protect the machine, so manual speeds are refused.
                 guard let hottest = self.temperatures.celsius() else { throw FanControlError.keyMissing("temperature") }
                 guard self.thermalGuard.allowsManual(hottestCelsius: hottest) else { throw FanControlError.writeRefused("thermal") }
-                try self.controller.setTarget(fan: fan, rpm: rpm)
+                try controller.setTarget(fan: fan, rpm: rpm)
                 self.manual = true
                 self.lastHeartbeat = Date()
                 reply(nil)
@@ -86,6 +91,20 @@ final class FanHelperService: NSObject, FanHelperXPC, NSXPCListenerDelegate, @un
 
     func releaseAll(reply: @escaping @Sendable () -> Void) {
         queue.async { self.releaseNow(); reply() }
+    }
+
+    func scanMACAddresses(cidr: String, interface: String, reply: @escaping @Sendable ([String: String], String?) -> Void) {
+        // Serialize temporary routes without blocking the fan heartbeat or thermal watchdog queue.
+        networkQueue.async {
+            let previous = self.networkScan
+            self.networkScan = Task {
+                await previous?.value
+                do {
+                    let request = try LANHelperScanRequest(cidr: cidr, interface: interface)
+                    reply(try await request.run(), nil)
+                } catch { reply([:], error.localizedDescription) }
+            }
+        }
     }
 }
 
@@ -105,13 +124,10 @@ func clientRequirement() -> String {
     return "anchor apple generic and \(identifier) and certificate leaf[subject.OU] = \"\(team)\""
 }
 
-guard let transport = AppleSMCTransport() else {
-    FileHandle.standardError.write(Data("AppleSMC is not reachable\n".utf8))
-    exit(1)
-}
-let controller = FanController(transport: transport)
-let service = FanHelperService(controller: controller)
-let listener = NSXPCListener(machServiceName: FanHelperConstants.machServiceName)
+// Network discovery remains available even on hardware without an accessible SMC.
+let controller = AppleSMCTransport().map { FanController(transport: $0) }
+let service = MacPocketHelperService(controller: controller)
+let listener = NSXPCListener(machServiceName: MacPocketHelperConstants.machServiceName)
 listener.delegate = service
 listener.setConnectionCodeSigningRequirement(clientRequirement())
 
@@ -119,7 +135,7 @@ nonisolated(unsafe) var signalSources: [DispatchSourceSignal] = []
 for signalNumber in [SIGTERM, SIGINT] {
     signal(signalNumber, SIG_IGN)
     let source = DispatchSource.makeSignalSource(signal: signalNumber, queue: .main)
-    source.setEventHandler { controller.releaseAll(); exit(0) }
+    source.setEventHandler { controller?.releaseAll(); exit(0) }
     source.resume()
     signalSources.append(source)
 }

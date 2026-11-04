@@ -45,7 +45,7 @@ final class FanControlService: ObservableObject {
         }
     }
 
-    private let daemon = SMAppService.daemon(plistName: FanHelperConstants.daemonPlistName)
+    private let daemon = SMAppService.daemon(plistName: MacPocketHelperConstants.daemonPlistName)
     private let temperatures = HottestTemperatureReader()
     private var connection: NSXPCConnection?
     private var curveState = FanCurveState()
@@ -83,14 +83,39 @@ final class FanControlService: ObservableObject {
     }
 
     func installHelper() {
+        if daemon.status == .enabled { refreshAvailability(); return }
         do { try daemon.register() } catch {
+            refreshAvailability()
+            if daemon.status == .requiresApproval {
+                SMAppService.openSystemSettingsLoginItems()
+                return
+            }
             // launchd refuses unsigned or ad-hoc builds; say so instead of offering controls that can't work.
-            availability = .unavailable(String(localized: "Fan yardımcısı kaydedilemedi: \(error.localizedDescription) Bu özellik yalnızca imzalı sürümde çalışır."))
+            availability = .unavailable(String(localized: "Yardımcı servis kaydedilemedi: \(error.localizedDescription) Bu özellik yalnızca imzalı sürümde çalışır."))
             return
         }
         refreshAvailability()
         if availability == .needsApproval { SMAppService.openSystemSettingsLoginItems() }
     }
+
+    /// Installation and authorization belong to the wizard; scans only reuse that service.
+    func prepareNetworkHelper() throws {
+        refreshAvailability()
+        guard daemon.status == .enabled else {
+            throw NSError(domain: "MacPocket.Helper", code: 1, userInfo: [NSLocalizedDescriptionKey:
+                String(localized: "Kurulum sihirbazındaki yardımcı servis şu anda etkin değil. Servis durumunu kurulum ekranından kontrol et.")])
+        }
+    }
+
+    #if DEBUG
+    /// Repairs an installation whose identity was changed during development, without opening another approval UI.
+    func restoreWizardRegistration() async throws {
+        // Remove only the accidentally renamed registration; retain the wizard's original service.
+        try? await SMAppService.daemon(plistName: "com.doancan.MacPocket.Helper.plist").unregister()
+        if daemon.status == .notRegistered || daemon.status == .notFound { try daemon.register() }
+        refreshAvailability()
+    }
+    #endif
 
     func openApproval() { SMAppService.openSystemSettingsLoginItems() }
 
@@ -133,7 +158,7 @@ final class FanControlService: ObservableObject {
         await apply(to: reading, helper: helper)
     }
 
-    private func apply(to fans: [Fan], helper: FanHelperXPC) async {
+    private func apply(to fans: [Fan], helper: MacPocketHelperXPC) async {
         let temperature = temperatures.celsius()
         // Profiles that depend on temperature must never run blind.
         if case .curve = profile, temperature == nil {
@@ -168,25 +193,25 @@ final class FanControlService: ObservableObject {
         }
     }
 
-    private func heartbeat(_ helper: FanHelperXPC) async {
+    private func heartbeat(_ helper: MacPocketHelperXPC) async {
         await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in helper.heartbeat { continuation.resume() } }
     }
 
-    private func release(_ helper: FanHelperXPC) async {
+    private func release(_ helper: MacPocketHelperXPC) async {
         await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in helper.releaseAll { continuation.resume() } }
         lastTargets = [:]
     }
 
-    private func proxy() -> FanHelperXPC? {
+    private func proxy() -> MacPocketHelperXPC? {
         if connection == nil {
-            let connection = NSXPCConnection(machServiceName: FanHelperConstants.machServiceName, options: .privileged)
-            connection.remoteObjectInterface = NSXPCInterface(with: FanHelperXPC.self)
+            let connection = NSXPCConnection(machServiceName: MacPocketHelperConstants.machServiceName, options: .privileged)
+            connection.remoteObjectInterface = NSXPCInterface(with: MacPocketHelperXPC.self)
             connection.invalidationHandler = { [weak self] in Task { @MainActor in self?.connection = nil } }
             connection.resume()
             self.connection = connection
         }
         return connection?.remoteObjectProxyWithErrorHandler { [weak self] error in
             Task { @MainActor in self?.message = error.localizedDescription }
-        } as? FanHelperXPC
+        } as? MacPocketHelperXPC
     }
 }

@@ -8,7 +8,7 @@ let package = Package(
         .library(name: "MacPocketCore", targets: ["MacPocketCore"]),
         .executable(name: "macpocket-probe", targets: ["MacPocketProbe"]),
         .executable(name: "MacPocket", targets: ["MacPocketApp"]),
-        .executable(name: "MacPocketFanHelper", targets: ["MacPocketFanHelper"]),
+        .executable(name: "MacPocketHelper", targets: ["MacPocketHelper"]),
     ],
     dependencies: [
         .package(url: "https://github.com/sparkle-project/Sparkle", from: "2.10.1"),
@@ -17,7 +17,7 @@ let package = Package(
         .target(name: "MacPocketCore"),
         .executableTarget(name: "MacPocketProbe", dependencies: ["MacPocketCore"]),
         .executableTarget(name: "MacPocketApp", dependencies: ["MacPocketCore", .product(name: "Sparkle", package: "Sparkle")]),
-        .executableTarget(name: "MacPocketFanHelper", dependencies: ["MacPocketCore"]),
+        .executableTarget(name: "MacPocketHelper", dependencies: ["MacPocketCore"]),
         .testTarget(name: "MacPocketCoreTests", dependencies: ["MacPocketCore"]),
     ]
 )

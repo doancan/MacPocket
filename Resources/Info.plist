@@ -24,6 +24,8 @@
   <key>SUEnableAutomaticChecks</key><true/>
   <key>SUScheduledCheckInterval</key><integer>86400</integer>
   <key>SUEnableSystemProfiling</key><false/>
+  <key>NSLocalNetworkUsageDescription</key><string>MacPocket, Yerel Ağ aracında evindeki cihazları bulmak ve adlarını göstermek için yerel ağı tarar; bu bilgiler internete gönderilmez.</string>
+  <key>NSBonjourServices</key><array><string>_companion-link._tcp</string><string>_airplay._tcp</string><string>_raop._tcp</string><string>_googlecast._tcp</string><string>_ipp._tcp</string><string>_ipps._tcp</string><string>_printer._tcp</string><string>_pdl-datastream._tcp</string><string>_hap._tcp</string><string>_matter._tcp</string><string>_smb._tcp</string><string>_afpovertcp._tcp</string><string>_ssh._tcp</string><string>_sftp-ssh._tcp</string><string>_rfb._tcp</string><string>_spotify-connect._tcp</string><string>_sonos._tcp</string><string>_apple-mobdev2._tcp</string><string>_device-info._tcp</string><string>_http._tcp</string></array>
   <key>NSAudioCaptureUsageDescription</key><string>MacPocket, ses mikserinde seçtiğin uygulamaların sesini yakalayıp ayarladığın seviyede yeniden çalar; ses kaydedilmez ve bu Mac’ten çıkmaz.</string>
   <key>NSMicrophoneUsageDescription</key><string>MacPocket, ekran kaydına mikrofonu eklemeni seçtiğinde sesini kaydeder.</string>
   <key>NSAppleEventsUsageDescription</key><string>MacPocket, hızlı işlemler için Finder’dan Çöp’ü boşaltmasını ve System Events’ten görünümü değiştirmesini ister.</string>

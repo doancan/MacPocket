@@ -66,6 +66,7 @@ final class MenuBarHistory: ObservableObject {
             return values.map { min(1, $0 / ceiling) }
         }
         switch module {
+        case .weather: return []
         case .cpu:
             return recent.map { sample in
                 switch settings.value {
@@ -158,6 +159,7 @@ enum MenuBarRenderer {
     /// Symbol for a module showing `value`: fans and heat have their own; the battery symbol reflects
     /// charge level and charging.
     static func symbol(for module: MenuBarModule, value: MenuBarValue? = nil, snapshot: SystemSnapshot?) -> String {
+        if module == .weather { return WeatherService.shared.snapshot?.symbol ?? module.symbol }
         if module == .network, snapshot?.connectivity?.online == false { return "wifi.slash" }
         if let symbol = value?.symbol { return symbol }
         guard module == .power, let power = snapshot?.power, power.batteryPresent, let charge = power.chargePercent else {

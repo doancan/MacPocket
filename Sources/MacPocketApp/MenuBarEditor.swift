@@ -94,6 +94,9 @@ struct MenuBarEditor: View {
                     }
                 } else {
                     groupedItem(foreground)
+                    if preferences.enabled.contains(.weather) {
+                        barItem(.weather, image: moduleImage(.weather), foreground: foreground)
+                    }
                 }
             }
             Image(systemName: "switch.2").font(.system(size: 12, weight: .medium)).padding(.horizontal, 7)
@@ -215,7 +218,7 @@ struct MenuBarEditor: View {
 
     private func moduleImage(_ module: MenuBarModule) -> NSImage {
         let settings = preferences.settings(for: module)
-        let reading = MenuBarFormatter.reading(module, settings: settings, snapshot: model.system, binaryUnits: preferences.binaryUnits)
+        let reading = MenuBarFormatter.reading(module, settings: settings, snapshot: model.system, binaryUnits: preferences.binaryUnits, weather: WeatherService.shared.snapshot)
         return MenuBarRenderer.module(module, settings: settings, reading: reading, snapshot: model.system, history: history)
     }
 }

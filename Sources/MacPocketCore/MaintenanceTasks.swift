@@ -276,6 +276,23 @@ public enum AdministratorShell {
 
     private static let queue = DispatchQueue(label: "MacPocket.administrator", qos: .userInitiated)
 
+    /// Some callers (notably network probes) need the system scripting process to present authorization reliably.
+    public static func runInSeparateProcess(_ command: String) async throws -> String {
+        guard !command.contains("\""), !command.contains("\\") else { throw Failure.failed(code: -1, message: command) }
+        let source = "do shell script \"\(command)\" with administrator privileges"
+        let result = try await BoundedProcess.run("/usr/bin/osascript", ["-e", source], timeout: 300)
+        if let failure = processFailure(result) { throw failure }
+        return result.output.hasSuffix("\n") ? String(result.output.dropLast()) : result.output
+    }
+
+    static func processFailure(_ result: BoundedProcess.Result) -> Failure? {
+        guard result.status != 0 else { return nil }
+        let message = result.errorOutput.trimmingCharacters(in: .whitespacesAndNewlines)
+        let code = message.range(of: #"\(-?\d+\)$"#, options: .regularExpression)
+            .flatMap { Int(message[$0].dropFirst().dropLast()) } ?? Int(result.status)
+        return code == -128 ? .cancelled : .failed(code: code, message: message)
+    }
+
     /// `command` must not contain double quotes or backslashes; callers build it from validated fixed words.
     public static func run(_ command: String) async throws -> String {
         guard !command.contains("\""), !command.contains("\\") else { throw Failure.failed(code: -1, message: command) }

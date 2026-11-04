@@ -2,6 +2,15 @@ import XCTest
 @testable import MacPocketCore
 
 final class MaintenanceTasksTests: XCTestCase {
+    func testAdministratorProcessPreservesCancellationAndShellErrorCodes() {
+        XCTAssertNil(AdministratorShell.processFailure(.init(status: 0, output: "ok", errorOutput: "")))
+        XCTAssertEqual(AdministratorShell.processFailure(.init(status: 1, output: "", errorOutput: "execution error: User canceled. (-128)\n")), .cancelled)
+        XCTAssertEqual(AdministratorShell.processFailure(.init(status: 1, output: "", errorOutput: "execution error: route failed (17)\n")),
+                       .failed(code: 17, message: "execution error: route failed (17)"))
+        XCTAssertEqual(AdministratorShell.processFailure(.init(status: 2, output: "", errorOutput: "syntax error")),
+                       .failed(code: 2, message: "syntax error"))
+    }
+
     private struct Call: Equatable { let path: String; let arguments: [String] }
 
     private final class Recorder: @unchecked Sendable {

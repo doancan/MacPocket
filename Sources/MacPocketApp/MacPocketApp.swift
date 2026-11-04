@@ -53,6 +53,73 @@ final class PocketAppDelegate: NSObject, NSApplicationDelegate {
             MainActor.assumeIsolated { PocketDock.apply() }
         }
         if PocketLaunch.showsWindow { NSApp.activate(ignoringOtherApps: true) }
+        #if DEBUG
+        // Exercise the ordinary scan from the signed app, whose identifier the root helper requires.
+        let arguments = CommandLine.arguments
+        if arguments.contains("--open-usb-eject") {
+            PocketApplicationState.shared.model.navigation.open(.usbEject)
+        }
+        if let index = arguments.firstIndex(of: "--snapshot-main-window"), arguments.indices.contains(index + 1) {
+            let destination = URL(fileURLWithPath: arguments[index + 1])
+            Task { @MainActor in
+                try? await Task.sleep(for: .seconds(2))
+                // Render only our own view hierarchy; this does not capture the screen or other applications.
+                guard let window = NSApp.mainWindow ?? NSApp.windows.first(where: { $0.isVisible && $0.canBecomeMain }), let view = window.contentView,
+                      let bitmap = view.bitmapImageRepForCachingDisplay(in: view.bounds) else { return }
+                view.cacheDisplay(in: view.bounds, to: bitmap)
+                try? bitmap.representation(using: .png, properties: [:])?.write(to: destination, options: .atomic)
+            }
+        }
+        if let index = arguments.firstIndex(of: "--diagnose-weather"), arguments.indices.contains(index + 2) {
+            let query = arguments[index + 1]
+            let destination = URL(fileURLWithPath: arguments[index + 2])
+            Task { @MainActor in
+                var report: [String: Any] = [:]
+                do {
+                    let places = try await WeatherLocationSearch.find(query)
+                    report["places"] = places.map { ["name": $0.name, "latitude": $0.latitude,
+                                                    "longitude": $0.longitude, "timeZone": $0.timeZone] as [String: Any] }
+                    if let place = places.first {
+                        let result = try await WeatherClient.fetch(location: place, language: "tr")
+                        report["temperature"] = result.current.temperature
+                        report["hourlyCount"] = result.hourly.count
+                        report["forecastCount"] = result.forecast.count
+                        report["symbol"] = result.symbol
+                        report["timeZone"] = result.timeZone.identifier
+                        let settings = MenuBarModuleSettings.defaults(for: .weather)
+                        report["menuBarText"] = MenuBarFormatter.reading(.weather, settings: settings, snapshot: nil, weather: result).lines
+                    }
+                } catch { report["error"] = error.localizedDescription }
+                report["ui"] = PocketApplicationState.shared.statusItem.showWeatherForDiagnostics()
+                if let data = try? JSONSerialization.data(withJSONObject: report, options: [.prettyPrinted, .sortedKeys]) {
+                    try? data.write(to: destination, options: .atomic)
+                }
+            }
+        }
+        if let index = arguments.firstIndex(of: "--diagnose-lan"), arguments.indices.contains(index + 1) {
+            let destination = URL(fileURLWithPath: arguments[index + 1])
+            Task { @MainActor in
+                if arguments.contains("--restore-wizard-helper") {
+                    try? await FanControlService.shared.restoreWizardRegistration()
+                }
+                PocketApplicationState.shared.model.navigation.open(.localNetwork)
+                let model = LANScannerModel.shared
+                await model.scan()
+                while model.scanning { try? await Task.sleep(for: .milliseconds(100)) }
+                let report: [String: Any] = [
+                    "error": model.error ?? "",
+                    "helper": String(describing: FanControlService.shared.availability),
+                    "networks": model.results.map { result in [
+                        "cidr": result.network.subnet.description,
+                        "devices": result.devices.map { ["ip": $0.ip, "mac": $0.mac ?? "", "source": $0.macSource.rawValue] }
+                    ] as [String: Any] },
+                ]
+                if let data = try? JSONSerialization.data(withJSONObject: report, options: [.prettyPrinted, .sortedKeys]) {
+                    try? data.write(to: destination, options: .atomic)
+                }
+            }
+        }
+        #endif
     }
 
     /// Dock icon click with no window open (for example after "show window at launch" was turned off).

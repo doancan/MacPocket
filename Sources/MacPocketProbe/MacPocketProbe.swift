@@ -9,6 +9,9 @@ struct MacPocketProbe {
         do {
             let arguments = Array(CommandLine.arguments.dropFirst())
             switch arguments.first ?? "help" {
+            case "usb-eject":
+                let disks = try await USBEject.load()
+                try output(disks.map { ["id": $0.id, "name": $0.name, "mounts": $0.mountPaths.joined(separator: ", ")] })
             case "system":
                 let monitor = SystemMonitor()
                 _ = try await monitor.snapshot()
@@ -85,6 +88,35 @@ struct MacPocketProbe {
                 let snapshot = await StartupItems.load()
                 try output(snapshot.items.map { ["label": $0.label, "class": $0.kind.rawValue, "enabled": String($0.isEnabled),
                                                  "app": $0.appName ?? "", "stateKnown": String(snapshot.stateKnown)] })
+            case "lan", "lan-macs":
+                // `lan` scans the primary network; `lan 192.168.2.0/24` scans a routed range.
+                var result: LANScanResult
+                if arguments.count > 1, let subnet = LANSubnet.parse(cidr: arguments[1]) {
+                    let network = LANScanner.customNetwork(subnet, name: arguments[1], attached: await LANScanner.availableNetworks())
+                    result = try await LANScanner.scan(networks: [network])[0]
+                } else {
+                    result = try await LANScanner.scan()
+                }
+                if arguments.first == "lan-macs" {
+                    let interface = result.network.isLocal ? result.network.interface : result.network.viaInterface
+                    let entries = try await LANOnLinkProbe.run(subnet: result.network.subnet, interface: interface,
+                                                               hosts: result.network.subnet.hosts.map(IPv4.text))
+                    result = result.mergingARP(entries)
+                }
+                print("\(result.network.interface) \(result.network.address) \(result.network.subnet.description) gateway \(result.network.gateway ?? "-")")
+                for device in result.devices {
+                    let latency = device.latency.map { String(format: "%.0f ms", $0 * 1000) } ?? "-"
+                    print([device.ip, device.mac ?? "-", device.kind.rawValue, latency, device.displayName ?? "-",
+                           device.model ?? "", device.services.sorted().joined(separator: ","),
+                           device.mac.map { _ in device.macSource.rawValue } ?? ""].joined(separator: " | "))
+                }
+            case "lan-networks":
+                for network in await LANScanner.availableNetworks() {
+                    print([network.interface, network.name, network.kind.rawValue, network.address, network.subnet.description,
+                           network.gateway ?? "-", network.isPrimary ? "primary" : ""].joined(separator: " | "))
+                }
+            case "power-schedule":
+                print(PowerScheduleReader.read())
             case "maintenance":
                 // `maintenance` lists tasks and support; `maintenance run <id>` runs one ready task.
                 let tasks = MaintenanceCatalog.tasks()

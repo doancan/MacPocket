@@ -54,7 +54,7 @@ Apple Silicon ve macOS 27 gerekir. 0.1.3’ten itibaren yeni sürümler uygulama
 | | Grup | Araçlar |
 | :-: | --- | --- |
 | 🖥️ | **Sistem ve ağ** | Görev Yöneticisi · Ağ Trafiği · Wi-Fi Analizi · Ağ Hız Testi · Port Yöneticisi · Hosts Dosyası · USB ve Thunderbolt · Sistem Raporları · Destek Raporu · Gizli Ayarlar · Bakım · Başlangıç Öğeleri · macOS Araçları |
-| 💽 | **Disk ve dosyalar** | Disk Sağlığı · Disk Analizi · büyük/eski dosyalar · aynı içerikli dosyalar (SHA-256) · Benzer Görseller · Uygulama Kalıntıları |
+| 💽 | **Disk ve dosyalar** | Disk Sağlığı · USB Çıkarma Yöneticisi · Disk Analizi · büyük/eski dosyalar · aynı içerikli dosyalar (SHA-256) · Benzer Görseller · Uygulama Kalıntıları |
 | 🪟 | **Ekran** | Ekran Ayarları (gizli HiDPI modları, yenileme hızı, yansıtma) · Ekran Parlaklığı · Ekran Görüntüsü · Ekran Kaydı · Ekrandan Al · Ekran Temizleme |
 | ⚡ | **Üretkenlik** | Ekran Süresi · Pencere Geçişi · Pencere Yerleşimi · Masa Düzenleri · Pano Geçmişi · Metin Kısaltmaları · Makrolar · Hızlı İşlemler · Odak Oturumu · Kapatma Koruması · Uygulama Dondurucu · Mac’i Uyanık Tut |
 | 🎧 | **Ses ve aygıtlar** | Ses Çıkışı · Ses Mikseri · Fare Kaydırma · Bluetooth Pilleri (Logitech HID++ dahil) |
