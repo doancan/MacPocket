@@ -17,6 +17,8 @@ final class ScreenRecorderService: NSObject, ObservableObject {
             registerShortcut()
         }
     }
+    @Published private(set) var transitioning = false
+    @Published private(set) var isSaving = false
     @Published private(set) var startedAt: Date?
     @Published private(set) var lastFile: URL?
     @Published private(set) var message: String?
@@ -46,7 +48,9 @@ final class ScreenRecorderService: NSObject, ObservableObject {
     }
 
     func begin() async {
-        guard !isRecording else { return }
+        guard !isRecording, !transitioning, output == nil else { return }
+        transitioning = true
+        defer { transitioning = false }
         guard CGPreflightScreenCaptureAccess() else {
             CGRequestScreenCaptureAccess()
             message = String(localized: "Kayıt için MacPocket’e Ekran Kaydı izni ver; sonra tekrar dene.")
@@ -85,30 +89,53 @@ final class ScreenRecorderService: NSObject, ObservableObject {
             let recording = SCRecordingOutput(configuration: recordingConfiguration, delegate: self)
             let stream = SCStream(filter: filter, configuration: configuration, delegate: nil)
             try stream.addRecordingOutput(recording)
-            try await stream.startCapture()
             self.stream = stream
             output = recording
             self.file = file
+            try await stream.startCapture()
+            guard output === recording else { return }
             startedAt = Date()
             message = nil
             hud.show(startedAt: startedAt!, stop: { [weak self] in Task { await self?.stop() } })
         } catch {
+            self.stream = nil; output = nil; self.file = nil
             message = String(localized: "Kayıt başlatılamadı: \(error.localizedDescription)")
         }
     }
 
     func stop() async {
-        guard let stream else { return }
+        guard let stream, !transitioning else { return }
+        let finishing = output.map(ObjectIdentifier.init)
+        transitioning = true
+        isSaving = true
         hud.hide()
-        do { try await stream.stopCapture() } catch { message = error.localizedDescription }
-        self.stream = nil
-        output = nil
-        startedAt = nil
-        if let file {
-            lastFile = file
-            PocketToast.show(String(localized: "Kayıt kaydedildi: \(file.lastPathComponent)"), symbol: "record.circle")
+        do {
+            try await stream.stopCapture()
+            if output.map(ObjectIdentifier.init) == finishing { startedAt = nil }
+            // Keep the output and file alive until its delegate confirms that writing finished.
+        } catch {
+            guard output.map(ObjectIdentifier.init) == finishing else { return }
+            message = String(localized: "Kayıt tamamlanamadı: \(error.localizedDescription)")
+            self.stream = nil; output = nil; file = nil; startedAt = nil; transitioning = false; isSaving = false
         }
-        file = nil
+    }
+
+    private func recordingFinished(_ recording: ObjectIdentifier, failure: String?) async {
+        guard output.map(ObjectIdentifier.init) == recording else { return }
+        let activeStream = stream
+        let finishedFile = file
+        stream = nil; output = nil; file = nil; startedAt = nil; transitioning = false; isSaving = false
+        hud.hide()
+        if let failure {
+            message = String(localized: "Kayıt tamamlanamadı: \(failure)")
+        } else if let finishedFile, FileManager.default.fileExists(atPath: finishedFile.path) {
+            message = nil
+            lastFile = finishedFile
+            PocketToast.show(String(localized: "Kayıt kaydedildi: \(finishedFile.lastPathComponent)"), symbol: "record.circle")
+        } else {
+            message = String(localized: "Kayıt dosyası bulunamadı. Kayıt klasörünü kontrol et.")
+        }
+        try? await activeStream?.stopCapture()
     }
 
     func chooseFolder() {
@@ -124,10 +151,13 @@ final class ScreenRecorderService: NSObject, ObservableObject {
 extension ScreenRecorderService: SCRecordingOutputDelegate {
     nonisolated func recordingOutput(_ recordingOutput: SCRecordingOutput, didFailWithError error: any Error) {
         let text = error.localizedDescription
-        Task { @MainActor in
-            self.message = String(localized: "Kayıt durdu: \(text)")
-            await self.stop()
-        }
+        let identity = ObjectIdentifier(recordingOutput)
+        Task { @MainActor in await self.recordingFinished(identity, failure: text) }
+    }
+
+    nonisolated func recordingOutputDidFinishRecording(_ recordingOutput: SCRecordingOutput) {
+        let identity = ObjectIdentifier(recordingOutput)
+        Task { @MainActor in await self.recordingFinished(identity, failure: nil) }
     }
 }
 
@@ -187,68 +217,86 @@ private struct RecordingHUDSurface: ViewModifier {
 /// Tools → Ekran Kaydı.
 struct ScreenRecorderView: View {
     @ObservedObject private var service = ScreenRecorderService.shared
+    @State private var captureAllowed = CGPreflightScreenCaptureAccess()
 
     var body: some View {
-        VStack(alignment: .leading, spacing: PocketSpacing.l) {
-            PocketPageHeading(title: "Ekran Kaydı",
-                              subtitle: "İmlecin bulunduğu ekranı sistem sesi ve istersen mikrofonla birlikte kaydet; ⇧⌘5’in kaydedemediği sesi de alır.",
-                              icon: "record.circle") {
-                Button { Task { await service.toggle() } } label: {
-                    Label(service.isRecording ? "Durdur" : "Kaydı başlat", systemImage: service.isRecording ? "stop.fill" : "record.circle")
+        ScrollView {
+            VStack(alignment: .leading, spacing: PocketSpacing.l) {
+                PocketPageHeading(title: "Ekran Kaydı",
+                                  subtitle: "İmlecin bulunduğu ekranı sistem sesi ve istersen mikrofonla birlikte kaydet; ⇧⌘5’in kaydedemediği sesi de alır.",
+                                  icon: "record.circle") {
+                    Button { Task { await service.toggle() } } label: {
+                        Label(service.isRecording ? "Durdur" : "Kaydı başlat", systemImage: service.isRecording ? "stop.fill" : "record.circle")
+                    }
+                    .buttonStyle(.pocketPrimary)
+                    .controlSize(.large)
+                    .disabled(service.transitioning)
                 }
-                .buttonStyle(.pocketPrimary)
-                .controlSize(.large)
-            }
-            if let message = service.message { PocketMessage(message, tone: .warning) }
-            if let start = service.startedAt {
-                HStack(spacing: PocketSpacing.m) {
-                    Circle().fill(.red).frame(width: 10, height: 10)
-                    Text("Kaydediliyor").font(.headline)
-                    Text(timerInterval: start...Date.distantFuture, countsDown: false).monospacedDigit()
+                if !captureAllowed {
+                    VStack(alignment: .leading, spacing: PocketSpacing.s) {
+                        PocketMessage("Kayıt için Ekran Kaydı izni gerekli. İzin verdikten sonra MacPocket’e dön.", tone: .warning)
+                        Button("Ekran Kaydı İznini Aç…") {
+                            NSWorkspace.shared.open(URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_ScreenCapture")!)
+                        }
+                    }
                 }
+                if let message = service.message { PocketMessage(message, tone: .warning) }
+                if service.transitioning {
+                    PocketProgressRow(message: service.isSaving ? "Kayıt dosyası tamamlanıyor…" : "Kayıt hazırlanıyor…")
+                }
+                if let start = service.startedAt {
+                    HStack(spacing: PocketSpacing.m) {
+                        Circle().fill(.red).frame(width: 10, height: 10)
+                        Text("Kaydediliyor").font(.headline)
+                        Text(timerInterval: start...Date.distantFuture, countsDown: false).monospacedDigit()
+                    }
+                    .pocketCard()
+                }
+                VStack(alignment: .leading, spacing: PocketSpacing.m) {
+                    PocketSectionHeader("Ayarlar", icon: "slider.horizontal.3")
+                    Toggle("Sistem sesini kaydet", isOn: $service.settings.systemAudio)
+                    Toggle("Mikrofonu kaydet", isOn: $service.settings.microphone)
+                    Toggle("İmleci göster", isOn: $service.settings.showCursor)
+                    HStack(spacing: PocketSpacing.xl) {
+                        Picker("Kare hızı", selection: $service.settings.framesPerSecond) {
+                            ForEach(ScreenRecordingSettings.frameRateChoices, id: \.self) { Text("\($0) kare/sn").tag($0) }
+                        }
+                        .fixedSize()
+                        Picker("Biçim", selection: $service.settings.codec) {
+                            Text("HEVC (küçük dosya)").tag(ScreenRecordingSettings.Codec.hevc)
+                            Text("H.264 (her yerde açılır)").tag(ScreenRecordingSettings.Codec.h264)
+                        }
+                        .fixedSize()
+                    }
+                    LabeledContent("Kayıt klasörü") {
+                        HStack {
+                            Text(service.folder.path.replacingOccurrences(of: NSHomeDirectory(), with: "~")).foregroundStyle(.secondary).lineLimit(1)
+                            Button("Değiştir…") { service.chooseFolder() }
+                        }
+                    }
+                    LabeledContent("Başlat / durdur") {
+                        KeyComboRecorder(combo: $service.settings.shortcut, allowsClearing: true, recording: { service.recordingShortcut = $0 })
+                    }
+                }
+                .disabled(service.isRecording || service.transitioning)
+                .frame(maxWidth: .infinity, alignment: .leading)
                 .pocketCard()
-            }
-            VStack(alignment: .leading, spacing: PocketSpacing.m) {
-                PocketSectionHeader("Ayarlar", icon: "slider.horizontal.3")
-                Toggle("Sistem sesini kaydet", isOn: $service.settings.systemAudio)
-                Toggle("Mikrofonu kaydet", isOn: $service.settings.microphone)
-                Toggle("İmleci göster", isOn: $service.settings.showCursor)
-                HStack(spacing: PocketSpacing.xl) {
-                    Picker("Kare hızı", selection: $service.settings.framesPerSecond) {
-                        ForEach(ScreenRecordingSettings.frameRateChoices, id: \.self) { Text("\($0) kare/sn").tag($0) }
-                    }
-                    .fixedSize()
-                    Picker("Biçim", selection: $service.settings.codec) {
-                        Text("HEVC (küçük dosya)").tag(ScreenRecordingSettings.Codec.hevc)
-                        Text("H.264 (her yerde açılır)").tag(ScreenRecordingSettings.Codec.h264)
-                    }
-                    .fixedSize()
-                }
-                LabeledContent("Kayıt klasörü") {
+                if let file = service.lastFile {
                     HStack {
-                        Text(service.folder.path.replacingOccurrences(of: NSHomeDirectory(), with: "~")).foregroundStyle(.secondary).lineLimit(1)
-                        Button("Değiştir…") { service.chooseFolder() }
+                        Image(systemName: "film")
+                        Text(file.lastPathComponent).lineLimit(1)
+                        Spacer()
+                        Button("Finder’da göster") { NSWorkspace.shared.activateFileViewerSelecting([file]) }
+                        Button("Aç") { NSWorkspace.shared.open(file) }
                     }
+                    .pocketCard()
                 }
-                LabeledContent("Başlat / durdur") {
-                    KeyComboRecorder(combo: $service.settings.shortcut, allowsClearing: true, recording: { service.recordingShortcut = $0 })
-                }
+                Spacer(minLength: 0)
             }
-            .disabled(service.isRecording)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .pocketCard()
-            if let file = service.lastFile {
-                HStack {
-                    Image(systemName: "film")
-                    Text(file.lastPathComponent).lineLimit(1)
-                    Spacer()
-                    Button("Finder’da göster") { NSWorkspace.shared.activateFileViewerSelecting([file]) }
-                    Button("Aç") { NSWorkspace.shared.open(file) }
-                }
-                .pocketCard()
-            }
-            Spacer(minLength: 0)
         }
         .pocketPage()
+        .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
+            captureAllowed = CGPreflightScreenCaptureAccess()
+        }
     }
 }

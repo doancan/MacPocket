@@ -105,9 +105,8 @@ struct TaskManagerView: View {
 
     private var controls: some View {
         HStack(spacing: PocketSpacing.m) {
-            PocketSearchField("Ad, PID veya kullanıcı ara…", text: $search)
+            PocketSearchField("Ad, PID veya kullanıcı ara…", text: $search, focus: $searchFocused)
                 .frame(maxWidth: 260)
-                .focused($searchFocused)
                 .accessibilityLabel("Süreç ara")
             GlassTabBar(tabs: ProcessScope.allCases.map { GlassTab(id: $0, title: $0.localizedTitle) }, selection: $scope)
             .accessibilityLabel("Kapsam")

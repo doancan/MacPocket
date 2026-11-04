@@ -107,6 +107,15 @@ struct USBEjectView: View {
                     if model.ejecting { ProgressView("Diskler çıkarılıyor…").controlSize(.small) }
                     if !model.loaded {
                         ProgressView("Harici diskler okunuyor…").frame(maxWidth: .infinity, minHeight: 180)
+                    } else if model.drives.isEmpty, model.error != nil {
+                        ContentUnavailableView {
+                            Label("Disk listesi alınamadı", systemImage: "externaldrive.badge.exclamationmark")
+                        } description: {
+                            Text("Bağlantıyı kontrol edip disk listesini yeniden yükle.")
+                        } actions: {
+                            Button("Yeniden Dene") { Task { await model.refresh() } }.disabled(model.refreshing)
+                        }
+                        .frame(maxWidth: .infinity, minHeight: 220).pocketCard()
                     } else if model.drives.isEmpty {
                         ContentUnavailableView("Harici disk bağlı değil", systemImage: "externaldrive",
                                                description: Text("USB bellek veya harici SSD bağladığında burada görünür."))

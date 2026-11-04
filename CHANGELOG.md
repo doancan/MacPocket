@@ -2,6 +2,11 @@
 
 ## Yayımlanmamış
 
+- **Case Converter:** 14 metin/kod biçimi; Türkçe/İngilizce İ/ı kuralları, 300 ms beklemeli canlı önizleme, satır satır toplu dönüşüm, kısaltma/sayı ayrıştırma ve Latin harflerini sadeleştirme. Tüm biçimleri karşılaştırma, tek tek/toplu kopyalama, seçilen sonucu girdi yapma ve metin istatistikleri. İşlem yereldir; 64 KiB girdi sınırı ve iptal/eski sonuç koruması bulunur.
+- **Pratik Araçlar:** Sol menüde ayrı bir çevrimdışı çalışma alanı. JSON düzenleme/küçültme, standart/URL uyumlu Base64, URL parametre kodlama, JWT içerik ve zaman inceleme, SHA-256/SHA-512, toplu UUID v4, güvenli parola/token, Unix saniye/milisaniye dönüşümü, satır farkı ve metin/Wi-Fi QR üretimi. Arama, kalıcı favoriler, örnekler, geçici araç taslakları, hata/ilerleme, kopyalama ve metin/PNG dışa aktarma bulunur. Girdi/sonuçlar otomatik diske yazılmaz; geçici pano çıktısı geçmişe arşivlenmez. JSON büyük sayıları ve anahtar sırasını korur; JWT imza doğrulaması yapılmaz.
+
+- **Araç arayüzleri:** 57 katalog girişinin ekran/yönlendirme envanteri çıkarıldı. Dar pencerede başlık eylemleri alt satıra geçer; kısa ayar ekranları kaydırılabilir. USB/Thunderbolt, disk sağlığı, Bluetooth, ağ trafiği ve başlangıç öğelerinde yüklenme/yenileme/boş/hata durumları ayrıldı. Arama odağı ve ağ haritasının klavye erişimi düzeltildi. Ses çıkışı hataları görünür; ekran kaydında hazırlama/kaydetme aşamaları gösterilir ve başarı dosya tamamlanınca bildirilir. Araç bazındaki doğrulama kapsamı `.design/tool-ui-report.md` içindedir.
+
 - **Araç performansı:** Ağ trafiği gruplarının toplamları tek geçişte hesaplanır; sıfırlama artık ek `nettop` başlatmaz ve bekleyen eski sonuçlar yeni oturuma karışmaz. Harici disk yokken USB çıkarma listesi üç yerine tek `diskutil` sorgusu yapar. Hava durumu, dakikalık kontrol döngüsü yerine doğrudan saatlik yenileme zamanını bekler; konum seçilmediyse zamanlayıcı başlatmaz.
 
 - **Menü çubuğunda hava durumu:** Sıcaklık ve koşul simgesi, hissedilen sıcaklık seçeneği, saatlik ve beş günlük tahmin paneli eklendi. Kullanıcı şehir/ilçe arayıp konumunu seçebilir; seçim uygulama yeniden açıldığında korunur. Konum değişikliği panelden veya Menü Çubuğu ayarlarından yapılabilir. Saatlik otomatik yenileme ve bağlantı hatasında son başarılı veriyi koruma bulunur.

@@ -5,10 +5,16 @@ import SwiftUI
 final class DiskHealthModel: ObservableObject {
     @Published private(set) var readings: [DiskHealthReading] = []
     @Published private(set) var loaded = false
+    @Published private(set) var refreshing = false
     @Published private(set) var updatedAt: Date?
 
     func refresh() async {
-        readings = await Task.detached(priority: .utility) { DiskHealthReader.read() }.value
+        guard !refreshing, !Task.isCancelled else { return }
+        refreshing = true
+        defer { refreshing = false }
+        let latest = await Task.detached(priority: .utility) { DiskHealthReader.read() }.value
+        guard !Task.isCancelled else { return }
+        readings = latest
         updatedAt = Date()
         loaded = true
     }
@@ -17,7 +23,7 @@ final class DiskHealthModel: ObservableObject {
     func run() async {
         while !Task.isCancelled {
             await refresh()
-            try? await Task.sleep(for: .seconds(10))
+            do { try await Task.sleep(for: .seconds(10)) } catch { return }
         }
     }
 }
@@ -31,16 +37,22 @@ struct DiskHealthView: View {
                               subtitle: "SSD’nin kendi bildirdiği yıpranma, yazılan veri, sıcaklık ve hata sayaçları (NVMe SMART).",
                               icon: "internaldrive.fill") {
                 Button { Task { await model.refresh() } } label: { Label("Yenile", systemImage: "arrow.clockwise") }
+                    .disabled(model.refreshing)
             }
             ScrollView {
                 VStack(alignment: .leading, spacing: PocketSpacing.l) {
-                    if model.readings.isEmpty {
-                        ContentUnavailableView(model.loaded ? "SMART verisi okunamadı" : "Okunuyor…", systemImage: "internaldrive",
-                                               description: Text(model.loaded ? "Bu Mac’teki diskler NVMe SMART bilgisi yayınlamıyor." : ""))
+                    if model.refreshing { PocketProgressRow(message: "Disk sağlığı okunuyor…") }
+                    if model.readings.isEmpty, model.loaded {
+                        ContentUnavailableView("SMART verisi okunamadı", systemImage: "internaldrive",
+                                               description: Text("Bu Mac’teki diskler NVMe SMART bilgisi yayınlamıyor."))
                             .frame(maxWidth: .infinity, minHeight: 220)
                             .pocketCard()
                     } else {
                         ForEach(model.readings) { DiskHealthCard(reading: $0) }
+                    }
+                    if let updatedAt = model.updatedAt {
+                        Text("Son okuma: \(updatedAt.formatted(date: .omitted, time: .shortened))")
+                            .font(.caption).foregroundStyle(.secondary)
                     }
                     Text("Değerler diskin kendi ölçümleridir ve 10 saniyede bir okunur. Harici USB kutuları SMART verisini genellikle iletmez; bu yüzden yalnız dahili ve doğrudan bağlı NVMe diskler listelenir.")
                         .font(.subheadline).foregroundStyle(.secondary)

@@ -37,6 +37,7 @@ struct PocketRootView: View {
                         sidebarRow(.applications)
                         sidebarRow(.tools)
                     }
+                    Section("Üretkenlik") { sidebarRow(.practical) }
                 }
                 .listStyle(.sidebar)
                 .safeAreaInset(edge: .top, spacing: 0) { PocketSidebarBrand() }
@@ -69,11 +70,13 @@ struct PocketRootView: View {
                                     .help("Araçlara dön (⌘[)")
                             }
                         }
-                        ToolbarItem(id: "refresh", placement: .primaryAction) { PocketRefreshButton(model: model) }
-                        ToolbarItem(id: "pause", placement: .primaryAction) { PocketPauseButton(model: model) }
-                        ToolbarItem(id: "interval", placement: .primaryAction) { PocketIntervalMenu(model: model) }
-                        // Monitoring controls share one glass group; Settings sits in its own.
-                        ToolbarSpacer(.fixed, placement: .primaryAction)
+                        if navigation.page != .practical {
+                            ToolbarItem(id: "refresh", placement: .primaryAction) { PocketRefreshButton(model: model) }
+                            ToolbarItem(id: "pause", placement: .primaryAction) { PocketPauseButton(model: model) }
+                            ToolbarItem(id: "interval", placement: .primaryAction) { PocketIntervalMenu(model: model) }
+                            // Monitoring controls share one glass group; Settings sits in its own.
+                            ToolbarSpacer(.fixed, placement: .primaryAction)
+                        }
                         ToolbarItem(id: "settings", placement: .primaryAction) {
                             SettingsLink { Label("Ayarlar", systemImage: "gearshape") }.help("Ayarlar (⌘,)")
                         }
@@ -126,6 +129,12 @@ struct PocketRootView: View {
         case .cleanup: CleanupView(model: model.cleanup.junk)
         case .storage: StorageView(model: model.storage)
         case .applications: ApplicationsView(model: model.applications)
+        case .practical:
+            #if DEBUG
+            PracticalToolsView(workspace: ToolUIAudit.practicalWorkspace ?? .shared)
+            #else
+            PracticalToolsView()
+            #endif
         case .tools:
             switch navigation.tool {
             case .similarImages: SimilarImagesView()
@@ -177,6 +186,7 @@ struct PocketRootView: View {
     private func openCatalogTool(_ id: String) {
         let home = FileManager.default.homeDirectoryForCurrentUser
         switch id {
+        case "practical-tools": navigation.select(.practical)
         case "similar-images": navigation.open(.similarImages)
         case "screen-cleaning": navigation.open(.screenCleaning)
         case "app-leftovers": navigation.open(.leftovers)

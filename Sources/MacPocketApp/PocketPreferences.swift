@@ -151,6 +151,7 @@ extension PocketPage {
         case .storage: String(localized: "Disk Analizi")
         case .applications: String(localized: "Uygulamalar")
         case .tools: String(localized: "Araçlar")
+        case .practical: String(localized: "Pratik Araçlar")
         }
     }
 

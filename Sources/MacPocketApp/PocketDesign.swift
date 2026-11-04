@@ -102,17 +102,36 @@ struct PocketPageHeading<Accessory: View>: View {
         self.title = title; self.subtitle = subtitle; self.icon = icon; self.accessory = accessory
     }
 
+    @State private var availableWidth: CGFloat = 1_000
+
     var body: some View {
+        Group {
+            if availableWidth < 760 {
+                VStack(alignment: .leading, spacing: PocketSpacing.m) {
+                    heading
+                    accessory()
+                }
+            } else {
+                HStack(alignment: .center, spacing: PocketSpacing.l) {
+                    heading
+                    Spacer(minLength: PocketSpacing.m)
+                    accessory().fixedSize(horizontal: true, vertical: false)
+                }
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { availableWidth = $0 }
+    }
+
+    private var heading: some View {
         HStack(alignment: .center, spacing: PocketSpacing.l) {
-            PocketIconTile(symbol: icon, tint: tint, size: 48)
+            PocketIconTile(symbol: icon, tint: tint, size: 48).accessibilityHidden(true)
             VStack(alignment: .leading, spacing: PocketSpacing.xxs) {
                 Text(title).font(.system(.title, design: .default, weight: .bold))
                     .accessibilityAddTraits(.isHeader)
                 Text(subtitle).font(.callout).foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
             }
-            Spacer(minLength: PocketSpacing.m)
-            accessory()
         }
     }
 }
@@ -592,7 +611,7 @@ struct PocketSearchField: View {
                 .accessibilityHidden(true)
             field
             if !text.isEmpty {
-                Button { text = "" } label: {
+                Button { text = ""; if let focus { focus.wrappedValue = true } else { ownFocus = true } } label: {
                     Image(systemName: "xmark.circle.fill").font(.system(size: 12))
                 }
                 .buttonStyle(.plain)
@@ -611,6 +630,7 @@ struct PocketSearchField: View {
         let textField = TextField(prompt, text: $text)
             .textFieldStyle(.plain)
             .font(.body)
+            .accessibilityLabel(Text(prompt))
             .onExitCommand { text = "" }
         if let focus { textField.focused(focus) } else { textField.focused($ownFocus) }
     }

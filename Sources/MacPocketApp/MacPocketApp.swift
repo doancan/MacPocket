@@ -56,6 +56,19 @@ final class PocketAppDelegate: NSObject, NSApplicationDelegate {
         #if DEBUG
         // Exercise the ordinary scan from the signed app, whose identifier the root helper requires.
         let arguments = CommandLine.arguments
+        if arguments.contains("--open-practical") { PocketApplicationState.shared.model.navigation.select(.practical) }
+        if arguments.contains("--open-case-converter") {
+            PracticalWorkspace.shared.selected = .caseConverter
+            PocketApplicationState.shared.model.navigation.select(.practical)
+        }
+        if let index = arguments.firstIndex(of: "--audit-practical"), arguments.indices.contains(index + 1) {
+            let destination = URL(fileURLWithPath: arguments[index + 1])
+            Task { @MainActor in await ToolUIAudit.runPractical(destination: destination) }
+        }
+        if let index = arguments.firstIndex(of: "--audit-tools"), arguments.indices.contains(index + 1) {
+            let destination = URL(fileURLWithPath: arguments[index + 1])
+            Task { @MainActor in await ToolUIAudit.run(destination: destination) }
+        }
         if arguments.contains("--open-usb-eject") {
             PocketApplicationState.shared.model.navigation.open(.usbEject)
         }

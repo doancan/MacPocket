@@ -6,6 +6,8 @@ final class PeripheralsModel: ObservableObject {
     @Published private(set) var devices: [USBDevice] = []
     @Published private(set) var ports: [ThunderboltPort] = []
     @Published private(set) var loaded = false
+    @Published private(set) var refreshing = false
+    @Published private(set) var thunderboltLoaded = false
     @Published private(set) var error: String?
     @Published var showHubs = false {
         didSet { UserDefaults.standard.set(showHubs, forKey: Self.showHubsKey) }
@@ -22,24 +24,34 @@ final class PeripheralsModel: ObservableObject {
         while !Task.isCancelled {
             let devices = await Task.detached(priority: .utility) { USBDeviceReader.read() }.value
             let ids = Set(devices.map(\.id))
+            guard !Task.isCancelled else { return }
             self.devices = devices
+            loaded = true
             // System Information is slow; ask it again only when the USB tree changed (a dock brings both).
             if ids != lastIDs {
                 lastIDs = ids
                 await refreshThunderbolt()
             }
             loaded = true
-            try? await Task.sleep(for: Self.interval)
+            do { try await Task.sleep(for: Self.interval) } catch { return }
         }
     }
 
     func refreshThunderbolt() async {
+        guard !refreshing else { return }
+        refreshing = true
+        defer { refreshing = false; thunderboltLoaded = true }
         do {
             let result = try await BoundedProcess.run(ThunderboltReport.executable, ThunderboltReport.arguments, timeout: 20)
+            try Task.checkCancellation()
+            guard result.status == 0 else {
+                throw NSError(domain: "MacPocket.Thunderbolt", code: Int(result.status),
+                              userInfo: [NSLocalizedDescriptionKey: String(localized: "Thunderbolt bilgileri okunamadı. Yeniden dene.")])
+            }
             ports = ThunderboltReport.parse(Data(result.output.utf8))
             error = nil
         } catch {
-            self.error = error.localizedDescription
+            if !Task.isCancelled { self.error = error.localizedDescription }
         }
     }
 
@@ -58,6 +70,7 @@ struct PeripheralsView: View {
                               subtitle: "Takılı aygıtları, bağlantı hızlarını ve çektikleri gücü gör; yavaş kablo veya portu fark et.",
                               icon: "cable.connector") {
                 Button { Task { await model.refreshThunderbolt() } } label: { Label("Yenile", systemImage: "arrow.clockwise") }
+                    .disabled(model.refreshing)
             }
             ScrollView {
                 VStack(alignment: .leading, spacing: PocketSpacing.l) {
@@ -79,8 +92,11 @@ struct PeripheralsView: View {
     private var thunderbolt: some View {
         VStack(alignment: .leading, spacing: PocketSpacing.m) {
             PocketSectionHeader("Thunderbolt / USB4 portları", icon: "bolt.horizontal")
-            if model.ports.isEmpty {
-                Text(model.loaded ? "Bu Mac Thunderbolt portu bildirmedi." : "Okunuyor…")
+            if model.refreshing {
+                PocketProgressRow(message: "Thunderbolt portları okunuyor…")
+            }
+            if model.ports.isEmpty, model.thunderboltLoaded, !model.refreshing {
+                Text(model.error == nil ? "Bu Mac Thunderbolt portu bildirmedi." : "Port bilgisi alınamadı; Yenile ile tekrar dene.")
                     .foregroundStyle(.secondary)
             } else {
                 LazyVGrid(columns: [GridItem(.adaptive(minimum: 220), spacing: PocketSpacing.m)], spacing: PocketSpacing.m) {
@@ -98,8 +114,10 @@ struct PeripheralsView: View {
                 }
             }
             let rows = model.visibleRows
-            if rows.isEmpty {
-                ContentUnavailableView(model.loaded ? "USB aygıtı yok" : "Okunuyor…", systemImage: "cable.connector.slash")
+            if !model.loaded {
+                PocketProgressRow(message: "USB aygıtları okunuyor…")
+            } else if rows.isEmpty {
+                ContentUnavailableView("USB aygıtı yok", systemImage: "cable.connector.slash")
                     .frame(maxWidth: .infinity, minHeight: 160)
                     .pocketCard()
             } else {

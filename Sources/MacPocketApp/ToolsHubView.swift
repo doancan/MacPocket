@@ -48,17 +48,25 @@ struct ToolsHubView: View {
         }
         .onReceive(NotificationCenter.default.publisher(for: .pocketFind)) { _ in searchFocused = true }
         .sheet(isPresented: $showAwake) { HubAwakeSheet(model: model) }
+        #if DEBUG
+        .onReceive(NotificationCenter.default.publisher(for: Notification.Name("MacPocket.debug.showAwake"))) { note in
+            showAwake = note.object as? Bool ?? false
+        }
+        #endif
     }
+
+    #if DEBUG
+    static var diagnosticCatalogIDs: [String] { HubTool.catalog.map(\.id) }
+    #endif
 
     // MARK: - Sections
 
     private var filters: some View {
         VStack(alignment: .leading, spacing: PocketSpacing.m) {
             HStack(spacing: PocketSpacing.m) {
-                PocketSearchField("Araç ara…", text: $search)
+                PocketSearchField("Araç ara…", text: $search, focus: $searchFocused)
                     .frame(maxWidth: 320)
-                    .focused($searchFocused)
-                    .accessibilityLabel("Araç ara")
+                        .accessibilityLabel("Araç ara")
                 Spacer(minLength: 0)
                 Toggle(isOn: $favoritesOnly) {
                     Label("Favoriler", systemImage: favoritesOnly ? "star.fill" : "star")
@@ -493,6 +501,7 @@ private struct HubTool: Identifiable {
     let category: HubCategory
 
     static let catalog: [HubTool] = [
+        .init(id: "practical-tools", title: String(localized: "Pratik Araçlar"), description: String(localized: "Case Converter, JSON, Base64, URL, JWT, hash, UUID, parola, tarih, metin karşılaştırma ve QR: çevrimdışı çalışma alanı."), icon: "square.grid.3x3", category: .productivity),
         .init(id: "mac-utilities", title: String(localized: "macOS Araçları"), description: String(localized: "Sistem raporları ve macOS ayarlarına hızlı erişim."), icon: "hammer", category: .system),
         .init(id: "maintenance", title: String(localized: "Bakım"), description: String(localized: "Önbellekleri sıfırla, başlangıç diskini doğrula, DNS’i temizle; yönetici gerektirenler tek parolayla çalışır."), icon: "wrench.and.screwdriver", category: .system),
         .init(id: "startup-items", title: String(localized: "Başlangıç Öğeleri"), description: String(localized: "Oturum açılışında ve Mac başlarken kendiliğinden çalışan öğeleri, sahipleriyle ve durumlarıyla gör."), icon: "power", category: .system),

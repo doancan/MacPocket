@@ -125,9 +125,8 @@ struct SystemToolsView: View {
                 HStack(spacing: PocketSpacing.s) {
                     Toggle("Ham çıktı", isOn: $showRawOutput).toggleStyle(.checkbox)
                     if showRawOutput {
-                        PocketSearchField("Çıktıda ara…", text: $outputSearch)
+                        PocketSearchField("Çıktıda ara…", text: $outputSearch, focus: $searchFocused)
                             .frame(maxWidth: 280)
-                            .focused($searchFocused)
                             .accessibilityLabel("Rapor çıktısında ara")
                     }
                     Spacer()

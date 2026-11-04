@@ -21,6 +21,7 @@ struct StartupItemsView: View {
     @StateObject private var model = StartupItemsModel()
     @State private var search = ""
     @State private var showsReadOnly = false
+    @FocusState private var searchFocused: Bool
 
     var body: some View {
         VStack(alignment: .leading, spacing: PocketSpacing.l) {
@@ -35,6 +36,7 @@ struct StartupItemsView: View {
                         .disabled(model.loading)
                 }
             }
+            if model.loading, model.snapshot != nil { PocketProgressRow(message: "Başlangıç öğeleri yenileniyor…") }
             if let snapshot = model.snapshot {
                 if !snapshot.stateKnown {
                     PocketMessage("Açık/kapalı durumu macOS’tan okunamadı; yalnız dosyaların kendi bilgisi gösteriliyor.", tone: .warning)
@@ -46,6 +48,7 @@ struct StartupItemsView: View {
         }
         .pocketPage()
         .task { await model.load() }
+        .onReceive(NotificationCenter.default.publisher(for: .pocketFind)) { _ in searchFocused = true }
     }
 
     private func content(_ all: [StartupItem]) -> some View {
@@ -54,7 +57,7 @@ struct StartupItemsView: View {
             $0.label.localizedCaseInsensitiveContains(query) || ($0.appName ?? "").localizedCaseInsensitiveContains(query)
         }
         return VStack(alignment: .leading, spacing: PocketSpacing.m) {
-            PocketSearchField("Ara", text: $search).frame(maxWidth: 320)
+            PocketSearchField("Başlangıç öğesi ara", text: $search, focus: $searchFocused).frame(maxWidth: 320)
             ScrollView {
                 VStack(alignment: .leading, spacing: PocketSpacing.l) {
                     ForEach(StartupClass.allCases) { kind in

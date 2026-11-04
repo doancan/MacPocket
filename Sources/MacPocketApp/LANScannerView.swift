@@ -376,16 +376,22 @@ struct LANScannerView: View {
                 ForEach(model.networks) { network in
                     let on = model.isSelected(network)
                     HStack(spacing: 6) {
-                        Image(systemName: on ? "checkmark.circle.fill" : "circle").foregroundStyle(on ? Color.accentColor : .secondary)
-                        Image(systemName: network.symbol)
-                        VStack(alignment: .leading, spacing: 0) {
-                            Text(networkTitle(network)).font(.callout.weight(.medium))
-                            Text(verbatim: network.subnet.description + (network.interface.isEmpty ? "" : " · \(network.interface)"))
-                                .font(.caption2).foregroundStyle(.secondary).monospacedDigit()
+                        Button { model.toggle(network) } label: {
+                            HStack(spacing: 6) {
+                                Image(systemName: on ? "checkmark.circle.fill" : "circle").foregroundStyle(on ? Color.accentColor : .secondary)
+                                Image(systemName: network.symbol)
+                                VStack(alignment: .leading, spacing: 0) {
+                                    Text(networkTitle(network)).font(.callout.weight(.medium))
+                                    Text(verbatim: network.subnet.description + (network.interface.isEmpty ? "" : " · \(network.interface)"))
+                                        .font(.caption2).foregroundStyle(.secondary).monospacedDigit()
+                                }
+                            }.contentShape(Rectangle())
                         }
+                        .buttonStyle(.plain)
+                        .accessibilityValue(on ? Text("Seçili") : Text("Seçili değil"))
                         if network.kind == .custom {
                             Button { model.removeRange(network) } label: { Image(systemName: "xmark.circle.fill").foregroundStyle(.secondary) }
-                                .buttonStyle(.plain).help("Aralığı kaldır")
+                                .buttonStyle(.plain).help("Aralığı kaldır").accessibilityLabel("Aralığı kaldır")
                         }
                     }
                     .padding(.horizontal, PocketSpacing.s).padding(.vertical, 5)
@@ -395,7 +401,6 @@ struct LANScannerView: View {
                             .strokeBorder(on ? Color.accentColor.opacity(0.5) : PocketTheme.line)
                     }
                     .contentShape(Rectangle())
-                    .onTapGesture { model.toggle(network) }
                     .contextMenu {
                         if network.kind == .custom {
                             Button("Aralığı Kaldır", role: .destructive) { model.removeRange(network) }
@@ -658,6 +663,7 @@ private struct LANDeviceRow: View {
 
 /// The router in the middle, devices that answered on the inner ring, quiet ones on the outer ring.
 private struct LANMapView: View {
+    @PocketReduceMotion private var reduceMotion
     let result: LANScanResult
     @ObservedObject var model: LANScannerModel
     @Binding var selection: LANDevice.ID?
@@ -716,28 +722,30 @@ private struct LANMapView: View {
     private func node(_ device: LANDevice, size: CGFloat) -> some View {
         let kind = model.kind(for: device)
         let active = selection == device.id
-        return VStack(spacing: 4) {
-            PocketIconTile(symbol: kind.symbol, tint: kind.tint, size: size)
-                .opacity(device.responded || device.isSelf || device.isGateway ? 1 : 0.55)
-                .overlay {
-                    RoundedRectangle(cornerRadius: size * 0.27, style: .continuous)
-                        .strokeBorder(Color.accentColor, lineWidth: active ? 3 : 0).padding(-3)
-                }
-                .overlay(alignment: .topTrailing) {
-                    if device.mac.map(model.fresh.contains) ?? false {
-                        Circle().fill(.orange).frame(width: 10, height: 10).offset(x: 3, y: -3)
+        return Button { selection = device.id } label: {
+            VStack(spacing: 4) {
+                PocketIconTile(symbol: kind.symbol, tint: kind.tint, size: size)
+                    .opacity(device.responded || device.isSelf || device.isGateway ? 1 : 0.55)
+                    .overlay {
+                        RoundedRectangle(cornerRadius: size * 0.27, style: .continuous)
+                            .strokeBorder(Color.accentColor, lineWidth: active ? 3 : 0).padding(-3)
                     }
-                }
-            Text(model.name(for: device)).font(.caption2.weight(.medium)).lineLimit(1).frame(maxWidth: 110)
-            Text(verbatim: device.latency.map(lanLatencyText) ?? device.ip).font(.system(size: 9)).foregroundStyle(.secondary).monospacedDigit()
+                    .overlay(alignment: .topTrailing) {
+                        if device.mac.map(model.fresh.contains) ?? false {
+                            Circle().fill(.orange).frame(width: 10, height: 10).offset(x: 3, y: -3)
+                        }
+                    }
+                Text(model.name(for: device)).font(.caption2.weight(.medium)).lineLimit(1).frame(maxWidth: 110)
+                Text(verbatim: device.latency.map(lanLatencyText) ?? device.ip).font(.system(size: 9)).foregroundStyle(.secondary).monospacedDigit()
+            }
         }
-        .scaleEffect(hovered == device.id ? 1.08 : 1)
-        .animation(.spring(response: 0.25, dampingFraction: 0.7), value: hovered)
+        .buttonStyle(.plain)
+        .scaleEffect(!reduceMotion && hovered == device.id ? 1.08 : 1)
+        .animation(reduceMotion ? nil : .spring(response: 0.25, dampingFraction: 0.7), value: hovered)
         .onHover { hovered = $0 ? device.id : (hovered == device.id ? nil : hovered) }
-        .onTapGesture { selection = device.id }
         .help([model.name(for: device), device.ip, model.vendor(for: device)].compactMap { $0 }.joined(separator: " · "))
         .accessibilityElement(children: .combine)
-        .accessibilityAddTraits(.isButton)
+        .accessibilityValue(active ? Text("Seçili") : Text("Seçili değil"))
     }
 }
 
@@ -802,7 +810,7 @@ private struct LANDeviceInspector: View {
                     }
                     Spacer(minLength: 0)
                     Button(action: close) { Image(systemName: "xmark.circle.fill").font(.title3).foregroundStyle(.secondary) }
-                        .buttonStyle(.plain).help("Kapat")
+                        .buttonStyle(.plain).help("Kapat").accessibilityLabel("Kapat")
                 }
                 actions
                 if let wakeSent {

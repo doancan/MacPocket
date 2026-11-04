@@ -31,6 +31,7 @@
 
 ## Öne çıkanlar
 
+- **Pratik Araçlar** — ayrı çalışma alanında 14 biçimli Case Converter, JSON, Base64, URL, JWT, hash, UUID, parola, Unix zamanı, metin karşılaştırma ve QR/Wi-Fi QR; çevrimdışı, arama ve favorilerle.
 - **Canlı sistem izleme** — CPU, RAM, disk, ağ ve sensörler; en sıcak sensörün trendi ve menü çubuğunda istediğin göstergeler.
 - **Uygulama başına ağ trafiği** — hangi uygulamanın şu an ne kadar indirip yüklediği, yardımcı süreçler uygulamada toplanmış halde.
 - **Wi-Fi analizi** — sinyal, gürültü, BSSID, çevredeki ağların kanal yoğunluğu ve modem için kanal önerisi.
@@ -58,9 +59,10 @@ Apple Silicon ve macOS 27 gerekir. 0.1.3’ten itibaren yeni sürümler uygulama
 | 🪟 | **Ekran** | Ekran Ayarları (gizli HiDPI modları, yenileme hızı, yansıtma) · Ekran Parlaklığı · Ekran Görüntüsü · Ekran Kaydı · Ekrandan Al · Ekran Temizleme |
 | ⚡ | **Üretkenlik** | Ekran Süresi · Pencere Geçişi · Pencere Yerleşimi · Masa Düzenleri · Pano Geçmişi · Metin Kısaltmaları · Makrolar · Hızlı İşlemler · Odak Oturumu · Kapatma Koruması · Uygulama Dondurucu · Mac’i Uyanık Tut |
 | 🎧 | **Ses ve aygıtlar** | Ses Çıkışı · Ses Mikseri · Fare Kaydırma · Bluetooth Pilleri (Logitech HID++ dahil) |
+| 🧰 | **Pratik Araçlar** | Case Converter (14 biçim, Türkçe/İngilizce, canlı önizleme) · JSON düzenleme/küçültme · Base64 ve URL kodlama · JWT inceleme · SHA-256/SHA-512 · UUID v4 · güvenli parola/token · Unix zamanı · satır karşılaştırma · QR/Wi-Fi QR ve PNG |
 | 🔒 | **Gizlilik ve güvenlik** | Gizlilik Kontrolü (mikrofon/kamera bildirimi) · Sistem Güvenliği (SIP, Gatekeeper) |
 
-Ana bölümler: Genel Bakış, Sistem İzleme, Güç Merkezi, Temizlik, Disk Analizi, Uygulamalar ve Araçlar.
+Ana bölümler: Genel Bakış, Sistem İzleme, Güç Merkezi, Temizlik, Disk Analizi, Uygulamalar, Araçlar ve Pratik Araçlar.
 Menü çubuğu birleşik grup veya ayrı CPU, GPU, RAM, disk, ağ (ping, Wi-Fi, VPN), güç ve sensör göstergeleri
 sunar; Ayarlar’daki canlı düzenleyicide sürükle-bırak sıralanır, görünüm ve eşik renkleri modül başına ayarlanır.
 
@@ -76,7 +78,7 @@ sunar; Ayarlar’daki canlı düzenleyicide sürükle-bırak sıralanır, görü
 <details>
 <summary><b>Bilinen sınırlar</b></summary>
 
-- Geliştirme pilsiz bir Mac mini’de yapılır; MacBook şarj sınırı/durdurma ve pil donanımı burada doğrulanmış sayılmaz.
+- Geliştirme pilsiz bir Mac Studio’da yapılır; MacBook şarj sınırı/durdurma ve pil donanımı burada doğrulanmış sayılmaz.
 - Gelişmiş güç otomasyonları henüz tamamlanmadı.
 - Tam AltTab, iStat veya CleanMyMac eşdeğerliği iddia edilmez; özel Spaces davranışları ve bütün görünüm seçenekleri eşlenmedi.
 - Hosts dosyasını kaydetmek macOS yönetici onayı ister.

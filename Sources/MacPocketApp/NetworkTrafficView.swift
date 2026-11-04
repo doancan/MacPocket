@@ -14,7 +14,8 @@ final class NetworkTrafficModel: ObservableObject {
     }
 
     static let interval: Duration = .seconds(2)
-    private var sampling = false
+    @Published private(set) var loaded = false
+    @Published private(set) var sampling = false
     private var generation = UUID()
     private var tracker = NetworkTrafficTracker()
     private var rows: [NetworkTrafficRow] = []
@@ -50,7 +51,7 @@ final class NetworkTrafficModel: ObservableObject {
         guard !sampling, !Task.isCancelled else { return }
         sampling = true
         let token = generation
-        defer { sampling = false }
+        defer { sampling = false; loaded = true }
         do {
             let result = try await BoundedProcess.run(NetworkTraffic.nettopPath, NetworkTraffic.nettopArguments, timeout: 10)
             guard !Task.isCancelled, token == generation else { return }
@@ -177,9 +178,11 @@ struct NetworkTrafficView: View {
     }
 
     @ViewBuilder private var list: some View {
-        if visible.isEmpty {
-            ContentUnavailableView(traffic.groups.isEmpty ? "Ölçülüyor…" : "Eşleşen süreç yok", systemImage: "network",
-                                   description: Text(traffic.groups.isEmpty ? "İlk ölçüm birkaç saniye sürer." : "Aramayı veya filtreyi değiştir."))
+        if !traffic.loaded {
+            PocketProgressRow(message: "İlk ağ trafiği ölçümü alınıyor…")
+        } else if visible.isEmpty {
+            ContentUnavailableView(traffic.error != nil && traffic.groups.isEmpty ? "Ağ trafiği okunamadı" : "Eşleşen süreç yok", systemImage: "network",
+                                   description: Text(traffic.groups.isEmpty ? "Yeni ölçümler bu sayfa açıkken otomatik alınır." : "Aramayı veya filtreyi değiştir."))
                 .frame(maxWidth: .infinity, minHeight: 240)
                 .pocketCard()
         } else {

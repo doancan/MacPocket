@@ -22,10 +22,10 @@ struct SupportReportView: View {
                     Button { Task { await prepare() } } label: { Label("Yenile", systemImage: "arrow.clockwise") }
                         .disabled(preparing)
                     Button { copy() } label: { Label("Kopyala", systemImage: "doc.on.doc") }
-                        .disabled(text.isEmpty)
+                        .disabled(text.isEmpty || preparing)
                     Button { save() } label: { Label("Kaydet…", systemImage: "square.and.arrow.down") }
                         .buttonStyle(.pocketPrimary)
-                        .disabled(text.isEmpty)
+                        .disabled(text.isEmpty || preparing)
                 }
             }
             HStack(spacing: PocketSpacing.l) {
@@ -37,6 +37,11 @@ struct SupportReportView: View {
                 if let status { Text(status).font(.callout).foregroundStyle(.secondary) }
             }
             .toggleStyle(.checkbox)
+            .disabled(preparing)
+            if preparing { PocketProgressRow(message: "Destek raporu hazırlanıyor…") }
+            if !preparing, let failure = model.error ?? ports.error {
+                PocketMessage(String(localized: "Rapor bazı verileri içermeyebilir: \(failure)"), tone: .warning)
+            }
             ScrollView {
                 Text(verbatim: text.isEmpty ? String(localized: "Rapor hazırlanıyor…") : text)
                     .font(.system(.callout, design: .monospaced))
@@ -52,6 +57,7 @@ struct SupportReportView: View {
     }
 
     private func prepare() async {
+        guard !preparing else { return }
         preparing = true
         defer { preparing = false }
         await model.refresh(includeProcesses: true)

@@ -143,19 +143,21 @@ struct QuickActionsView: View {
     @State private var volumes = QuickActionService.ejectableVolumes()
 
     var body: some View {
-        VStack(alignment: .leading, spacing: PocketSpacing.l) {
-            PocketPageHeading(title: "Hızlı İşlemler", subtitle: "Sık yapılan sistem işlemlerini tek tıkla çalıştır.", icon: "bolt.circle")
-            if let outcome = service.outcome { PocketMessage(outcome.text, tone: outcome.tone) }
-            LazyVGrid(columns: [GridItem(.adaptive(minimum: 240), spacing: PocketSpacing.m)], spacing: PocketSpacing.m) {
-                ForEach(QuickAction.allCases) { action in
-                    QuickActionTile(action: action, running: service.running == action,
-                                    detail: action == .ejectDisks ? ejectDetail : action.detail) {
-                        action.needsConfirmation ? (confirming = action) : service.perform(action)
+        ScrollView {
+            VStack(alignment: .leading, spacing: PocketSpacing.l) {
+                PocketPageHeading(title: "Hızlı İşlemler", subtitle: "Sık yapılan sistem işlemlerini tek tıkla çalıştır.", icon: "bolt.circle")
+                if let outcome = service.outcome { PocketMessage(outcome.text, tone: outcome.tone) }
+                LazyVGrid(columns: [GridItem(.adaptive(minimum: 240), spacing: PocketSpacing.m)], spacing: PocketSpacing.m) {
+                    ForEach(QuickAction.allCases) { action in
+                        QuickActionTile(action: action, running: service.running == action,
+                                        detail: action == .ejectDisks ? ejectDetail : action.detail) {
+                            action.needsConfirmation ? (confirming = action) : service.perform(action)
+                        }
+                        .disabled(service.running != nil || (action == .ejectDisks && volumes.isEmpty))
                     }
-                    .disabled(service.running != nil || (action == .ejectDisks && volumes.isEmpty))
                 }
+                Spacer(minLength: 0)
             }
-            Spacer(minLength: 0)
         }
         .pocketPage()
         .onReceive(NSWorkspace.shared.notificationCenter.publisher(for: NSWorkspace.didMountNotification)) { _ in volumes = QuickActionService.ejectableVolumes() }

@@ -33,8 +33,9 @@ struct BluetoothBatteryView: View {
             }
             ScrollView {
                 VStack(alignment: .leading, spacing: PocketSpacing.l) {
-                    if service.devices.isEmpty {
-                        ContentUnavailableView(service.loading ? "Aygıtlar okunuyor…" : "Bağlı Bluetooth aygıtı yok",
+                    if service.loading { PocketProgressRow(message: "Bluetooth aygıtları okunuyor…") }
+                    if service.devices.isEmpty, !service.loading {
+                        ContentUnavailableView("Bağlı Bluetooth aygıtı yok",
                                                systemImage: "dot.radiowaves.left.and.right",
                                                description: Text("Bir klavye, fare ya da kulaklık bağlanınca burada görünür."))
                             .frame(maxWidth: .infinity, minHeight: 220)
