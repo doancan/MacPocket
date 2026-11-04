@@ -36,7 +36,7 @@ public enum TemperatureGroup: String, Codable, Sendable, CaseIterable, Identifia
     }
 
     /// nil for sensors that do not report a temperature of the Mac ("tcal" is a fixed calibration value).
-    static func classify(_ name: String) -> TemperatureGroup? {
+    public static func classify(_ name: String) -> TemperatureGroup? {
         let lowered = name.lowercased()
         if lowered.contains("tcal") { return nil }
         if lowered.contains("tdie") { return .soc }

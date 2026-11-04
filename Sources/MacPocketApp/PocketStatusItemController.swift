@@ -41,8 +41,12 @@ final class PocketStatusItemController: NSObject, NSPopoverDelegate {
             }
         }.store(in: &subscriptions)
         store.$preferences.dropFirst().removeDuplicates().receive(on: RunLoop.main).sink { [weak self] _ in
-            MainActor.assumeIsolated { self?.refresh() }
+            MainActor.assumeIsolated {
+                self?.refresh()
+                self?.updatePing()
+            }
         }.store(in: &subscriptions)
+        updatePing()
         model.$paused.removeDuplicates().receive(on: RunLoop.main).sink { [weak self] _ in
             MainActor.assumeIsolated { self?.updateTooltips() }
         }.store(in: &subscriptions)
@@ -54,6 +58,15 @@ final class PocketStatusItemController: NSObject, NSPopoverDelegate {
             .receive(on: RunLoop.main).sink { [weak self] _ in
                 MainActor.assumeIsolated { self?.showPopover(for: nil) }
             }.store(in: &subscriptions)
+    }
+
+    /// The ping leaves the Mac, so it runs only while the network module shows latency in the menu bar.
+    private func updatePing() {
+        let preferences = store.preferences
+        let wanted = preferences.visible && preferences.enabled.contains(.network)
+            && preferences.settings(for: .network).value == .networkPing
+        let monitor = model.systemMonitor
+        Task { await monitor.setPingEnabled(wanted) }
     }
 
     private func updateAppearance() {

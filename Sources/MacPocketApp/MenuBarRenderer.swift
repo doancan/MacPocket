@@ -21,6 +21,11 @@ struct MenuBarSample: Identifiable, Sendable {
     let thermal: Double?
     /// Hottest sensor in °C.
     var temperature: Double? = nil
+    var gpu: Double? = nil
+    var gpuRenderer: Double? = nil
+    var gpuMemory: Double? = nil
+    var ping: Double? = nil
+    var wifiRSSI: Double? = nil
     var id: Date { date }
     var cpuTotal: Double? { cpuUser.flatMap { user in cpuSystem.map { min(100, user + $0) } } }
 }
@@ -44,7 +49,10 @@ final class MenuBarHistory: ObservableObject {
             battery: snapshot.power.chargePercent,
             fan: snapshot.fans?.compactMap(\.fraction).max(),
             thermal: MenuBarFormatter.thermalLevel(snapshot.thermalState),
-            temperature: snapshot.temperatures.flatMap(TemperatureSummary.hottest)?.celsius))
+            temperature: snapshot.temperatures.flatMap(TemperatureSummary.hottest)?.celsius,
+            gpu: snapshot.gpu?.utilizationPercent, gpuRenderer: snapshot.gpu?.rendererPercent,
+            gpuMemory: snapshot.gpu?.memoryInUseBytes.map { Double($0) / Double(max(1, snapshot.physicalMemoryBytes)) },
+            ping: snapshot.connectivity?.pingMilliseconds, wifiRSSI: snapshot.connectivity?.wifiRSSI.map(Double.init)))
         if samples.count > Self.capacity { samples.removeFirst(samples.count - Self.capacity) }
     }
 
@@ -66,10 +74,22 @@ final class MenuBarHistory: ObservableObject {
                 default: (sample.cpuTotal ?? 0) / 100
                 }
             }
+        case .gpu:
+            return recent.map { sample in
+                switch settings.value {
+                case .gpuRenderer: (sample.gpuRenderer ?? sample.gpu ?? 0) / 100
+                case .gpuMemory: sample.gpuMemory ?? 0
+                default: (sample.gpu ?? 0) / 100
+                }
+            }
         case .memory:
             return recent.map { settings.value == .memoryPressure ? ($0.memoryPressure ?? 0) / 100 : $0.memoryFraction ?? 0 }
         case .disk:
             return scaled(recent.map { ($0.diskRead ?? 0) + ($0.diskWrite ?? 0) }, floor: 1_048_576)
+        case .network where settings.value == .networkPing:
+            return scaled(recent.map { $0.ping ?? 0 }, floor: 100)
+        case .network where settings.value == .networkWifiSignal:
+            return recent.map { sample in sample.wifiRSSI.map { min(1, max(0, ($0 + 90) / 60)) } ?? 0 }
         case .network:
             let values = recent.map { sample -> Double in
                 switch settings.value {
@@ -89,6 +109,14 @@ final class MenuBarHistory: ObservableObject {
                 }
             }
         }
+    }
+
+    /// Write (up) and read (down) series for the mirrored disk graph.
+    func diskMirror(count: Int) -> (up: [Double], down: [Double]) {
+        let recent = samples.suffix(count)
+        let up = recent.map { $0.diskWrite ?? 0 }, down = recent.map { $0.diskRead ?? 0 }
+        let ceiling = max(1_048_576, up.max() ?? 0, down.max() ?? 0)
+        return (up.map { min(1, $0 / ceiling) }, down.map { min(1, $0 / ceiling) })
     }
 
     /// Upload (positive) and download (negative side) series for the mirrored network graph.
@@ -130,6 +158,7 @@ enum MenuBarRenderer {
     /// Symbol for a module showing `value`: fans and heat have their own; the battery symbol reflects
     /// charge level and charging.
     static func symbol(for module: MenuBarModule, value: MenuBarValue? = nil, snapshot: SystemSnapshot?) -> String {
+        if module == .network, snapshot?.connectivity?.online == false { return "wifi.slash" }
         if let symbol = value?.symbol { return symbol }
         guard module == .power, let power = snapshot?.power, power.batteryPresent, let charge = power.chargePercent else {
             return module.symbol
@@ -175,6 +204,46 @@ enum MenuBarRenderer {
         let filled = NSRect(x: rect.minX, y: rect.minY, width: rect.width, height: max(rect.width, rect.height * level))
         NSColor.black.setFill()
         NSBezierPath(roundedRect: filled, xRadius: radius, yRadius: radius).fill()
+    }
+
+    /// Pie filling clockwise from the top inside a thin ring.
+    private static func drawPie(_ fraction: Double, in rect: NSRect) {
+        let ring = NSBezierPath(ovalIn: rect.insetBy(dx: 0.6, dy: 0.6))
+        ring.lineWidth = 1.2
+        NSColor.black.withAlphaComponent(0.35).setStroke()
+        ring.stroke()
+        let level = CGFloat(min(1, max(0, fraction)))
+        guard level > 0.005 else { return }
+        let center = NSPoint(x: rect.midX, y: rect.midY)
+        let wedge = NSBezierPath()
+        wedge.move(to: center)
+        wedge.appendArc(withCenter: center, radius: rect.width / 2 - 2, startAngle: 90, endAngle: 90 - 360 * level, clockwise: true)
+        wedge.close()
+        NSColor.black.setFill()
+        wedge.fill()
+    }
+
+    /// One thin bar per logical CPU, filled from the bottom.
+    private static func drawCores(_ values: [Double], in rect: NSRect) {
+        guard !values.isEmpty else { return }
+        let gap: CGFloat = values.count > 12 ? 1 : 1.5
+        let barWidth = (rect.width - gap * CGFloat(values.count - 1)) / CGFloat(values.count)
+        for (index, value) in values.enumerated() {
+            let x = rect.minX + CGFloat(index) * (barWidth + gap)
+            NSColor.black.withAlphaComponent(0.22).setFill()
+            NSRect(x: x, y: rect.minY, width: barWidth, height: rect.height).fill()
+            let height = rect.height * CGFloat(min(1, max(0, value / 100)))
+            guard height > 0.3 else { continue }
+            NSColor.black.setFill()
+            NSRect(x: x, y: rect.minY, width: barWidth, height: height).fill()
+        }
+    }
+
+    static func coresWidth(_ count: Int) -> CGFloat { max(8, CGFloat(count) * (count > 12 ? 3 : 3.5)) }
+
+    /// A VPN is connected and the network module asks to show it.
+    static func showsVPN(_ module: MenuBarModule, settings: MenuBarModuleSettings, snapshot: SystemSnapshot?) -> Bool {
+        module == .network && settings.showVPN && snapshot?.connectivity?.vpnActive == true
     }
 
     /// Bar-graph history inside a faint rounded frame.
@@ -229,17 +298,23 @@ enum MenuBarRenderer {
     static func moduleKey(_ module: MenuBarModule, settings: MenuBarModuleSettings, reading: MenuBarReading,
                           snapshot: SystemSnapshot?, history: MenuBarHistory) -> Key {
         var levels: [Int] = []
-        if settings.style == .gauge {
+        if settings.style == .gauge || settings.style == .pie {
             levels.append(Int((reading.fraction ?? history.graph(for: module, settings: settings, count: 1).last ?? 0) * 40))
+        } else if settings.style == .cores {
+            levels += (snapshot?.cpuCorePercents ?? []).map { Int($0 / 100 * 16) }
         } else if settings.style == .graph {
             if module == .network && settings.value == .networkUpDown {
                 let mirror = history.networkMirror(count: graphSamples)
+                levels += mirror.up.map { Int($0 * 40) } + mirror.down.map { Int($0 * 40) }
+            } else if module == .disk && settings.value == .diskReadWrite {
+                let mirror = history.diskMirror(count: graphSamples)
                 levels += mirror.up.map { Int($0 * 40) } + mirror.down.map { Int($0 * 40) }
             } else {
                 levels += history.graph(for: module, settings: settings, count: graphSamples).map { Int($0 * 40) }
             }
         }
-        return Key(parts: [module.rawValue, String(describing: settings), symbol(for: module, value: settings.value, snapshot: snapshot)]
+        return Key(parts: [module.rawValue, String(describing: settings), symbol(for: module, value: settings.value, snapshot: snapshot),
+                           showsVPN(module, settings: settings, snapshot: snapshot) ? "vpn" : ""]
                    + reading.lines + reading.reserve, levels: levels)
     }
 
@@ -267,7 +342,11 @@ enum MenuBarRenderer {
             x += width + gap
         }
 
-        if settings.showIcon {
+        if showsVPN(module, settings: settings, snapshot: snapshot) {
+            add(width: 9, gap: 2) { start in drawSymbol("lock.fill", in: NSRect(x: start, y: 5, width: 9, height: 12), pointSize: 9) }
+        }
+        // Offline: the slashed Wi-Fi glyph says it even when the user hid the icon.
+        if settings.showIcon || (module == .network && snapshot?.connectivity?.online == false) {
             add(width: 15) { start in drawSymbol(symbolName, in: NSRect(x: start, y: 3, width: 15, height: 16)) }
         }
         if sideLabel {
@@ -280,9 +359,19 @@ enum MenuBarRenderer {
         case .gauge:
             let fraction = reading.fraction ?? history.graph(for: module, settings: settings, count: 1).last ?? 0
             add(width: 5, gap: 4) { start in drawGauge(fraction, in: NSRect(x: start, y: 3, width: 5, height: 16)) }
+        case .pie:
+            let fraction = reading.fraction ?? history.graph(for: module, settings: settings, count: 1).last ?? 0
+            add(width: 15, gap: 4) { start in drawPie(fraction, in: NSRect(x: start, y: 3.5, width: 15, height: 15)) }
+        case .cores:
+            let cores = snapshot?.cpuCorePercents ?? []
+            let coreWidth = coresWidth(cores.count)
+            add(width: coreWidth, gap: 4) { start in drawCores(cores, in: NSRect(x: start, y: 3, width: coreWidth, height: 16)) }
         case .graph:
             if module == .network && settings.value == .networkUpDown {
                 let mirror = history.networkMirror(count: graphSamples)
+                add(width: 28, gap: 4) { start in drawMirrorGraph(up: mirror.up, down: mirror.down, in: NSRect(x: start, y: 3, width: 28, height: 16)) }
+            } else if module == .disk && settings.value == .diskReadWrite {
+                let mirror = history.diskMirror(count: graphSamples)
                 add(width: 28, gap: 4) { start in drawMirrorGraph(up: mirror.up, down: mirror.down, in: NSRect(x: start, y: 3, width: 28, height: 16)) }
             } else {
                 let values = history.graph(for: module, settings: settings, count: graphSamples)

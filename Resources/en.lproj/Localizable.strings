@@ -450,7 +450,6 @@
 "Düşük güç %lld" = "Low power %lld";
 "Düşük güç modu" = "Low Power Mode";
 "Düşük ve yüksek bekleme gecikmeleri arasındaki pil yüzdesi." = "Battery percentage that separates the low and high standby delays.";
-"Dış IP adresi gizlilik nedeniyle sorgulanmaz; hiçbir ağ isteği yapılmaz." = "Your public IP address isn’t looked up for privacy; no network requests are made.";
 "Dışa Aktar" = "Export";
 "Dışa Aktar…" = "Export…";
 "Ekle" = "Add";
@@ -2627,7 +2626,6 @@
 /* Hottest sensor */
 "En sıcak sensör" = "Hottest sensor";
 "Son %lld dk · en düşük %@ · en yüksek %@" = "Last %lld min · low %@ · high %@";
-"En sıcak sensör (°C)" = "Hottest sensor (°C)";
 "En sıcak sensör: %@C" = "Hottest sensor: %@C";
 
 /* USB & Thunderbolt, Disk Health, Wi-Fi Analysis, Hosts File */
@@ -2873,3 +2871,45 @@
 "Pencere ve pano" = "Windows and clipboard";
 "Wi-Fi ve donanım" = "Wi-Fi and hardware";
 "Yaklaşık bir dakika sürer · Hiçbir veri bu Mac’ten çıkmaz" = "Takes about a minute · No data leaves this Mac";
+
+/* Menu bar: GPU, network status, styles, sensor */
+"Grafik işlemci" = "Graphics processor";
+"İşleyici %@" = "Renderer %@";
+"Döşeyici %@" = "Tiler %@";
+"Bu Mac grafik işlemci istatistiği yayınlamıyor." = "This Mac doesn’t publish graphics processor statistics.";
+"İşleyici" = "Renderer";
+"Birleşik belleğin %@ kadarı grafik işlemcide." = "%@ of unified memory is held by the graphics processor.";
+"GPU çekirdeği" = "GPU cores";
+"İşleyici (fragment)" = "Renderer (fragment)";
+"Döşeyici (geometri)" = "Tiler (geometry)";
+"Dış IP adresi gizlilik nedeniyle sorgulanmaz. Gecikme ölçümü yalnız menü çubuğunda ping seçiliyken 1.1.1.1’e tek paket gönderir." = "Your public IP address is never looked up. Latency is measured only while ping is shown in the menu bar, with a single packet to 1.1.1.1.";
+"İnternet" = "Internet";
+"Bağlantı türü" = "Connection type";
+"Wi-Fi sinyali" = "Wi-Fi signal";
+"VPN" = "VPN";
+"Gecikme (1.1.1.1)" = "Latency (1.1.1.1)";
+"Yanıt yok" = "No reply";
+"Sensör" = "Sensor";
+"%@ (şu an yok)" = "%@ (not present)";
+"VPN bağlıyken kilit simgesi göster" = "Show a lock while a VPN is connected";
+"Gecikme her 10 saniyede 1.1.1.1’e tek bir ping paketiyle ölçülür; bu değer seçili değilken hiç paket gönderilmez." = "Latency is measured every 10 seconds with a single ping to 1.1.1.1; no packets are sent while this value isn’t selected.";
+"GPU kullanımı (%)" = "GPU usage (%)";
+"İşleyici (%)" = "Renderer (%)";
+"GPU belleği (boyut)" = "GPU memory (size)";
+"Okuma ve yazma (iki satır)" = "Read and write (two lines)";
+"Gecikme (ping)" = "Latency (ping)";
+"Wi-Fi sinyali (dBm)" = "Wi-Fi signal (dBm)";
+"Sıcaklık sensörü (°C)" = "Temperature sensor (°C)";
+"Pasta" = "Pie";
+"Çevrimdışı" = "Offline";
+"Ağ: internet bağlantısı yok" = "Network: no internet connection";
+"GPU işleyici: %@" = "GPU renderer: %@";
+"GPU: %@ kullanım" = "GPU: %@ usage";
+"GPU belleği: %@" = "GPU memory: %@";
+"Gecikme: yanıt yok" = "Latency: no reply";
+"Gecikme: %@" = "Latency: %@";
+"Wi-Fi bağlı değil" = "Wi-Fi not connected";
+"Wi-Fi sinyali: %@, %@" = "Wi-Fi signal: %1$@, %2$@";
+"MenuBar.diskReadMark" = "R";
+"MenuBar.diskWriteMark" = "W";
+"%@: %@C" = "%1$@: %2$@C";

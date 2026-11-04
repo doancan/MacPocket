@@ -4,13 +4,14 @@ import Foundation
 
 /// One monitoring module shown in the menu bar (a status item, or a tab of the grouped popover).
 public enum MenuBarModule: String, CaseIterable, Codable, Sendable, Identifiable {
-    case cpu, memory, disk, network, power
+    case cpu, gpu, memory, disk, network, power
 
     public var id: String { rawValue }
 
     public var title: String {
         switch self {
         case .cpu: "CPU"
+        case .gpu: "GPU"
         case .memory: String(localized: "Bellek")
         case .disk: String(localized: "Disk")
         case .network: String(localized: "Ağ")
@@ -22,6 +23,7 @@ public enum MenuBarModule: String, CaseIterable, Codable, Sendable, Identifiable
     public var shortLabel: String {
         switch self {
         case .cpu: "CPU"
+        case .gpu: "GPU"
         case .memory: String(localized: "MenuBar.shortLabel.memory", defaultValue: "RAM")
         case .disk: String(localized: "MenuBar.shortLabel.disk", defaultValue: "DİSK")
         case .network: String(localized: "MenuBar.shortLabel.network", defaultValue: "AĞ")
@@ -35,6 +37,8 @@ public enum MenuBarModule: String, CaseIterable, Codable, Sendable, Identifiable
         case .powerFanSpeed, .powerFanPercent: String(localized: "MenuBar.shortLabel.fan", defaultValue: "FAN")
         case .powerThermal: String(localized: "MenuBar.shortLabel.thermal", defaultValue: "ISI")
         case .powerTemperature: "°C"
+        case .networkPing: "PING"
+        case .networkWifiSignal: "Wi-Fi"
         default: shortLabel
         }
     }
@@ -42,6 +46,7 @@ public enum MenuBarModule: String, CaseIterable, Codable, Sendable, Identifiable
     public var symbol: String {
         switch self {
         case .cpu: "cpu"
+        case .gpu: "square.stack.3d.up.fill"
         case .memory: "memorychip"
         case .disk: "internaldrive"
         case .network: "arrow.up.arrow.down"
@@ -53,9 +58,10 @@ public enum MenuBarModule: String, CaseIterable, Codable, Sendable, Identifiable
     public var valueOptions: [MenuBarValue] {
         switch self {
         case .cpu: [.cpuTotal, .cpuUser, .cpuSystem]
+        case .gpu: [.gpuUtilization, .gpuRenderer, .gpuMemory]
         case .memory: [.memoryUsedPercent, .memoryUsedBytes, .memoryFreeBytes, .memoryPressure]
-        case .disk: [.diskFreeBytes, .diskUsedPercent, .diskFreePercent, .diskActivity]
-        case .network: [.networkUpDown, .networkCombined, .networkDownload, .networkUpload]
+        case .disk: [.diskFreeBytes, .diskUsedPercent, .diskFreePercent, .diskActivity, .diskReadWrite]
+        case .network: [.networkUpDown, .networkCombined, .networkDownload, .networkUpload, .networkPing, .networkWifiSignal]
         case .power: [.powerBattery, .powerTimeRemaining, .powerSource, .powerFanSpeed, .powerFanPercent, .powerThermal, .powerTemperature]
         }
     }
@@ -66,14 +72,20 @@ public enum MenuBarModule: String, CaseIterable, Codable, Sendable, Identifiable
 
     /// Enabled state when the user never chose one.
     public var enabledByDefault: Bool { self == .cpu || self == .memory }
+
+    /// Display styles that make sense for this module; per-core bars exist only for the CPU.
+    public var styleOptions: [MenuBarDisplayStyle] {
+        self == .cpu ? MenuBarDisplayStyle.allCases : MenuBarDisplayStyle.allCases.filter { $0 != .cores }
+    }
 }
 
 /// What a module shows as its menu bar value.
 public enum MenuBarValue: String, Codable, Sendable, CaseIterable, Identifiable {
     case cpuTotal, cpuUser, cpuSystem
+    case gpuUtilization, gpuRenderer, gpuMemory
     case memoryUsedPercent, memoryUsedBytes, memoryFreeBytes, memoryPressure
-    case diskFreeBytes, diskUsedPercent, diskFreePercent, diskActivity
-    case networkUpDown, networkCombined, networkDownload, networkUpload
+    case diskFreeBytes, diskUsedPercent, diskFreePercent, diskActivity, diskReadWrite
+    case networkUpDown, networkCombined, networkDownload, networkUpload, networkPing, networkWifiSignal
     case powerBattery, powerTimeRemaining, powerSource
     case powerFanSpeed, powerFanPercent, powerThermal, powerTemperature
 
@@ -85,6 +97,8 @@ public enum MenuBarValue: String, Codable, Sendable, CaseIterable, Identifiable 
         case .powerFanSpeed, .powerFanPercent: "fan"
         case .powerThermal: "thermometer.medium"
         case .powerTemperature: "thermometer.high"
+        case .networkPing: "stopwatch"
+        case .networkWifiSignal: "wifi"
         default: nil
         }
     }
@@ -94,6 +108,9 @@ public enum MenuBarValue: String, Codable, Sendable, CaseIterable, Identifiable 
         case .cpuTotal: String(localized: "Toplam kullanım")
         case .cpuUser: String(localized: "Kullanıcı")
         case .cpuSystem: String(localized: "Sistem")
+        case .gpuUtilization: String(localized: "GPU kullanımı (%)")
+        case .gpuRenderer: String(localized: "İşleyici (%)")
+        case .gpuMemory: String(localized: "GPU belleği (boyut)")
         case .memoryUsedPercent: String(localized: "Kullanılan (%)")
         case .memoryUsedBytes: String(localized: "Kullanılan (boyut)")
         case .memoryFreeBytes: String(localized: "Kullanılabilir (boyut)")
@@ -102,17 +119,20 @@ public enum MenuBarValue: String, Codable, Sendable, CaseIterable, Identifiable 
         case .diskUsedPercent: String(localized: "Doluluk (%)")
         case .diskFreePercent: String(localized: "Boş alan (%)")
         case .diskActivity: String(localized: "Okuma + yazma hızı")
+        case .diskReadWrite: String(localized: "Okuma ve yazma (iki satır)")
         case .networkUpDown: String(localized: "Gönderme ve alma (iki satır)")
         case .networkCombined: String(localized: "Toplam hız")
         case .networkDownload: String(localized: "Yalnız alma")
         case .networkUpload: String(localized: "Yalnız gönderme")
+        case .networkPing: String(localized: "Gecikme (ping)")
+        case .networkWifiSignal: String(localized: "Wi-Fi sinyali (dBm)")
         case .powerBattery: String(localized: "Pil yüzdesi")
         case .powerTimeRemaining: String(localized: "Kalan süre")
         case .powerSource: String(localized: "Güç kaynağı")
         case .powerFanSpeed: String(localized: "Fan hızı (rpm)")
         case .powerFanPercent: String(localized: "Fan hızı (%)")
         case .powerThermal: String(localized: "Isı durumu")
-        case .powerTemperature: String(localized: "En sıcak sensör (°C)")
+        case .powerTemperature: String(localized: "Sıcaklık sensörü (°C)")
         }
     }
 }
@@ -152,16 +172,21 @@ public enum MenuBarGroupedStyle: String, Codable, Sendable, CaseIterable, Identi
 
 /// How a separate status item draws its module.
 public enum MenuBarDisplayStyle: String, Codable, Sendable, CaseIterable, Identifiable {
-    case value, graph, gauge, icon
+    case value, graph, gauge, pie, cores, icon
     public var id: String { rawValue }
     public var title: String {
         switch self {
         case .value: String(localized: "Değer")
         case .graph: String(localized: "Mini grafik")
         case .gauge: String(localized: "Mini çubuk")
+        case .pie: String(localized: "Pasta")
+        case .cores: String(localized: "Çekirdekler")
         case .icon: String(localized: "Yalnız simge")
         }
     }
+
+    /// Styles that draw a level or history and may show the value beside it.
+    public var drawsLevel: Bool { self == .graph || self == .gauge || self == .pie || self == .cores }
 }
 
 // MARK: - Settings
@@ -177,11 +202,17 @@ public struct MenuBarModuleSettings: Codable, Equatable, Sendable {
     public var value: MenuBarValue
     /// Disk module only: the volume to show; empty means the startup volume.
     public var volumePath: String
+    /// Power module temperature: the sensor to show by name; empty means the hottest one.
+    public var sensorName: String
+    /// Network module: mark the item with a lock while a VPN is connected.
+    public var showVPN: Bool
 
     public init(style: MenuBarDisplayStyle = .value, showLabel: Bool = true, showIcon: Bool = false,
-                showValue: Bool = true, decimals: Bool = false, value: MenuBarValue, volumePath: String = "") {
+                showValue: Bool = true, decimals: Bool = false, value: MenuBarValue, volumePath: String = "",
+                sensorName: String = "", showVPN: Bool = true) {
         self.style = style; self.showLabel = showLabel; self.showIcon = showIcon
         self.showValue = showValue; self.decimals = decimals; self.value = value; self.volumePath = volumePath
+        self.sensorName = sensorName; self.showVPN = showVPN
     }
 
     public static func defaults(for module: MenuBarModule) -> Self {
@@ -192,7 +223,7 @@ public struct MenuBarModuleSettings: Codable, Equatable, Sendable {
         }
     }
 
-    private enum CodingKeys: String, CodingKey { case style, showLabel, showIcon, showValue, decimals, value, volumePath }
+    private enum CodingKeys: String, CodingKey { case style, showLabel, showIcon, showValue, decimals, value, volumePath, sensorName, showVPN }
 
     /// Missing or unknown fields fall back to defaults, so stored settings survive future additions.
     public init(from decoder: Decoder) throws {
@@ -204,13 +235,16 @@ public struct MenuBarModuleSettings: Codable, Equatable, Sendable {
                   showValue: (try? container.decodeIfPresent(Bool.self, forKey: .showValue)) ?? true,
                   decimals: (try? container.decodeIfPresent(Bool.self, forKey: .decimals)) ?? false,
                   value: value ?? .cpuTotal,
-                  volumePath: (try? container.decodeIfPresent(String.self, forKey: .volumePath)) ?? "")
+                  volumePath: (try? container.decodeIfPresent(String.self, forKey: .volumePath)) ?? "",
+                  sensorName: (try? container.decodeIfPresent(String.self, forKey: .sensorName)) ?? "",
+                  showVPN: (try? container.decodeIfPresent(Bool.self, forKey: .showVPN)) ?? true)
     }
 
     /// Keeps `value` within the module's options (e.g. after decoding a hand-edited plist).
     func normalized(for module: MenuBarModule) -> Self {
         var copy = self
         if !module.valueOptions.contains(value) { copy.value = module.valueOptions[0] }
+        if !module.styleOptions.contains(style) { copy.style = .value }
         return copy
     }
 }
@@ -379,7 +413,7 @@ public struct MenuBarPreferences: Equatable, Sendable {
                 settings.value = battery ? .powerBattery : .powerSource
             case .network:
                 settings = .defaults(for: .network)
-            case .cpu:
+            case .cpu, .gpu:
                 break
             }
             if let data = try? encoder.encode(settings) { defaults.set(data, forKey: moduleKey(module)) }
@@ -486,7 +520,53 @@ public enum MenuBarFormatter {
                                  accessibility: String(localized: "Ağ: ölçüm bekleniyor"))
                 : pending()
         }
+        if module == .network, s.connectivity?.online == false {
+            let text = String(localized: "Çevrimdışı")
+            return MenuBarReading(lines: [text], reserve: [text], fraction: nil, magnitude: nil,
+                                  accessibility: String(localized: "Ağ: internet bağlantısı yok"))
+        }
         switch settings.value {
+        case .gpuUtilization, .gpuRenderer:
+            guard let gpu = s.gpu else { return pending() }
+            let value = settings.value == .gpuRenderer ? (gpu.rendererPercent ?? gpu.utilizationPercent) : gpu.utilizationPercent
+            let text = percent(value, decimals: decimals)
+            let spoken = settings.value == .gpuRenderer ? String(localized: "GPU işleyici: \(text)") : String(localized: "GPU: \(text) kullanım")
+            return MenuBarReading(lines: [text], reserve: [percentReserve], fraction: value / 100, magnitude: value, accessibility: spoken)
+        case .gpuMemory:
+            guard let used = s.gpu?.memoryInUseBytes else { return pending(bytesReserve) }
+            let text = bytes(Double(used), binary: binaryUnits, decimals: decimals)
+            let fraction = s.physicalMemoryBytes > 0 ? min(1, Double(used) / Double(s.physicalMemoryBytes)) : nil
+            return MenuBarReading(lines: [text], reserve: [bytesReserve], fraction: fraction, magnitude: fraction.map { $0 * 100 },
+                                  accessibility: String(localized: "GPU belleği: \(text)"))
+        case .networkPing:
+            guard let connectivity = s.connectivity else { return pending("999 ms") }
+            if connectivity.pingFailed {
+                return MenuBarReading(lines: ["—"], reserve: ["999 ms"], fraction: nil, magnitude: nil,
+                                      accessibility: String(localized: "Gecikme: yanıt yok"))
+            }
+            guard let ms = connectivity.pingMilliseconds else { return pending("999 ms") }
+            let text = number(ms, fractionDigits: decimals && ms < 100 ? 1 : 0) + " ms"
+            return MenuBarReading(lines: [text], reserve: ["999 ms"], fraction: min(1, ms / 150), magnitude: ms,
+                                  accessibility: String(localized: "Gecikme: \(text)"))
+        case .networkWifiSignal:
+            guard let connectivity = s.connectivity else { return pending("-100 dBm") }
+            guard let rssi = connectivity.wifiRSSI else {
+                return MenuBarReading(lines: ["—"], reserve: ["-100 dBm"], fraction: nil, magnitude: nil,
+                                      accessibility: String(localized: "Wi-Fi bağlı değil"))
+            }
+            let text = "\(rssi) dBm"
+            // −90 dBm (unusable) … −30 dBm (next to the router).
+            let fraction = min(1, max(0, Double(rssi + 90) / 60))
+            return MenuBarReading(lines: [text], reserve: ["-100 dBm"], fraction: fraction, magnitude: fraction * 100,
+                                  accessibility: String(localized: "Wi-Fi sinyali: \(text), \(WiFiSignalQuality(rssi: rssi).title)"))
+        case .diskReadWrite:
+            let read = s.diskIO?.readBytesPerSecond, write = s.diskIO?.writeBytesPerSecond
+            let readText = rate(read, binary: binaryUnits), writeText = rate(write, binary: binaryUnits)
+            let readMark = String(localized: "MenuBar.diskReadMark", defaultValue: "O"), writeMark = String(localized: "MenuBar.diskWriteMark", defaultValue: "Y")
+            return MenuBarReading(lines: [readMark + " " + readText, writeMark + " " + writeText],
+                                  reserve: [readMark + " 999 KB/s", writeMark + " 999 KB/s"], fraction: nil,
+                                  magnitude: read.flatMap { r in write.map { r + $0 } },
+                                  accessibility: String(localized: "Disk etkinliği: okuma \(readText), yazma \(writeText)"))
         case .cpuTotal, .cpuUser, .cpuSystem:
             guard let user = s.cpuUserPercent, let system = s.cpuSystemPercent else { return pending() }
             let value = settings.value == .cpuUser ? user : settings.value == .cpuSystem ? system : min(100, user + system)
@@ -591,14 +671,16 @@ public enum MenuBarFormatter {
                                   accessibility: String(localized: "Isı durumu: \(text)"))
         case .powerTemperature:
             guard let readings = s.temperatures else { return pending("100°") }
-            guard let hottest = TemperatureSummary.hottest(readings) else {
+            let chosen = settings.sensorName.isEmpty ? nil : readings.first { $0.name == settings.sensorName }
+            guard let sensor = chosen ?? TemperatureSummary.hottest(readings) else {
                 return MenuBarReading(lines: ["—"], reserve: ["100°"], fraction: nil, magnitude: nil,
                                       accessibility: String(localized: "Bu Mac sıcaklık sensörü yayınlamıyor."))
             }
-            let text = number(hottest.celsius, fractionDigits: 0) + "°"
-            return MenuBarReading(lines: [text], reserve: ["100°"], fraction: min(1, max(0, hottest.celsius / 100)),
-                                  magnitude: hottest.celsius,
-                                  accessibility: String(localized: "En sıcak sensör: \(text)C"))
+            let text = number(sensor.celsius, fractionDigits: decimals ? 1 : 0) + "°"
+            return MenuBarReading(lines: [text], reserve: [decimals ? "100,0°" : "100°"], fraction: min(1, max(0, sensor.celsius / 100)),
+                                  magnitude: sensor.celsius,
+                                  accessibility: chosen == nil ? String(localized: "En sıcak sensör: \(text)C")
+                                                               : String(localized: "\(sensor.name): \(text)C"))
         case .powerBattery, .powerTimeRemaining, .powerSource:
             let power = s.power
             let charging = power.isCharging == true

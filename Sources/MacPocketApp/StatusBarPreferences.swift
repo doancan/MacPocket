@@ -8,6 +8,7 @@ extension MenuBarModule {
     var tint: Color {
         switch self {
         case .cpu: PocketTheme.accent
+        case .gpu: Color(hex: 0x30B0C7)
         case .memory: PocketTheme.memory
         case .disk: PocketTheme.disk
         case .network: Color(hex: 0x00A6C8)
@@ -175,6 +176,8 @@ struct StatusBarPreferencesView: View {
         return DisclosureGroup(isExpanded: Binding(get: { expanded == module },
                                                    set: { expanded = $0 ? module : nil })) {
             ModuleSettingsEditor(module: module, settings: store.settings(module), volumes: model.system?.volumes ?? [],
+                                 sensors: (model.system?.temperatures ?? [])
+                                     .filter { TemperatureGroup.classify($0.name) != nil }.sorted { $0.name < $1.name },
                                  layout: store.preferences.layout)
                 .padding(.top, PocketSpacing.xs)
         } label: {
@@ -209,6 +212,7 @@ private struct ModuleSettingsEditor: View {
     let module: MenuBarModule
     @Binding var settings: MenuBarModuleSettings
     let volumes: [VolumeSnapshot]
+    var sensors: [TemperatureReading] = []
     let layout: MenuBarLayout
 
     var body: some View {
@@ -225,14 +229,32 @@ private struct ModuleSettingsEditor: View {
                     ForEach(volumes, id: \.path) { Text($0.name).tag($0.path) }
                 }
             }
+            if module == .power && settings.value == .powerTemperature {
+                Picker("Sensör", selection: $settings.sensorName) {
+                    Text("En sıcak sensör").tag("")
+                    if !settings.sensorName.isEmpty, !sensors.contains(where: { $0.name == settings.sensorName }) {
+                        Text("\(settings.sensorName) (şu an yok)").tag(settings.sensorName)
+                    }
+                    ForEach(sensors, id: \.name) { sensor in
+                        Text(verbatim: "\(sensor.name) · \(MenuBarFormatter.number(sensor.celsius, fractionDigits: 0))°").tag(sensor.name)
+                    }
+                }
+            }
+            if module == .network {
+                Toggle("VPN bağlıyken kilit simgesi göster", isOn: $settings.showVPN)
+                if settings.value == .networkPing {
+                    Text("Gecikme her 10 saniyede 1.1.1.1’e tek bir ping paketiyle ölçülür; bu değer seçili değilken hiç paket gönderilmez.")
+                        .font(.subheadline).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+                }
+            }
             LabeledContent("Görünüm") {
-                GlassTabBar(tabs: MenuBarDisplayStyle.allCases.map { GlassTab(id: $0, title: $0.title) }, selection: $settings.style)
-                    .frame(maxWidth: 300)
+                GlassTabBar(tabs: module.styleOptions.map { GlassTab(id: $0, title: $0.title) }, selection: $settings.style)
+                    .frame(maxWidth: 420)
             }
             HStack(spacing: PocketSpacing.l) {
                 Toggle("Etiket", isOn: $settings.showLabel)
                 Toggle("Simge", isOn: $settings.showIcon)
-                if settings.style == .graph || settings.style == .gauge {
+                if settings.style.drawsLevel {
                     Toggle("Değer", isOn: $settings.showValue)
                 }
                 Toggle("Ondalık", isOn: $settings.decimals)

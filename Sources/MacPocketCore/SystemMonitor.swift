@@ -57,6 +57,9 @@ public struct SystemSnapshot: Codable, Sendable {
     /// SMC whole-system power draw and DC input power, in watts.
     public var systemPowerWatts: Double? = nil
     public var powerInputWatts: Double? = nil
+    /// Nil when no accelerator publishes performance statistics.
+    public var gpu: GPUSnapshot? = nil
+    public var connectivity: ConnectivitySnapshot? = nil
     public let uptimeSeconds: Double
     public let thermalState: String
     public let volumes: [VolumeSnapshot]
@@ -133,8 +136,14 @@ public actor SystemMonitor {
     private var diskIO = DiskIOSampler()
     private let fanSensor = FanSensor()
     private let temperatureSensor = TemperatureSensor()
+    private let gpuSampler = GPUSampler()
+    private let connectivityMonitor = ConnectivityMonitor()
+    /// The ping leaves the Mac, so it runs only while something the user turned on shows latency.
+    private var pingEnabled = false
 
     public init() {}
+
+    public func setPingEnabled(_ enabled: Bool) { pingEnabled = enabled }
 
     public func snapshot() throws -> SystemSnapshot {
         let host = mach_host_self()
@@ -168,6 +177,8 @@ public actor SystemMonitor {
         snapshot.fans = fanSensor.sample()
         snapshot.temperatures = temperatureSensor.sample()
         (snapshot.systemPowerWatts, snapshot.powerInputWatts) = fanSensor.power()
+        snapshot.gpu = gpuSampler.sample()
+        snapshot.connectivity = connectivityMonitor.sample(pingEnabled: pingEnabled)
         return snapshot
     }
 

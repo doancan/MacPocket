@@ -252,6 +252,7 @@ struct MenuBarModuleDetail: View {
             }
             switch module {
             case .cpu: CPUDetail(model: model, history: history, advanced: advanced)
+            case .gpu: GPUDetail(model: model, history: history, binary: binaryUnits, advanced: advanced)
             case .memory: MemoryDetail(model: model, history: history, binary: binaryUnits, advanced: advanced)
             case .disk: DiskDetail(model: model, history: history, binary: binaryUnits, advanced: advanced)
             case .network: NetworkDetail(model: model, history: history, binary: binaryUnits, advanced: advanced)
@@ -328,6 +329,52 @@ private struct CPUDetail: View {
     private func cpuSubtitle(_ system: SystemSnapshot?) -> String {
         let user = percentText(system?.cpuUserPercent), kernel = percentText(system?.cpuSystemPercent)
         return String(localized: "Kullanıcı \(user), Sistem \(kernel)")
+    }
+}
+
+private struct GPUDetail: View {
+    @ObservedObject var model: PocketModel
+    @ObservedObject var history: MenuBarHistory
+    let binary: Bool
+    let advanced: Bool
+    private let module = MenuBarModule.gpu
+
+    var body: some View {
+        let gpu = model.system?.gpu
+        VStack(alignment: .leading, spacing: PocketSpacing.s + 2) {
+            ModuleHeader(module: module, value: percentText(gpu?.utilizationPercent, decimals: true),
+                         subtitle: gpu?.model ?? String(localized: "Grafik işlemci")) {
+                if let renderer = gpu?.rendererPercent { Text("İşleyici \(percentText(renderer))") }
+                if let tiler = gpu?.tilerPercent { Text("Döşeyici \(percentText(tiler))") }
+            }
+            if gpu == nil {
+                Text("Bu Mac grafik işlemci istatistiği yayınlamıyor.").font(.callout).foregroundStyle(.secondary).menuBarSection()
+            } else {
+                HistoryChart(series: [
+                    .init(name: String(localized: "Kullanım"), color: module.tint, values: history.samples.compactMap { s in s.gpu.map { (s.date, $0) } }),
+                    .init(name: String(localized: "İşleyici"), color: PocketTheme.brandSecondary, values: history.samples.compactMap { s in s.gpuRenderer.map { (s.date, $0) } }),
+                ], ceiling: 100, height: 72)
+                .menuBarSection()
+                VStack(alignment: .leading, spacing: PocketSpacing.xs + 2) {
+                    SectionTitle(title: "Bellek", trailing: gpu?.memoryInUseBytes.map { MenuBarFormatter.bytes(Double($0), binary: binary) })
+                    if let used = gpu?.memoryInUseBytes, let total = model.system?.physicalMemoryBytes, total > 0 {
+                        CapacityBar(fraction: Double(used) / Double(total), tint: module.tint)
+                        Text("Birleşik belleğin \(percentText(Double(used) / Double(total) * 100)) kadarı grafik işlemcide.")
+                            .font(.caption).foregroundStyle(.secondary)
+                    }
+                }
+                .menuBarSection()
+                if advanced {
+                    VStack(spacing: PocketSpacing.xs + 1) {
+                        InfoRow(title: "Model", value: gpu?.model ?? "—")
+                        InfoRow(title: "GPU çekirdeği", value: gpu?.coreCount.map { "\($0)" } ?? "—")
+                        InfoRow(title: "İşleyici (fragment)", value: percentText(gpu?.rendererPercent))
+                        InfoRow(title: "Döşeyici (geometri)", value: percentText(gpu?.tilerPercent))
+                    }
+                    .menuBarSection()
+                }
+            }
+        }
     }
 }
 
@@ -496,6 +543,8 @@ private struct NetworkDetail: View {
             ], height: 76, axisLabel: { MenuBarFormatter.rate($0, binary: binary) })
             .menuBarSection()
 
+            connectionStatus(model.system?.connectivity).menuBarSection()
+
             if advanced {
                 VStack(spacing: PocketSpacing.xs + 1) {
                     InfoRow(title: "Birincil arayüz", value: network?.primaryInterface ?? String(localized: "Bağlantı yok"))
@@ -505,10 +554,37 @@ private struct NetworkDetail: View {
                 }
                 .menuBarSection()
 
-                Label("Dış IP adresi gizlilik nedeniyle sorgulanmaz; hiçbir ağ isteği yapılmaz.", systemImage: "lock.shield")
+                Label("Dış IP adresi gizlilik nedeniyle sorgulanmaz. Gecikme ölçümü yalnız menü çubuğunda ping seçiliyken 1.1.1.1’e tek paket gönderir.", systemImage: "lock.shield")
                     .font(.caption).foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
             }
+        }
+    }
+
+    @ViewBuilder private func connectionStatus(_ connectivity: ConnectivitySnapshot?) -> some View {
+        VStack(spacing: PocketSpacing.xs + 1) {
+            let online = connectivity?.online
+            InfoRow(title: "İnternet", value: online == nil ? "—" : online == true ? String(localized: "Bağlı") : String(localized: "Bağlantı yok"),
+                    dot: online == nil ? nil : online == true ? PocketTheme.disk : .red)
+            InfoRow(title: "Bağlantı türü", value: linkTitle(connectivity?.link))
+            if let rssi = connectivity?.wifiRSSI {
+                InfoRow(title: "Wi-Fi sinyali", value: "\(rssi) dBm · \(WiFiSignalQuality(rssi: rssi).title)")
+            }
+            InfoRow(title: "VPN", value: connectivity?.vpnActive == true ? String(localized: "Bağlı") : String(localized: "Kapalı"),
+                    dot: connectivity?.vpnActive == true ? PocketTheme.disk : nil)
+            if let connectivity, connectivity.pingMilliseconds != nil || connectivity.pingFailed {
+                InfoRow(title: "Gecikme (1.1.1.1)", value: connectivity.pingMilliseconds.map { MenuBarFormatter.number($0, fractionDigits: 0) + " ms" }
+                        ?? String(localized: "Yanıt yok"))
+            }
+        }
+    }
+
+    private func linkTitle(_ link: ConnectivitySnapshot.Link?) -> String {
+        switch link ?? ConnectivitySnapshot.Link.none {
+        case .wifi: "Wi-Fi"
+        case .ethernet: "Ethernet"
+        case .other: String(localized: "Diğer")
+        case .none: String(localized: "Yok")
         }
     }
 
