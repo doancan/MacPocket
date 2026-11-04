@@ -2,6 +2,8 @@
 
 ## Yayımlanmamış
 
+- 🎛 **Menü çubuğu düzenleyici**: canlı menü çubuğu önizlemesinde sürükle-bırak sıralama, raftan ekleme/kapatma, tıkla-ayarla; açık/koyu önizleme
+- 🚦 **Eşik renkleri**: değer uyarı eşiğini geçince turuncu, kritikte kırmızı; birim ve yön değere göre (%, °C, ms, dBm)
 - ⏳ **Ekran Süresi**: uygulama başına günlük/saatlik süre, 7 ve 30 günlük grafik; boşta, kilitli ve uykuda sayılmaz, veriler bu Mac’te kalır
 - 📊 **Menü çubuğu**: GPU modülü, ping, Wi-Fi sinyali, VPN kilidi ve çevrimdışı uyarısı; disk okuma/yazma, pasta ve çekirdek çubukları; sıcaklık için sensör seçimi
 - 👋 **Kurulum sihirbazı**: ilk açılışta karşılama, canlı izin durumu, Sistem Ayarları’nın yanında sürükle-bırak kartı ve tercihler; Ayarlar › Genel’den yeniden açılır

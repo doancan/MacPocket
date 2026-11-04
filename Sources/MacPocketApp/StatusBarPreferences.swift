@@ -73,15 +73,38 @@ extension MenuBarGroupedStyle {
     }
 }
 
-/// Settings → Menü Çubuğu.
+/// Settings → Menü Çubuğu: the live editor first, then the selected module's options, then layout and units.
 struct StatusBarPreferencesView: View {
     @ObservedObject var model: PocketModel
     @ObservedObject private var store = MenuBarSettingsStore.shared
-    @ObservedObject private var history = MenuBarHistory.shared
-    @State private var expanded: MenuBarModule?
+    @State private var selection: MenuBarModule?
 
     var body: some View {
         Form {
+            Section {
+                MenuBarEditor(model: model, selection: $selection)
+                    .padding(.vertical, PocketSpacing.xs)
+            } header: { Text("Menü çubuğu") }
+
+            if let module = selection ?? store.preferences.enabledModules.first ?? store.preferences.order.first {
+                Section {
+                    HStack(spacing: PocketSpacing.s) {
+                        PocketIconTile(symbol: module.symbol, tint: module.tint, size: 24)
+                        Text(module.title).font(.headline)
+                        Spacer(minLength: PocketSpacing.s)
+                        Text("Menü çubuğunda").foregroundStyle(.secondary)
+                        Toggle("Menü çubuğunda", isOn: store.enabled(module)).toggleStyle(.switch).controlSize(.small).labelsHidden()
+                    }
+                    ModuleSettingsEditor(module: module, settings: store.settings(module), volumes: model.system?.volumes ?? [],
+                                         sensors: (model.system?.temperatures ?? [])
+                                             .filter { TemperatureGroup.classify($0.name) != nil }.sorted { $0.name < $1.name },
+                                         layout: store.preferences.layout)
+                } header: { Text("Seçili modül") } footer: {
+                    Text("Pil bilgileri yalnız pili olan Mac’lerde, fan hızı yalnız fanlı Mac’lerde gösterilir. Sığmayan öğeleri macOS ekran alanına göre gizleyebilir.")
+                        .font(.subheadline).foregroundStyle(.secondary)
+                }
+            }
+
             Section {
                 Toggle("Menü çubuğunda göster", isOn: $store.preferences.visible)
                 LabeledContent("Düzen") {
@@ -90,23 +113,11 @@ struct StatusBarPreferencesView: View {
                 }
                 Text(store.preferences.layout == .grouped
                      ? "Menü çubuğunda tek, kompakt bir simge; tıklayınca her modül kendi sekmesinde açılır."
-                     : "Her etkin modül kendi menü çubuğu öğesini ve kendi ayarlarını kullanır: CPU, bellek, disk, ağ, güç ve fan. Öğeler ⌘ basılıyken sürüklenebilir.")
+                     : "Her etkin modül kendi menü çubuğu öğesini ve kendi ayarlarını kullanır. Gerçek menü çubuğunda öğeler ⌘ basılıyken de sürüklenebilir.")
                     .font(.subheadline).foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
                 if store.preferences.layout == .grouped { groupedOptions }
-                LabeledContent("Önizleme") { preview }
             } header: { Text("Yerleşim") }
-
-            Section {
-                ForEach(store.preferences.order) { module in
-                    moduleRow(module)
-                }
-            } header: {
-                Text("Modüller")
-            } footer: {
-                Text("Pil bilgileri yalnız pili olan Mac’lerde, fan hızı yalnız fanlı Mac’lerde gösterilir. Sığmayan öğeleri macOS ekran alanına göre gizleyebilir.")
-                    .font(.subheadline).foregroundStyle(.secondary)
-            }
 
             Section {
                 Picker("Boyut birimi", selection: $store.preferences.binaryUnits) {
@@ -135,7 +146,7 @@ struct StatusBarPreferencesView: View {
                     Label(module.title, systemImage: module.symbol).tag(module)
                 }
             }
-            Text("Gösterge, modülün kendi ayarlarında seçili değeri izler; örneğin Güç ve Fan için “Fan hızı (%)” seçiliyse fanın en yüksek hızına oranını gösterir. Hız gibi üst sınırı olmayan değerler son ölçümlerin en yükseğine göre oranlanır.")
+            Text("Gösterge, modülün kendi ayarlarında seçili değeri izler; eşiğe göre renk açıksa simge de renklenir. Hız gibi üst sınırı olmayan değerler son ölçümlerin en yükseğine göre oranlanır.")
                 .font(.subheadline).foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
         }
@@ -143,67 +154,6 @@ struct StatusBarPreferencesView: View {
         Text("Başlangıç diskindeki boş alan bildirim eşiğinin altına düştüğünde, ısı yükseldiğinde veya bellek baskısı kritikleştiğinde simgenin köşesinde nokta belirir; nedeni ipucunda yazar.")
             .font(.subheadline).foregroundStyle(.secondary)
             .fixedSize(horizontal: false, vertical: true)
-    }
-
-    @ViewBuilder private var preview: some View {
-        let preferences = store.preferences
-        if !preferences.visible {
-            Text("Gizli").foregroundStyle(.secondary)
-        } else if preferences.layout == .grouped || preferences.enabledModules.isEmpty {
-            let attention = MenuBarAttention.isNeeded(model.system,
-                                                      diskFreeThreshold: ResourceAlertSettings.load(from: .standard).diskFreePercent)
-            MenuBarItemPreview(image: MenuBarRenderer.grouped(MenuBarRenderer.groupedState(preferences: preferences, snapshot: model.system,
-                                                                                            history: history, attention: attention)))
-        } else {
-            HStack(spacing: PocketSpacing.xs) {
-                ForEach(preferences.enabledModules) { module in
-                    MenuBarItemPreview(image: moduleImage(module))
-                }
-            }
-        }
-    }
-
-    private func moduleImage(_ module: MenuBarModule) -> NSImage {
-        let settings = store.preferences.settings(for: module)
-        let reading = MenuBarFormatter.reading(module, settings: settings, snapshot: model.system,
-                                               binaryUnits: store.preferences.binaryUnits)
-        return MenuBarRenderer.module(module, settings: settings, reading: reading, snapshot: model.system, history: history)
-    }
-
-    private func moduleRow(_ module: MenuBarModule) -> some View {
-        let order = store.preferences.order
-        let index = order.firstIndex(of: module) ?? 0
-        return DisclosureGroup(isExpanded: Binding(get: { expanded == module },
-                                                   set: { expanded = $0 ? module : nil })) {
-            ModuleSettingsEditor(module: module, settings: store.settings(module), volumes: model.system?.volumes ?? [],
-                                 sensors: (model.system?.temperatures ?? [])
-                                     .filter { TemperatureGroup.classify($0.name) != nil }.sorted { $0.name < $1.name },
-                                 layout: store.preferences.layout)
-                .padding(.top, PocketSpacing.xs)
-        } label: {
-            HStack(spacing: PocketSpacing.s) {
-                Toggle(isOn: store.enabled(module)) { EmptyView() }
-                    .labelsHidden()
-                    .toggleStyle(.checkbox)
-                    .accessibilityLabel("\(module.title) modülünü menü çubuğunda göster")
-                PocketIconTile(symbol: module.symbol, tint: module.tint, size: 20)
-                Text(module.title)
-                Spacer(minLength: PocketSpacing.s)
-                if store.preferences.layout == .separate, store.preferences.enabled.contains(module) {
-                    MenuBarItemPreview(image: moduleImage(module))
-                }
-                Button { store.move(module, by: -1) } label: { Image(systemName: "chevron.up") }
-                    .disabled(index == 0)
-                    .help("Öne al")
-                    .accessibilityLabel("\(module.title) modülünü öne al")
-                Button { store.move(module, by: 1) } label: { Image(systemName: "chevron.down") }
-                    .disabled(index == order.count - 1)
-                    .help("Arkaya al")
-                    .accessibilityLabel("\(module.title) modülünü arkaya al")
-            }
-            .buttonStyle(.borderless)
-            .controlSize(.small)
-        }
     }
 }
 
@@ -247,9 +197,17 @@ private struct ModuleSettingsEditor: View {
                         .font(.subheadline).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
                 }
             }
-            LabeledContent("Görünüm") {
+            VStack(alignment: .leading, spacing: PocketSpacing.xs) {
+                Text("Görünüm")
                 GlassTabBar(tabs: module.styleOptions.map { GlassTab(id: $0, title: $0.title) }, selection: $settings.style)
-                    .frame(maxWidth: 420)
+                    .frame(maxWidth: .infinity)
+            }
+            if settings.value.thresholdUnit != nil {
+                LabeledContent("Renk") {
+                    GlassTabBar(tabs: MenuBarColorMode.allCases.map { GlassTab(id: $0, title: $0.title) }, selection: $settings.colorMode)
+                        .frame(maxWidth: 240)
+                }
+                if settings.colorMode == .thresholds { ThresholdEditor(settings: $settings) }
             }
             HStack(spacing: PocketSpacing.l) {
                 Toggle("Etiket", isOn: $settings.showLabel)
@@ -267,5 +225,55 @@ private struct ModuleSettingsEditor: View {
                     .fixedSize(horizontal: false, vertical: true)
             }
         }
+    }
+}
+
+/// Warning and critical limits for a module's value, in its own unit.
+private struct ThresholdEditor: View {
+    @Binding var settings: MenuBarModuleSettings
+
+    var body: some View {
+        if let unit = settings.value.thresholdUnit, let limits = settings.thresholds {
+            VStack(alignment: .leading, spacing: PocketSpacing.s) {
+                row(String(localized: "Uyarı"), color: .orange, unit: unit, value: limits.warning) { settings.warningThreshold = $0 }
+                row(String(localized: "Kritik"), color: .red, unit: unit, value: limits.critical) { settings.criticalThreshold = $0 }
+                HStack {
+                    Text(explanation(unit)).font(.subheadline).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+                    Spacer(minLength: PocketSpacing.s)
+                    if settings.warningThreshold != nil || settings.criticalThreshold != nil {
+                        Button("Varsayılana Dön") { settings.warningThreshold = nil; settings.criticalThreshold = nil }
+                            .controlSize(.small)
+                    }
+                }
+            }
+        }
+    }
+
+    private func row(_ title: String, color: Color, unit: MenuBarThresholdUnit, value: Double,
+                     set: @escaping (Double) -> Void) -> some View {
+        HStack(spacing: PocketSpacing.s) {
+            Circle().fill(color).frame(width: 9, height: 9)
+            Text(title).frame(width: 52, alignment: .leading)
+            Slider(value: Binding(get: { value }, set: { set(($0 / unit.step).rounded() * unit.step) }), in: unit.range)
+            Text(verbatim: format(value, unit)).monospacedDigit().frame(width: 74, alignment: .trailing)
+        }
+        .accessibilityElement(children: .combine)
+    }
+
+    private func format(_ value: Double, _ unit: MenuBarThresholdUnit) -> String {
+        switch unit {
+        case .percent: MenuBarFormatter.percentText(MenuBarFormatter.number(value, fractionDigits: 0))
+        default: MenuBarFormatter.number(value, fractionDigits: 0) + " " + unit.symbol
+        }
+    }
+
+    private func explanation(_ unit: MenuBarThresholdUnit) -> String {
+        let measured: String = switch settings.value {
+        case .memoryFreeBytes, .diskFreeBytes, .diskFreePercent: String(localized: "Doluluk oranı")
+        case .powerFanSpeed: String(localized: "Fanın en yüksek hıza oranı")
+        case .powerTimeRemaining: String(localized: "Pil yüzdesi")
+        default: String(localized: "Değer")
+        }
+        return String(localized: "\(measured) eşiğin \(settings.value.thresholdDirection) öğe turuncuya, kritik eşikte kırmızıya döner.")
     }
 }

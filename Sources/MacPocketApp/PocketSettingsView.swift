@@ -20,7 +20,7 @@ struct PocketSettingsView: View {
             PocketAdvancedSettings(model: model)
                 .tabItem { Label("Gelişmiş", systemImage: "gearshape.2") }
         }
-        .frame(width: 640, height: 520)
+        .frame(width: 760, height: 620)
         .onAppear { loginItem.refresh() }
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
             loginItem.refresh()

@@ -32,9 +32,6 @@
 "%@ kullanımda · %@ toplam" = "%1$@ used · %2$@ total";
 "%@ kullanımda, %@ boş" = "%1$@ used, %2$@ free";
 "%@ listeden çıkar" = "Remove %@ from the list";
-"%@ modülünü arkaya al" = "Move %@ module later";
-"%@ modülünü menü çubuğunda göster" = "Show %@ module in the menu bar";
-"%@ modülünü öne al" = "Move %@ module earlier";
 "%@ seç" = "Select %@";
 "%@ seçili · %@" = "%1$@ selected · %2$@";
 "%@ toplam" = "%@ total";
@@ -191,7 +188,6 @@
 "Arka plan görevi" = "Background task";
 "Arka plan uyanması" = "Dark wake";
 "Arka planda uyanmalar" = "Dark wakes";
-"Arkaya al" = "Move Later";
 "Arşiv" = "Archive";
 "Atlanan veya okunamayan görseller (%lld)" = "Skipped or unreadable images (%lld)";
 "Ayar dosyası" = "Settings file";
@@ -1412,7 +1408,6 @@
 "Önbellekteki dosyalar" = "Cached files";
 "Öndeki uygulama" = "Front app";
 "Öne Getir" = "Bring to Front";
-"Öne al" = "Move Earlier";
 "Önizle" = "Preview";
 "Önizleme" = "Preview";
 "Önizleme Ekran Kaydı izni gerektirir." = "Previews require Screen Recording permission.";
@@ -1519,10 +1514,8 @@
 "Fan: %@" = "Fan: %@";
 "Fanlar" = "Fans";
 "Gruplu düzende bu modül açılır pencerede kendi sekmesinde gösterilir; seçili değer canlı göstergeyi de besler. Görünüm seçenekleri Ayrı düzende uygulanır." = "In the grouped layout this module appears as its own tab in the popover, and the selected value also drives the live icon. Appearance options apply to the separate layout.";
-"Gösterge, modülün kendi ayarlarında seçili değeri izler; örneğin Güç ve Fan için “Fan hızı (%)” seçiliyse fanın en yüksek hızına oranını gösterir. Hız gibi üst sınırı olmayan değerler son ölçümlerin en yükseğine göre oranlanır." = "The icon follows the value selected in the module’s own settings; for example, with “Fan speed (%)” selected for Power & Fans it shows how close the fan is to its maximum speed. Values without an upper bound, such as rates, are scaled to the highest recent reading.";
 "Göstergenin izlediği" = "Icon tracks";
 "Güç ve Fan" = "Power & Fans";
-"Her etkin modül kendi menü çubuğu öğesini ve kendi ayarlarını kullanır: CPU, bellek, disk, ağ, güç ve fan. Öğeler ⌘ basılıyken sürüklenebilir." = "Each enabled module gets its own menu bar item and settings: CPU, memory, disk, network, power and fans. Hold ⌘ to drag items.";
 "Isı durumu" = "Thermal state";
 "Isı durumu: %@" = "Thermal state: %@";
 "Isı yüksek" = "The Mac is running hot";
@@ -2962,3 +2955,25 @@
 "Hangi uygulamada ne kadar zaman geçirdiğini gör; boşta ve kilitli süre sayılmaz, veriler bu Mac’te kalır." = "See how much time you spend in each app; idle and locked time isn’t counted, and the data stays on this Mac.";
 "0 dk" = "0 min";
 "< 1 dk" = "< 1 min";
+
+/* Menu bar editor and thresholds */
+"Sürükleyerek sırala, rafa bırakarak kapat; ayarlamak için öğeye tıkla." = "Drag to reorder, drop on the shelf to turn off; click an item to configure it.";
+"Menü çubuğu öğesi gizli" = "Menu bar item hidden";
+"Gruplu simge" = "Grouped icon";
+"Açılır pencere sekmeleri" = "Popover tabs";
+"Raftan modül sürükle" = "Drag a module from the shelf";
+"Kapalı modüller" = "Turned-off modules";
+"Tüm modüller menü çubuğunda. Kapatmak için buraya sürükle." = "All modules are in the menu bar. Drag one here to turn it off.";
+"Menü çubuğuna eklemek için tıkla veya sürükle" = "Click or drag to add to the menu bar";
+"Menü çubuğu" = "Menu bar";
+"Menü çubuğunda" = "In menu bar";
+"Seçili modül" = "Selected module";
+"Her etkin modül kendi menü çubuğu öğesini ve kendi ayarlarını kullanır. Gerçek menü çubuğunda öğeler ⌘ basılıyken de sürüklenebilir." = "Each enabled module gets its own menu bar item and options. In the real menu bar, items can also be dragged while holding ⌘.";
+"Gösterge, modülün kendi ayarlarında seçili değeri izler; eşiğe göre renk açıksa simge de renklenir. Hız gibi üst sınırı olmayan değerler son ölçümlerin en yükseğine göre oranlanır." = "The gauge follows the value selected in the module’s own options; with threshold colors on, the icon is colored too. Values without an upper bound, such as speeds, scale to the recent maximum.";
+"Varsayılana Dön" = "Reset to Default";
+"Doluluk oranı" = "Fill level";
+"Fanın en yüksek hıza oranı" = "Share of maximum fan speed";
+"%@ eşiğin %@ öğe turuncuya, kritik eşikte kırmızıya döner." = "%1$@ %2$@ the threshold turns the item orange, and red at the critical one.";
+"Eşiğe göre" = "By threshold";
+"altına düşünce" = "dropping below";
+"üstüne çıkınca" = "rising above";

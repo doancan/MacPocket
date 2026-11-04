@@ -266,3 +266,9 @@ ayarı değiştirilmeden yalnız birim testleriyle doğrulandı.
 - **Canlı doğrulanan:** Takibi başlatma, Finder/Safari/MacPocket arasında geçiş sonrası süre, pay, geçiş sayısı (4) ve en yoğun saat; 7 gün görünümü ve okunur eksen; sayfanın sonuna kadar kaydırma.
 - **Doğrulanmayan:** Boşta duraklatma, kilit/uyku duraklatması, video uygulamasının sayılmaya devam etmesi, gece yarısını geçen kayıt (yalnız birim testi), silme onayı.
 
+## Menü çubuğu düzenleyici ve eşik renkleri
+
+- **Uygulanan:** Ayarlar › Menü Çubuğu üstte canlı bir menü çubuğu şeridi (öğeler gerçek çizimle), sürükleyerek sıralama, kapalı modüller rafı (rafa bırakınca kapanır, raftan sürükleyince/tıklayınca açılır), seçili modülün ayar paneli, açık/koyu/sistem önizleme; gruplu düzende açılır pencere sekme sırası. Ayarlar penceresi 760×620. Eşik renkleri: `MenuBarColorMode` (tek renk/eşiğe göre), değer birimine göre eşikler (`MenuBarThresholdUnit`: %, °C, ms, dBm), düşükken kötü değerlerde (pil, Wi-Fi) ters yön, varsayılan eşikler; uyarı turuncu, kritik kırmızı (yalnız alarmda şablon dışı görüntü). Gruplu canlı simge de izlediği modülün eşiğine göre renklenir.
+- **Canlı doğrulanan:** Sürükleyerek sıralama (RAM → CPU önüne, kayıtlı sıra değişti), raftan Disk ekleme, GPU’yu rafa bırakıp kapatma; gerçek menü çubuğu anında güncellendi. CPU %14 > %5 uyarı → turuncu, sıcaklık 66° > 50° kritik → kırmızı hem önizlemede hem gerçek menü çubuğunda.
+- **Doğrulanmayan:** Gruplu düzende sekme sürükleme ve renkli gruplu simge, koyu önizleme seçeneği, eşik kaydırıcılarını sürükleme.
+

@@ -293,6 +293,30 @@ enum MenuBarRenderer {
         return image
     }
 
+    // MARK: Threshold color
+
+    static func color(for level: MenuBarLevel) -> NSColor? {
+        switch level {
+        case .normal: nil
+        case .warning: .systemOrange
+        case .critical: .systemRed
+        }
+    }
+
+    /// A template image recolored for a warning or critical level. Colored images no longer follow the menu bar
+    /// appearance, so only alarm states use them; the normal state stays a template.
+    static func colored(_ image: NSImage, level: MenuBarLevel) -> NSImage {
+        guard let color = color(for: level) else { return image }
+        let tinted = NSImage(size: image.size, flipped: false) { rect in
+            image.draw(in: rect)
+            color.set()
+            rect.fill(using: .sourceAtop)
+            return true
+        }
+        tinted.isTemplate = false
+        return tinted
+    }
+
     // MARK: Separate item
 
     static func moduleKey(_ module: MenuBarModule, settings: MenuBarModuleSettings, reading: MenuBarReading,
@@ -314,12 +338,19 @@ enum MenuBarRenderer {
             }
         }
         return Key(parts: [module.rawValue, String(describing: settings), symbol(for: module, value: settings.value, snapshot: snapshot),
-                           showsVPN(module, settings: settings, snapshot: snapshot) ? "vpn" : ""]
+                           showsVPN(module, settings: settings, snapshot: snapshot) ? "vpn" : "",
+                           "\(MenuBarThresholds.level(reading, settings: settings).rawValue)"]
                    + reading.lines + reading.reserve, levels: levels)
     }
 
     static func module(_ module: MenuBarModule, settings: MenuBarModuleSettings, reading: MenuBarReading,
                        snapshot: SystemSnapshot?, history: MenuBarHistory) -> NSImage {
+        colored(moduleTemplate(module, settings: settings, reading: reading, snapshot: snapshot, history: history),
+                level: MenuBarThresholds.level(reading, settings: settings))
+    }
+
+    private static func moduleTemplate(_ module: MenuBarModule, settings: MenuBarModuleSettings, reading: MenuBarReading,
+                                       snapshot: SystemSnapshot?, history: MenuBarHistory) -> NSImage {
         let symbolName = symbol(for: module, value: settings.value, snapshot: snapshot)
         let shortLabel = module.shortLabel(for: settings.value)
         if settings.style == .icon {
@@ -424,6 +455,7 @@ enum MenuBarRenderer {
         /// 0…1 level of the metric module.
         var level: Double
         var attention: Bool
+        var alarm: MenuBarLevel = .normal
     }
 
     static func groupedState(preferences: MenuBarPreferences, snapshot: SystemSnapshot?, history: MenuBarHistory,
@@ -434,11 +466,12 @@ enum MenuBarRenderer {
         let level = reading.fraction ?? history.graph(for: metric, settings: settings, count: graphSamples).last ?? 0
         return GroupedState(style: preferences.groupedStyle,
                             symbol: symbol(for: metric, value: settings.value, snapshot: snapshot),
-                            level: min(1, max(0, level)), attention: preferences.groupedBadge && attention)
+                            level: min(1, max(0, level)), attention: preferences.groupedBadge && attention,
+                            alarm: preferences.groupedStyle.isLive ? MenuBarThresholds.level(reading, settings: settings) : .normal)
     }
 
     static func groupedKey(_ state: GroupedState) -> Key {
-        Key(parts: [state.style.rawValue, state.style == .ring ? state.symbol : "", state.attention ? "attention" : ""],
+        Key(parts: [state.style.rawValue, state.style == .ring ? state.symbol : "", state.attention ? "attention" : "", "\(state.alarm.rawValue)"],
             levels: state.style.isLive ? [Int((state.level * Double(levelSteps)).rounded())] : [])
     }
 
@@ -449,6 +482,10 @@ enum MenuBarRenderer {
     private static let badgeRoom: CGFloat = 3
 
     static func grouped(_ state: GroupedState) -> NSImage {
+        colored(groupedTemplate(state), level: state.alarm)
+    }
+
+    private static func groupedTemplate(_ state: GroupedState) -> NSImage {
         let width = iconWidth + (state.attention ? badgeRoom : 0)
         let level = Double(Int((state.level * Double(levelSteps)).rounded())) / Double(levelSteps)
         return template(width: width) {
@@ -526,7 +563,7 @@ struct MenuBarItemPreview: View {
 
     var body: some View {
         Image(nsImage: image)
-            .renderingMode(.template)
+            .renderingMode(image.isTemplate ? .template : .original)
             .foregroundStyle(.primary)
             .padding(.horizontal, PocketSpacing.s)
             .frame(height: 24)

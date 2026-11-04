@@ -189,6 +189,112 @@ public enum MenuBarDisplayStyle: String, Codable, Sendable, CaseIterable, Identi
     public var drawsLevel: Bool { self == .graph || self == .gauge || self == .pie || self == .cores }
 }
 
+// MARK: - Thresholds
+
+/// How a module item is colored in the menu bar.
+public enum MenuBarColorMode: String, Codable, Sendable, CaseIterable, Identifiable {
+    /// Follows the menu bar like every other item (template image).
+    case monochrome
+    /// Orange past the warning threshold, red past the critical one.
+    case thresholds
+    public var id: String { rawValue }
+    public var title: String { self == .monochrome ? String(localized: "Tek renk") : String(localized: "Eşiğe göre") }
+}
+
+public enum MenuBarLevel: Int, Sendable, Comparable {
+    case normal, warning, critical
+    public static func < (a: Self, b: Self) -> Bool { a.rawValue < b.rawValue }
+}
+
+/// The scale a value's thresholds are entered in.
+public enum MenuBarThresholdUnit: Sendable, Equatable {
+    case percent, celsius, milliseconds, dBm
+
+    public var symbol: String {
+        switch self {
+        case .percent: "%"
+        case .celsius: "°C"
+        case .milliseconds: "ms"
+        case .dBm: "dBm"
+        }
+    }
+
+    public var range: ClosedRange<Double> {
+        switch self {
+        case .percent: 0...100
+        case .celsius: 30...110
+        case .milliseconds: 10...1000
+        case .dBm: -95 ... -40
+        }
+    }
+
+    public var step: Double {
+        switch self {
+        case .percent, .celsius, .dBm: 1
+        case .milliseconds: 10
+        }
+    }
+}
+
+extension MenuBarValue {
+    /// Nil for values with no meaningful alarm level (rates, power source).
+    public var thresholdUnit: MenuBarThresholdUnit? {
+        switch self {
+        case .cpuTotal, .cpuUser, .cpuSystem, .gpuUtilization, .gpuRenderer, .gpuMemory,
+             .memoryUsedPercent, .memoryUsedBytes, .memoryFreeBytes, .memoryPressure,
+             .diskFreeBytes, .diskUsedPercent, .diskFreePercent, .powerBattery, .powerTimeRemaining,
+             .powerFanSpeed, .powerFanPercent, .powerThermal: .percent
+        case .powerTemperature: .celsius
+        case .networkPing: .milliseconds
+        case .networkWifiSignal: .dBm
+        case .diskActivity, .diskReadWrite, .networkUpDown, .networkCombined, .networkDownload, .networkUpload, .powerSource: nil
+        }
+    }
+
+    /// Battery charge and Wi-Fi signal get worse as they fall; everything else as it rises.
+    public var lowerIsWorse: Bool {
+        switch self {
+        case .powerBattery, .powerTimeRemaining, .networkWifiSignal: true
+        default: false
+        }
+    }
+
+    /// Thresholds used until the user sets their own: (warning, critical).
+    public var defaultThresholds: (warning: Double, critical: Double)? {
+        switch self {
+        case .cpuTotal, .cpuUser, .cpuSystem, .gpuUtilization, .gpuRenderer: (70, 90)
+        case .gpuMemory: (50, 75)
+        case .memoryUsedPercent, .memoryUsedBytes, .memoryFreeBytes: (80, 92)
+        case .memoryPressure: (50, 80)
+        case .diskFreeBytes, .diskUsedPercent, .diskFreePercent: (85, 95)
+        case .powerBattery, .powerTimeRemaining: (20, 10)
+        case .powerFanSpeed, .powerFanPercent: (70, 90)
+        case .powerThermal: (50, 75)
+        case .powerTemperature: (80, 95)
+        case .networkPing: (100, 250)
+        case .networkWifiSignal: (-70, -80)
+        default: nil
+        }
+    }
+
+    /// Short description for settings, e.g. "üstüne çıkınca" or "altına düşünce".
+    public var thresholdDirection: String {
+        lowerIsWorse ? String(localized: "altına düşünce") : String(localized: "üstüne çıkınca")
+    }
+}
+
+public enum MenuBarThresholds {
+    /// The level of a reading under the module's thresholds; normal when coloring is off or the value has no scale.
+    public static func level(_ reading: MenuBarReading, settings: MenuBarModuleSettings) -> MenuBarLevel {
+        guard settings.colorMode == .thresholds, let value = reading.thresholdValue,
+              let limits = settings.thresholds else { return .normal }
+        if settings.value.lowerIsWorse {
+            return value <= limits.critical ? .critical : value <= limits.warning ? .warning : .normal
+        }
+        return value >= limits.critical ? .critical : value >= limits.warning ? .warning : .normal
+    }
+}
+
 // MARK: - Settings
 
 /// Per-module menu bar options, stored as JSON under `MenuBarPreferences.moduleKey(_:)`.
@@ -206,13 +312,25 @@ public struct MenuBarModuleSettings: Codable, Equatable, Sendable {
     public var sensorName: String
     /// Network module: mark the item with a lock while a VPN is connected.
     public var showVPN: Bool
+    public var colorMode: MenuBarColorMode
+    /// User thresholds in the value's unit; nil keeps the value's defaults.
+    public var warningThreshold: Double?
+    public var criticalThreshold: Double?
+
+    /// The thresholds in effect for the current value, or nil when it has no scale.
+    public var thresholds: (warning: Double, critical: Double)? {
+        guard let defaults = value.defaultThresholds else { return nil }
+        return (warningThreshold ?? defaults.warning, criticalThreshold ?? defaults.critical)
+    }
 
     public init(style: MenuBarDisplayStyle = .value, showLabel: Bool = true, showIcon: Bool = false,
                 showValue: Bool = true, decimals: Bool = false, value: MenuBarValue, volumePath: String = "",
-                sensorName: String = "", showVPN: Bool = true) {
+                sensorName: String = "", showVPN: Bool = true, colorMode: MenuBarColorMode = .monochrome,
+                warningThreshold: Double? = nil, criticalThreshold: Double? = nil) {
         self.style = style; self.showLabel = showLabel; self.showIcon = showIcon
         self.showValue = showValue; self.decimals = decimals; self.value = value; self.volumePath = volumePath
         self.sensorName = sensorName; self.showVPN = showVPN
+        self.colorMode = colorMode; self.warningThreshold = warningThreshold; self.criticalThreshold = criticalThreshold
     }
 
     public static func defaults(for module: MenuBarModule) -> Self {
@@ -223,7 +341,7 @@ public struct MenuBarModuleSettings: Codable, Equatable, Sendable {
         }
     }
 
-    private enum CodingKeys: String, CodingKey { case style, showLabel, showIcon, showValue, decimals, value, volumePath, sensorName, showVPN }
+    private enum CodingKeys: String, CodingKey { case style, showLabel, showIcon, showValue, decimals, value, volumePath, sensorName, showVPN, colorMode, warningThreshold, criticalThreshold }
 
     /// Missing or unknown fields fall back to defaults, so stored settings survive future additions.
     public init(from decoder: Decoder) throws {
@@ -237,7 +355,10 @@ public struct MenuBarModuleSettings: Codable, Equatable, Sendable {
                   value: value ?? .cpuTotal,
                   volumePath: (try? container.decodeIfPresent(String.self, forKey: .volumePath)) ?? "",
                   sensorName: (try? container.decodeIfPresent(String.self, forKey: .sensorName)) ?? "",
-                  showVPN: (try? container.decodeIfPresent(Bool.self, forKey: .showVPN)) ?? true)
+                  showVPN: (try? container.decodeIfPresent(Bool.self, forKey: .showVPN)) ?? true,
+                  colorMode: (try? container.decodeIfPresent(MenuBarColorMode.self, forKey: .colorMode)) ?? .monochrome,
+                  warningThreshold: try? container.decodeIfPresent(Double.self, forKey: .warningThreshold),
+                  criticalThreshold: try? container.decodeIfPresent(Double.self, forKey: .criticalThreshold))
     }
 
     /// Keeps `value` within the module's options (e.g. after decoding a hand-edited plist).
@@ -435,6 +556,8 @@ public struct MenuBarReading: Equatable, Sendable {
     public let magnitude: Double?
     /// Spoken description, e.g. "CPU: %12 kullanım".
     public let accessibility: String
+    /// The value in its threshold unit (see `MenuBarValue.thresholdUnit`), nil when it has none.
+    public var thresholdValue: Double? = nil
 }
 
 public enum MenuBarFormatter {
@@ -506,6 +629,19 @@ public enum MenuBarFormatter {
 
     public static func reading(_ module: MenuBarModule, settings raw: MenuBarModuleSettings,
                                snapshot: SystemSnapshot?, binaryUnits: Bool = true) -> MenuBarReading {
+        var reading = baseReading(module, settings: raw, snapshot: snapshot, binaryUnits: binaryUnits)
+        let value = raw.normalized(for: module).value
+        switch value.thresholdUnit {
+        case .percent?: reading.thresholdValue = reading.fraction.map { $0 * 100 }
+        case .celsius?, .milliseconds?: reading.thresholdValue = reading.fraction == nil ? nil : reading.magnitude
+        case .dBm?: reading.thresholdValue = reading.fraction == nil ? nil : snapshot?.connectivity?.wifiRSSI.map(Double.init)
+        case nil: break
+        }
+        return reading
+    }
+
+    private static func baseReading(_ module: MenuBarModule, settings raw: MenuBarModuleSettings,
+                                    snapshot: SystemSnapshot?, binaryUnits: Bool) -> MenuBarReading {
         let settings = raw.normalized(for: module)
         let decimals = settings.decimals
         let percentReserve = percent(100, decimals: decimals)

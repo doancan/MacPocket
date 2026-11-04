@@ -107,4 +107,54 @@ final class MenuBarExtrasTests: XCTestCase {
         XCTAssertEqual(MenuBarPreferences.completeOrder([.network, .cpu]).last, .power)
         XCTAssertTrue(MenuBarPreferences.completeOrder([.network, .cpu]).contains(.gpu), "Existing orders gain the GPU module")
     }
+
+    func testThresholdColoringFollowsUnitsAndDirection() {
+        var cpu = MenuBarModuleSettings(value: .cpuTotal)
+        let busy = MenuBarFormatter.reading(.cpu, settings: cpu, snapshot: snapshot())
+        XCTAssertEqual(busy.thresholdValue, 15)
+        XCTAssertEqual(MenuBarThresholds.level(busy, settings: cpu), .normal, "Coloring is off by default")
+        cpu.colorMode = .thresholds
+        cpu.warningThreshold = 10
+        XCTAssertEqual(MenuBarThresholds.level(busy, settings: cpu), .warning)
+        cpu.criticalThreshold = 14
+        XCTAssertEqual(MenuBarThresholds.level(busy, settings: cpu), .critical)
+
+        var temperature = MenuBarModuleSettings(value: .powerTemperature, colorMode: .thresholds)
+        let hot = MenuBarFormatter.reading(.power, settings: temperature, snapshot: snapshot())
+        XCTAssertEqual(hot.thresholdValue, 61.4)
+        XCTAssertEqual(MenuBarThresholds.level(hot, settings: temperature), .normal, "Default 80 °C warning")
+        temperature.warningThreshold = 60
+        XCTAssertEqual(MenuBarThresholds.level(hot, settings: temperature), .warning)
+
+        let ping = MenuBarModuleSettings(value: .networkPing, colorMode: .thresholds, warningThreshold: 10)
+        XCTAssertEqual(MenuBarThresholds.level(MenuBarFormatter.reading(.network, settings: ping, snapshot: snapshot()), settings: ping), .warning)
+
+        var signal = MenuBarModuleSettings(value: .networkWifiSignal, colorMode: .thresholds)
+        let wifi = MenuBarFormatter.reading(.network, settings: signal, snapshot: snapshot())
+        XCTAssertEqual(wifi.thresholdValue, -58)
+        XCTAssertEqual(MenuBarThresholds.level(wifi, settings: signal), .normal, "−58 dBm is above the −70 warning")
+        signal.warningThreshold = -55
+        XCTAssertEqual(MenuBarThresholds.level(wifi, settings: signal), .warning, "Lower is worse for signal")
+
+        let rates = MenuBarModuleSettings(value: .networkCombined, colorMode: .thresholds)
+        XCTAssertNil(MenuBarValue.networkCombined.thresholdUnit)
+        XCTAssertEqual(MenuBarThresholds.level(MenuBarFormatter.reading(.network, settings: rates, snapshot: snapshot()), settings: rates), .normal)
+
+        var pending = snapshot(); pending.gpu = nil
+        let gpu = MenuBarModuleSettings(value: .gpuUtilization, colorMode: .thresholds, warningThreshold: 0)
+        XCTAssertEqual(MenuBarThresholds.level(MenuBarFormatter.reading(.gpu, settings: gpu, snapshot: pending), settings: gpu), .normal,
+                       "A missing reading is never colored")
+    }
+
+    func testThresholdSettingsRoundTripAndDefaults() throws {
+        let settings = MenuBarModuleSettings(value: .powerBattery, colorMode: .thresholds, warningThreshold: 30)
+        let decoded = try JSONDecoder().decode(MenuBarModuleSettings.self, from: JSONEncoder().encode(settings))
+        XCTAssertEqual(decoded, settings)
+        XCTAssertEqual(decoded.thresholds?.warning, 30)
+        XCTAssertEqual(decoded.thresholds?.critical, 10, "Unset critical keeps the default")
+        XCTAssertTrue(MenuBarValue.powerBattery.lowerIsWorse)
+        XCTAssertTrue(MenuBarValue.allCases.allSatisfy { ($0.thresholdUnit == nil) == ($0.defaultThresholds == nil) },
+                      "Every value with a unit has defaults and vice versa")
+    }
 }
+
