@@ -2,13 +2,24 @@
 
 ## Yayımlanmamış
 
-- 🎛 **Menü çubuğu düzenleyici**: canlı menü çubuğu önizlemesinde sürükle-bırak sıralama, raftan ekleme/kapatma, tıkla-ayarla; açık/koyu önizleme
-- 🚦 **Eşik renkleri**: değer uyarı eşiğini geçince turuncu, kritikte kırmızı; birim ve yön değere göre (%, °C, ms, dBm)
-- ⏳ **Ekran Süresi**: uygulama başına günlük/saatlik süre, 7 ve 30 günlük grafik; boşta, kilitli ve uykuda sayılmaz, veriler bu Mac’te kalır
-- 📊 **Menü çubuğu**: GPU modülü, ping, Wi-Fi sinyali, VPN kilidi ve çevrimdışı uyarısı; disk okuma/yazma, pasta ve çekirdek çubukları; sıcaklık için sensör seçimi
-- 👋 **Kurulum sihirbazı**: ilk açılışta karşılama, canlı izin durumu, Sistem Ayarları’nın yanında sürükle-bırak kartı ve tercihler; Ayarlar › Genel’den yeniden açılır
-- 🧰 **Bakım** yenilendi: Launch Services, disk doğrulama, bellek, Spotlight ve Dock/Finder görevleri; yönetici görevleri tek parolayla, görev başına canlı durum ve son çalıştırma bilgisi
-- 🛠 Release derlemesindeki tüm uyarılar temizlendi
+## 0.1.3 — 4 Kasım 2026
+
+### ✨ Yeni
+- **Otomatik güncelleme** — Sparkle ile; “Güncellemeleri Denetle…” menüsü, Ayarlar’da otomatik denetim ve indirme, imzalı güncellemeler
+- **Ekran Süresi** — uygulama başına günlük ve saatlik süre, 7 ve 30 günlük grafik; boşta, kilitli ve uykuda sayılmaz
+- **Kurulum sihirbazı** — ilk açılışta karşılama, izinlerin canlı durumu ve Sistem Ayarları’na sürükle-bırak kartı
+- **GPU modülü** — menü çubuğunda GPU kullanımı, işleyici ve bellek; ayrıntı paneli
+
+### 🚀 İyileştirmeler
+- Menü çubuğu düzenleyici: canlı önizlemede sürükle-bırak sıralama, raftan ekle/kapat, tıkla-ayarla
+- Eşik renkleri: değer uyarı eşiğinde turuncu, kritikte kırmızı (%, °C, ms, dBm)
+- Ağ modülüne ping, Wi-Fi sinyali, VPN kilidi ve çevrimdışı uyarısı
+- Yeni görünümler: CPU çekirdek çubukları, pasta, disk okuma/yazma; sıcaklık için sensör seçimi
+- Bakım yenilendi: 8 görev, yönetici görevleri tek parolayla, canlı durum ve son çalıştırma bilgisi
+
+### 🛠 Düzeltmeler
+- Release derlemesindeki tüm derleyici uyarıları temizlendi
+- İzin verilince macOS uygulamayı yeniden başlattığında kurulum sihirbazı kaldığı yerden sürüyor
 
 ## 0.1.2 — 3 Kasım 2026
 
