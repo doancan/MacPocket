@@ -29,6 +29,7 @@ import json, os, re, subprocess, sys
 
 strings_dir, resources, stub, extra, only = sys.argv[1:6]
 sources = os.path.join(os.path.dirname(resources), "Sources")
+source_roots = [sources, os.path.join(os.path.dirname(resources), "Packages", "SSHConfigKit", "Sources")]
 
 def load_table(path):
     if not os.path.exists(path):
@@ -52,7 +53,7 @@ for name in sorted(os.listdir(strings_dir)):
     with open(os.path.join(strings_dir, name), encoding="utf-8") as handle:
         document = json.load(handle)
     source = document.get("source", name)
-    if not os.path.exists(source) or not os.path.realpath(source).startswith(os.path.realpath(sources)):
+    if not os.path.exists(source) or not any(os.path.realpath(source).startswith(os.path.realpath(root) + os.sep) for root in source_roots):
         continue
     if only and not re.search(only, source):
         continue
@@ -98,5 +99,16 @@ if stub and missing:
         for key in missing:
             handle.write(f'"{escape(key)}" = "{escape(key)}";\n')
 print(f"{len(keys)} anahtar · {len(missing)} eksik İngilizce çeviri · {len(mismatched)} biçim uyuşmazlığı · {len(unused)} kullanılmayan çeviri")
-sys.exit(1 if missing or mismatched else 0)
+shortcut_localizations = os.path.join(os.path.dirname(resources), "Packages", "KeyboardShortcuts", "Sources", "KeyboardShortcuts", "Localization")
+shortcut_en = load_table(os.path.join(shortcut_localizations, "en.lproj", "Localizable.strings"))
+shortcut_tr = load_table(os.path.join(shortcut_localizations, "tr.lproj", "Localizable.strings"))
+shortcut_missing = sorted(set(shortcut_en) - set(shortcut_tr))
+shortcut_mismatched = sorted(k for k in shortcut_en if k in shortcut_tr and
+    sorted(specifier.findall(shortcut_en[k])) != sorted(specifier.findall(shortcut_tr[k])))
+for key in shortcut_missing:
+    print(f"Kısayol kaydedicisinde eksik Türkçe çeviri: {key}")
+for key in shortcut_mismatched:
+    print(f"Kısayol kaydedicisinde biçim uyuşmazlığı: {key}")
+print(f"Kısayol kaydedicisi: {len(shortcut_en)} anahtar · {len(shortcut_missing)} eksik Türkçe çeviri · {len(shortcut_mismatched)} biçim uyuşmazlığı")
+sys.exit(1 if missing or mismatched or shortcut_missing or shortcut_mismatched else 0)
 PY

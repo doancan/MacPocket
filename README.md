@@ -31,6 +31,7 @@
 
 ## Öne çıkanlar
 
+- **SSH Yöneticisi** — kayıpsız config düzenleme, bağlantı/ProxyJump testleri, Terminal/iTerm2/Ghostty, anahtarlar, known_hosts, yedekler ve global kısayollu hızlı bağlantı. SSHConfigManager kaynakları yerel paketlerle bu projeye taşındı; [aktarım ve doğrulama notları](docs/SSH_INTEGRATION.md).
 - **Pratik Araçlar** — ayrı çalışma alanında 14 biçimli Case Converter, JSON, Base64, URL, JWT, hash, UUID, parola, Unix zamanı, metin karşılaştırma ve QR/Wi-Fi QR; çevrimdışı, arama ve favorilerle.
 - **Canlı sistem izleme** — CPU, RAM, disk, ağ ve sensörler; en sıcak sensörün trendi ve menü çubuğunda istediğin göstergeler.
 - **Uygulama başına ağ trafiği** — hangi uygulamanın şu an ne kadar indirip yüklediği, yardımcı süreçler uygulamada toplanmış halde.

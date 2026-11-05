@@ -2,6 +2,7 @@ import AppKit
 import Combine
 import SwiftUI
 import MacPocketCore
+import MacPocketSSH
 
 @main
 @MainActor
@@ -21,7 +22,10 @@ struct MacPocketApplication: App {
         }
         .defaultSize(width: 1280, height: 820)
         .windowToolbarStyle(.unified)
-        .commands { PocketCommands(model: state.model) }
+        .commands {
+            PocketCommands(model: state.model)
+            SSHCommands()
+        }
 
         Window("MacPocket’a Hoş Geldin", id: "onboarding") {
             OnboardingView(loginItem: state.loginItem)
@@ -52,12 +56,21 @@ final class PocketAppDelegate: NSObject, NSApplicationDelegate {
                                                                   queue: .main) { _ in
             MainActor.assumeIsolated { PocketDock.apply() }
         }
+        SSHRuntime.shared.start {
+            let model = PocketApplicationState.shared.model
+            model.navigation.select(.ssh)
+            model.openMainWindow?()
+        }
         if PocketLaunch.showsWindow { NSApp.activate(ignoringOtherApps: true) }
         #if DEBUG
         // Exercise the ordinary scan from the signed app, whose identifier the root helper requires.
         let arguments = CommandLine.arguments
         if let index = arguments.firstIndex(of: "--audit-modules"), arguments.indices.contains(index + 1) {
             Task { @MainActor in await ModuleRuntimeAudit.run(destination: URL(fileURLWithPath: arguments[index + 1])) }
+        }
+        if let index = arguments.firstIndex(of: "--audit-ssh"), arguments.indices.contains(index + 1) {
+            let destination = URL(fileURLWithPath: arguments[index + 1])
+            Task { @MainActor in await SSHRuntimeAudit.run(destination: destination) }
         }
         if arguments.contains("--open-practical") { PocketApplicationState.shared.model.navigation.select(.practical) }
         if arguments.contains("--open-case-converter") {
@@ -169,11 +182,14 @@ final class PocketAppDelegate: NSObject, NSApplicationDelegate {
             if alert.suppressionButton?.state == .on { defaults.set(false, forKey: PocketPreferenceKey.confirmQuitWhileAwake) }
             if response != .alertFirstButtonReturn { return .terminateCancel }
         }
+        let sshReply = SSHRuntime.shared.prepareToTerminate(sender) { PocketLaunch.terminating = true }
+        guard sshReply == .terminateNow else { return sshReply }
         PocketLaunch.terminating = true
         return .terminateNow
     }
 
     func applicationWillTerminate(_ notification: Notification) {
+        SSHRuntime.shared.stop()
         PocketModuleRuntime.shared.shutdown()
         PocketRelaunch.spawnIfPending()
     }

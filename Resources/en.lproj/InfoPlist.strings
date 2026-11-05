@@ -1,5 +1,5 @@
 /* Info.plist privacy strings in English; the Turkish source lives in Info.plist. */
-"NSAppleEventsUsageDescription" = "MacPocket asks Finder to empty the Trash and System Events to switch the appearance for quick actions.";
+"NSAppleEventsUsageDescription" = "MacPocket controls Finder and System Events for quick actions and your selected terminal to open SSH connections.";
 "NSAudioCaptureUsageDescription" = "MacPocket captures the sound of the apps you adjust in the volume mixer and plays it back at the level you set; nothing is recorded or leaves this Mac.";
 "NSMicrophoneUsageDescription" = "MacPocket records your voice when you choose to add the microphone to a screen recording.";
 "NSLocationUsageDescription" = "MacPocket uses your approximate location to work out sunrise and sunset times for night mode; your location never leaves this Mac.";

@@ -7,6 +7,7 @@ enum PocketPage: String, CaseIterable, Identifiable, Hashable {
     case overview = "Genel Bakış", performance = "Sistem İzleme", power = "Güç Merkezi"
     case cleanup = "Temizlik", storage = "Disk Analizi", applications = "Uygulamalar", tools = "Araçlar"
     case practical = "Pratik Araçlar"
+    case ssh = "SSH Yöneticisi"
     var id: String { rawValue }
     var icon: String {
         switch self {
@@ -18,6 +19,7 @@ enum PocketPage: String, CaseIterable, Identifiable, Hashable {
         case .applications: "app.badge.fill"
         case .tools: "wrench.and.screwdriver.fill"
         case .practical: "square.grid.3x3"
+        case .ssh: "terminal.fill"
         }
     }
 }

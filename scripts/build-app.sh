@@ -33,6 +33,14 @@ mkdir -p "$macpocket_app_dir/Contents/Frameworks"
 ditto "$macpocket_binary_dir/Sparkle.framework" "$macpocket_app_dir/Contents/Frameworks/Sparkle.framework"
 install_name_tool -add_rpath "@executable_path/../Frameworks" "$macpocket_app_dir/Contents/MacOS/MacPocket"
 install -m 644 Resources/AppIcon.icns "$macpocket_app_dir/Contents/Resources/AppIcon.icns"
+install -m 644 Resources/SSHManagerIcon.icns "$macpocket_app_dir/Contents/Resources/SSHManagerIcon.icns"
+mkdir -p "$macpocket_app_dir/Contents/Resources/Licenses"
+install -m 644 Packages/KeyboardShortcuts/license "$macpocket_app_dir/Contents/Resources/Licenses/KeyboardShortcuts.txt"
+# SwiftPM libraries can load their own resource bundles (for example the shortcut recorder's translations).
+for macpocket_resource_bundle in "$macpocket_binary_dir"/*.bundle; do
+    [ -d "$macpocket_resource_bundle" ] || continue
+    ditto "$macpocket_resource_bundle" "$macpocket_app_dir/Contents/Resources/$(basename "$macpocket_resource_bundle")"
+done
 # Offline IEEE and MACLookup manufacturer databases (refresh: see docs/NATIVE_MACOS.md).
 install -m 644 Resources/oui.tsv.lzfse "$macpocket_app_dir/Contents/Resources/oui.tsv.lzfse"
 install -m 644 Resources/maclookup.json.lzfse "$macpocket_app_dir/Contents/Resources/maclookup.json.lzfse"

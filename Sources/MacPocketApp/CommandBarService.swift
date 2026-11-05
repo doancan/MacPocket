@@ -1,6 +1,7 @@
 import AppKit
 import ApplicationServices
 import MacPocketCore
+import MacPocketSSH
 
 @MainActor
 final class CommandBarService: ObservableObject {
@@ -12,7 +13,7 @@ final class CommandBarService: ObservableObject {
     struct Entry: Identifiable {
         enum Target {
             case tool(String), practical(PracticalTool), quick(QuickAction), application(URL), window(String)
-            case clipboard(UUID), snippet(Snippet), parameter(ParameterCommand)
+            case clipboard(UUID), snippet(Snippet), parameter(ParameterCommand), ssh(SSHSection), sshQuickConnect
         }
         let search: CommandSearchEntry
         let symbol: String
@@ -192,6 +193,15 @@ final class CommandBarService: ObservableObject {
                       symbol: "text.append", target: .snippet(snippet))
             }
         }
+        rows += SSHSection.allCases.map { section in
+            Entry(search: .init(id: "ssh:" + section.rawValue,
+                                title: section.localizedTitle, subtitle: String(localized: "SSH Yöneticisi"),
+                                keywords: "ssh config host server key known_hosts backup terminal", kind: .tool),
+                  symbol: section.icon, target: .ssh(section))
+        }
+        rows.append(Entry(search: .init(id: "ssh:quick-connect", title: String(localized: "SSH Hızlı Bağlan"),
+                                        keywords: "ssh connect terminal", kind: .action),
+                          symbol: "terminal", target: .sshQuickConnect))
         return rows
     }
 
@@ -247,6 +257,8 @@ final class CommandBarService: ObservableObject {
         }
         close()
         switch row.target {
+        case .ssh(let section): SSHRuntime.shared.open(section)
+        case .sshQuickConnect: SSHRuntime.shared.showQuickConnect()
         case .tool(let id): openTool(id)
         case .practical(let tool):
             PracticalWorkspace.shared.selected = tool

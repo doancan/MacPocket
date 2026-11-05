@@ -50,6 +50,7 @@ extension PocketPage {
         case .applications: Color(hex: 0x7B5CFF)
         case .tools: Color(hex: 0x5F6B7E)
         case .practical: Color(hex: 0x007E80)
+        case .ssh: Color(hex: 0x22A55B)
         }
     }
 }

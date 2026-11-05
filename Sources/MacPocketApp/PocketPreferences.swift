@@ -152,6 +152,7 @@ extension PocketPage {
         case .applications: String(localized: "Uygulamalar")
         case .tools: String(localized: "Araçlar")
         case .practical: String(localized: "Pratik Araçlar")
+        case .ssh: String(localized: "SSH Yöneticisi")
         }
     }
 

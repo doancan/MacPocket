@@ -1,5 +1,6 @@
 import AppKit
 import MacPocketCore
+import MacPocketSSH
 import SwiftUI
 
 /// What a popover shows: the grouped item's tabbed view, or one separate module.
@@ -19,6 +20,7 @@ struct PocketMenuBarView: View {
     @AppStorage("MacPocket.appearance") private var appearance = PocketAppearance.defaultValue
     @AppStorage("MacPocket.menubar.selectedTab") private var storedTab = MenuBarModule.cpu.rawValue
     @State private var selection: MenuBarModule
+    @State private var showsSSH = false
     @PocketReduceMotion private var reduceMotion
 
     init(model: PocketModel, history: MenuBarHistory, content: MenuBarPopoverContent) {
@@ -76,6 +78,10 @@ struct PocketMenuBarView: View {
     private var footer: some View {
         HStack(spacing: PocketSpacing.s) {
             Spacer(minLength: PocketSpacing.s)
+            footerButton("SSH Hızlı Bağlan", symbol: "terminal") { showsSSH.toggle() }
+                .popover(isPresented: $showsSSH) {
+                    SSHQuickConnectView { showsSSH = false }
+                }
             footerButton("MacPocket’ı aç", symbol: "macwindow") { model.openMainWindow?() }
                 .keyboardShortcut("0", modifiers: .command)
             footerButton("Ayarlar", symbol: "gearshape") { model.openSettingsWindow?() }

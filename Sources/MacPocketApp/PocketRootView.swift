@@ -37,7 +37,10 @@ struct PocketRootView: View {
                         sidebarRow(.applications)
                         sidebarRow(.tools)
                     }
-                    Section("Üretkenlik") { sidebarRow(.practical) }
+                    Section("Üretkenlik") {
+                        sidebarRow(.practical)
+                        sidebarRow(.ssh)
+                    }
                 }
                 .listStyle(.sidebar)
                 .safeAreaInset(edge: .top, spacing: 0) { PocketSidebarBrand() }
@@ -70,7 +73,7 @@ struct PocketRootView: View {
                                     .help("Araçlara dön (⌘[)")
                             }
                         }
-                        if navigation.page != .practical {
+                        if navigation.page != .practical && navigation.page != .ssh {
                             ToolbarItem(id: "refresh", placement: .primaryAction) { PocketRefreshButton(model: model) }
                             ToolbarItem(id: "pause", placement: .primaryAction) { PocketPauseButton(model: model) }
                             ToolbarItem(id: "interval", placement: .primaryAction) { PocketIntervalMenu(model: model) }
@@ -108,11 +111,15 @@ struct PocketRootView: View {
 
     private func sidebarRow(_ page: PocketPage) -> some View {
         HStack(spacing: 10) {
-            switch sidebarIcons {
-            case .colorful: PocketIconTile(symbol: page.icon, tint: page.tint, size: 24)
-            case .monochrome:
-                Image(systemName: page.icon).font(.system(size: 14, weight: .medium))
-                    .foregroundStyle(.secondary).frame(width: 24, height: 24).accessibilityHidden(true)
+            if page == .ssh {
+                SSHManagerIcon(size: 24)
+            } else {
+                switch sidebarIcons {
+                case .colorful: PocketIconTile(symbol: page.icon, tint: page.tint, size: 24)
+                case .monochrome:
+                    Image(systemName: page.icon).font(.system(size: 14, weight: .medium))
+                        .foregroundStyle(.secondary).frame(width: 24, height: 24).accessibilityHidden(true)
+                }
             }
             Text(page.localizedTitle).font(.body)
         }
@@ -129,6 +136,7 @@ struct PocketRootView: View {
         case .cleanup: CleanupView(model: model.cleanup.junk)
         case .storage: StorageView(model: model.storage)
         case .applications: ApplicationsView(model: model.applications)
+        case .ssh: SSHManagerView()
         case .practical:
             #if DEBUG
             PracticalToolsView(workspace: ToolUIAudit.practicalWorkspace ?? .shared)

@@ -105,7 +105,7 @@ struct GlassTabBar<ID: Hashable>: View {
                 labels
             }
             .padding(.horizontal, inset)
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .frame(minWidth: 0, maxWidth: .infinity, maxHeight: .infinity)
             .background(Color.primary.opacity(colorScheme == .dark ? 0.08 : 0.055), in: Capsule())
             .overlay { Capsule().strokeBorder(PocketTheme.line, lineWidth: 0.5) }
         } else {
@@ -120,7 +120,7 @@ struct GlassTabBar<ID: Hashable>: View {
                 labels
             }
             .padding(.horizontal, inset)
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .frame(minWidth: 0, maxWidth: .infinity, maxHeight: .infinity)
             .background(PocketTheme.raised, in: Capsule())
             .overlay { Capsule().strokeBorder(PocketTheme.line) }
         }
