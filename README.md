@@ -14,7 +14,7 @@
   <img alt="Platform" src="https://img.shields.io/badge/macOS-27%2B-black?logo=apple">
   <img alt="Apple Silicon" src="https://img.shields.io/badge/Apple%20Silicon-arm64-blue">
   <img alt="Swift" src="https://img.shields.io/badge/Swift-6-orange?logo=swift">
-  <img alt="Testler" src="https://img.shields.io/badge/testler-562-brightgreen">
+  <img alt="Testler" src="https://img.shields.io/badge/testler-639-brightgreen">
   <img alt="Diller" src="https://img.shields.io/badge/dil-T%C3%BCrk%C3%A7e%20%C2%B7%20English-lightgrey">
 </p>
 
@@ -47,7 +47,7 @@
 ## İndirme
 
 İmzalı ve notarize edilmiş paket [GitHub Releases](https://github.com/doancan/MacPocket/releases/latest)
-sayfasındadır: `MacPocket-0.1.3-macOS-arm64.zip` dosyasını aç, uygulamayı **Uygulamalar** klasörüne taşı.
+sayfasındadır: `MacPocket-0.1.4-macOS-arm64.zip` dosyasını aç, uygulamayı **Uygulamalar** klasörüne taşı.
 Apple Silicon ve macOS 27 gerekir. 0.1.3’ten itibaren yeni sürümler uygulama içinden (Sparkle) kurulur.
 
 ## Araçlar

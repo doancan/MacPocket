@@ -2,6 +2,8 @@
 
 ## Yayımlanmamış
 
+## 0.1.4 — 5 Kasım 2026
+
 - **Case Converter:** 14 metin/kod biçimi; Türkçe/İngilizce İ/ı kuralları, 300 ms beklemeli canlı önizleme, satır satır toplu dönüşüm, kısaltma/sayı ayrıştırma ve Latin harflerini sadeleştirme. Tüm biçimleri karşılaştırma, tek tek/toplu kopyalama, seçilen sonucu girdi yapma ve metin istatistikleri. İşlem yereldir; 64 KiB girdi sınırı ve iptal/eski sonuç koruması bulunur.
 - **Pratik Araçlar:** Sol menüde ayrı bir çevrimdışı çalışma alanı. JSON düzenleme/küçültme, standart/URL uyumlu Base64, URL parametre kodlama, JWT içerik ve zaman inceleme, SHA-256/SHA-512, toplu UUID v4, güvenli parola/token, Unix saniye/milisaniye dönüşümü, satır farkı ve metin/Wi-Fi QR üretimi. Arama, kalıcı favoriler, örnekler, geçici araç taslakları, hata/ilerleme, kopyalama ve metin/PNG dışa aktarma bulunur. Girdi/sonuçlar otomatik diske yazılmaz; geçici pano çıktısı geçmişe arşivlenmez. JSON büyük sayıları ve anahtar sırasını korur; JWT imza doğrulaması yapılmaz.
 
@@ -18,6 +20,7 @@
 - Diğer alt ağlarda MAC bilgisi: SNMP hedef IP–arayüz eşleştirmesi; eşleştirilemeyen arayüz MAC’leri için açıklama; doğrudan ARP sonucunun önceliği ve arayüz/adres filtresi.
 - Helper’ın sihirbazdaki servis kimliği, dosya yolu ve XPC adı korunur; normal tarama yeniden kurulum/onay başlatmaz.
 - Normal ağ taraması, kurulu yardımcı servis üzerinden tüm seçili alt ağlarda MAC aramasını otomatik tamamlar; ayrı düğme veya tarama başına parola gerekmez. Doğrudan arama 32 eşzamanlı ping ile sınırlıdır ve normal taramada görünmeyen cihazları da ekler.
+
 ## 0.1.3 — 4 Kasım 2026
 
 ### ✨ Yeni
