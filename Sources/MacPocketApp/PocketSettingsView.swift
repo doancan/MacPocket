@@ -17,6 +17,8 @@ struct PocketSettingsView: View {
                 .tabItem { Label("Menü Çubuğu", systemImage: "menubar.rectangle") }
             PocketMonitoringSettings(model: model)
                 .tabItem { Label("İzleme", systemImage: "waveform.path.ecg") }
+            PocketModuleSettings()
+                .tabItem { Label("Modüller", systemImage: "square.grid.3x3") }
             PocketAdvancedSettings(model: model)
                 .tabItem { Label("Gelişmiş", systemImage: "gearshape.2") }
         }

@@ -9,6 +9,10 @@ import UserNotifications
 @MainActor
 final class BluetoothBatteryService: NSObject, ObservableObject {
     static let shared = BluetoothBatteryService()
+    #if DEBUG
+    private let moduleProbe = ModuleServiceProbe("BluetoothBatteryService")
+    #endif
+    private(set) var moduleRunning = false
 
     struct Settings: Codable, Equatable {
         var lowBatteryAlerts = true
@@ -38,6 +42,7 @@ final class BluetoothBatteryService: NSObject, ObservableObject {
     private var alerts: LowBatteryAlerts
     private var logitech: [(name: String, kind: BluetoothBatteryDevice.Kind, reading: HIDPPBattery.Reading)] = []
     private var logitechAt: Date?
+    private var refreshGeneration = UUID()
     private var timer: Timer?
     private var statusItem: NSStatusItem?
 
@@ -48,7 +53,18 @@ final class BluetoothBatteryService: NSObject, ObservableObject {
         super.init()
     }
 
+    func stopForModule() {
+        moduleRunning = false
+        timer?.invalidate()
+        timer = nil
+        refreshGeneration = UUID()
+        if let statusItem { NSStatusBar.system.removeStatusItem(statusItem) }
+        statusItem = nil
+    }
+
     func start() {
+        guard !moduleRunning, PocketModule.bluetoothBattery.isAvailable() else { return }
+        moduleRunning = true
         guard timer == nil else { return }
         updateStatusItem()
         Task { await refresh() }
@@ -64,15 +80,18 @@ final class BluetoothBatteryService: NSObject, ObservableObject {
     }
 
     func refresh(forceProfile: Bool = false) async {
-        guard !loading else { return }
+        guard moduleRunning, !loading else { return }
+        let generation = refreshGeneration
         loading = true
         defer { loading = false }
         let registry = await Task.detached { Self.registryLevels() }.value
+        guard moduleRunning, generation == refreshGeneration else { return }
         let addresses = Set(registry.keys)
         let stale = profiledAt.map { Date().timeIntervalSince($0) > 600 } ?? true
         // Re-read the (slow) profiler when the set of accessories changes, not every minute a cabled one is missing from it.
         if forceProfile || stale || addresses != knownAddresses {
             if let data = await Self.systemProfiler() {
+                guard moduleRunning, generation == refreshGeneration else { return }
                 profiled = BluetoothBatteryParser.connectedDevices(fromSystemProfiler: data)
                 profiledAt = Date()
                 knownAddresses = addresses
@@ -80,13 +99,16 @@ final class BluetoothBatteryService: NSObject, ObservableObject {
         }
         // HID++ talks to the device itself: every five minutes is plenty for a battery.
         if forceProfile || logitechAt.map({ Date().timeIntervalSince($0) > 300 }) ?? true {
-            switch await LogitechBatteryReader.read() {
+            let result = await LogitechBatteryReader.read()
+            guard moduleRunning, generation == refreshGeneration else { return }
+            switch result {
             case .readings(let readings): logitech = readings; logitechNeedsPermission = false
             case .notPermitted: logitech = []; logitechNeedsPermission = true
             case .none: logitech = []; logitechNeedsPermission = false
             }
             logitechAt = Date()
         }
+        guard moduleRunning, generation == refreshGeneration else { return }
         devices = BluetoothBatteryParser.merge(BluetoothBatteryParser.merge(profiled, registry: registry), logitech: logitech)
         updatedAt = Date()
         if settings.lowBatteryAlerts { notify(alerts.evaluate(devices)) }
@@ -101,7 +123,7 @@ final class BluetoothBatteryService: NSObject, ObservableObject {
 
     /// The lowest level with its device's symbol in the menu bar; the menu lists every accessory.
     private func updateStatusItem() {
-        guard settings.showInMenuBar else {
+        guard moduleRunning, settings.showInMenuBar else {
             if let statusItem { NSStatusBar.system.removeStatusItem(statusItem) }
             statusItem = nil
             return
@@ -191,3 +213,9 @@ extension Notification.Name {
     /// Asks the main window to open a tool by its catalog ID.
     static let pocketOpenTool = Notification.Name("MacPocket.openTool")
 }
+
+#if DEBUG
+extension BluetoothBatteryService {
+    var moduleDiagnosticResources: [String: Int] { ["timer": timer?.isValid == true ? 1 : 0, "statusItem": statusItem == nil ? 0 : 1] }
+}
+#endif

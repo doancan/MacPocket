@@ -12,6 +12,10 @@ import MacPocketCore
 @MainActor
 final class ClipboardService: ObservableObject {
     static let shared = ClipboardService()
+    #if DEBUG
+    private let moduleProbe = ModuleServiceProbe("ClipboardService")
+    #endif
+    private(set) var moduleRunning = false
 
     @Published var settings: ClipboardSettings {
         didSet {
@@ -26,7 +30,11 @@ final class ClipboardService: ObservableObject {
     var recordingShortcut = false { didSet { registerShortcut() } }
     @Published private(set) var shortcutRegistered = false
 
+    #if DEBUG
+    private let archive = ModuleRuntimeAudit.dataURL("clipboard").map { ClipboardArchive(directory: $0) } ?? .standard
+    #else
     private let archive = ClipboardArchive.standard
+    #endif
     private let pasteboard = NSPasteboard.general
     private var pollTimer: Timer?
     private var clearTimer: Timer?
@@ -49,7 +57,14 @@ final class ClipboardService: ObservableObject {
     }
 
     /// Called once at launch.
+    func stopForModule() {
+        moduleRunning = false
+        deactivate()
+    }
+
     func start() {
+        guard !moduleRunning, PocketModule.clipboard.isAvailable() else { return }
+        moduleRunning = true
         if settings.enabled { activate() }
     }
 
@@ -68,6 +83,7 @@ final class ClipboardService: ObservableObject {
     }
 
     private func activate() {
+        guard moduleRunning else { return }
         if settings.saveToDisk {
             do { history = try archive.load() } catch { report(String(localized: "Pano geçmişi okunamadı: \(error.localizedDescription)")) }
         }
@@ -96,7 +112,7 @@ final class ClipboardService: ObservableObject {
     }
 
     private func registerShortcut() {
-        guard settings.enabled, !recordingShortcut else {
+        guard moduleRunning, settings.enabled, !recordingShortcut else {
             hotKey.unregister()
             shortcutRegistered = false
             return
@@ -184,23 +200,36 @@ final class ClipboardService: ObservableObject {
     // MARK: Using items
 
     /// Puts the item back on the pasteboard. `plain` drops formatting (and turns files into their paths).
-    func copy(_ item: ClipboardItem, plain: Bool = false) {
-        writeToPasteboard(item.content, plain: plain)
+    @discardableResult
+    func copy(_ item: ClipboardItem, plain: Bool = false) -> Bool {
+        guard moduleRunning, writeToPasteboard(item.content, plain: plain) else {
+            report(String(localized: "Pano öğesi kopyalanamadı. Kaynak dosya silinmiş veya erişilemez olabilir."))
+            return false
+        }
         history.markUsed(item.id, at: Date())
         scheduleSave()
         scheduleClear()
+        return true
     }
 
     /// Copies the item and, when allowed, pastes it into the app in front by sending ⌘V.
     func paste(_ item: ClipboardItem, plain: Bool = false) {
-        copy(item, plain: plain)
+        guard copy(item, plain: plain) else { return }
         guard settings.pasteOnSelect else { return }
         guard AXIsProcessTrusted() else {
             report(String(localized: "Kopyalandı. Doğrudan yapıştırmak için MacPocket’e Erişilebilirlik izni ver; şimdilik ⌘V ile yapıştır."))
             return
         }
         // Let the panel give focus back before the keystroke arrives.
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.08) { Self.sendPasteKeystroke() }
+        let target = NSWorkspace.shared.frontmostApplication
+        let pid = target?.processIdentifier
+        let launch = target?.launchDate
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.08) { [weak self] in
+            guard self?.moduleRunning == true, let pid, pid != getpid(),
+                  NSWorkspace.shared.frontmostApplication?.processIdentifier == pid,
+                  NSRunningApplication(processIdentifier: pid)?.launchDate == launch else { return }
+            Self.sendPasteKeystroke()
+        }
     }
 
     private static func sendPasteKeystroke() {
@@ -241,21 +270,30 @@ final class ClipboardService: ObservableObject {
         return LinkCleaner(extraParameters: settings.extraTrackingParameters).clean(url) != nil
     }
 
-    private func writeToPasteboard(_ content: ClipboardContent, plain: Bool) {
+    @discardableResult
+    private func writeToPasteboard(_ content: ClipboardContent, plain: Bool) -> Bool {
+        // Resolve an image before clearing the current clipboard: its backing file may have disappeared.
+        var resolvedImage: NSImage?
+        if case let .image(reference) = content {
+            resolvedImage = image(for: reference)
+            guard resolvedImage != nil else { return false }
+        }
         pasteboard.clearContents()
+        let written: Bool
         switch content {
-        case let .text(text): pasteboard.setString(text, forType: .string)
+        case let .text(text): written = pasteboard.setString(text, forType: .string)
         case let .link(url):
-            if !plain { pasteboard.writeObjects([url as NSURL]) }
-            pasteboard.setString(url.absoluteString, forType: .string)
+            if !plain { _ = pasteboard.writeObjects([url as NSURL]) }
+            written = pasteboard.setString(url.absoluteString, forType: .string)
         case let .files(urls):
-            if plain { pasteboard.setString(urls.map(\.path).joined(separator: "\n"), forType: .string) }
-            else { pasteboard.writeObjects(urls.map { $0 as NSURL }) }
-        case let .image(reference):
-            if let image = image(for: reference) { pasteboard.writeObjects([image]) }
+            if plain { written = pasteboard.setString(urls.map(\.path).joined(separator: "\n"), forType: .string) }
+            else { written = pasteboard.writeObjects(urls.map { $0 as NSURL }) }
+        case .image:
+            written = resolvedImage.map { pasteboard.writeObjects([$0]) } ?? false
         }
         ownChangeCount = pasteboard.changeCount
         lastChangeCount = pasteboard.changeCount
+        return written
     }
 
     // MARK: Clearing the system clipboard
@@ -273,6 +311,7 @@ final class ClipboardService: ObservableObject {
 
     /// Empties the system clipboard; the history keeps its copy.
     func clearSystemClipboard() {
+        guard moduleRunning else { return }
         pasteboard.clearContents()
         ownChangeCount = pasteboard.changeCount
         lastChangeCount = pasteboard.changeCount
@@ -347,7 +386,13 @@ final class ClipboardService: ObservableObject {
     // MARK: Panel
 
     func togglePanel() {
-        guard settings.enabled else { return }
+        guard moduleRunning, settings.enabled else { return }
         panel.toggle()
     }
 }
+
+#if DEBUG
+extension ClipboardService {
+    var moduleDiagnosticResources: [String: Int] { ["pollTimer": pollTimer?.isValid == true ? 1 : 0, "clearTimer": clearTimer?.isValid == true ? 1 : 0, "observers": observers.count, "shortcut": shortcutRegistered ? 1 : 0] }
+}
+#endif

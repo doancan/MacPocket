@@ -2,9 +2,26 @@ import AppKit
 import MacPocketCore
 import SwiftUI
 
+@MainActor
+enum KeyComboPresentation {
+    static func displayName(_ combo: KeyCombo) -> String {
+        let key: String
+        if combo.keyCode == 49 { key = String(localized: "Boşluk") }
+        else if combo.keyCode <= 50, ![36, 48].contains(combo.keyCode),
+                let event = CGEvent(keyboardEventSource: CGEventSource(stateID: .privateState), virtualKey: combo.keyCode, keyDown: true),
+                let characters = NSEvent(cgEvent: event)?.charactersIgnoringModifiers, !characters.isEmpty {
+            key = characters.uppercased()
+        } else { key = SwitcherKeys.name(for: combo.keyCode) }
+        return (combo.modifiers.contains(.control) ? "⌃" : "") + (combo.modifiers.contains(.option) ? "⌥" : "")
+            + (combo.modifiers.contains(.shift) ? "⇧" : "") + (combo.modifiers.contains(.command) ? "⌘" : "") + key
+    }
+}
+
 /// Click, then press a combination with ⌘, ⌃ or ⌥. Esc cancels; with `allowsClearing`, ⌫ switches it off.
 /// `recording` reports start and end so the owner can suspend its global shortcuts meanwhile.
 struct KeyComboRecorder: View {
+    private static let recordingBegan = Notification.Name("MacPocket.keyComboRecordingBegan")
+    @State private var recordingID = UUID()
     @Binding var combo: KeyCombo?
     var allowsClearing = false
     /// false for macro steps, which may press plain keys such as ↩ or ⇥.
@@ -23,7 +40,7 @@ struct KeyComboRecorder: View {
                     if isRecording {
                         Text("Kısayola bas…")
                     } else if let combo {
-                        Text(verbatim: combo.displayName)
+                        Text(verbatim: KeyComboPresentation.displayName(combo))
                     } else {
                         Text("Kapalı").foregroundStyle(.secondary)
                     }
@@ -36,9 +53,14 @@ struct KeyComboRecorder: View {
             }
         }
         .onDisappear(perform: stop)
+        .onReceive(NotificationCenter.default.publisher(for: Self.recordingBegan)) { notification in
+            if notification.object as? UUID != recordingID { stop() }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: NSApplication.willResignActiveNotification)) { _ in stop() }
     }
 
     private func start() {
+        NotificationCenter.default.post(name: Self.recordingBegan, object: recordingID)
         rejected = false
         isRecording = true
         recording(true)

@@ -10,7 +10,7 @@ import UniformTypeIdentifiers
 public enum ScreenshotMode: String, Codable, CaseIterable, Sendable {
     /// Area selection with the mode bar (Area / Window / Fullscreen / Previous area).
     case allInOne
-    case area, window, fullscreen, previousArea
+    case area, window, fullscreen, previousArea, scrolling
 }
 
 public enum ScreenshotFormat: String, Codable, CaseIterable, Sendable {
@@ -112,11 +112,12 @@ public enum ScreenshotEncoder {
     public enum Failure: Error { case encode }
 
     /// The image in the chosen format; JPEG is flattened onto white first.
-    public static func encode(_ image: CGImage, as format: ScreenshotFormat, quality: Double = 0.9) throws -> Data {
+    public static func encode(_ image: CGImage, as format: ScreenshotFormat, quality: Double = 0.9, scale: Double = 1) throws -> Data {
         let source = format.supportsTransparency ? image : flattened(image) ?? image
         let data = NSMutableData()
         guard let destination = CGImageDestinationCreateWithData(data, format.typeIdentifier, 1, nil) else { throw Failure.encode }
-        var properties: [CFString: Any] = [:]
+        let scale = scale.isFinite && scale > 0 ? min(8, scale) : 1
+        var properties: [CFString: Any] = [kCGImagePropertyDPIWidth: 72 * scale, kCGImagePropertyDPIHeight: 72 * scale]
         if format != .png { properties[kCGImageDestinationLossyCompressionQuality] = min(1, max(0, quality)) }
         CGImageDestinationAddImage(destination, source, properties as CFDictionary)
         guard CGImageDestinationFinalize(destination) else { throw Failure.encode }

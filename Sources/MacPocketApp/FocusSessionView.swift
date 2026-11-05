@@ -6,6 +6,9 @@ import UserNotifications
 @MainActor
 final class FocusSessionService: ObservableObject {
     static let shared = FocusSessionService()
+    #if DEBUG
+    private let moduleProbe = ModuleServiceProbe("FocusSessionService")
+    #endif
 
     @Published var settings = FocusSettings.load(from: .standard) {
         didSet { if settings != oldValue { settings.save(to: .standard) } }
@@ -19,6 +22,7 @@ final class FocusSessionService: ObservableObject {
     private weak var model: PocketModel?
     private var timer: Timer?
     private var plannedMinutes = 0
+    private var ownedAwakeSessionID: UUID?
 
     private init() {}
 
@@ -32,10 +36,26 @@ final class FocusSessionService: ObservableObject {
     }
     /// Set while start or finish is between awaits, so a second click can't interleave with it.
     private var transitioning = false
+    private(set) var moduleRunning = false
+    var canSuspendModule: Bool { !isRunning && !transitioning }
 
     func attach(_ model: PocketModel) {
+        guard !moduleRunning, PocketModule.focus.isAvailable() else { return }
+        moduleRunning = true
         self.model = model
-        recoverFromInterruptedSession()
+    }
+
+    func stopForModule() {
+        moduleRunning = false
+        undoForQuit()
+        if PocketModule.displays.isAvailable() { DisplayBrightnessService.shared.scheduleHeld = false }
+        timer?.invalidate()
+        timer = nil
+        startedAt = nil
+        endsAt = nil
+        applied = []
+        ownedAwakeSessionID = nil
+        model = nil
     }
 
     private func recordPending() {
@@ -48,12 +68,16 @@ final class FocusSessionService: ObservableObject {
         UserDefaults.standard.set(try? JSONEncoder().encode(pending), forKey: Self.pendingKey)
     }
 
-    private func recoverFromInterruptedSession() {
+    static func recoverAfterCrash() {
         guard let data = UserDefaults.standard.data(forKey: Self.pendingKey),
               let pending = try? JSONDecoder().decode(Pending.self, from: data) else { return }
         UserDefaults.standard.removeObject(forKey: Self.pendingKey)
-        if pending.guardedQuit { QuitGuardService.shared.settings.quitMode = .off }
-        for (display, level) in pending.dimmed ?? [:] { DisplayBrightnessService.shared.restoreLevelNow(level, for: display) }
+        if pending.guardedQuit {
+            var settings = QuitGuardSettings.load(from: .standard)
+            settings.quitMode = .off
+            settings.save(to: .standard)
+        }
+        DisplayBrightnessService.restoreInterruptedLevels(pending.dimmed ?? [:])
         if pending.hidDesktopIcons { Task { try? await QuickActionService.setDesktopIcons(visible: true) } }
     }
 
@@ -82,18 +106,24 @@ final class FocusSessionService: ObservableObject {
     var isRunning: Bool { startedAt != nil }
 
     func start() async {
-        guard !isRunning, !transitioning else { return }
+        guard moduleRunning, !isRunning, !transitioning else { return }
+        guard (!settings.guardQuit || PocketModule.quitGuard.isAvailable()),
+              (settings.dimOtherDisplays == nil || PocketModule.displays.isAvailable()),
+              ((settings.startMacro == nil && settings.endMacro == nil) || PocketModule.macros.isAvailable()) else {
+            message = String(localized: "Odak oturumunun kullanacağı modülleri Ayarlar > Modüller’den aç veya ilgili oturum seçeneklerini kapat.")
+            return
+        }
         transitioning = true
         defer { transitioning = false }
-        let brightness = DisplayBrightnessService.shared
+        let brightness = PocketModule.displays.isAvailable() ? DisplayBrightnessService.shared : nil
         var active: UInt32?
         var id: CGDirectDisplayID = 0
         var count: UInt32 = 0
         if CGGetDisplaysWithPoint(CGEvent(source: nil)?.location ?? .zero, 1, &id, &count) == .success, count > 0 { active = id }
         let environment = FocusEnvironment(
             desktopIconsVisible: QuickActionService.desktopIconsVisible,
-            quitGuardOff: QuitGuardService.shared.settings.quitMode == .off,
-            displayLevels: Dictionary(uniqueKeysWithValues: brightness.displays.map { ($0.id, $0.level) }),
+            quitGuardOff: PocketModule.quitGuard.isAvailable() && QuitGuardService.shared.settings.quitMode == .off,
+            displayLevels: Dictionary(uniqueKeysWithValues: (brightness?.displays ?? []).map { ($0.id, $0.level) }),
             activeDisplay: active)
         let changes = FocusPlanner.start(settings, environment: environment)
         let now = Date()
@@ -102,15 +132,18 @@ final class FocusSessionService: ObservableObject {
         plannedMinutes = settings.minutes
         message = nil
         applied = []
-        brightness.scheduleHeld = true
+        brightness?.scheduleHeld = true
         for change in changes {
             switch change {
             case let .keepAwake(minutes):
-                await model?.startAwake(duration: Double(minutes) * 60)
+                guard let session = await model?.startAwake(duration: Double(minutes) * 60) else {
+                    message = model?.awakeError ?? String(localized: "Uyanık tutma oturumu başlatılamadı."); continue
+                }
+                ownedAwakeSessionID = session.id
             case .hideDesktopIcons:
                 do { try await QuickActionService.setDesktopIcons(visible: false) } catch { message = error.localizedDescription; continue }
             case let .dimDisplay(display, level, _):
-                brightness.setLevel(level, for: display, fromSchedule: true)
+                brightness?.setLevel(level, for: display, fromSchedule: true)
             case .guardQuit:
                 QuitGuardService.shared.settings.quitMode = .hold
             case let .runMacro(id):
@@ -136,22 +169,23 @@ final class FocusSessionService: ObservableObject {
         defer { transitioning = false }
         timer?.invalidate()
         timer = nil
-        let brightness = DisplayBrightnessService.shared
+        let brightness = PocketModule.displays.isAvailable() ? DisplayBrightnessService.shared : nil
         for change in applied.reversed() {
             switch change {
             case .keepAwake:
-                await model?.stopAwake()
+                if let ownedAwakeSessionID { await model?.stopAwake(sessionID: ownedAwakeSessionID) }
+                ownedAwakeSessionID = nil
             case .hideDesktopIcons:
                 try? await QuickActionService.setDesktopIcons(visible: true)
             case let .dimDisplay(display, _, previous):
-                brightness.setLevel(previous, for: display, fromSchedule: true)
+                brightness?.setLevel(previous, for: display, fromSchedule: true)
             case .guardQuit:
                 QuitGuardService.shared.settings.quitMode = .off
             case .runMacro:
                 break
             }
         }
-        brightness.scheduleHeld = false
+        brightness?.scheduleHeld = false
         if let id = settings.endMacro, let macro = MacroService.shared.library.macros.first(where: { $0.id == id }) {
             MacroService.shared.run(macro)
         }
@@ -185,7 +219,11 @@ final class FocusSessionService: ObservableObject {
 /// Tools → Odak Oturumu.
 struct FocusSessionView: View {
     @ObservedObject private var service = FocusSessionService.shared
-    @ObservedObject private var macros = MacroService.shared
+    @ObservedObject private var modules = PocketModuleRuntime.shared
+    private var availableMacros: [Macro] {
+        guard modules.available.contains(.macros) else { return [] }
+        return MacroService.shared.library.macros
+    }
     @PocketReduceMotion private var reduceMotion
 
     var body: some View {
@@ -262,12 +300,12 @@ struct FocusSessionView: View {
             Toggle("⌘Q ile yanlışlıkla çıkmayı engelle", isOn: $service.settings.guardQuit)
             Picker("Başlarken çalışacak makro", selection: $service.settings.startMacro) {
                 Text("Yok").tag(UUID?.none)
-                ForEach(macros.library.macros) { Text($0.name).tag(Optional($0.id)) }
+                ForEach(availableMacros) { Text($0.name).tag(Optional($0.id)) }
             }
             .frame(maxWidth: 420)
             Picker("Biterken çalışacak makro", selection: $service.settings.endMacro) {
                 Text("Yok").tag(UUID?.none)
-                ForEach(macros.library.macros) { Text($0.name).tag(Optional($0.id)) }
+                ForEach(availableMacros) { Text($0.name).tag(Optional($0.id)) }
             }
             .frame(maxWidth: 420)
             Text("İpucu: macOS Odak modunu açan bir Kestirme’yi bir makroya koyup burada seçebilirsin. Oturum yalnız kendi değiştirdiklerini geri alır.")
@@ -320,3 +358,9 @@ struct FocusSessionView: View {
         }
     }
 }
+
+#if DEBUG
+extension FocusSessionService {
+    var moduleDiagnosticResources: [String: Int] { ["timer": timer?.isValid == true ? 1 : 0, "running": isRunning ? 1 : 0] }
+}
+#endif

@@ -7,15 +7,23 @@ import UniformTypeIdentifiers
 @MainActor
 enum ScreenshotEditor {
     private static var windows: [NSWindow] = []
+    private static var models: [Int: ScreenshotEditorModel] = [:]
+    static var hasUnsavedChanges: Bool { models.values.contains { $0.dirty || $0.outputBusy || $0.editingText != nil } }
+    static func closeAll() { for window in windows { window.close() } }
+    #if DEBUG
+    static var diagnosticWindows: Int { windows.count }
+    static var diagnosticModel: ScreenshotEditorModel? { models.values.first }
+    #endif
 
     static func open(_ capture: ScreenshotCapture, onSave: @escaping (ScreenshotCapture) -> Void = { _ in }) {
+        guard ScreenshotService.shared.moduleRunning, !ScreenshotService.shared.busy else { return }
         let model = ScreenshotEditorModel(capture: capture, onSave: onSave)
         let screen = NSScreen.screens.first { NSMouseInRect(NSEvent.mouseLocation, $0.frame, false) } ?? NSScreen.main
         let area = screen?.visibleFrame ?? NSRect(x: 0, y: 0, width: 1440, height: 900)
         let pointSize = NSSize(width: CGFloat(capture.image.width) / capture.scale, height: CGFloat(capture.image.height) / capture.scale)
         let fit = min(1, (area.width * 0.85) / pointSize.width, (area.height * 0.85 - 60) / pointSize.height)
         let size = NSSize(width: max(820, pointSize.width * fit + 120), height: max(520, pointSize.height * fit + 120))
-        let window = NSWindow(contentRect: NSRect(origin: .zero, size: size), styleMask: [.titled, .closable, .resizable, .miniaturizable, .fullSizeContentView],
+        let window = ScreenshotEditorWindow(contentRect: NSRect(origin: .zero, size: size), styleMask: [.titled, .closable, .resizable, .miniaturizable, .fullSizeContentView],
                               backing: .buffered, defer: false)
         window.title = capture.fileURL?.lastPathComponent ?? String(localized: "Ekran Görüntüsünü Düzenle")
         window.titlebarAppearsTransparent = true
@@ -25,12 +33,23 @@ enum ScreenshotEditor {
         window.center()
         windows.append(window)
         let number = window.windowNumber
-        NotificationCenter.default.addObserver(forName: NSWindow.willCloseNotification, object: window, queue: .main) { _ in
-            MainActor.assumeIsolated { windows.removeAll { $0.windowNumber == number } }
+        models[number] = model
+        window.onClosed = {
+            model.cancelOutput()
+            models.removeValue(forKey: number)
+            windows.removeAll { $0.windowNumber == number }
         }
         NSApp.activate(ignoringOtherApps: true)
         window.makeKeyAndOrderFront(nil)
         model.window = window
+    }
+}
+
+private final class ScreenshotEditorWindow: NSWindow, ScreenshotChrome {
+    var onClosed: (() -> Void)?
+    override func close() {
+        let callback = onClosed; onClosed = nil
+        callback?(); super.close(); contentView = nil
     }
 }
 
@@ -66,6 +85,10 @@ final class ScreenshotEditorModel: ObservableObject {
     @Published var weight = 1
     @Published var editingText: (point: CGPoint, text: String)?
     @Published private(set) var dirty = false
+    @Published private(set) var outputBusy = false
+    @Published private(set) var renderFailed = false
+    private var outputTask: Task<Void, Never>?
+    private var closed = false
     private var redoStack: [Annotation] = []
     private let onSave: (ScreenshotCapture) -> Void
     weak var window: NSWindow?
@@ -87,18 +110,21 @@ final class ScreenshotEditorModel: ObservableObject {
     var canRedo: Bool { !redoStack.isEmpty }
 
     func add(_ annotation: Annotation) {
+        guard !outputBusy, !closed else { return }
         annotations.append(annotation)
         redoStack.removeAll()
         dirty = true
     }
 
     func undo() {
+        guard !outputBusy, !closed else { return }
         guard let last = annotations.popLast() else { return }
         redoStack.append(last)
         dirty = true
     }
 
     func redo() {
+        guard !outputBusy, !closed else { return }
         guard let next = redoStack.popLast() else { return }
         annotations.append(next)
         dirty = true
@@ -112,35 +138,49 @@ final class ScreenshotEditorModel: ObservableObject {
     }
 
     private func render() {
-        rendered = AnnotationRenderer.render(capture.image, annotations: annotations) ?? capture.image
+        guard let image = AnnotationRenderer.render(capture.image, annotations: annotations) else { renderFailed = true; return }
+        rendered = image; renderFailed = false
     }
 
     // MARK: Output
 
     func copy() {
+        guard !outputBusy, !closed else { return }
         commitText()
-        ScreenshotService.shared.copy(rendered, scale: capture.scale)
-        PocketToast.show(String(localized: "Panoya kopyalandı"), symbol: "doc.on.doc")
+        guard !renderFailed else { return }
+        let image = rendered, scale = Double(capture.scale)
+        outputBusy = true
+        outputTask = Task { [weak self] in
+            guard let self else { return }
+            defer { self.outputBusy = false; self.outputTask = nil }
+            do {
+                let data = try await ScreenshotAsyncOutput.encode(image, format: .png, quality: 1, scale: scale)
+                try Task.checkCancellation(); guard !self.closed else { return }
+                NSPasteboard.general.clearContents(); NSPasteboard.general.setData(data, forType: .png)
+                PocketToast.show(String(localized: "Panoya kopyalandı"), symbol: "doc.on.doc")
+            } catch is CancellationError {} catch { self.showOutputError(error) }
+        }
+    }
+    func pin() {
+        guard !outputBusy, !closed else { return }
+        commitText()
+        guard !renderFailed else { return }
+        let current = dirty ? ScreenshotCapture(image: rendered, scale: capture.scale, fileURL: nil, date: Date(), mode: capture.mode) : capture
+        _ = ScreenshotService.shared.pin(current)
     }
 
     /// Overwrites the capture's file, or saves a new one in the screenshot folder when it has none.
     func save() {
+        guard !outputBusy, !closed else { return }
         commitText()
-        let service = ScreenshotService.shared
-        var updated = capture
-        updated.image = rendered
-        if let url = capture.fileURL {
-            guard service.write(rendered, to: url) != nil else { return }
-        } else {
-            updated.fileURL = service.save(updated)
-            guard updated.fileURL != nil else { return }
-        }
-        if let url = updated.fileURL { service.noteSaved(url, image: rendered, mode: capture.mode) }
-        finishSave(updated)
+        guard !renderFailed else { return }
+        saveUpdated(to: capture.fileURL)
     }
 
     func saveAs() {
+        guard !outputBusy, !closed else { return }
         commitText()
+        guard !renderFailed else { return }
         let panel = NSSavePanel()
         let format = ScreenshotService.shared.settings.format
         panel.allowedContentTypes = [UTType(filenameExtension: format.fileExtension) ?? .png]
@@ -150,14 +190,39 @@ final class ScreenshotEditorModel: ObservableObject {
         panel.beginSheetModal(for: window) { [weak self] response in
             guard response == .OK, let url = panel.url else { return }
             MainActor.assumeIsolated {
-                guard let self, ScreenshotService.shared.write(self.rendered, to: url) != nil else { return }
-                ScreenshotService.shared.noteSaved(url, image: self.rendered, mode: self.capture.mode)
-                var updated = self.capture
-                updated.image = self.rendered
-                updated.fileURL = url
-                self.finishSave(updated)
+                guard let self, !self.closed else { return }
+                self.saveUpdated(to: url)
             }
         }
+    }
+
+    private func saveUpdated(to url: URL?) {
+        guard !outputBusy, !closed, !renderFailed else { return }
+        var updated = capture; updated.image = rendered
+        let settings = ScreenshotService.shared.settings
+        outputBusy = true
+        outputTask = Task { [weak self] in
+            guard let self else { return }
+            defer { self.outputBusy = false; self.outputTask = nil }
+            do {
+                if let url {
+                    let format = ScreenshotFormat.allCases.first { $0.fileExtension == url.pathExtension.lowercased() } ?? settings.format
+                    try await ScreenshotAsyncOutput.write(updated.image, to: url, format: format, quality: settings.quality, scale: Double(updated.scale))
+                    updated.fileURL = url
+                } else {
+                    updated.fileURL = try await ScreenshotService.shared.saveAsync(updated)
+                }
+                try Task.checkCancellation(); guard !self.closed else { return }
+                if let url = updated.fileURL { ScreenshotService.shared.noteSaved(url, image: updated.image, mode: updated.mode) }
+                self.finishSave(updated)
+            } catch is CancellationError {} catch { self.showOutputError(error) }
+        }
+    }
+
+    func cancelOutput() { closed = true; outputTask?.cancel() }
+    private func showOutputError(_ error: Error) {
+        guard !closed else { return }
+        PocketToast.show(String(localized: "Görüntü dışa aktarılamadı: \(error.localizedDescription)"), symbol: "exclamationmark.triangle")
     }
 
     private func finishSave(_ updated: ScreenshotCapture) {
@@ -216,6 +281,7 @@ struct ScreenshotEditorView: View {
                 .overlay(alignment: .top) { hint.padding(.top, PocketSpacing.m) }
                 .overlay(alignment: .leading) { toolRail.padding(.leading, PocketSpacing.m) }
             }
+            .disabled(model.outputBusy)
         }
         .frame(minWidth: 760, minHeight: 480)
         .background(KeyCommands(model: model))
@@ -229,18 +295,22 @@ struct ScreenshotEditorView: View {
             Text(verbatim: model.capture.fileURL?.lastPathComponent ?? String(localized: "Ekran Görüntüsünü Düzenle"))
                 .font(.callout.weight(.semibold)).foregroundStyle(.secondary).lineLimit(1).truncationMode(.middle)
             if model.dirty { Circle().fill(.secondary).frame(width: 6, height: 6).help("Kaydedilmemiş değişiklikler") }
+            if model.outputBusy { ProgressView().controlSize(.small) }
+            if model.renderFailed { Image(systemName: "exclamationmark.triangle").help("Görüntü işlenemedi; dışa aktarmadan önce son değişikliği geri al.") }
             Spacer(minLength: PocketSpacing.m)
             Button { model.undo() } label: { Image(systemName: "arrow.uturn.backward") }
                 .disabled(!model.canUndo).help("Geri al (⌘Z)")
             Button { model.redo() } label: { Image(systemName: "arrow.uturn.forward") }
                 .disabled(!model.canRedo).help("Yinele (⇧⌘Z)")
             Button("Kopyala") { model.copy() }
+            Button("Sabitle") { model.pin() }
             Button("Farklı Kaydet…") { model.saveAs() }
             Button("Kaydet") { model.save() }
                 .buttonStyle(.pocketPrimary)
                 .keyboardShortcut("s", modifiers: .command)
         }
         .controlSize(.regular)
+        .disabled(model.outputBusy)
         .padding(.leading, 84)
         .padding(.trailing, PocketSpacing.m)
         .frame(height: 44)

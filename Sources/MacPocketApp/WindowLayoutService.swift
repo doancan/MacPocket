@@ -6,6 +6,10 @@ import MacPocketCore
 @MainActor
 final class WindowLayoutService: ObservableObject {
     static let shared = WindowLayoutService()
+    #if DEBUG
+    private let moduleProbe = ModuleServiceProbe("WindowLayoutService")
+    #endif
+    private(set) var moduleRunning = false
 
     @Published var settings: WindowLayoutSettings {
         didSet {
@@ -30,10 +34,22 @@ final class WindowLayoutService: ObservableObject {
         settings = WindowLayoutSettings.load(from: .standard)
     }
 
-    func start() { registerShortcuts() }
+    func stopForModule() {
+        moduleRunning = false
+        hotKeys.values.forEach { $0.unregister() }
+        hotKeys = [:]
+        refused = []
+        lastPress = nil
+    }
+
+    func start() {
+        guard !moduleRunning, PocketModule.windowLayout.isAvailable() else { return }
+        moduleRunning = true
+        registerShortcuts()
+    }
 
     private func registerShortcuts() {
-        let active = settings.enabled && !recording
+        let active = moduleRunning && settings.enabled && !recording
         let conflicts = Set(settings.conflicts)
         var refused: [WindowLayoutAction] = []
         for action in WindowLayoutAction.allCases {
@@ -51,6 +67,7 @@ final class WindowLayoutService: ObservableObject {
     // MARK: Performing
 
     func perform(_ action: WindowLayoutAction) {
+        guard moduleRunning else { return }
         guard AXIsProcessTrusted() else {
             message = String(localized: "Pencereleri taşımak için MacPocket’e Erişilebilirlik izni ver.")
             return
@@ -115,3 +132,9 @@ final class WindowLayoutService: ObservableObject {
 private extension CGRect {
     var area: CGFloat { isNull ? 0 : width * height }
 }
+
+#if DEBUG
+extension WindowLayoutService {
+    var moduleDiagnosticResources: [String: Int] { ["hotKeys": hotKeys.count] }
+}
+#endif

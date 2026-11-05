@@ -8,6 +8,9 @@ import MacPocketCore
 @MainActor
 final class MonitorVolumeService: ObservableObject {
     static let shared = MonitorVolumeService()
+    #if DEBUG
+    private let moduleProbe = ModuleServiceProbe("MonitorVolumeService")
+    #endif
 
     struct Settings: Codable, Equatable {
         var keysEnabled = false
@@ -50,6 +53,8 @@ final class MonitorVolumeService: ObservableObject {
     private var pendingWrite: Task<Void, Never>?
     private var observers: [NSObjectProtocol] = []
     private var started = false
+    private var detectionGeneration = UUID()
+    private let audioObservers = AudioPropertyObservers()
     private var refreshAgain = false
 
     private init() {
@@ -58,13 +63,10 @@ final class MonitorVolumeService: ObservableObject {
     }
 
     func start() {
-        guard !started else { return }
+        guard !started, PocketModule.audioOutput.isAvailable() else { return }
         started = true
-        let system = AudioObjectID(kAudioObjectSystemObject)
         for selector in [kAudioHardwarePropertyDefaultOutputDevice, kAudioHardwarePropertyDevices] {
-            var address = AudioObjectPropertyAddress(mSelector: selector, mScope: kAudioObjectPropertyScopeGlobal,
-                                                     mElement: kAudioObjectPropertyElementMain)
-            AudioObjectAddPropertyListenerBlock(system, &address, .main) { [weak self] _, _ in
+            audioObservers.add(selector) { [weak self] _, _ in
                 Task { @MainActor in await self?.refresh() }
             }
         }
@@ -79,9 +81,25 @@ final class MonitorVolumeService: ObservableObject {
         Task { await refresh() }
     }
 
+    func stopForModule() {
+        started = false
+        detectionGeneration = UUID()
+        pendingWrite?.cancel()
+        pendingWrite = nil
+        audioObservers.removeAll()
+        observers.forEach { NotificationCenter.default.removeObserver($0) }
+        observers = []
+        keyTap?.stop()
+        keyTap = nil
+        channel = nil
+        route = .none
+        tapActive = false
+    }
+
     // MARK: Routing
 
     func refresh() async {
+        guard started else { return }
         if detecting { refreshAgain = true; return }
         detecting = true
         repeat {
@@ -93,6 +111,8 @@ final class MonitorVolumeService: ObservableObject {
     }
 
     private func detect() async {
+        let generation = detectionGeneration
+        guard started else { return }
         guard let outputID = AudioOutputSystem.defaultOutput,
               let device = AudioOutputSystem.outputDevices().first(where: { $0.objectID == outputID }) else {
             route = .none; channel = nil; return
@@ -120,11 +140,14 @@ final class MonitorVolumeService: ObservableObject {
         channel = (serviceID, opened)
         // DDC reads block for ~50 ms per attempt: off the main thread.
         var reading = await Task.detached { (opened.get(.volume), opened.get(.audioMute, attempts: 2)) }.value
+        guard started, generation == detectionGeneration else { return }
         if reading.0 == nil {
             // Monitors drop the odd burst of transactions (often right after wake or a display change): one more try.
             try? await Task.sleep(for: .seconds(1))
+            guard started, generation == detectionGeneration else { return }
             reading = await Task.detached { (opened.get(.volume), opened.get(.audioMute, attempts: 2)) }.value
         }
+        guard started, generation == detectionGeneration else { return }
         guard let volume = reading.0, volume.maximum > 0 else {
             route = .unsupported(name: device.name); return
         }
@@ -160,7 +183,8 @@ final class MonitorVolumeService: ObservableObject {
         route = .monitor(monitor)
         write(monitor, muteChanged: wasMuted != monitor.state.muted)
         guard showIndicator else { return }
-        let brightness = DisplayBrightnessService.shared.settings
+        let brightness = UserDefaults.standard.data(forKey: DisplayBrightnessService.Settings.storageKey)
+            .flatMap { try? JSONDecoder().decode(DisplayBrightnessService.Settings.self, from: $0) } ?? DisplayBrightnessService.Settings()
         guard brightness.showIndicator else { return }
         BrightnessIndicator.show(level: monitor.state.effectiveLevel, on: Self.displayUnderPointer() ?? monitor.display,
                                  position: brightness.indicatorPosition ?? .topRight, style: brightness.indicatorStyle ?? .modern,
@@ -192,7 +216,7 @@ final class MonitorVolumeService: ObservableObject {
     // MARK: Keys
 
     private func configureTap() {
-        let wanted = settings.keysEnabled && AXIsProcessTrusted()
+        let wanted = started && settings.keysEnabled && AXIsProcessTrusted()
         if wanted && keyTap == nil {
             keyTap = VolumeKeyTap { [weak self] key, fine in
                 Task { @MainActor in self?.apply(key, fine: fine, showIndicator: true) }
@@ -250,3 +274,9 @@ final class VolumeKeyTap: @unchecked Sendable {
         return false
     }
 }
+
+#if DEBUG
+extension MonitorVolumeService {
+    var moduleDiagnosticResources: [String: Int] { ["observers": observers.count + audioObservers.count, "tap": tapActive ? 1 : 0, "write": pendingWrite == nil ? 0 : 1] }
+}
+#endif

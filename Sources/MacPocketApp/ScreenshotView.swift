@@ -11,6 +11,7 @@ extension ScreenshotMode {
         case .window: String(localized: "Pencere")
         case .fullscreen: String(localized: "Tam ekran")
         case .previousArea: String(localized: "Önceki alan")
+        case .scrolling: String(localized: "Kaydırmalı")
         }
     }
 
@@ -21,6 +22,7 @@ extension ScreenshotMode {
         case .window: "macwindow"
         case .fullscreen: "display"
         case .previousArea: "arrow.uturn.backward.square"
+        case .scrolling: "rectangle.expand.vertical"
         }
     }
 }
@@ -28,6 +30,7 @@ extension ScreenshotMode {
 /// Tools → Ekran Görüntüsü: capture buttons with their shortcuts, after-capture and saving options, and the history.
 struct ScreenshotView: View {
     @ObservedObject private var service = ScreenshotService.shared
+    @ObservedObject private var pins = ScreenshotService.shared.pins
     @State private var permission = CGPreflightScreenCaptureAccess()
 
     var body: some View {
@@ -48,6 +51,14 @@ struct ScreenshotView: View {
                         .accessibilityLabel("Mesajı kapat")
                 }
             }
+            if service.busy {
+                HStack {
+                    ProgressView().controlSize(.small)
+                    Text("Ekran görüntüsü işlemi sürüyor…").font(.callout)
+                    Spacer()
+                    Button("Çekimi İptal Et") { service.cancelCapture() }
+                }
+            }
             ScrollView {
                 VStack(alignment: .leading, spacing: PocketSpacing.l) {
                     captureHero
@@ -55,6 +66,7 @@ struct ScreenshotView: View {
                         afterCaptureGroup
                         savingGroup
                     }
+                    pinnedCaptures
                     historyCard
                 }
                 .padding(.bottom, PocketSpacing.l)
@@ -70,7 +82,7 @@ struct ScreenshotView: View {
 
     private var captureHero: some View {
         VStack(alignment: .leading, spacing: PocketSpacing.m) {
-            HStack(spacing: PocketSpacing.m) {
+            LazyVGrid(columns: [GridItem(.adaptive(minimum: 130), spacing: PocketSpacing.m)], spacing: PocketSpacing.m) {
                 ForEach(ScreenshotMode.allCases, id: \.self) { mode in
                     CaptureModeTile(mode: mode, service: service)
                 }
@@ -177,6 +189,26 @@ struct ScreenshotView: View {
     }
 
     // MARK: History
+
+    private var pinnedCaptures: some View {
+        VStack(alignment: .leading, spacing: PocketSpacing.s) {
+            PocketSectionHeader("Ekranda Sabitlenenler", icon: "pin")
+            Text("Önizlemedeki Sabitle düğmesinden veya geçmişteki menüden görüntüyü sabitle. Sabit görüntüler bu oturumda bellekte tutulur; modül kapanınca kapanır.")
+                .font(.subheadline).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+            if let capture = service.latestCapture {
+                Button("Son Çekimi Sabitle") { service.pin(capture) }.disabled(service.busy)
+            }
+            ForEach(pins.items) { model in
+                HStack {
+                    Text(verbatim: "\(model.capture.image.width) × \(model.capture.image.height)").monospacedDigit()
+                    Spacer()
+                    Button("Göster") { pins.show(model.id) }
+                    Button("Kapat") { pins.close(model.id) }
+                }
+            }
+            if !pins.items.isEmpty { Button("Tüm Sabitlemeleri Kapat") { pins.closeAll() } }
+        }.frame(maxWidth: .infinity, alignment: .leading).pocketCard()
+    }
 
     private var historyCard: some View {
         VStack(alignment: .leading, spacing: PocketSpacing.m) {
@@ -375,6 +407,8 @@ private struct HistoryTile: View {
     let entry: ScreenshotHistoryEntry
     @State private var thumbnail: NSImage?
     @State private var hovering = false
+    @State private var outputTask: Task<Void, Never>?
+    @State private var outputBusy = false
 
     var body: some View {
         Color.clear
@@ -409,6 +443,7 @@ private struct HistoryTile: View {
                             Button("Aç") { NSWorkspace.shared.open(URL(fileURLWithPath: entry.path)) }
                             Button("Finder’da Göster") { NSWorkspace.shared.activateFileViewerSelecting([URL(fileURLWithPath: entry.path)]) }
                             Divider()
+                            Button("Ekranda sabitle") { pin() }.disabled(ScreenshotService.shared.busy)
                             Button("Geçmişten Kaldır") { ScreenshotService.shared.removeFromHistory(entry.id) }
                         } label: {
                             Image(systemName: "ellipsis").font(.system(size: 11, weight: .bold)).foregroundStyle(.white)
@@ -417,6 +452,7 @@ private struct HistoryTile: View {
                         .menuStyle(.button).buttonStyle(.plain).menuIndicator(.hidden).fixedSize()
                     }
                     .padding(6)
+                    .disabled(outputBusy)
                     .transition(.opacity)
                 }
             }
@@ -427,6 +463,8 @@ private struct HistoryTile: View {
         .animation(.easeOut(duration: 0.15), value: hovering)
         .onTapGesture(count: 2) { edit() }
         .task(id: entry.path) { thumbnail = await Self.loadThumbnail(entry.path) }
+        .onDisappear { outputTask?.cancel() }
+        .overlay { if outputBusy { ProgressView().padding(10).background(.regularMaterial, in: RoundedRectangle(cornerRadius: 10)) } }
         .help(entry.path)
     }
 
@@ -439,21 +477,36 @@ private struct HistoryTile: View {
         .help(help)
     }
 
-    private func image() -> CGImage? {
-        guard let source = CGImageSourceCreateWithURL(URL(fileURLWithPath: entry.path) as CFURL, nil) else { return nil }
-        return CGImageSourceCreateImageAtIndex(source, 0, nil)
-    }
-
     private func edit() {
-        guard let image = image() else { return }
-        ScreenshotEditor.open(ScreenshotCapture(image: image, scale: NSScreen.main?.backingScaleFactor ?? 2,
-                                                fileURL: URL(fileURLWithPath: entry.path), date: entry.date, mode: entry.mode))
+        perform { capture in ScreenshotEditor.open(capture) }
+    }
+    private func pin() {
+        perform { capture in _ = ScreenshotService.shared.pin(capture) }
     }
 
     private func copy() {
-        guard let image = image() else { return }
-        ScreenshotService.shared.copy(image, scale: NSScreen.main?.backingScaleFactor ?? 2)
-        PocketToast.show(String(localized: "Panoya kopyalandı"), symbol: "doc.on.doc")
+        perform { capture in
+            let data = try await ScreenshotAsyncOutput.encode(capture.image, format: .png, quality: 1, scale: Double(capture.scale))
+            try Task.checkCancellation(); guard ScreenshotService.shared.moduleRunning else { return }
+            NSPasteboard.general.clearContents(); NSPasteboard.general.setData(data, forType: .png)
+            PocketToast.show(String(localized: "Panoya kopyalandı"), symbol: "doc.on.doc")
+        }
+    }
+
+    private func perform(_ operation: @escaping @MainActor (ScreenshotCapture) async throws -> Void) {
+        guard !outputBusy, ScreenshotService.shared.moduleRunning, !ScreenshotService.shared.busy else { return }
+        outputBusy = true
+        let entry = entry
+        outputTask = Task {
+            defer { outputBusy = false; outputTask = nil }
+            do {
+                let capture = try await ScreenshotAsyncOutput.load(entry)
+                try Task.checkCancellation(); guard ScreenshotService.shared.moduleRunning else { return }
+                try await operation(capture)
+            } catch is CancellationError {} catch {
+                PocketToast.show(String(localized: "Görüntü dışa aktarılamadı: \(error.localizedDescription)"), symbol: "exclamationmark.triangle")
+            }
+        }
     }
 
     private static func loadThumbnail(_ path: String) async -> NSImage? {

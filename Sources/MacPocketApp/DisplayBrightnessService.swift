@@ -11,6 +11,10 @@ import MacPocketCore
 @MainActor
 final class DisplayBrightnessService: ObservableObject {
     static let shared = DisplayBrightnessService()
+    #if DEBUG
+    private let moduleProbe = ModuleServiceProbe("DisplayBrightnessService")
+    #endif
+    private(set) var moduleRunning = false
 
     enum Method: String, Codable, CaseIterable {
         case automatic, hardware, software
@@ -91,6 +95,7 @@ final class DisplayBrightnessService: ObservableObject {
     private var warmth: (red: Float, green: Float, blue: Float) = (1, 1, 1)
     private var keyTap: BrightnessKeyTap?
     private var observers: [NSObjectProtocol] = []
+    private var detectionGeneration = UUID()
     private var scheduleTimer: Timer?
     /// Until when a manual change wins over the schedule. A date, not a minute of the day, so a Mac asleep
     /// at that minute still returns to the schedule afterwards.
@@ -108,7 +113,26 @@ final class DisplayBrightnessService: ObservableObject {
             .flatMap { try? JSONDecoder().decode(Settings.self, from: $0) } ?? Settings()
     }
 
+    func stopForModule() {
+        moduleRunning = false
+        observers.forEach { NotificationCenter.default.removeObserver($0) }
+        observers = []
+        scheduleTimer?.invalidate()
+        scheduleTimer = nil
+        pendingWrites.values.forEach { $0.cancel() }
+        pendingWrites = [:]
+        detectionGeneration = UUID()
+        keyTap?.stop()
+        keyTap = nil
+        tapActive = false
+        restoreSoftwareDimming()
+        channels = [:]
+        displays = []
+    }
+
     func start() {
+        guard !moduleRunning, PocketModule.displays.isAvailable() else { return }
+        moduleRunning = true
         observers.append(NotificationCenter.default.addObserver(forName: NSApplication.didChangeScreenParametersNotification,
                                                                 object: nil, queue: .main) { [weak self] _ in
             Task { @MainActor in await self?.refreshDisplays() }
@@ -151,6 +175,7 @@ final class DisplayBrightnessService: ObservableObject {
     var scheduleHeld = false
 
     func applySchedule() {
+        guard moduleRunning else { return }
         // In "follow the sun" mode NightModeService drives brightness; the points are not used.
         guard schedule.source != .solar else { return }
         guard schedule.enabled, !scheduleHeld, let target = schedule.level(at: Self.currentMinute) else { return }
@@ -204,6 +229,7 @@ final class DisplayBrightnessService: ObservableObject {
 
     /// Serialized: a request arriving during a refresh runs once more afterwards instead of racing it.
     func refreshDisplays() async {
+        guard moduleRunning else { return }
         if detecting { refreshAgain = true; return }
         detecting = true
         repeat {
@@ -214,6 +240,8 @@ final class DisplayBrightnessService: ObservableObject {
     }
 
     private func detect() async {
+        let generation = detectionGeneration
+        guard moduleRunning else { return }
         let online = Self.onlineExternalDisplays()
         let registry = DisplayRegistry.scan()
         let matches = DisplayMatcher.match(online.map { (id: $0, vendor: CGDisplayVendorNumber($0), product: CGDisplayModelNumber($0),
@@ -240,6 +268,7 @@ final class DisplayBrightnessService: ObservableObject {
                 let readTask = Task.detached { () -> (Reading?, Reading?) in (channel.get(.brightness), channel.get(.contrast, attempts: 2)) }
                 probe = await readTask.value
             }
+            guard moduleRunning, generation == detectionGeneration else { return }
             let hardware = probe.brightness != nil
             let active: Method = preference == .software ? .software : preference == .hardware && channel != nil ? .hardware
                 : hardware ? .hardware : .software
@@ -282,6 +311,7 @@ final class DisplayBrightnessService: ObservableObject {
     // MARK: Changing brightness
 
     func setLevel(_ level: Double, for id: CGDirectDisplayID, fromSchedule: Bool = false) {
+        guard moduleRunning else { return }
         let clamped = min(1, max(0, level))
         if !fromSchedule, schedule.enabled {
             if schedule.source == .solar {
@@ -308,7 +338,29 @@ final class DisplayBrightnessService: ObservableObject {
     /// Coalesces slider and key-repeat bursts: only the latest value is written, at most every 40 ms.
     /// Restores a level right away (quit, crash recovery): DDC is written synchronously, and the stored level is
     /// updated so the next launch doesn't re-apply a dimmed one.
+    /// Crash recovery runs even when the module is unavailable, without constructing its service or listeners.
+    static func restoreInterruptedLevels(_ levels: [UInt32: Double]) {
+        guard !levels.isEmpty else { return }
+        var settings = UserDefaults.standard.data(forKey: Settings.storageKey)
+            .flatMap { try? JSONDecoder().decode(Settings.self, from: $0) } ?? Settings()
+        let displays = onlineExternalDisplays().filter { levels[$0] != nil }
+        let matches = DisplayMatcher.match(displays.map { (id: $0, vendor: CGDisplayVendorNumber($0), product: CGDisplayModelNumber($0),
+                                                           serial: CGDisplaySerialNumber($0)) }, registry: DisplayRegistry.scan())
+        for id in displays {
+            guard let storedLevel = levels[id], storedLevel.isFinite else { continue }
+            let level = min(1, max(0, storedLevel))
+            let key = key(for: id)
+            settings.levels[key] = level
+            guard settings.methods[key] != .software, DDCChannel.isAvailable, let registryID = matches[id],
+                  let channel = DDCChannel.shared(registryID: registryID), let reading = channel.get(.brightness), reading.maximum > 0 else { continue }
+            channel.set(.brightness, value: UInt16((level * Double(reading.maximum)).rounded()))
+        }
+        if let data = try? JSONEncoder().encode(settings) { UserDefaults.standard.set(data, forKey: Settings.storageKey) }
+    }
+
     func restoreLevelNow(_ level: Double, for id: CGDirectDisplayID) {
+        pendingWrites[id]?.cancel()
+        pendingWrites[id] = nil
         let key = displays.first { $0.id == id }?.key ?? "\(CGDisplayVendorNumber(id))-\(CGDisplayModelNumber(id))-\(CGDisplaySerialNumber(id))"
         settings.levels[key] = level
         if let index = displays.firstIndex(where: { $0.id == id }) { displays[index].level = level }
@@ -356,7 +408,7 @@ final class DisplayBrightnessService: ObservableObject {
     // MARK: Keys
 
     private func configureTap() {
-        let wanted = settings.keysEnabled && AXIsProcessTrusted()
+        let wanted = moduleRunning && settings.keysEnabled && AXIsProcessTrusted()
         if wanted && keyTap == nil {
             keyTap = BrightnessKeyTap { [weak self] key, fine, targets in
                 Task { @MainActor in self?.apply(key, fine: fine, to: targets) }
@@ -753,3 +805,9 @@ struct GammaTable {
         return same(red, other.red) && same(green, other.green) && same(blue, other.blue)
     }
 }
+
+#if DEBUG
+extension DisplayBrightnessService {
+    var moduleDiagnosticResources: [String: Int] { ["observers": observers.count, "timer": scheduleTimer?.isValid == true ? 1 : 0, "tap": tapActive ? 1 : 0, "writes": pendingWrites.count] }
+}
+#endif

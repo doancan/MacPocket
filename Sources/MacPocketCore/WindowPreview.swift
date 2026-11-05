@@ -29,8 +29,16 @@ public actor WindowPreviewProvider {
 
     /// Captures `window` scaled to fit `maxPixels` (never upscaled).
     public func image(for window: SwitchableWindow, maxPixels: CGSize) async throws -> WindowImage {
+        try Task.checkCancellation()
         guard Self.permitted else { throw WindowPreviewError.permissionRequired }
+        let live = await MainActor.run {
+            guard let app = NSRunningApplication(processIdentifier: window.processID), !app.isTerminated else { return false }
+            return window.launchedAt == nil || app.launchDate == window.launchedAt
+        }
+        guard live else { throw WindowPreviewError.expired }
+        guard maxPixels.width.isFinite, maxPixels.height.isFinite, maxPixels.width > 0, maxPixels.height > 0 else { throw WindowPreviewError.unavailable }
         let target = try await scWindow(for: window)
+        try Task.checkCancellation()
         let configuration = SCStreamConfiguration()
         let scale = min(1, maxPixels.width / max(1, target.frame.width), maxPixels.height / max(1, target.frame.height))
         configuration.width = max(1, Int(target.frame.width * scale))
@@ -54,9 +62,9 @@ public actor WindowPreviewProvider {
 
     private func scWindow(for window: SwitchableWindow) async throws -> SCWindow {
         if let id = window.windowID {
-            if let match = try await shareable(maxAge: 1.5).windows.first(where: { $0.windowID == id }) { return match }
+            if let match = try await shareable(maxAge: 1.5).windows.first(where: { $0.windowID == id && $0.owningApplication?.processID == window.processID }) { return match }
             // The window may be newer than the cached list.
-            if let match = try await shareable(maxAge: 0).windows.first(where: { $0.windowID == id }) { return match }
+            if let match = try await shareable(maxAge: 0).windows.first(where: { $0.windowID == id && $0.owningApplication?.processID == window.processID }) { return match }
             throw WindowPreviewError.unavailable
         }
         // Legacy path for entries without a WindowServer id: require one unique title match.

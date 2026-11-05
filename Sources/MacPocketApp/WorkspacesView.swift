@@ -6,6 +6,10 @@ import SwiftUI
 @MainActor
 final class WorkspaceService: ObservableObject {
     static let shared = WorkspaceService()
+    #if DEBUG
+    private let moduleProbe = ModuleServiceProbe("WorkspaceService")
+    #endif
+    private(set) var moduleRunning = false
 
     @Published var store = WorkspaceStore.load(from: .standard) {
         didSet {
@@ -21,9 +25,20 @@ final class WorkspaceService: ObservableObject {
 
     private init() {}
 
-    func start() { registerShortcuts() }
+    func stopForModule() {
+        moduleRunning = false
+        hotKeys.values.forEach { $0.unregister() }
+        hotKeys = [:]
+    }
+
+    func start() {
+        guard !moduleRunning, PocketModule.workspaces.isAvailable() else { return }
+        moduleRunning = true
+        registerShortcuts()
+    }
 
     private func registerShortcuts() {
+        guard moduleRunning else { return }
         for (id, hotKey) in hotKeys where !store.layouts.contains(where: { $0.id == id }) {
             hotKey.unregister()
             hotKeys[id] = nil
@@ -45,7 +60,7 @@ final class WorkspaceService: ObservableObject {
             return nil
         }
         var windows: [SavedWindow] = []
-        let frozen = AppFreezerService.shared.frozen
+        let frozen = PocketModule.freezer.isAvailable() ? AppFreezerService.shared.frozen : [:]
         for app in NSWorkspace.shared.runningApplications where app.activationPolicy == .regular && app.processIdentifier != getpid() {
             // A paused app can't answer Accessibility requests.
             guard let bundleID = app.bundleIdentifier, !app.isHidden, frozen[app.processIdentifier] == nil else { continue }
@@ -62,6 +77,7 @@ final class WorkspaceService: ObservableObject {
     }
 
     func restore(_ layout: WorkspaceLayout) async {
+        guard moduleRunning else { return }
         guard restoring == nil else { return }
         guard AXIsProcessTrusted() else {
             message = String(localized: "Pencereleri taşımak için Erişilebilirlik izni gerekir.")
@@ -85,7 +101,7 @@ final class WorkspaceService: ObservableObject {
                 }
             }
             guard let app else { continue }
-            if AppFreezerService.shared.frozen[app.processIdentifier] != nil { AppFreezerService.shared.thaw(app.processIdentifier) }
+            if PocketModule.freezer.isAvailable(), AppFreezerService.shared.frozen[app.processIdentifier] != nil { AppFreezerService.shared.thaw(app.processIdentifier) }
             if app.isHidden { app.unhide() }
             let current = FocusedWindow.windows(of: app.processIdentifier)
             let saved = layout.windows.filter { $0.bundleID == bundleID }
@@ -211,3 +227,9 @@ private struct WorkspaceRow: View {
         .pocketCard()
     }
 }
+
+#if DEBUG
+extension WorkspaceService {
+    var moduleDiagnosticResources: [String: Int] { ["hotKeys": hotKeys.count, "restoring": restoring == nil ? 0 : 1] }
+}
+#endif

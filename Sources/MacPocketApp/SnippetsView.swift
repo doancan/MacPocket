@@ -8,6 +8,10 @@ import SwiftUI
 @MainActor
 final class SnippetService: ObservableObject {
     static let shared = SnippetService()
+    #if DEBUG
+    private let moduleProbe = ModuleServiceProbe("SnippetService")
+    #endif
+    private(set) var moduleRunning = false
 
     @Published var settings = SnippetSettings.load(from: .standard) {
         didSet {
@@ -19,6 +23,7 @@ final class SnippetService: ObservableObject {
     @Published private(set) var tapActive = false
     @Published private(set) var expansions = 0
 
+    private var observers: [NSObjectProtocol] = []
     private var matcher = SnippetMatcher()
     private var tap: CFMachPort?
     private var source: CFRunLoopSource?
@@ -26,18 +31,28 @@ final class SnippetService: ObservableObject {
 
     private init() {}
 
-    func start() {
+    func stopForModule() {
+        moduleRunning = false
         configureTap()
-        NotificationCenter.default.addObserver(forName: NSApplication.didBecomeActiveNotification, object: nil, queue: .main) { [weak self] _ in
+        observers.forEach { NotificationCenter.default.removeObserver($0); NSWorkspace.shared.notificationCenter.removeObserver($0) }
+        observers = []
+        matcher.reset()
+    }
+
+    func start() {
+        guard !moduleRunning, PocketModule.snippets.isAvailable() else { return }
+        moduleRunning = true
+        configureTap()
+        observers.append(NotificationCenter.default.addObserver(forName: NSApplication.didBecomeActiveNotification, object: nil, queue: .main) { [weak self] _ in
             MainActor.assumeIsolated { self?.configureTap() }
-        }
-        NSWorkspace.shared.notificationCenter.addObserver(forName: NSWorkspace.didActivateApplicationNotification, object: nil, queue: .main) { [weak self] _ in
+        })
+        observers.append(NSWorkspace.shared.notificationCenter.addObserver(forName: NSWorkspace.didActivateApplicationNotification, object: nil, queue: .main) { [weak self] _ in
             MainActor.assumeIsolated { self?.matcher.reset() }
-        }
+        })
     }
 
     func configureTap() {
-        let wanted = settings.enabled && AXIsProcessTrusted()
+        let wanted = moduleRunning && settings.enabled && AXIsProcessTrusted()
         if wanted && tap == nil {
             let mask = CGEventMask(1 << CGEventType.keyDown.rawValue) | CGEventMask(1 << CGEventType.leftMouseDown.rawValue)
                 | CGEventMask(1 << CGEventType.rightMouseDown.rawValue)
@@ -58,6 +73,7 @@ final class SnippetService: ObservableObject {
             }
         } else if !wanted, let tap {
             CGEvent.tapEnable(tap: tap, enable: false)
+            CFMachPortInvalidate(tap)
             if let source { CFRunLoopRemoveSource(CFRunLoopGetMain(), source, .commonModes) }
             self.tap = nil
             source = nil
@@ -199,3 +215,9 @@ struct SnippetsView: View {
         .pocketCard()
     }
 }
+
+#if DEBUG
+extension SnippetService {
+    var moduleDiagnosticResources: [String: Int] { ["observers": observers.count, "tap": tapActive ? 1 : 0] }
+}
+#endif

@@ -8,6 +8,10 @@ import SwiftUI
 @MainActor
 final class QuitGuardService: ObservableObject {
     static let shared = QuitGuardService()
+    #if DEBUG
+    private let moduleProbe = ModuleServiceProbe("QuitGuardService")
+    #endif
+    private(set) var moduleRunning = false
 
     @Published var settings: QuitGuardSettings {
         didSet {
@@ -30,12 +34,22 @@ final class QuitGuardService: ObservableObject {
         settings = QuitGuardSettings.load(from: .standard)
     }
 
-    func start() { configure() }
+    func stopForModule() {
+        moduleRunning = false
+        remove()
+        tapActive = false
+    }
+
+    func start() {
+        guard !moduleRunning, PocketModule.quitGuard.isAvailable() else { return }
+        moduleRunning = true
+        configure()
+    }
 
     /// Installs or removes the tap to match the settings and permission. Called again when the app activates,
     /// so granting Accessibility later takes effect without a relaunch.
     func configure() {
-        let wanted = settings.isActive && AXIsProcessTrusted()
+        let wanted = moduleRunning && settings.isActive && AXIsProcessTrusted()
         if wanted && tap == nil { install() }
         if !wanted && tap != nil { remove() }
         tapActive = tap != nil
@@ -61,7 +75,7 @@ final class QuitGuardService: ObservableObject {
     }
 
     private func remove() {
-        if let tap { CGEvent.tapEnable(tap: tap, enable: false) }
+        if let tap { CGEvent.tapEnable(tap: tap, enable: false); CFMachPortInvalidate(tap) }
         if let source { CFRunLoopRemoveSource(CFRunLoopGetMain(), source, .commonModes) }
         tap = nil
         source = nil
@@ -247,3 +261,9 @@ private struct QuitGuardHUDSurface: ViewModifier {
         content.glassEffect(.regular, in: .capsule)
     }
 }
+
+#if DEBUG
+extension QuitGuardService {
+    var moduleDiagnosticResources: [String: Int] { ["tap": tap == nil ? 0 : 1, "timer": ticker?.isValid == true ? 1 : 0] }
+}
+#endif

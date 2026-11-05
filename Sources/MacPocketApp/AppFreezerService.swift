@@ -6,6 +6,10 @@ import SwiftUI
 @MainActor
 final class AppFreezerService: ObservableObject {
     static let shared = AppFreezerService()
+    #if DEBUG
+    private let moduleProbe = ModuleServiceProbe("AppFreezerService")
+    #endif
+    private(set) var moduleRunning = false
 
     @Published var settings: AppFreezerSettings {
         didSet {
@@ -27,8 +31,19 @@ final class AppFreezerService: ObservableObject {
         settings = AppFreezerSettings.load(from: .standard)
     }
 
+    func stopForModule() {
+        moduleRunning = false
+        timer?.invalidate()
+        timer = nil
+        observers.forEach { NSWorkspace.shared.notificationCenter.removeObserver($0) }
+        observers = []
+        backgroundSince = [:]
+        thawAll()
+    }
+
     func start() {
-        thawLeftoversFromPreviousRun()
+        guard !moduleRunning, PocketModule.freezer.isAvailable() else { return }
+        moduleRunning = true
         let center = NSWorkspace.shared.notificationCenter
         observers.append(center.addObserver(forName: NSWorkspace.didActivateApplicationNotification, object: nil, queue: .main) { [weak self] note in
             let app = note.userInfo?[NSWorkspace.applicationUserInfoKey] as? NSRunningApplication
@@ -59,12 +74,13 @@ final class AppFreezerService: ObservableObject {
 
     /// Resumes everything (quit, or the feature turned off).
     func thawAll() {
-        for pid in frozen.keys { signal(pid, SIGCONT) }
+        for pid in frozen.keys { Self.signal(pid, SIGCONT) }
         frozen = [:]
         persist()
     }
 
     func evaluate() {
+        guard moduleRunning else { return }
         // Nothing to freeze and nothing frozen: skip scanning every running app.
         guard settings.hasWork || !frozen.isEmpty else { return }
         let now = Date()
@@ -91,7 +107,7 @@ final class AppFreezerService: ObservableObject {
     }
 
     func thaw(_ pid: pid_t) {
-        signal(pid, SIGCONT)
+        Self.signal(pid, SIGCONT)
         frozen[pid] = nil
         backgroundSince[pid] = Date()
         persist()
@@ -99,13 +115,13 @@ final class AppFreezerService: ObservableObject {
 
     private func freeze(_ pid: pid_t, bundleID: String) {
         guard frozen[pid] == nil else { return }
-        signal(pid, SIGSTOP)
+        Self.signal(pid, SIGSTOP)
         frozen[pid] = bundleID
         persist()
     }
 
     /// Sends `sig` to the app and its helper processes (renderers, plug-ins), which would otherwise keep running.
-    private func signal(_ pid: pid_t, _ sig: Int32) {
+    private static func signal(_ pid: pid_t, _ sig: Int32) {
         // A terminated app reports pid -1: kill(-1, …) would reach every process of the user, kill(0, …) our group.
         guard pid > 1, pid != getpid() else { return }
         for child in Self.children(of: pid) where child > 1 && child != getpid() { kill(child, sig) }
@@ -125,13 +141,13 @@ final class AppFreezerService: ObservableObject {
     }
 
     /// After a crash, resumes apps the previous run froze, if each PID still belongs to the same app.
-    private func thawLeftoversFromPreviousRun() {
+    static func recoverAfterCrash() {
         let stored = UserDefaults.standard.stringArray(forKey: Self.frozenKey) ?? []
         for entry in stored {
             let parts = entry.split(separator: ":", maxSplits: 1).map(String.init)
             guard parts.count == 2, let pid = pid_t(parts[0]),
                   NSRunningApplication(processIdentifier: pid)?.bundleIdentifier == parts[1] else { continue }
-            signal(pid, SIGCONT)
+            Self.signal(pid, SIGCONT)
         }
         UserDefaults.standard.removeObject(forKey: Self.frozenKey)
     }
@@ -245,3 +261,9 @@ struct AppFreezerView: View {
         service.settings.rules.append(contentsOf: ids.map { AppFreezeRule(bundleID: $0) })
     }
 }
+
+#if DEBUG
+extension AppFreezerService {
+    var moduleDiagnosticResources: [String: Int] { ["observers": observers.count, "timer": timer?.isValid == true ? 1 : 0, "frozen": frozen.count] }
+}
+#endif

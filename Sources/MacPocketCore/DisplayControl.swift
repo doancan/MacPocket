@@ -164,16 +164,22 @@ public final class DDCChannel: @unchecked Sendable {
     /// I2C transactions to one display must not overlap.
     private let queue: DispatchQueue
 
-    nonisolated(unsafe) private static var sharedChannels: [UInt64: DDCChannel] = [:]
+    private final class WeakChannel {
+        weak var value: DDCChannel?
+        init(_ value: DDCChannel) { self.value = value }
+    }
+    // Share a live channel without keeping its IOKit service alive after both display modules release it.
+    nonisolated(unsafe) private static var sharedChannels: [UInt64: WeakChannel] = [:]
     private static let sharedLock = NSLock()
 
     /// The one channel for this registry entry in this process. Brightness and volume share it, so their I2C
     /// transactions to the same monitor run on one queue instead of interleaving and garbling each other's replies.
     public static func shared(registryID: UInt64) -> DDCChannel? {
         sharedLock.withLock {
-            if let existing = sharedChannels[registryID] { return existing }
-            let channel = DDCChannel(registryID: registryID)
-            sharedChannels[registryID] = channel
+            sharedChannels = sharedChannels.filter { $0.value.value != nil }
+            if let existing = sharedChannels[registryID]?.value { return existing }
+            guard let channel = DDCChannel(registryID: registryID) else { return nil }
+            sharedChannels[registryID] = WeakChannel(channel)
             return channel
         }
     }

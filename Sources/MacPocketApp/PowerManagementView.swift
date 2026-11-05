@@ -402,7 +402,7 @@ struct PowerKeepAwakeCard: View {
                     Image(systemName: "cup.and.saucer.fill").font(.title2).foregroundStyle(PocketTheme.power)
                         .accessibilityHidden(true)
                     VStack(alignment: .leading, spacing: PocketSpacing.xxs) {
-                        Text("Mac uyanık tutuluyor").font(.headline)
+                        Text(model.awakeIsAutomatic ? "Koşullu uyanık tutma etkin" : "Mac uyanık tutuluyor").font(.headline)
                         if let end = session.endsAt {
                             TimelineView(.periodic(from: .now, by: 1)) { context in
                                 Text("\(remaining(until: end, now: context.date)) kaldı · bitiş \(end.formatted(date: .omitted, time: .shortened))")
@@ -439,6 +439,8 @@ struct PowerKeepAwakeCard: View {
                 .font(.subheadline).foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
             if let error = model.awakeError { PocketMessage(error, error: true) }
+            Divider()
+            AwakeAutomationView(service: model.awakeAutomation)
         }
         .frame(maxWidth: .infinity, alignment: .topLeading)
         .pocketCard()

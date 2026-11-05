@@ -283,6 +283,18 @@ final class ApplicationWorkspaceModel: ObservableObject {
     @Published var applications: [InstalledApplication] = []
     @Published var casks: [HomebrewCask] = []
     @Published var updates: [HomebrewCask] = []
+    @Published var updateSettings = ApplicationUpdateSettings.load(from: .standard) {
+        didSet {
+            guard updateSettings != oldValue else { return }
+            updateSettings.save(to: .standard)
+            updatesCheckedAt = nil; updateSourceResults = [:]; remoteUpdates = []; updates = []; updateCheckCancelled = false
+        }
+    }
+    @Published private(set) var remoteUpdates: [ApplicationUpdateFinding] = []
+    @Published private(set) var updateSourceResults: [ApplicationUpdateSource: ApplicationUpdateSourceResult] = [:]
+    @Published private(set) var currentUpdateSource: ApplicationUpdateSource?
+    @Published private(set) var updateProgress: String?
+    @Published private(set) var updateCheckCancelled = false
     @Published var loaded = false
     @Published var busy = false
     @Published var checkingUpdates = false
@@ -298,13 +310,21 @@ final class ApplicationWorkspaceModel: ObservableObject {
     private let inventory = ApplicationInventory()
     private let homebrew = HomebrewApplications()
     private let trashService = FileTrashService()
+    private let updateScanner: ApplicationUpdateScanner
+    private var updateTask: Task<Void, Never>?
+
+    init(updateScanner: ApplicationUpdateScanner = ApplicationUpdateScanner()) { self.updateScanner = updateScanner }
+
+    var visibleRemoteUpdates: [ApplicationUpdateFinding] { remoteUpdates.filter { updateSettings.sources.contains($0.source) } }
+    var visibleHomebrewUpdates: [HomebrewCask] { updateSettings.sources.contains(.homebrew) ? updates : [] }
+    var availableUpdateCount: Int { visibleHomebrewUpdates.count + visibleRemoteUpdates.count }
 
     var selectedApplication: InstalledApplication? { applications.first { $0.id == selection } }
     var filtered: [InstalledApplication] {
         applications.filter { search.isEmpty || "\($0.name) \($0.bundleID)".localizedCaseInsensitiveContains(search) }
     }
     func load() async {
-        guard !busy else { return }
+        guard !busy, !checkingUpdates else { return }
         busy = true
         defer { busy = false }
         do { applications = try await inventory.scan(roots: ApplicationInventory.defaultRoots + additionalRoots); loaded = true; failure = nil }
@@ -312,7 +332,7 @@ final class ApplicationWorkspaceModel: ObservableObject {
         if casks.isEmpty { casks = (try? await homebrew.installed()) ?? [] }
     }
     func chooseApplicationFolder() {
-        guard !busy else { return }
+        guard !busy, !checkingUpdates, updatingToken == nil else { return }
         let panel = NSOpenPanel()
         panel.canChooseDirectories = true; panel.canChooseFiles = false
         panel.prompt = String(localized: "Envantere Ekle")
@@ -323,12 +343,51 @@ final class ApplicationWorkspaceModel: ObservableObject {
         }
     }
     func checkUpdates() async {
-        guard !busy, !checkingUpdates, updatingToken == nil else { return }
-        checkingUpdates = true; failure = nil
-        defer { checkingUpdates = false }
-        do { updates = try await homebrew.updates(); updatesCheckedAt = Date() }
-        catch { failure = error.localizedDescription }
+        guard !busy, !checkingUpdates, updatingToken == nil, !updateSettings.sources.isEmpty else { return }
+        checkingUpdates = true; failure = nil; updateCheckCancelled = false; updateSourceResults = [:]; remoteUpdates = []; updates = []
+        let settings = updateSettings
+        let task = Task { [weak self] in
+            guard let self else { return }
+            defer { self.checkingUpdates = false; self.currentUpdateSource = nil; self.updateProgress = nil; self.updateTask = nil }
+            if !self.loaded {
+                do {
+                    self.applications = try await self.inventory.scan(roots: ApplicationInventory.defaultRoots + self.additionalRoots)
+                    self.loaded = true
+                    self.casks = (try? await self.homebrew.installed()) ?? []
+                } catch {
+                    if Task.isCancelled { self.updateCheckCancelled = true } else { self.failure = error.localizedDescription }
+                    return
+                }
+            }
+            let candidates = self.applications.filter { self.cask(for: $0) == nil }
+            for source in ApplicationUpdateSource.allCases where settings.sources.contains(source) {
+                if Task.isCancelled { self.updateCheckCancelled = true; break }
+                self.currentUpdateSource = source; self.updateProgress = source.localizedTitle
+                do {
+                    let result: ApplicationUpdateSourceResult
+                    if source == .homebrew {
+                        let updates = try await self.homebrew.updates()
+                        try Task.checkCancellation(); self.updates = updates
+                        result = .init(checked: self.casks.count)
+                    } else {
+                        result = try await self.updateScanner.check(source, applications: candidates, settings: settings) { [weak self] done, total in
+                            await MainActor.run { self?.updateProgress = String(localized: "\(source.localizedTitle) · \(done)/\(total) uygulama") }
+                        }
+                    }
+                    try Task.checkCancellation()
+                    self.updateSourceResults[source] = result
+                    self.remoteUpdates += result.findings
+                } catch {
+                    if Task.isCancelled { self.updateCheckCancelled = true; break }
+                    self.updateSourceResults[source] = .init(failures: [error.localizedDescription])
+                }
+            }
+            self.updatesCheckedAt = Date()
+        }
+        updateTask = task
+        await withTaskCancellationHandler { await task.value } onCancel: { task.cancel() }
     }
+    func cancelUpdateCheck() { updateTask?.cancel() }
     func cask(for app: InstalledApplication) -> HomebrewCask? {
         let parent = app.url.deletingLastPathComponent().standardizedFileURL
         guard parent.path == "/Applications" || parent.path == FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Applications").path else { return nil }

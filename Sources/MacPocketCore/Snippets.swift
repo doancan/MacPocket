@@ -71,6 +71,7 @@ public struct SnippetMatcher: Sendable {
 }
 
 public enum SnippetExpander {
+    private static let variables = try? NSRegularExpression(pattern: #"\{(?:date|time|datetime|weekday|clipboard)\}"#)
     /// Replaces variables. Unknown {words} are left as typed.
     public static func expand(_ template: String, now: Date, clipboard: String?, locale: Locale, timeZone: TimeZone = .current) -> String {
         func format(_ pattern: String) -> String {
@@ -87,6 +88,14 @@ public enum SnippetExpander {
             "{weekday}": format("EEEE"),
             "{clipboard}": clipboard ?? "",
         ]
-        return values.reduce(template) { $0.replacingOccurrences(of: $1.key, with: $1.value) }
+        // Match only the original template: clipboard text containing {date}, for example, stays literal.
+        // Replacing dictionary keys one by one made this depend on the dictionary's iteration order.
+        guard let variables else { return template }
+        let source = template as NSString
+        let output = NSMutableString(string: template)
+        for match in variables.matches(in: template, range: NSRange(location: 0, length: source.length)).reversed() {
+            if let value = values[source.substring(with: match.range)] { output.replaceCharacters(in: match.range, with: value) }
+        }
+        return output as String
     }
 }

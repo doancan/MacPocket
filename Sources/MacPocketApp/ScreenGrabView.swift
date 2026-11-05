@@ -61,6 +61,10 @@ enum PocketToast {
 @MainActor
 final class ScreenGrabService: ObservableObject {
     static let shared = ScreenGrabService()
+    #if DEBUG
+    private let moduleProbe = ModuleServiceProbe("ScreenGrabService")
+    #endif
+    private(set) var moduleRunning = false
 
     enum Action: String, CaseIterable, Codable { case text, code, color }
 
@@ -94,9 +98,20 @@ final class ScreenGrabService: ObservableObject {
             .flatMap { try? JSONDecoder().decode(Settings.self, from: $0) } ?? Settings()
     }
 
-    func start() { registerShortcuts() }
+    func stopForModule() {
+        moduleRunning = false
+        hotKeys.values.forEach { $0.unregister() }
+        hotKeys = [:]
+    }
+
+    func start() {
+        guard !moduleRunning, PocketModule.screenGrab.isAvailable() else { return }
+        moduleRunning = true
+        registerShortcuts()
+    }
 
     private func registerShortcuts() {
+        guard moduleRunning else { return }
         for action in Action.allCases {
             let hotKey = hotKeys[action] ?? PocketGlobalHotKey { [weak self] in self?.perform(action) }
             hotKeys[action] = hotKey
@@ -105,6 +120,7 @@ final class ScreenGrabService: ObservableObject {
     }
 
     func perform(_ action: Action) {
+        guard moduleRunning else { return }
         switch action {
         case .text, .code: Task { await grab(action) }
         case .color: pickColor()
@@ -130,6 +146,7 @@ final class ScreenGrabService: ObservableObject {
         let result: Result<[String], Error> = await Task.detached {
             Result { action == .text ? [try ScreenTextReader.text(in: image)] : try ScreenTextReader.codes(in: image) }
         }.value
+        guard moduleRunning else { return }
         switch result {
         case let .success(found):
             let text = found.joined(separator: "\n").trimmingCharacters(in: .whitespacesAndNewlines)
@@ -150,6 +167,7 @@ final class ScreenGrabService: ObservableObject {
         NSColorSampler().show { [weak self] color in
             guard let self, let rgb = color?.usingColorSpace(.sRGB) else { return }
             MainActor.assumeIsolated {
+                guard self.moduleRunning else { return }
                 let picked = PickedColor(red: rgb.redComponent, green: rgb.greenComponent, blue: rgb.blueComponent)
                 self.colors = Array(([picked] + self.colors.filter { $0 != picked }).prefix(16))
                 let text = picked.formatted(self.settings.colorFormat)
@@ -277,3 +295,9 @@ struct ScreenGrabView: View {
         .pocketCard()
     }
 }
+
+#if DEBUG
+extension ScreenGrabService {
+    var moduleDiagnosticResources: [String: Int] { ["hotKeys": hotKeys.count, "busy": busy ? 1 : 0] }
+}
+#endif

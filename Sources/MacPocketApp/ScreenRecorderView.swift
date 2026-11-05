@@ -9,6 +9,10 @@ import SwiftUI
 @MainActor
 final class ScreenRecorderService: NSObject, ObservableObject {
     static let shared = ScreenRecorderService()
+    #if DEBUG
+    private let moduleProbe = ModuleServiceProbe("ScreenRecorderService")
+    #endif
+    private(set) var moduleRunning = false
 
     @Published var settings = ScreenRecordingSettings.load(from: .standard) {
         didSet {
@@ -32,10 +36,19 @@ final class ScreenRecorderService: NSObject, ObservableObject {
 
     var isRecording: Bool { startedAt != nil }
 
-    func start() { registerShortcut() }
+    func stopForModule() {
+        moduleRunning = false
+        hotKey.unregister()
+    }
+
+    func start() {
+        guard !moduleRunning, PocketModule.recorder.isAvailable() else { return }
+        moduleRunning = true
+        registerShortcut()
+    }
 
     private func registerShortcut() {
-        if let shortcut = settings.shortcut, !recordingShortcut { hotKey.register(shortcut) } else { hotKey.unregister() }
+        if let shortcut = settings.shortcut, moduleRunning, !recordingShortcut { hotKey.register(shortcut) } else { hotKey.unregister() }
     }
 
     var folder: URL {
@@ -48,7 +61,7 @@ final class ScreenRecorderService: NSObject, ObservableObject {
     }
 
     func begin() async {
-        guard !isRecording, !transitioning, output == nil else { return }
+        guard moduleRunning, !isRecording, !transitioning, output == nil else { return }
         transitioning = true
         defer { transitioning = false }
         guard CGPreflightScreenCaptureAccess() else {
@@ -300,3 +313,9 @@ struct ScreenRecorderView: View {
         }
     }
 }
+
+#if DEBUG
+extension ScreenRecorderService {
+    var moduleDiagnosticResources: [String: Int] { ["recording": isRecording ? 1 : 0, "saving": isSaving ? 1 : 0] }
+}
+#endif

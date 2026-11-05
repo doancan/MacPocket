@@ -13,6 +13,9 @@ import MacPocketCore
 @MainActor
 final class NightModeService: ObservableObject {
     static let shared = NightModeService()
+    #if DEBUG
+    private let moduleProbe = ModuleServiceProbe("NightModeService")
+    #endif
     nonisolated static let nightShiftSnapshotKey = "MacPocket.night.nightShiftSnapshot"
     /// `defaults write com.doancan.MacPocket MacPocket.night.debugNow -string "2026-11-02T18:00:00+03:00"`
     nonisolated static let debugNowKey = "MacPocket.night.debugNow"
@@ -68,6 +71,12 @@ final class NightModeService: ObservableObject {
         nightShift = NightShiftSession(client: client, load: NightModeService.loadSnapshot, save: NightModeService.saveSnapshot)
     }
 
+    static func recoverAfterCrashIfDisabled() {
+        guard !PocketModule.displays.isAvailable(), UserDefaults.standard.object(forKey: nightShiftSnapshotKey) != nil else { return }
+        let session = NightShiftSession(client: NightShiftClient(), load: loadSnapshot, save: saveSnapshot)
+        session.recoverIfNeeded()
+    }
+
     /// Whether macOS Night Shift can be driven on this Mac.
     var nightShiftAvailable: Bool { nightShiftClient.isAvailable }
 
@@ -79,7 +88,8 @@ final class NightModeService: ObservableObject {
     private var now: Date { debugNow ?? Date() }
 
     func start() {
-        guard !started else { return }
+        guard !started, PocketModule.displays.isAvailable() else { return }
+        stopped = false
         started = true
         // A snapshot left by a crash is the user's own Night Shift state: put it back before anything else.
         nightShift.recoverIfNeeded()
@@ -107,6 +117,28 @@ final class NightModeService: ObservableObject {
             })
         }
         evaluate()
+    }
+
+    func stopForModule() {
+        if drivingBrightness, !brightness.brightnessHeld(at: now) {
+            let bases = resolveBases(brightness.schedule.night?.baseLevels ?? [:])
+            for display in brightness.displays {
+                if let base = bases[display.key] { brightness.restoreLevelNow(base, for: display.id) }
+            }
+        }
+        prepareForQuit()
+        started = false
+        subscriptions = []
+        observers.forEach { NSWorkspace.shared.notificationCenter.removeObserver($0) }
+        observers = []
+        brightness.solarManualChange = nil
+        location.cancel()
+        location.onLocation = { _, _ in }
+        drivingBrightness = false
+        effectiveNight = 0
+        lastApplied = [:]
+        warmthDisplays = []
+        setStatus(.off)
     }
 
     func pauseForAnHour() {
@@ -414,3 +446,9 @@ final class NightModeService: ObservableObject {
         }
     }
 }
+
+#if DEBUG
+extension NightModeService {
+    var moduleDiagnosticResources: [String: Int] { ["observers": observers.count, "subscriptions": subscriptions.count, "timer": timer?.isValid == true ? 1 : 0] }
+}
+#endif

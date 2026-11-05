@@ -4,6 +4,35 @@ import IOKit.pwr_mgt
 @testable import MacPocketCore
 
 final class SleepControllerTests: XCTestCase {
+    func testIdleClaimNeverReplacesManualSessionAndOwnedStopRejectsStaleID() async throws {
+        let controller = SleepController()
+        let manual = try await controller.start(durationSeconds: nil, keepDisplayAwake: false)
+        let claim = try await controller.startIfIdle(durationSeconds: 60, keepDisplayAwake: true)
+        XCTAssertNil(claim)
+        let replacement = try await controller.start(durationSeconds: nil, keepDisplayAwake: false)
+        let staleStop = try await controller.stop(sessionID: manual.id)
+        XCTAssertFalse(staleStop)
+        let status = await controller.status(); XCTAssertEqual(status?.id, replacement.id)
+        let ownedStop = try await controller.stop(sessionID: replacement.id)
+        XCTAssertTrue(ownedStop)
+        let stopped = await controller.status(); XCTAssertNil(stopped)
+    }
+
+    func testConcurrentIdleClaimsHaveOneOwner() async throws {
+        let controller = SleepController()
+        do {
+            let owners = try await withThrowingTaskGroup(of: AwakeSession?.self) { group in
+                for _ in 0..<16 { group.addTask { try await controller.startIfIdle(durationSeconds: 60, keepDisplayAwake: false) } }
+                var owners: [AwakeSession] = []
+                for try await session in group { if let session { owners.append(session) } }
+                return owners
+            }
+            XCTAssertEqual(owners.count, 1)
+            let status = await controller.status(); XCTAssertEqual(status?.id, owners.first?.id)
+        } catch { try? await controller.stop(); throw error }
+        try await controller.stop()
+    }
+
     private func nativeAssertions(for session: AwakeSession) throws -> [[String: Any]] {
         var unmanaged: Unmanaged<CFDictionary>?
         let result = IOPMCopyAssertionsByProcess(&unmanaged)

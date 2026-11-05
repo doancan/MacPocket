@@ -6,6 +6,9 @@ import SwiftUI
 @MainActor
 final class AudioOutputService: ObservableObject {
     static let shared = AudioOutputService()
+    #if DEBUG
+    private let moduleProbe = ModuleServiceProbe("AudioOutputService")
+    #endif
 
     @Published var settings = AudioOutputSettings.load(from: .standard) {
         didSet {
@@ -20,28 +23,34 @@ final class AudioOutputService: ObservableObject {
     var recordingShortcut = false { didSet { registerShortcut() } }
     private lazy var hotKey = PocketGlobalHotKey { [weak self] in self?.switchToNext() }
     private var previous: AudioOutputDevice?
+    private(set) var moduleRunning = false
+    private let audioObservers = AudioPropertyObservers()
 
     private init() {}
 
     func start() {
+        guard !moduleRunning, PocketModule.audioOutput.isAvailable() else { return }
+        moduleRunning = true
         reload()
         previous = devices.first { $0.objectID == current }
-        let system = AudioObjectID(kAudioObjectSystemObject)
-        var defaultAddress = AudioObjectPropertyAddress(mSelector: kAudioHardwarePropertyDefaultOutputDevice,
-                                                        mScope: kAudioObjectPropertyScopeGlobal, mElement: kAudioObjectPropertyElementMain)
-        AudioObjectAddPropertyListenerBlock(system, &defaultAddress, .main) { [weak self] _, _ in
-            MainActor.assumeIsolated { self?.outputChanged() }
+        audioObservers.add(kAudioHardwarePropertyDefaultOutputDevice) { [weak self] _, _ in
+            MainActor.assumeIsolated { if self?.moduleRunning == true { self?.outputChanged() } }
         }
-        var listAddress = AudioObjectPropertyAddress(mSelector: kAudioHardwarePropertyDevices,
-                                                     mScope: kAudioObjectPropertyScopeGlobal, mElement: kAudioObjectPropertyElementMain)
-        AudioObjectAddPropertyListenerBlock(system, &listAddress, .main) { [weak self] _, _ in
-            MainActor.assumeIsolated { self?.reload() }
+        audioObservers.add(kAudioHardwarePropertyDevices) { [weak self] _, _ in
+            MainActor.assumeIsolated { if self?.moduleRunning == true { self?.reload() } }
         }
         registerShortcut()
     }
 
+    func stopForModule() {
+        moduleRunning = false
+        hotKey.unregister()
+        audioObservers.removeAll()
+        previous = nil
+    }
+
     private func registerShortcut() {
-        if let shortcut = settings.shortcut, !recordingShortcut { hotKey.register(shortcut) } else { hotKey.unregister() }
+        if let shortcut = settings.shortcut, moduleRunning, !recordingShortcut { hotKey.register(shortcut) } else { hotKey.unregister() }
     }
 
     func reload() {
@@ -70,6 +79,7 @@ final class AudioOutputService: ObservableObject {
     }
 
     func switchToNext() {
+        guard moduleRunning else { return }
         reload()
         let uid = devices.first { $0.objectID == current }?.uid
         guard let next = AudioOutputRules.next(after: uid, devices: devices, cycle: settings.cycle) else { return }
@@ -169,3 +179,9 @@ extension AudioOutputDevice.Kind {
         }
     }
 }
+
+#if DEBUG
+extension AudioOutputService {
+    var moduleDiagnosticResources: [String: Int] { ["listeners": audioObservers.count] }
+}
+#endif

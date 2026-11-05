@@ -31,6 +31,20 @@ public struct SwitchableWindow: Identifiable, Sendable {
     public var otherSpace = false
     /// Front-to-back WindowServer order among on-screen windows; nil when off screen.
     public var zOrder: Int? = nil
+    public var canResize = false
+
+    public init(id: String, processID: Int32, application: String, title: String, applicationURL: URL?,
+                minimized: Bool, hidden: Bool, fullScreen: Bool, frontmost: Bool, windowAccessible: Bool,
+                canClose: Bool, canMinimize: Bool, canFullScreen: Bool, launchedAt: Date?, lastFocusedAt: Date?,
+                windowID: UInt32? = nil, frame: CGRect? = nil, displayID: UInt32? = nil,
+                otherSpace: Bool = false, zOrder: Int? = nil, canResize: Bool = false) {
+        self.id = id; self.processID = processID; self.application = application; self.title = title
+        self.applicationURL = applicationURL; self.minimized = minimized; self.hidden = hidden
+        self.fullScreen = fullScreen; self.frontmost = frontmost; self.windowAccessible = windowAccessible
+        self.canClose = canClose; self.canMinimize = canMinimize; self.canFullScreen = canFullScreen
+        self.launchedAt = launchedAt; self.lastFocusedAt = lastFocusedAt; self.windowID = windowID
+        self.frame = frame; self.displayID = displayID; self.otherSpace = otherSpace; self.zOrder = zOrder; self.canResize = canResize
+    }
 
     /// A window that exists in WindowServer and can be captured, with or without AX actions.
     public var isRealWindow: Bool { windowID != nil || windowAccessible }
@@ -145,15 +159,24 @@ public actor WindowCatalog {
 
     public func noteApplicationActivation(_ pid: Int32) { if pid != getpid() { applicationHistory[pid] = Date() } }
 
-    public func snapshot() async -> WindowCatalogReport {
-        let (apps, screens) = await MainActor.run { () -> ([ApplicationInfo], [(UInt32, CGRect)]) in
+    public func snapshot(processIDs: Set<Int32>? = nil, includingCurrentApplication: Bool = false, matchingApplicationURL: URL? = nil) async -> WindowCatalogReport {
+        let (candidates, screens) = await MainActor.run { () -> ([ApplicationInfo], [(UInt32, CGRect)]) in
             let front = NSWorkspace.shared.frontmostApplication?.processIdentifier
-            let apps = NSWorkspace.shared.runningApplications.filter { $0.activationPolicy == .regular && $0.processIdentifier != getpid() }.map {
+            let apps = NSWorkspace.shared.runningApplications.filter {
+                ($0.activationPolicy == .regular || (includingCurrentApplication && $0.processIdentifier == getpid()))
+                    && (includingCurrentApplication || $0.processIdentifier != getpid())
+                    && (processIDs?.contains($0.processIdentifier) ?? true)
+            }.map {
                 ApplicationInfo(pid: $0.processIdentifier, name: $0.localizedName ?? String(localized: "Uygulama"), url: $0.bundleURL,
                                 launchedAt: $0.launchDate, frontmost: $0.processIdentifier == front, hidden: $0.isHidden)
             }.sorted { $0.frontmost && !$1.frontmost }
             return (apps, Self.displayFrames())
         }
+        let apps: [ApplicationInfo]
+        if let matchingApplicationURL {
+            let canonical = matchingApplicationURL.standardizedFileURL.resolvingSymlinksInPath()
+            apps = candidates.filter { $0.url?.standardizedFileURL.resolvingSymlinksInPath() == canonical }
+        } else { apps = candidates }
         let trusted = AXIsProcessTrusted()
         let server = Self.serverWindows()
         let zOrder = Self.onScreenOrder()
@@ -208,7 +231,8 @@ public actor WindowCatalog {
                                         canFullScreen: Self.settable(window, "AXFullScreen"), launchedAt: app.launchedAt,
                                         lastFocusedAt: focusHistory[id] ?? applicationHistory[app.pid],
                                         windowID: windowID, frame: frame, displayID: display(for: frame),
-                                        otherSpace: false, zOrder: windowID.flatMap { zOrder[$0] }))
+                                        otherSpace: false, zOrder: windowID.flatMap { zOrder[$0] },
+                                        canResize: Self.settable(window, kAXPositionAttribute) && Self.settable(window, kAXSizeAttribute)))
                     produced += 1
                 }
                 if elements.count > 80 { partial = true }
@@ -255,10 +279,11 @@ public actor WindowCatalog {
     }
 
     public func focus(_ id: String) async throws {
+        try Task.checkCancellation()
         let handle = try await validatedHandle(id)
         let info = handle.application
         let activated = await MainActor.run { () -> Bool in
-            guard let app = NSRunningApplication(processIdentifier: info.pid), app.launchDate == info.launchedAt else { return false }
+            guard !Task.isCancelled, let app = NSRunningApplication(processIdentifier: info.pid), app.launchDate == info.launchedAt else { return false }
             app.unhide()
             // A windowless app gets the Dock-click behaviour (reopen), which usually opens a new window.
             if handle.window == nil, handle.windowID == nil, let url = app.bundleURL {
@@ -268,19 +293,24 @@ public actor WindowCatalog {
             return app.activate(options: [])
         }
         guard activated else { throw WindowCatalogError.expired }
+        try Task.checkCancellation()
         if let window = handle.window {
             try raise(window)
         } else if let windowID = handle.windowID, AXIsProcessTrusted() {
             // Activating the app moves to its Space; the window then becomes visible to AX and can be raised.
+            var raised = false
             for _ in 0..<10 {
                 try await Task.sleep(for: .milliseconds(70))
                 let element = AXUIElementCreateApplication(info.pid)
+                AXUIElementSetMessagingTimeout(element, 0.2)
                 let windows = (Self.attribute(element, kAXWindowsAttribute) as? [AXUIElement]) ?? []
                 if let window = windows.first(where: { Self.windowID(of: $0) == windowID }) {
-                    try? raise(window)
+                    try raise(window)
+                    raised = true
                     break
                 }
             }
+            guard raised else { throw WindowCatalogError.focusFailed }
         }
         focusHistory[id] = Date()
     }
@@ -293,11 +323,12 @@ public actor WindowCatalog {
 
     public func perform(_ action: WindowAction, on id: String) async throws {
         let handle = try await validatedHandle(id)
+        try Task.checkCancellation()
         switch action {
         case .hideApplication, .quitApplication:
             let info = handle.application
             let result = await MainActor.run { () -> Bool in
-                guard let app = NSRunningApplication(processIdentifier: info.pid), app.launchDate == info.launchedAt else { return false }
+                guard !Task.isCancelled, let app = NSRunningApplication(processIdentifier: info.pid), app.launchDate == info.launchedAt else { return false }
                 // terminate() asks the app to quit normally; it may show its own save prompt.
                 return action == .hideApplication ? app.hide() : app.terminate()
             }
@@ -324,6 +355,38 @@ public actor WindowCatalog {
         case .hideApplication, .quitApplication: return
         }
         guard result == .success else { throw WindowCatalogError.focusFailed }
+    }
+
+    /// Layout the selected catalog window, never whichever window happens to be frontmost.
+    public func layout(_ action: WindowLayoutAction, on id: String, gap: CGFloat = 8) async throws {
+        let handle = try await validatedHandle(id)
+        try Task.checkCancellation()
+        guard AXIsProcessTrusted() else { throw WindowCatalogError.permissionRequired }
+        guard gap.isFinite, (0...100).contains(gap), action != .restore else { throw WindowCatalogError.unsupported }
+        guard let window = handle.window, let frame = Self.frame(of: window),
+              Self.settable(window, kAXPositionAttribute), Self.settable(window, kAXSizeAttribute),
+              !Self.boolean(window, "AXFullScreen") else { throw WindowCatalogError.unsupported }
+        let target = await MainActor.run { () -> CGRect? in
+            let screens = NSScreen.screens.sorted { ($0.frame.minX, -$0.frame.maxY) < ($1.frame.minX, -$1.frame.maxY) }
+            guard let primaryHeight = NSScreen.screens.first?.frame.maxY,
+                  let source = screens.max(by: { $0.frame.intersection(WindowLayoutGeometry.flip(frame, primaryHeight: primaryHeight)).area
+                      < $1.frame.intersection(WindowLayoutGeometry.flip(frame, primaryHeight: primaryHeight)).area }) else { return nil }
+            let current = WindowLayoutGeometry.flip(frame, primaryHeight: primaryHeight)
+            let target: CGRect?
+            if action == .nextDisplay || action == .previousDisplay {
+                guard screens.count > 1, let index = screens.firstIndex(of: source) else { return nil }
+                let next = (index + (action == .nextDisplay ? 1 : screens.count - 1)) % screens.count
+                target = WindowLayoutGeometry.move(current, from: source.visibleFrame, to: screens[next].visibleFrame)
+            } else {
+                target = WindowLayoutGeometry.frame(for: action, in: source.visibleFrame, gap: gap, current: current)
+            }
+            return target.map { WindowLayoutGeometry.flip($0, primaryHeight: primaryHeight) }
+        }
+        guard let target else { throw WindowCatalogError.unsupported }
+        _ = try await validatedHandle(id)
+        try Task.checkCancellation()
+        AXUIElementSetAttributeValue(window, kAXMinimizedAttribute as CFString, kCFBooleanFalse)
+        guard FocusedWindow(element: window, processID: handle.application.pid).setFrame(target) else { throw WindowCatalogError.focusFailed }
     }
 
     private func validatedHandle(_ id: String) async throws -> Handle {

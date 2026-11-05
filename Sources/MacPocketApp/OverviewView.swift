@@ -6,6 +6,7 @@ import SystemConfiguration
 /// Genel Bakış: a dashboard of twelve equal tiles mixing live readings with small controls.
 /// Twelve divides evenly into 2, 3 and 4 columns, so every row is full at any window width.
 struct OverviewView: View {
+    @ObservedObject private var modules = PocketModuleRuntime.shared
     @ObservedObject var model: PocketModel
     @ObservedObject var files: FileWorkspaceModel
     @ObservedObject var applications: ApplicationWorkspaceModel
@@ -37,7 +38,16 @@ struct OverviewView: View {
                     PowerTile(model: model, open: { navigation.select(.power) })
                     SystemTile(model: model, verdict: health, open: { navigation.select(.performance) })
                     KeepAwakeTile(model: model, open: { navigation.select(.power) })
-                    ClipboardTile(open: { navigation.open(.clipboard) })
+                    if modules.available.contains(.clipboard) {
+                        ClipboardTile(open: { navigation.open(.clipboard) })
+                    } else {
+                        DashboardTile(title: "Pano Geçmişi", icon: "doc.on.clipboard", tint: PocketTheme.brandSecondary,
+                                      open: { navigation.open(.clipboard) }) {
+                            TileValue(value: String(localized: "Modül kapalı"), caption: String(localized: "Ayarların ve geçmişin korunuyor"))
+                        } bottom: {
+                            Button("Modülü Aç") { modules.setAvailable(.clipboard, true) }
+                        }
+                    }
                     SpeedTestTile(open: { navigation.open(.speedTest) })
                     CleanupTile(cleanup: files.junk, open: { navigation.select(.cleanup) })
                     ApplicationsTile(applications: applications, open: { navigation.select(.applications) },
@@ -467,8 +477,8 @@ private struct ApplicationsTile: View {
         DashboardTile(title: "Uygulamalar", icon: "app.badge", tint: PocketPage.applications.tint, open: open) {
             TileValue(value: applications.loaded ? "\(applications.applications.count)" : "…",
                       caption: applications.updatesCheckedAt == nil ? String(localized: "Güncellemeler denetlenmedi")
-                          : applications.updates.isEmpty ? String(localized: "Homebrew uygulamaları güncel")
-                          : String(localized: "\(applications.updates.count) güncelleme hazır"), rolls: true)
+                          : applications.availableUpdateCount == 0 ? String(localized: "Kaynak sonuçlarını incele")
+                          : String(localized: "\(applications.availableUpdateCount) güncelleme hazır"), rolls: true)
         } bottom: {
             HStack(spacing: PocketSpacing.s) {
                 Button { Task { await applications.checkUpdates() } } label: {
@@ -478,7 +488,7 @@ private struct ApplicationsTile: View {
                         Label("Denetle", systemImage: "arrow.triangle.2.circlepath").frame(maxWidth: .infinity)
                     }
                 }
-                .disabled(applications.checkingUpdates)
+                .disabled(applications.checkingUpdates || applications.busy || applications.updatingToken != nil || applications.updateSettings.sources.isEmpty)
                 Button("Güncellemeler", action: openUpdates)
             }
         }
@@ -487,7 +497,7 @@ private struct ApplicationsTile: View {
 
 /// A few switches people flip often: hidden files (Finder restarts), window layout shortcuts, the menu bar item.
 private struct QuickSettingsTile: View {
-    @ObservedObject private var layout = WindowLayoutService.shared
+    @ObservedObject private var modules = PocketModuleRuntime.shared
     @ObservedObject private var menuBar = MenuBarSettingsStore.shared
     @ObservedObject private var quickActions = QuickActionService.shared
     @State private var hiddenFiles = HiddenSettingsService().state(of: Self.hiddenFilesSetting).value == .bool(true)
@@ -501,7 +511,12 @@ private struct QuickSettingsTile: View {
             VStack(alignment: .leading, spacing: PocketSpacing.s) {
                 row("Gizli dosyalar", icon: "eye", isOn: Binding(get: { hiddenFiles }, set: setHiddenFiles))
                     .disabled(applying)
-                row("Pencere yerleşimi", icon: "rectangle.split.2x1", isOn: $layout.settings.enabled)
+                if modules.available.contains(.windowLayout) {
+                    DashboardWindowLayoutToggle()
+                } else {
+                    Button("Pencere Yerleşimi Modülünü Aç") { modules.setAvailable(.windowLayout, true) }
+                        .font(.callout)
+                }
                 row("Menü çubuğu simgesi", icon: "menubar.rectangle", isOn: $menuBar.preferences.visible)
             }
         } bottom: {
@@ -539,5 +554,13 @@ private struct QuickSettingsTile: View {
             hiddenFiles = HiddenSettingsService().state(of: Self.hiddenFilesSetting).value == .bool(true)
             applying = false
         }
+    }
+}
+
+private struct DashboardWindowLayoutToggle: View {
+    @ObservedObject private var service = WindowLayoutService.shared
+    var body: some View {
+        Toggle(isOn: $service.settings.enabled) { Label("Pencere yerleşimi", systemImage: "rectangle.split.2x1") }
+            .font(.callout).toggleStyle(.switch).controlSize(.small)
     }
 }

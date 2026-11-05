@@ -56,6 +56,9 @@ final class PocketAppDelegate: NSObject, NSApplicationDelegate {
         #if DEBUG
         // Exercise the ordinary scan from the signed app, whose identifier the root helper requires.
         let arguments = CommandLine.arguments
+        if let index = arguments.firstIndex(of: "--audit-modules"), arguments.indices.contains(index + 1) {
+            Task { @MainActor in await ModuleRuntimeAudit.run(destination: URL(fileURLWithPath: arguments[index + 1])) }
+        }
         if arguments.contains("--open-practical") { PocketApplicationState.shared.model.navigation.select(.practical) }
         if arguments.contains("--open-case-converter") {
             PracticalWorkspace.shared.selected = .caseConverter
@@ -171,13 +174,7 @@ final class PocketAppDelegate: NSObject, NSApplicationDelegate {
     }
 
     func applicationWillTerminate(_ notification: Notification) {
-        ClipboardService.shared.flushSave()
-        ScreenTimeService.shared.flush()
-        NightModeService.shared.prepareForQuit()
-        DisplayBrightnessService.shared.restoreSoftwareDimming()
-        AppFreezerService.shared.thawAll()
-        FocusSessionService.shared.undoForQuit()
-        VolumeMixerService.shared.stopAll()
+        PocketModuleRuntime.shared.shutdown()
         PocketRelaunch.spawnIfPending()
     }
 
@@ -222,18 +219,34 @@ final class PocketModel: ObservableObject {
     var openSettingsWindow: (() -> Void)?
     let processMonitor = ProcessMonitor()
     let systemMonitor = SystemMonitor()
-    let sleepController = SleepController()
+    let sleepController: any SleepControlling
+    private var awakeOperationGeneration = 0
+    private var awakeAutomationInstance: AwakeAutomationService?
+    var awakeAutomation: AwakeAutomationService {
+        if let awakeAutomationInstance { return awakeAutomationInstance }
+        let service = AwakeAutomationService(controller: sleepController, sessionChanged: { [weak self] session in
+            if self?.awakeSession != session { self?.awakeSession = session }
+        })
+        awakeAutomationInstance = service; return service
+    }
+    var awakeIsAutomatic: Bool { awakeSession != nil && awakeAutomationInstance?.ownedSessionID == awakeSession?.id }
     private var historyDays = PowerHistoryRetention.days(from: .standard)
+    #if DEBUG
+    private lazy var historyStore = PowerHistoryStore(url: ModuleRuntimeAudit.dataURL("power-history.json"), maximumEntries: PowerHistoryRetention.maximumEntries(days: historyDays))
+    #else
     private lazy var historyStore = PowerHistoryStore(maximumEntries: PowerHistoryRetention.maximumEntries(days: historyDays))
+    #endif
     private var historyLoaded = false
     private let alerts = PocketAlertNotifier()
     private var subscriptions = Set<AnyCancellable>()
     private var refreshing = false
     private var pollingTask: Task<Void, Never>?
 
-    init() {
+    init(sleepController: any SleepControlling = SleepController(), startMonitoring: Bool = true) {
+        self.sleepController = sleepController
         let interval = UserDefaults.standard.double(forKey: "MacPocket.refreshSeconds")
         if [1.0, 2.0, 5.0, 10.0].contains(interval) { refreshSeconds = interval }
+        guard startMonitoring else { return }
         for (notification, event) in [(NSWorkspace.willSleepNotification, "Uyku"), (NSWorkspace.didWakeNotification, "Uyanma")] {
             NSWorkspace.shared.notificationCenter.publisher(for: notification).sink { [weak self] _ in
                 Task { @MainActor [weak self] in await self?.recordPowerEvent(event) }
@@ -267,8 +280,12 @@ final class PocketModel: ObservableObject {
             catch { powerHistoryError = error.localizedDescription; historyLoaded = true }
         }
         // Every @Published write notifies all observers, even with an equal value; publish only changes.
+        let awakeGeneration = awakeOperationGeneration
         let session = await sleepController.status()
-        if session != awakeSession { awakeSession = session }
+        if awakeGeneration == awakeOperationGeneration, session != awakeSession { awakeSession = session }
+        if awakeAutomationInstance != nil || UserDefaults.standard.data(forKey: AwakeAutomationSettings.key) != nil {
+            await awakeAutomation.refreshPreferencesAndReconcile()
+        }
         if !paused {
             await refresh(includeProcesses: (mainWindowVisible && navigation.tool == .taskManager) || menuBarProcessesWanted)
         }
@@ -326,21 +343,45 @@ final class PocketModel: ObservableObject {
     static let awakeDisplayDefault = true
 
     /// `duration` nil keeps the Mac awake until stopped; `display` nil follows the saved preference.
-    func startAwake(duration: Double? = 1800, display: Bool? = nil) async {
+    @discardableResult func startAwake(duration: Double? = 1800, display: Bool? = nil) async -> AwakeSession? {
+        if let duration, (!duration.isFinite || duration <= 0 || duration > SleepController.maximumDurationSeconds) {
+            awakeError = SleepControllerError.invalidDuration.localizedDescription; return nil
+        }
+        awakeOperationGeneration += 1
+        let generation = awakeOperationGeneration
+        awakeAutomation.pauseForManualControl()
         let keepDisplayAwake = display
             ?? (UserDefaults.standard.object(forKey: Self.awakeDisplayKey) as? Bool ?? Self.awakeDisplayDefault)
         do {
-            awakeSession = try await sleepController.start(durationSeconds: duration, keepDisplayAwake: keepDisplayAwake)
-            awakeError = nil
-        } catch { awakeError = error.localizedDescription }
+            let created = try await sleepController.start(durationSeconds: duration, keepDisplayAwake: keepDisplayAwake)
+            if generation == awakeOperationGeneration { awakeSession = created; awakeError = nil }
+            return created
+        } catch {
+            let current = await sleepController.status()
+            if generation == awakeOperationGeneration { awakeError = error.localizedDescription; awakeSession = current }
+            return nil
+        }
     }
 
     func stopAwake() async {
+        awakeOperationGeneration += 1
+        let generation = awakeOperationGeneration
+        awakeAutomation.pauseForManualControl()
         do {
             try await sleepController.stop()
-            awakeSession = await sleepController.status()
-            awakeError = nil
-        } catch { awakeError = error.localizedDescription }
+            let current = await sleepController.status()
+            if generation == awakeOperationGeneration { awakeSession = current; awakeError = nil }
+        } catch { if generation == awakeOperationGeneration { awakeError = error.localizedDescription } }
+    }
+
+    /// Focus owns its original session only; a later manual or automatic replacement is independent.
+    func stopAwake(sessionID: UUID) async {
+        let generation = awakeOperationGeneration
+        do {
+            _ = try await sleepController.stop(sessionID: sessionID)
+            let current = await sleepController.status()
+            if generation == awakeOperationGeneration { awakeSession = current }
+        } catch { if generation == awakeOperationGeneration { awakeError = error.localizedDescription } }
     }
 
     func terminate(_ entry: ProcessEntry, force: Bool) async {

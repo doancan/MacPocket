@@ -55,8 +55,10 @@ public enum MouseScrollTransform {
         func adjust(_ delta: Int32, reversed: Bool) -> Double {
             guard delta != 0 else { return 0 }
             let sign: Double = (delta > 0) != reversed ? 1 : -1
-            let magnitude = settings.linear ? Double(settings.linesPerNotch) : Double(abs(delta))
-            return sign * magnitude * settings.speed
+            let magnitude = settings.linear ? Double(min(10, max(1, settings.linesPerNotch))) : abs(Double(delta))
+            let speed = settings.speed.isFinite ? min(3, max(0.5, settings.speed)) : 1
+            // Bound every downstream line→point conversion, including malformed HID packets.
+            return sign * min(10_000, magnitude * speed)
         }
         let lines = (adjust(vertical, reversed: settings.reverseVertical), adjust(horizontal, reversed: settings.reverseHorizontal))
         if settings.smooth {
@@ -80,9 +82,10 @@ public struct SmoothScroller: Sendable {
     public var isIdle: Bool { framesLeft == 0 }
 
     public mutating func add(vertical: Double, horizontal: Double, frames: Int) {
-        remaining.vertical += vertical
-        remaining.horizontal += horizontal
-        framesLeft = max(1, frames)
+        guard vertical.isFinite, horizontal.isFinite else { return }
+        remaining.vertical = min(1_000_000, max(-1_000_000, remaining.vertical + vertical))
+        remaining.horizontal = min(1_000_000, max(-1_000_000, remaining.horizontal + horizontal))
+        framesLeft = min(240, max(1, frames))
     }
 
     /// The distance for the next frame; ease-out: a third of what's left, everything on the last frame.

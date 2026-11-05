@@ -44,6 +44,12 @@ final class NightLocationProvider: NSObject, ObservableObject, CLLocationManager
         }
     }
 
+    func cancel() {
+        isRequesting = false
+        isRequestPending = false
+        manager.stopUpdatingLocation()
+    }
+
     private func requestLocation() {
         guard !isRequesting,
               LocationRefreshPolicy.shouldFetch(lastFetch: defaults.object(forKey: Self.fetchedAtKey) as? Date, now: Date())
@@ -53,6 +59,7 @@ final class NightLocationProvider: NSObject, ObservableObject, CLLocationManager
     }
 
     private func handle(location: CLLocation) {
+        guard isRequesting else { return }
         let coordinate = Coordinate(latitude: location.coordinate.latitude, longitude: location.coordinate.longitude)
         // Named offline after the nearest catalog city: the location never leaves the Mac (no reverse geocoding).
         let name = CityCatalog.nearest(to: coordinate, within: Self.cityNameRadiusKilometers)?.name

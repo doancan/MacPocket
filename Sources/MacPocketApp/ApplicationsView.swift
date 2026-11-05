@@ -7,7 +7,6 @@ struct ApplicationsView: View {
     @State private var uninstallPlan: UninstallPlan?
     @State private var pendingUpdate: HomebrewCask?
     @State private var confirmUpdate = false
-    @State private var showUpdatesInfo = false
     @FocusState private var searchFocused: Bool
 
     private var working: Bool { model.busy || model.checkingUpdates || model.updatingToken != nil }
@@ -17,7 +16,7 @@ struct ApplicationsView: View {
             let removing = ["kaldırılıyor", String(localized: "kaldırılıyor")].contains(model.packageAction)
             return removing ? String(localized: "\(token) Homebrew ile kaldırılıyor…") : String(localized: "\(token) Homebrew ile güncelleniyor…")
         }
-        return model.checkingUpdates ? String(localized: "Güncellemeler kontrol ediliyor…") : String(localized: "Uygulamalar inceleniyor…")
+        return model.checkingUpdates ? (model.updateProgress ?? String(localized: "Güncellemeler kontrol ediliyor…")) : String(localized: "Uygulamalar inceleniyor…")
     }
 
     var body: some View {
@@ -61,16 +60,20 @@ struct ApplicationsView: View {
     private var headingActions: some View {
         HStack(spacing: PocketSpacing.s) {
             if model.showUpdates {
-                Button("Güncellemeleri Kontrol Et") { Task { await model.checkUpdates() } }
-                    .buttonStyle(.pocketPrimary)
-                    .disabled(model.busy || model.checkingUpdates || model.updatingToken != nil)
-                    .help("Homebrew kataloğunda yeni sürümleri ara")
+                if model.checkingUpdates {
+                    Button("Denetimi İptal Et") { model.cancelUpdateCheck() }
+                } else {
+                    Button("Güncellemeleri Kontrol Et") { Task { await model.checkUpdates() } }
+                        .buttonStyle(.pocketPrimary)
+                        .disabled(model.busy || model.updatingToken != nil || model.updateSettings.sources.isEmpty)
+                        .help("Seçilen kaynaklarda yeni sürümleri ara")
+                }
             } else {
                 Button("Klasör Ekle…") { model.chooseApplicationFolder() }
-                    .disabled(model.busy)
+                    .disabled(working)
                     .help("Standart konumlar dışındaki bir uygulama klasörünü envantere ekle")
                 Button("Yenile") { Task { await model.load() } }
-                    .disabled(model.busy)
+                    .disabled(working)
                     .help("Uygulama envanterini yeniden oku")
             }
         }
@@ -137,54 +140,52 @@ struct ApplicationsView: View {
 
     private var updateList: some View {
         VStack(alignment: .leading, spacing: PocketSpacing.m) {
+            ApplicationUpdateSourcesView(model: model, working: working)
             HStack(spacing: PocketSpacing.s) {
-                Group {
-                    if let checked = model.updatesCheckedAt {
-                        Text("Son kontrol \(checked.formatted(date: .abbreviated, time: .shortened))")
-                    } else {
-                        Text("Henüz kontrol edilmedi")
-                    }
-                }
-                .font(.callout).foregroundStyle(.secondary)
-                Button { showUpdatesInfo.toggle() } label: { Image(systemName: "info.circle") }
-                    .buttonStyle(.borderless)
-                    .accessibilityLabel("Güncellemeler hakkında")
-                    .help("Hangi uygulamalar kapsanır?")
-                    .popover(isPresented: $showUpdatesInfo, arrowEdge: .bottom) {
-                        Text("Yalnız Homebrew’ün yerel kataloğunda yeni sürümü bulunan uygulamalar listelenir. App Store, Setapp ve üretici güncellemeleri kendi kanallarından yönetilir.")
-                            .font(.callout)
-                            .fixedSize(horizontal: false, vertical: true)
-                            .frame(width: 300)
-                            .padding(PocketSpacing.l)
-                    }
+                if let checked = model.updatesCheckedAt {
+                    Text("Son kontrol \(checked.formatted(date: .abbreviated, time: .shortened))")
+                } else { Text("Henüz kontrol edilmedi") }
                 Spacer(minLength: 0)
-                if !model.updates.isEmpty {
-                    Text("\(model.updates.count) güncelleme").font(.callout).foregroundStyle(.secondary)
-                }
+                if model.availableUpdateCount > 0 { Text("\(model.availableUpdateCount) güncelleme") }
+            }.font(.callout).foregroundStyle(.secondary)
+            if model.updateCheckCancelled {
+                PocketMessage("Denetim iptal edildi. Tamamlanmış kaynakların sonuçları gösteriliyor.", tone: .warning)
             }
-            if model.updates.isEmpty {
-                if !model.checkingUpdates {
-                    ContentUnavailableView {
-                        Label(model.updatesCheckedAt == nil ? "Güncellemeleri kontrol et" : "Güncelleme bulunamadı",
-                              systemImage: "arrow.triangle.2.circlepath")
-                    } description: {
-                        Text("Bu sonuç yalnız Homebrew tarafından yönetilen uygulamaları kapsar.")
-                    } actions: {
-                        if model.updatesCheckedAt == nil {
-                            Button("Güncellemeleri Kontrol Et") { Task { await model.checkUpdates() } }
-                                .disabled(working)
-                        }
-                    }
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-                }
+            if model.availableUpdateCount == 0, !model.checkingUpdates {
+                ContentUnavailableView {
+                    Label(model.updatesCheckedAt == nil ? "Güncellemeleri kontrol et" : "Uygun güncelleme bulunamadı", systemImage: "arrow.triangle.2.circlepath")
+                } description: {
+                    Text("Kaynak durumlarını kontrol et. Eşleşmeyen, atlanan veya hatalı kaynaklar güncel sayılmaz; kanal ve sistem gereksinimleri uygulanır.")
+                }.frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
                 ScrollView {
                     LazyVStack(spacing: PocketSpacing.s) {
-                        ForEach(model.updates) { update in updateRow(update) }
+                        ForEach(model.visibleHomebrewUpdates) { update in updateRow(update) }
+                        ForEach(model.visibleRemoteUpdates) { update in remoteUpdateRow(update) }
                     }
                 }
             }
         }
+    }
+
+    private func remoteUpdateRow(_ update: ApplicationUpdateFinding) -> some View {
+        HStack(spacing: PocketSpacing.m) {
+            PocketAppIcon(url: update.app.url, size: 36)
+            VStack(alignment: .leading, spacing: PocketSpacing.xxs) {
+                Text(update.app.name).font(.headline).lineLimit(1)
+                Text("\(update.installedVersion) → \(update.availableVersion)").font(.callout).foregroundStyle(.secondary).monospacedDigit()
+                Text(update.source.localizedTitle).font(.caption).foregroundStyle(.secondary)
+                if let channel = update.release.channel { Text("Kanal: \(channel)").font(.caption).foregroundStyle(.secondary) }
+            }
+            Spacer(minLength: PocketSpacing.s)
+            Button(update.source == .appStore ? "App Store’da Aç" : "Uygulamayı Aç") {
+                if let id = update.release.storeID, let url = URL(string: "macappstore://apps.apple.com/\(model.updateSettings.country.lowercased())/app/id\(id)") {
+                    NSWorkspace.shared.open(url)
+                } else {
+                    NSWorkspace.shared.openApplication(at: update.app.url, configuration: .init())
+                }
+            }.disabled(working)
+        }.pocketCard(padding: PocketSpacing.m, radius: PocketRadius.medium)
     }
 
     private func updateRow(_ update: HomebrewCask) -> some View {
@@ -229,7 +230,7 @@ private struct ApplicationInspector: View {
     @ObservedObject var model: ApplicationWorkspaceModel
     let reviewUninstall: (UninstallPlan) -> Void
 
-    private var channel: String { model.cask(for: app) != nil ? "Homebrew" : app.channel.title }
+    private var channel: String { model.cask(for: app) != nil ? ApplicationUpdateSource.homebrew.localizedTitle : app.channel.localizedTitle }
     private var version: String { app.build.isEmpty || app.build == app.version ? app.version : "\(app.version) (\(app.build))" }
 
     var body: some View {
@@ -321,7 +322,7 @@ private struct InstalledApplicationsTable: View {
             TableColumn("Sürüm") { app in Text(app.version).lineLimit(1).monospacedDigit() }
                 .width(min: 70, ideal: 120)
             TableColumn("Kanal") { app in
-                Text(verbatim: model.cask(for: app) != nil ? "Homebrew" : app.channel.title).foregroundStyle(.secondary)
+                Text(verbatim: model.cask(for: app) != nil ? ApplicationUpdateSource.homebrew.localizedTitle : app.channel.localizedTitle).foregroundStyle(.secondary)
             }
             .width(min: 80, ideal: 105)
         }

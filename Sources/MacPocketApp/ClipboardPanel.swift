@@ -70,6 +70,8 @@ final class ClipboardPanelController {
         if let keyMonitor { NSEvent.removeMonitor(keyMonitor) }
         keyMonitor = nil
         window?.onResign = nil
+        window?.endEditing(for: nil)
+        window?.makeFirstResponder(nil)
         window?.orderOut(nil)
         window?.contentView = nil
         window?.onResign = { [weak self] in self?.close() }

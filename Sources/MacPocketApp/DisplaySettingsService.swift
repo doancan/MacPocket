@@ -9,6 +9,10 @@ import SwiftUI
 @MainActor
 final class DisplaySettingsService: ObservableObject {
     static let shared = DisplaySettingsService()
+    #if DEBUG
+    private let moduleProbe = ModuleServiceProbe("DisplaySettingsService")
+    #endif
+    private(set) var moduleRunning = false
 
     struct Display: Identifiable, Equatable {
         let id: CGDirectDisplayID
@@ -45,7 +49,18 @@ final class DisplaySettingsService: ObservableObject {
 
     private init() {}
 
+    func stopForModule() {
+        moduleRunning = false
+        revert()
+        if let observer { NotificationCenter.default.removeObserver(observer) }
+        observer = nil
+        cgModes = [:]
+        displays = []
+    }
+
     func start() {
+        guard !moduleRunning, PocketModule.displays.isAvailable() else { return }
+        moduleRunning = true
         guard observer == nil else { return }
         refresh()
         observer = NotificationCenter.default.addObserver(forName: NSApplication.didChangeScreenParametersNotification, object: nil,
@@ -53,6 +68,7 @@ final class DisplaySettingsService: ObservableObject {
     }
 
     func refresh() {
+        guard moduleRunning else { return }
         var ids = [CGDirectDisplayID](repeating: 0, count: 16)
         var count: UInt32 = 0
         guard CGGetOnlineDisplayList(16, &ids, &count) == .success else { return }
@@ -250,3 +266,9 @@ private struct DisplayConfirmationView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 }
+
+#if DEBUG
+extension DisplaySettingsService {
+    var moduleDiagnosticResources: [String: Int] { ["observer": observer == nil ? 0 : 1, "timer": countdown?.isValid == true ? 1 : 0, "pending": pending == nil ? 0 : 1] }
+}
+#endif

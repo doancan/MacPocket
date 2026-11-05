@@ -226,8 +226,9 @@ final class PocketStatusItemController: NSObject, NSPopoverDelegate {
         let menu = NSMenu()
         menu.addItem(withTitle: String(localized: "MacPocket’ı aç"), action: #selector(openMainWindow), keyEquivalent: "").target = self
         menu.addItem(withTitle: String(localized: "Ayarlar"), action: #selector(openSettings), keyEquivalent: ",").target = self
-        let schedule = DisplayBrightnessService.shared.schedule
-        if schedule.enabled, schedule.source == .solar {
+        menu.addItem(withTitle: String(localized: "Komut Çubuğu’nu Aç"), action: #selector(openCommandBar), keyEquivalent: "").target = self
+        menu.addItem(withTitle: String(localized: "Dosya Rafı’nı Aç"), action: #selector(openShelf), keyEquivalent: "").target = self
+        if PocketModule.displays.isAvailable(), DisplayBrightnessService.shared.schedule.enabled, DisplayBrightnessService.shared.schedule.source == .solar {
             menu.addItem(.separator())
             if case .paused(until: .some) = NightModeService.shared.status {
                 menu.addItem(withTitle: String(localized: "Gece modunu yeniden aç"), action: #selector(resumeNightMode), keyEquivalent: "").target = self
@@ -246,6 +247,16 @@ final class PocketStatusItemController: NSObject, NSPopoverDelegate {
     @objc private func openMainWindow() {
         NSApp.activate(ignoringOtherApps: true)
         model.openMainWindow?()
+    }
+
+    @objc private func openCommandBar() {
+        if PocketModule.commandBar.isAvailable() { CommandBarService.shared.show() }
+        else { model.navigation.open(.commandBar); model.openMainWindow?() }
+    }
+
+    @objc private func openShelf() {
+        if PocketModule.shelf.isAvailable() { ShelfService.shared.show() }
+        else { model.navigation.open(.shelf); model.openMainWindow?() }
     }
 
     @objc private func openSettings() {
@@ -276,32 +287,18 @@ final class PocketApplicationState: ObservableObject {
     let statusItem: PocketStatusItemController
 
     init() {
+        #if DEBUG
+        ModuleRuntimeAudit.prepareIfRequested()
+        #endif
         let model = PocketModel()
         self.model = model
-        _ = WindowSwitcherHotkeyController.shared
         loginItem = LoginItemController()
         statusItem = PocketStatusItemController(model: model)
-        ClipboardService.shared.start()
-        WindowLayoutService.shared.start()
-        QuitGuardService.shared.start()
-        DisplayBrightnessService.shared.start()
-        MonitorVolumeService.shared.start()
-        NightModeService.shared.start()
-        MacroService.shared.start()
-        AppFreezerService.shared.start()
-        FocusSessionService.shared.attach(model)
-        WorkspaceService.shared.start()
-        SnippetService.shared.start()
-        ScreenGrabService.shared.start()
-        ScreenshotService.shared.start()
-        BluetoothBatteryService.shared.start()
-        ScreenTimeService.shared.start()
+        PocketModuleRuntime.shared.start(model: model)
+        #if DEBUG
+        if !ModuleRuntimeAudit.requested { _ = UpdateService.shared }
+        #else
         _ = UpdateService.shared
-        DisplaySettingsService.shared.start()
-        MouseScrollService.shared.start()
-        AudioOutputService.shared.start()
-        VolumeMixerService.shared.start()
-        ScreenRecorderService.shared.start()
-        PrivacyMonitorService.shared.start()
+        #endif
     }
 }

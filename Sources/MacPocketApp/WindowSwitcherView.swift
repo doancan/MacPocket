@@ -34,6 +34,8 @@ struct WindowSwitcherView: View {
             }
         }
         .pocketPage()
+        .onAppear { model.startObserving() }
+        .onDisappear { model.stopObserving() }
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
             accessibility = AXIsProcessTrusted()
             screenRecording = WindowPreviewProvider.permitted

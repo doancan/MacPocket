@@ -53,4 +53,11 @@ final class SnippetTests: XCTestCase {
         XCTAssertEqual(text, "15.01.2027 11:00 Cuma [pano] {unknown}")
         XCTAssertEqual(SnippetExpander.expand("{clipboard}", now: now, clipboard: nil, locale: Locale(identifier: "tr")), "")
     }
+
+    func testClipboardContentIsInsertedLiterallyWithoutRecursiveExpansion() {
+        let content = "🧩 {date} {time} {clipboard}"
+        let result = SnippetExpander.expand("📌 {clipboard} | {clipboard} | {unknown}", now: .distantPast,
+                                           clipboard: content, locale: Locale(identifier: "tr"))
+        XCTAssertEqual(result, "📌 \(content) | \(content) | {unknown}")
+    }
 }

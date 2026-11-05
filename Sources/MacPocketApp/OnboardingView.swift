@@ -33,17 +33,6 @@ extension OnboardingPermission {
         }
     }
 
-    var usedBy: LocalizedStringKey {
-        switch self {
-        case .accessibility: "Pencere Geçişi · Pencere Yerleşimi · Makrolar · Pano · Metin Kısayolları · Fare Kaydırma"
-        case .screenRecording: "Ekran Görüntüsü · Ekran Kaydı · Pencere Geçişi"
-        case .fullDiskAccess: "Temizlik · Disk Analizi · Uygulama Kalıntıları"
-        case .inputMonitoring: "Bluetooth Pilleri"
-        case .location: "Wi-Fi Analizi · Gece Modu"
-        case .notifications: "İzleme uyarıları · Bluetooth Pilleri"
-        }
-    }
-
     var symbol: String {
         switch self {
         case .accessibility: "accessibility"
@@ -108,6 +97,7 @@ final class OnboardingModel: ObservableObject {
     @Published private(set) var forward = true
     @Published private(set) var states: [OnboardingPermission: OnboardingPermissionState] = [:]
     @Published private(set) var requested: Set<OnboardingPermission> = []
+    @Published private(set) var availableModules = Set(PocketModule.allCases.filter { $0.isAvailable() })
     private let location = CLLocationManager()
     private var polling: Task<Void, Never>?
     private(set) var finished = false
@@ -117,12 +107,14 @@ final class OnboardingModel: ObservableObject {
     }
 
     var permissions: [OnboardingPermission] { OnboardingPermission.allCases }
-    var applicable: [OnboardingPermission] { permissions.filter { states[$0] != .unavailable } }
+    var applicable: [OnboardingPermission] { permissions.filter { states[$0] != .unavailable && usage($0).isRelevant } }
     var grantedCount: Int { applicable.filter { states[$0] == .granted }.count }
     var missing: [OnboardingPermission] { applicable.filter { states[$0] != .granted } }
 
     /// macOS applies Screen Recording and Input Monitoring to a running app only after a relaunch.
-    var relaunchSuggested: Bool { requested.contains { $0.mayNeedRelaunch && states[$0] != .granted } }
+    var relaunchSuggested: Bool { requested.contains { $0.mayNeedRelaunch && states[$0] != .granted && usage($0).isRelevant } }
+
+    func usage(_ permission: OnboardingPermission) -> PermissionUsage { PermissionUsageMap.usage(permission, availableModules: availableModules) }
 
     func state(_ permission: OnboardingPermission) -> OnboardingPermissionState { states[permission] ?? .notGranted }
 
@@ -142,10 +134,12 @@ final class OnboardingModel: ObservableObject {
     }
 
     func refresh() async {
+        let enabled = Set(PocketModule.allCases.filter { $0.isAvailable() })
+        if availableModules != enabled { availableModules = enabled }
         var next: [OnboardingPermission: OnboardingPermissionState] = [:]
         for permission in permissions { next[permission] = await PermissionProbe.state(of: permission, location: location) }
         if next != states { states = next }
-        if let shown = PermissionDragHelper.shared.permission, next[shown] == .granted { PermissionDragHelper.shared.hide() }
+        if let shown = PermissionDragHelper.shared.permission, next[shown] == .granted || !usage(shown).isRelevant { PermissionDragHelper.shared.hide() }
     }
 
     func go(to target: OnboardingStep) {
@@ -160,6 +154,8 @@ final class OnboardingModel: ObservableObject {
     func back() { if let previous = step.previous { go(to: previous) } }
 
     func request(_ permission: OnboardingPermission) {
+        let available = Set(PocketModule.allCases.filter { $0.isAvailable() })
+        guard PermissionUsageMap.usage(permission, availableModules: available).isRelevant else { return }
         requested.insert(permission)
         OnboardingRecord.saveResumeStep(.permissions)
         switch permission {
@@ -638,7 +634,8 @@ private struct OnboardingPermissions: View {
             ScrollView {
                 VStack(spacing: PocketSpacing.s) {
                     ForEach(model.permissions) { permission in
-                        OnboardingPermissionRow(permission: permission, state: model.state(permission),
+                        OnboardingPermissionRow(permission: permission, state: model.state(permission), usage: model.usage(permission),
+                                                audioOnlyNote: permission == .screenRecording && model.availableModules.contains(.mixer),
                                                 requested: model.requested.contains(permission),
                                                 request: { model.request(permission) })
                     }
@@ -687,9 +684,11 @@ private struct OnboardingPermissions: View {
     }
 }
 
-private struct OnboardingPermissionRow: View {
+struct OnboardingPermissionRow: View {
     let permission: OnboardingPermission
     let state: OnboardingPermissionState
+    let usage: PermissionUsage
+    let audioOnlyNote: Bool
     let requested: Bool
     let request: () -> Void
 
@@ -699,14 +698,30 @@ private struct OnboardingPermissionRow: View {
             VStack(alignment: .leading, spacing: 3) {
                 HStack(spacing: PocketSpacing.xs) {
                     Text(permission.title).font(.headline)
-                    if permission.isRecommended { PocketStatusBadge(text: "Önerilen", tone: .accent) }
+                    if permission.isRecommended && usage.isRelevant { PocketStatusBadge(text: "Önerilen", tone: .accent) }
                 }
                 Text(permission.reason).font(.callout).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
-                Text(permission.usedBy).font(.caption).foregroundStyle(.tertiary).lineLimit(1).truncationMode(.tail)
-                if requested && !state.isGranted { hint }
+                if usage.isRelevant {
+                    Text(usage.activeTitles.joined(separator: " · ")).font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+                } else {
+                    Text("Bu izni kullanan etkin modül yok.").font(.caption).foregroundStyle(.secondary)
+                }
+                if !usage.inactiveModules.isEmpty {
+                    DisclosureGroup("Kapalı modüller") {
+                        Text(usage.inactiveModules.map(\.localizedTitle).joined(separator: " · ")).font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+                    }.font(.caption)
+                }
+                if audioOnlyNote {
+                    Text("Bu satır ekran kaydı iznini ölçer. Ses Mikseri sistem sesi iznini ilk yönlendirmede ayrıca denetler.")
+                        .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+                }
+                if requested && usage.isRelevant && !state.isGranted { hint }
             }
             Spacer(minLength: PocketSpacing.m)
-            trailing.frame(minWidth: 112, alignment: .trailing)
+            Group {
+                if usage.isRelevant { trailing }
+                else { Text(state.isGranted ? "Verildi · kullanılmıyor" : "Etkin araç yok").font(.caption).foregroundStyle(.secondary) }
+            }.frame(minWidth: 112, alignment: .trailing)
         }
         .pocketCard(padding: PocketSpacing.m)
         .overlay {

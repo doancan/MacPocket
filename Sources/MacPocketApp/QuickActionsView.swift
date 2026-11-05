@@ -16,14 +16,18 @@ final class QuickActionService: ObservableObject {
 
     private init() {}
 
-    func perform(_ action: QuickAction) {
-        guard running == nil else { return }
+    func perform(_ action: QuickAction, completion: (@MainActor (Outcome?) -> Void)? = nil) {
+        guard running == nil else {
+            completion?(Outcome(text: String(localized: "Devam eden hızlı işlemin bitmesini bekle."), tone: .warning))
+            return
+        }
         running = action
         outcome = nil
         Task {
             let result = await Self.run(action)
             running = nil
             outcome = result
+            completion?(result)
         }
     }
 

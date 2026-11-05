@@ -9,6 +9,9 @@ import SwiftUI
 @MainActor
 final class WindowSwitcherHotkeyController: NSObject, ObservableObject {
     static let shared = WindowSwitcherHotkeyController()
+    #if DEBUG
+    private let moduleProbe = ModuleServiceProbe("WindowSwitcherHotkeyController")
+    #endif
 
     @Published private(set) var registrationMessage = String(localized: "Global kısayol kapalı.")
     @Published private(set) var shortcuts: [SwitcherShortcut] = []
@@ -52,6 +55,14 @@ final class WindowSwitcherHotkeyController: NSObject, ObservableObject {
 
     private override init() {
         super.init()
+    }
+
+    private(set) var moduleRunning = false
+
+    func start() {
+        guard !moduleRunning, PocketModule.windowSwitcher.isAvailable() else { return }
+        moduleRunning = true
+        model.startObserving()
         let defaults = UserDefaults.standard
         if !defaults.bool(forKey: "switcher.cardOverlayConfigured") {
             defaults.set(true, forKey: "switcher.globalEnabled")
@@ -87,6 +98,23 @@ final class WindowSwitcherHotkeyController: NSObject, ObservableObject {
         installLocalMonitor()
         configure()
         Task { [weak self] in await self?.model.refresh() }
+    }
+
+    func stopForModule() {
+        moduleRunning = false
+        dismiss()
+        subscriptions = []
+        for ref in keyRefs { UnregisterEventHotKey(ref) }
+        keyRefs = []
+        hotkeyMap = [:]
+        registeredSignature = ""
+        if let handler { RemoveEventHandler(handler) }
+        handler = nil
+        if let monitor { NSEvent.removeMonitor(monitor) }
+        monitor = nil
+        if gestureFingers > 0 { TrackpadSwipeMonitor.shared.stop() }
+        gestureFingers = -1
+        model.stopObserving()
     }
 
     // MARK: Settings
@@ -152,6 +180,7 @@ final class WindowSwitcherHotkeyController: NSObject, ObservableObject {
     }
 
     private func configure() {
+        guard moduleRunning else { return }
         let defaults = UserDefaults.standard
         let fingers = defaults.integer(forKey: "switcher.gestureFingers")
         if fingers != gestureFingers {
@@ -330,6 +359,7 @@ final class WindowSwitcherHotkeyController: NSObject, ObservableObject {
     }
 
     private func summon(shortcut: SwitcherShortcut, backwards: Bool, holdsModifiers: Bool) {
+        guard moduleRunning else { return }
         if sessionID != nil { step(backwards: backwards); return }
         let id = UUID()
         sessionID = id; preparing = true; commitWhenReady = false
@@ -545,3 +575,9 @@ final class SwitcherPreviewPanel: NSPanel {
         orderFront(nil)
     }
 }
+
+#if DEBUG
+extension WindowSwitcherHotkeyController {
+    var moduleDiagnosticResources: [String: Int] { ["hotKeys": keyRefs.count, "handler": handler == nil ? 0 : 1, "monitor": monitor == nil ? 0 : 1, "subscriptions": subscriptions.count] }
+}
+#endif

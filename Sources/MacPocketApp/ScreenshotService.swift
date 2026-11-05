@@ -7,6 +7,10 @@ import MacPocketCore
 @MainActor
 final class ScreenshotService: ObservableObject {
     static let shared = ScreenshotService()
+    #if DEBUG
+    private let moduleProbe = ModuleServiceProbe("ScreenshotService")
+    #endif
+    private(set) var moduleRunning = false
 
     @Published var settings: ScreenshotSettings {
         didSet {
@@ -22,12 +26,21 @@ final class ScreenshotService: ObservableObject {
     @Published private(set) var conflictingApp: String?
     @Published private(set) var message: String?
     @Published private(set) var busy = false
+    @Published private(set) var latestCapture: ScreenshotCapture?
     var recordingShortcut = false { didSet { registerShortcuts() } }
+    let pins = ScreenshotPins()
 
     private var hotKeys: [ScreenshotMode: PocketGlobalHotKey] = [:]
+    private var observers: [NSObjectProtocol] = []
     private var overlay: ScreenshotSelectionOverlay?
+    private var captureTask: Task<Void, Never>?
+    private var captureID: UUID?
+    private var scrollingSession: ScrollingScreenshotSession?
     private static let previousAreaKey = "MacPocket.screenshot.previousArea"
     private static let historyURL: URL = {
+        #if DEBUG
+        if let url = ModuleRuntimeAudit.dataURL("screenshot-history.json") { return url }
+        #endif
         let folder = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0].appendingPathComponent("MacPocket", isDirectory: true)
         try? FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
         return folder.appendingPathComponent("screenshot-history.json")
@@ -39,15 +52,42 @@ final class ScreenshotService: ObservableObject {
         history.prune(now: Date()) { FileManager.default.fileExists(atPath: $0) }
     }
 
+    func stopForModule() {
+        moduleRunning = false
+        cancelCapture()
+        pins.closeAll()
+        latestCapture = nil
+        ScreenshotQuickAccess.shared.closeAll()
+        ScreenshotEditor.closeAll()
+        hotKeys.values.forEach { $0.unregister() }
+        hotKeys = [:]
+        overlay?.finish(nil)
+        overlay = nil
+        observers.forEach { NotificationCenter.default.removeObserver($0); NSWorkspace.shared.notificationCenter.removeObserver($0) }
+        observers = []
+        failedShortcuts = []
+        failedRegistrations = []
+    }
+
     func start() {
+        guard !moduleRunning, PocketModule.screenshot.isAvailable() else { return }
+        moduleRunning = true
         registerShortcuts()
         for name in [NSWorkspace.didLaunchApplicationNotification, NSWorkspace.didTerminateApplicationNotification] {
-            NSWorkspace.shared.notificationCenter.addObserver(forName: name, object: nil, queue: .main) { [weak self] _ in
+            observers.append(NSWorkspace.shared.notificationCenter.addObserver(forName: name, object: nil, queue: .main) { [weak self] _ in
                 MainActor.assumeIsolated { self?.checkConflicts() }
-            }
+            })
         }
-        NotificationCenter.default.addObserver(forName: NSApplication.didBecomeActiveNotification, object: nil, queue: .main) { [weak self] _ in
+        observers.append(NotificationCenter.default.addObserver(forName: NSApplication.didBecomeActiveNotification, object: nil, queue: .main) { [weak self] _ in
             MainActor.assumeIsolated { self?.checkConflicts() }
+        })
+        observers.append(NotificationCenter.default.addObserver(forName: NSApplication.didChangeScreenParametersNotification, object: nil, queue: .main) { [weak self] _ in
+            MainActor.assumeIsolated { self?.cancelCapture() }
+        })
+        for name in [NSWorkspace.willSleepNotification, NSWorkspace.sessionDidResignActiveNotification] {
+            observers.append(NSWorkspace.shared.notificationCenter.addObserver(forName: name, object: nil, queue: .main) { [weak self] _ in
+                MainActor.assumeIsolated { self?.cancelCapture() }
+            })
         }
     }
 
@@ -62,6 +102,7 @@ final class ScreenshotService: ObservableObject {
     private var failedRegistrations: Set<ScreenshotMode> = []
 
     private func registerShortcuts() {
+        guard moduleRunning else { return }
         var failed: Set<ScreenshotMode> = []
         for mode in ScreenshotMode.allCases {
             let hotKey = hotKeys[mode] ?? PocketGlobalHotKey { [weak self] in self?.capture(mode) }
@@ -86,35 +127,54 @@ final class ScreenshotService: ObservableObject {
     // MARK: Capturing
 
     func capture(_ mode: ScreenshotMode) {
-        guard !busy, overlay == nil else { return }
+        guard moduleRunning, !busy, overlay == nil else { return }
         guard CGPreflightScreenCaptureAccess() else {
             CGRequestScreenCaptureAccess()
             message = String(localized: "Ekran görüntüsü almak için MacPocket’e Ekran Kaydı izni ver; sonra tekrar dene.")
             return
         }
-        Task { await run(mode) }
+        beginCapture { [weak self] in await self?.run(mode) }
+    }
+
+    @discardableResult private func beginCapture(_ operation: @escaping @MainActor () async -> Void) -> Bool {
+        guard moduleRunning, !busy, overlay == nil else { return false }
+        busy = true
+        let id = UUID(); captureID = id
+        captureTask = Task { [weak self] in
+            guard let self else { return }
+            defer { if self.captureID == id { self.busy = false; self.captureTask = nil; self.captureID = nil; self.scrollingSession = nil } }
+            await operation()
+        }
+        return true
     }
 
     private func run(_ mode: ScreenshotMode) async {
-        busy = true
-        defer { busy = false }
         do {
             switch mode {
             case .fullscreen:
                 guard let display = Self.displayUnderPointer() else { return }
                 let image = try await Self.captureDisplay(display)
-                finish(image, mode: .fullscreen)
+                try await finish(image, mode: .fullscreen, scale: Self.scale(for: display, image: image))
             case .previousArea:
                 try await capturePreviousArea()
-            case .area, .window, .allInOne:
+            case .area, .window, .allInOne, .scrolling:
                 let screens = try await freezeScreens()
-                let selection = await select(on: screens, mode: mode)
+                let selection = try await select(on: screens, mode: mode)
                 try await handle(selection, screens: screens, mode: mode)
             }
+        } catch is CancellationError {
         } catch {
+            guard moduleRunning, !Task.isCancelled else { return }
             message = String(localized: "Ekran görüntüsü alınamadı: \(error.localizedDescription)")
+            PocketToast.show(message ?? error.localizedDescription, symbol: "exclamationmark.triangle")
         }
     }
+
+    func cancelCapture() {
+        captureTask?.cancel(); overlay?.finish(nil); scrollingSession?.cancel()
+    }
+
+    var canSuspendModule: Bool { !busy && !ScreenshotEditor.hasUnsavedChanges && !pins.items.contains { $0.working } }
 
     private func handle(_ selection: ScreenshotSelection?, screens: [FrozenScreen], mode: ScreenshotMode) async throws {
         switch selection {
@@ -125,19 +185,41 @@ final class ScreenshotService: ObservableObject {
                   let pixels = ScreenshotGeometry.pixelRect(rect, scale: screen.scale, imageSize: CGSize(width: screen.image.width, height: screen.image.height)),
                   let crop = screen.image.cropping(to: pixels) else { return }
             savePreviousArea(display: display, rect: rect)
-            finish(crop, mode: .area)
+            try await finish(crop, mode: .area, scale: screen.scale)
         case let .fullscreen(display):
-            if let screen = screens.first(where: { $0.display == display }) { finish(screen.image, mode: .fullscreen) }
+            if let screen = screens.first(where: { $0.display == display }) { try await finish(screen.image, mode: .fullscreen, scale: screen.scale) }
         case let .window(id):
-            finish(try await Self.captureWindow(id), mode: .window)
+            let result = try await Self.captureWindow(id)
+            try await finish(result.image, mode: .window, scale: result.scale)
+        case let .scrolling(display, rect):
+            try Task.checkCancellation()
+            guard let screen = screens.first(where: { $0.display == display }) else { throw CaptureError.noDisplay }
+            let rect = rect.intersection(CGRect(origin: .zero, size: screen.frame.size))
+            guard rect.width * screen.scale >= 32, rect.height * screen.scale >= 64 else { throw ScrollScreenshotStitcher.Failure.invalidFrame }
+            savePreviousArea(display: display, rect: rect)
+            let area = CGRect(x: screen.frame.minX + rect.minX, y: screen.frame.maxY - rect.maxY, width: rect.width, height: rect.height)
+            let session = ScrollingScreenshotSession(); scrollingSession = session
+            defer { session.cancel() }
+            session.prepare(near: area)
+            let source = try await ScrollingScreenshotSession.source(displayID: display, rect: rect, scale: screen.scale)
+            try await performScrolling(session, frame: area, source: source, scale: screen.scale)
         case .previousArea:
             try await capturePreviousArea(frozen: screens)
         }
     }
 
-    private func select(on screens: [FrozenScreen], mode: ScreenshotMode) async -> ScreenshotSelection? {
+    private func performScrolling(_ session: ScrollingScreenshotSession, frame: CGRect, source: @escaping ScrollingScreenshotSession.FrameSource, scale: CGFloat) async throws {
+        guard let result = try await session.run(frame: frame, source: source) else { return }
+        try await finish(result.image, mode: .scrolling, scale: scale)
+        if result.partial { message = String(localized: "Son hareket eşleşmedi; yalnız doğrulanmış bölümler kaydedildi.") }
+        else if result.limited { message = String(localized: "Yakalama sınırına ulaşıldı; şimdiye kadarki bölümler kaydedildi.") }
+    }
+
+    private func select(on screens: [FrozenScreen], mode: ScreenshotMode) async throws -> ScreenshotSelection? {
+        try Task.checkCancellation()
         let overlay = ScreenshotSelectionOverlay(screens: screens, windows: Self.windowsOnScreen(), startInWindowMode: mode == .window,
                                                  showsModeBar: mode == .allInOne, hasPreviousArea: loadPreviousArea() != nil)
+        if mode == .scrolling { overlay.setScrollingMode(true) }
         self.overlay = overlay
         defer { self.overlay = nil }
         return await withCheckedContinuation { continuation in
@@ -156,74 +238,48 @@ final class ScreenshotService: ObservableObject {
         } else {
             image = try await Self.captureDisplay(previous.display)
         }
-        let scale = NSScreen.screens.first { $0.displayID == previous.display }?.backingScaleFactor ?? 2
+        let scale = frozen?.first { $0.display == previous.display }?.scale ?? Self.scale(for: previous.display, image: image)
         guard let pixels = ScreenshotGeometry.pixelRect(previous.rect, scale: scale, imageSize: CGSize(width: image.width, height: image.height)),
               let crop = image.cropping(to: pixels) else { return }
-        finish(crop, mode: .previousArea)
+        try await finish(crop, mode: .previousArea, scale: scale)
     }
 
     // MARK: After capture
 
-    private func finish(_ image: CGImage, mode: ScreenshotMode) {
-        if settings.playSound { NSSound(contentsOfFile: "/System/Library/Components/CoreAudio.component/Contents/SharedSupport/SystemSounds/system/Screen Capture.aif", byReference: true)?.play() }
-        let date = Date()
-        let scale = NSScreen.screens.first { NSMouseInRect(NSEvent.mouseLocation, $0.frame, false) }?.backingScaleFactor ?? 2
-        var savedURL: URL?
+    private func finish(_ image: CGImage, mode: ScreenshotMode, scale: CGFloat) async throws {
+        try Task.checkCancellation(); guard moduleRunning else { return }
+        let settings = settings
+        var capture = ScreenshotCapture(image: image, scale: scale, fileURL: nil, date: Date(), mode: mode)
+        let png = settings.copyToClipboard ? try await ScreenshotAsyncOutput.encode(image, format: .png, quality: 1, scale: Double(scale)) : nil
+        try Task.checkCancellation()
         if settings.saveToFolder {
-            savedURL = write(image, to: ScreenshotFiles.url(in: folder, at: date, prefix: String(localized: "Ekran Resmi"), format: settings.format) {
-                FileManager.default.fileExists(atPath: $0.path)
-            })
-            if let savedURL {
-                history.add(ScreenshotHistoryEntry(path: savedURL.path, date: date, mode: mode, pixelWidth: image.width, pixelHeight: image.height))
-                saveHistory()
-            }
+            do { capture.fileURL = try await saveAsync(capture, encodedData: settings.format == .png ? png : nil) }
+            catch is CancellationError { throw CancellationError() }
+            catch { message = String(localized: "Ekran görüntüsü kaydedilemedi: \(error.localizedDescription)") }
         }
-        if settings.copyToClipboard { copy(image, scale: scale) }
-        if settings.showOverlay {
-            ScreenshotQuickAccess.shared.show(ScreenshotCapture(image: image, scale: scale, fileURL: savedURL, date: date, mode: mode))
-        }
+        try Task.checkCancellation(); guard moduleRunning else { return }
+        if let png { NSPasteboard.general.clearContents(); NSPasteboard.general.setData(png, forType: .png) }
+        latestCapture = capture
+        if settings.playSound { NSSound(contentsOfFile: "/System/Library/Components/CoreAudio.component/Contents/SharedSupport/SystemSounds/system/Screen Capture.aif", byReference: true)?.play() }
+        if settings.showOverlay { ScreenshotQuickAccess.shared.show(capture) }
     }
 
-    /// Writes the image in the chosen format; nil (with a message) on failure.
-    @discardableResult
-    func write(_ image: CGImage, to url: URL) -> URL? {
-        do {
-            let data = try ScreenshotEncoder.encode(image, as: ScreenshotFormat(rawValue: url.pathExtension.lowercased()) ?? settings.format,
-                                                   quality: settings.quality)
-            try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
-            try data.write(to: url, options: .atomic)
-            return url
-        } catch {
-            message = String(localized: "Ekran görüntüsü kaydedilemedi: \(error.localizedDescription)")
-            return nil
+    func saveAsync(_ capture: ScreenshotCapture, encodedData: Data? = nil) async throws -> URL {
+        if let url = capture.fileURL, FileManager.default.fileExists(atPath: url.path) { return url }
+        let settings = settings, folder = folder, prefix = String(localized: "Ekran Resmi")
+        let worker = Task.detached(priority: .userInitiated) {
+            try Task.checkCancellation()
+            let data = try encodedData ?? ScreenshotEncoder.encode(capture.image, as: settings.format, quality: settings.quality, scale: Double(capture.scale))
+            return try ScreenshotFileWriter.write(data, folder: folder, date: capture.date, prefix: prefix, format: settings.format)
         }
-    }
-
-    /// Saves a capture that wasn't saved automatically (from the preview card); returns the file.
-    func save(_ capture: ScreenshotCapture) -> URL? {
-        if let url = capture.fileURL { return url }
-        guard let url = write(capture.image, to: ScreenshotFiles.url(in: folder, at: capture.date, prefix: String(localized: "Ekran Resmi"),
-                                                                    format: settings.format) { FileManager.default.fileExists(atPath: $0.path) })
-        else { return nil }
-        history.add(ScreenshotHistoryEntry(path: url.path, date: capture.date, mode: capture.mode, pixelWidth: capture.image.width,
-                                           pixelHeight: capture.image.height))
-        saveHistory()
+        let url = try await withTaskCancellationHandler { try await worker.value } onCancel: { worker.cancel() }
+        if !Task.isCancelled { noteSaved(url, image: capture.image, mode: capture.mode) }
         return url
     }
 
-    /// A temporary file for dragging an unsaved capture into another app.
-    func temporaryFile(for capture: ScreenshotCapture) -> URL? {
-        let url = FileManager.default.temporaryDirectory.appendingPathComponent("MacPocket Screenshots", isDirectory: true)
-            .appendingPathComponent(ScreenshotFiles.url(in: URL(fileURLWithPath: "/"), at: capture.date, prefix: String(localized: "Ekran Resmi"),
-                                                        format: settings.format) { _ in false }.lastPathComponent)
-        if FileManager.default.fileExists(atPath: url.path) { return url }
-        return write(capture.image, to: url)
-    }
-
-    func copy(_ image: CGImage, scale: CGFloat) {
-        let nsImage = NSImage(cgImage: image, size: NSSize(width: CGFloat(image.width) / scale, height: CGFloat(image.height) / scale))
-        NSPasteboard.general.clearContents()
-        NSPasteboard.general.writeObjects([nsImage])
+    @discardableResult func pin(_ capture: ScreenshotCapture) -> Bool {
+        guard moduleRunning, !busy else { return false }
+        return pins.pin(capture)
     }
 
     func removeFromHistory(_ id: UUID) {
@@ -261,8 +317,9 @@ final class ScreenshotService: ObservableObject {
         var frozen: [FrozenScreen] = []
         for screen in NSScreen.screens {
             guard let display = screen.displayID else { continue }
-            frozen.append(FrozenScreen(display: display, frame: screen.frame, scale: screen.backingScaleFactor,
-                                       image: try await Self.captureDisplay(display)))
+            try Task.checkCancellation()
+            let image = try await Self.captureDisplay(display)
+            frozen.append(FrozenScreen(display: display, frame: screen.frame, scale: Self.scale(for: display, image: image), image: image))
         }
         return frozen
     }
@@ -284,7 +341,7 @@ final class ScreenshotService: ObservableObject {
     }
 
     /// One window on its own, with its shadow and a transparent background.
-    static func captureWindow(_ id: CGWindowID) async throws -> CGImage {
+    static func captureWindow(_ id: CGWindowID) async throws -> (image: CGImage, scale: CGFloat) {
         let content = try await SCShareableContent.excludingDesktopWindows(true, onScreenWindowsOnly: true)
         guard let window = content.windows.first(where: { $0.windowID == id }) else { throw CaptureError.noWindow }
         let filter = SCContentFilter(desktopIndependentWindow: window)
@@ -296,7 +353,12 @@ final class ScreenshotService: ObservableObject {
         configuration.captureResolution = .best
         configuration.ignoreShadowsSingleWindow = false
         configuration.shouldBeOpaque = false
-        return try await SCScreenshotManager.captureImage(contentFilter: filter, configuration: configuration)
+        return (try await SCScreenshotManager.captureImage(contentFilter: filter, configuration: configuration), scale)
+    }
+
+    private static func scale(for display: CGDirectDisplayID, image: CGImage) -> CGFloat {
+        guard let screen = NSScreen.screens.first(where: { $0.displayID == display }), screen.frame.width > 0 else { return 1 }
+        return CGFloat(image.width) / screen.frame.width
     }
 
     enum CaptureError: LocalizedError {
@@ -331,7 +393,7 @@ final class ScreenshotService: ObservableObject {
 }
 
 /// One capture handed to the preview card and the editor.
-struct ScreenshotCapture: Identifiable {
+struct ScreenshotCapture: Identifiable, Sendable {
     let id = UUID()
     var image: CGImage
     var scale: CGFloat
@@ -343,3 +405,26 @@ struct ScreenshotCapture: Identifiable {
 extension NSScreen {
     var displayID: CGDirectDisplayID? { (deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] as? NSNumber)?.uint32Value }
 }
+
+#if DEBUG
+extension ScreenshotService {
+    @discardableResult func diagnosticCapture(_ session: ScrollingScreenshotSession, source: @escaping ScrollingScreenshotSession.FrameSource) -> Bool {
+        guard ModuleRuntimeAudit.requested else { return false }
+        return beginCapture { [weak self] in
+            guard let self else { return }
+            self.scrollingSession = session
+            defer { session.cancel() }
+            do {
+                try await self.performScrolling(session, frame: CGRect(x: 120, y: 160, width: 400, height: 300), source: source, scale: 2)
+            } catch is CancellationError {} catch { self.message = error.localizedDescription }
+        }
+    }
+    var moduleDiagnosticResources: [String: Int] {
+        var resources = pins.diagnosticResources
+        resources.merge(["observers": observers.count, "hotKeys": hotKeys.count, "overlay": overlay == nil ? 0 : 1,
+                         "captureTask": captureTask == nil ? 0 : 1, "scrollHUD": scrollingSession?.diagnosticResources ?? 0,
+                         "editors": ScreenshotEditor.diagnosticWindows], uniquingKeysWith: { _, new in new })
+        return resources
+    }
+}
+#endif

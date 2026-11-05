@@ -347,6 +347,7 @@ private struct HubAwakeSheet: View {
             if let error = model.awakeError {
                 PocketMessage(error, error: true)
             }
+            Button("Otomasyon Kuralları…") { model.navigation.select(.power); dismiss() }
             HStack {
                 Spacer()
                 if let session = model.awakeSession, session.active {
@@ -368,7 +369,7 @@ private struct HubAwakeSheet: View {
 
     private func activeSession(_ session: AwakeSession) -> some View {
         VStack(alignment: .leading, spacing: PocketSpacing.s) {
-            PocketStatusBadge(text: "Etkin oturum" as LocalizedStringKey, systemImage: "circle.fill", tone: .accent)
+            PocketStatusBadge(text: model.awakeIsAutomatic ? "Koşullu oturum" : "Etkin oturum", systemImage: "circle.fill", tone: .accent)
             HubAwakeCountdown(session: session)
                 .font(.system(.title2, design: .monospaced).weight(.medium))
             Text(session.keepDisplayAwake ? "Ekran da açık tutuluyor." : "Ekranın kapanması engellenmiyor.")
@@ -427,7 +428,7 @@ private struct HubAwakeSheet: View {
 
 // MARK: - Catalog
 
-private enum HubCategory: String, CaseIterable, Identifiable {
+enum HubCategory: String, CaseIterable, Identifiable {
     case all = "Tümü", productivity = "Üretkenlik", system = "Sistem ve Bakım"
     case applications = "Uygulamalar", files = "Dosyalar ve Disk"
     case privacy = "Gizlilik ve Güvenlik"
@@ -491,73 +492,94 @@ private enum HubAwakeDuration: String, CaseIterable, Identifiable {
     }
 }
 
-/// Every catalog entry opens a working tool; ids are routed by `PocketRootView.openCatalogTool`,
+/// Every catalog entry opens a working tool; ids are routed by `PocketModel.openCatalogTool`,
 /// except "keep-awake", which this view presents itself.
-private struct HubTool: Identifiable {
+struct HubTool: Identifiable {
     let id: String
-    let title: String
-    let description: String
+    private let titleResource: LocalizedStringResource
+    private let descriptionResource: LocalizedStringResource
+    var title: String { String(localized: titleResource) }
+    var description: String { String(localized: descriptionResource) }
+    var searchKeywords: String {
+        var english = titleResource
+        english.locale = Locale(identifier: "en")
+        var turkish = titleResource
+        turkish.locale = Locale(identifier: "tr")
+        return String(localized: english) + " " + String(localized: turkish)
+    }
     let icon: String
     let category: HubCategory
 
+    init(id: String, title: LocalizedStringResource, description: LocalizedStringResource, icon: String, category: HubCategory) {
+        self.id = id
+        titleResource = title
+        descriptionResource = description
+        self.icon = icon
+        self.category = category
+    }
+
     static let catalog: [HubTool] = [
-        .init(id: "practical-tools", title: String(localized: "Pratik Araçlar"), description: String(localized: "Case Converter, JSON, Base64, URL, JWT, hash, UUID, parola, tarih, metin karşılaştırma ve QR: çevrimdışı çalışma alanı."), icon: "square.grid.3x3", category: .productivity),
-        .init(id: "mac-utilities", title: String(localized: "macOS Araçları"), description: String(localized: "Sistem raporları ve macOS ayarlarına hızlı erişim."), icon: "hammer", category: .system),
-        .init(id: "maintenance", title: String(localized: "Bakım"), description: String(localized: "Önbellekleri sıfırla, başlangıç diskini doğrula, DNS’i temizle; yönetici gerektirenler tek parolayla çalışır."), icon: "wrench.and.screwdriver", category: .system),
-        .init(id: "startup-items", title: String(localized: "Başlangıç Öğeleri"), description: String(localized: "Oturum açılışında ve Mac başlarken kendiliğinden çalışan öğeleri, sahipleriyle ve durumlarıyla gör."), icon: "power", category: .system),
-        .init(id: "launch-jobs", title: String(localized: "Başlatma Görevleri"), description: String(localized: "Kullanıcı oturumunun launchd görevlerini incele."), icon: "list.bullet", category: .system),
-        .init(id: "speed-test", title: String(localized: "Ağ Hız Testi"), description: String(localized: "İndirme, yükleme ve yanıt verme hızını macOS’un yerleşik aracıyla ölç; sonuçları karşılaştır."), icon: "speedometer", category: .system),
-        .init(id: "network-traffic", title: String(localized: "Ağ Trafiği"), description: String(localized: "Hangi uygulamanın şu an ne kadar indirip yüklediğini canlı gör; yardımcı süreçler uygulamada toplanır."), icon: "arrow.up.arrow.down.circle", category: .system),
-        .init(id: "local-network", title: String(localized: "Yerel Ağ"), description: String(localized: "Ağa bağlı cihazları adları, IP ve MAC adresleri ve türleriyle gör; yeni katılanları fark et."), icon: "network.badge.shield.half.filled", category: .system),
-        .init(id: "power-schedule", title: String(localized: "Güç Zamanlaması"), description: String(localized: "Mac’in belirli saatlerde uyanmasını, açılmasını, uyumasını veya kapanmasını planla."), icon: "calendar.badge.clock", category: .system),
-        .init(id: "wifi", title: String(localized: "Wi-Fi Analizi"), description: String(localized: "Sinyal gücünü, paraziti ve çevredeki ağların kanal yoğunluğunu gör; modem için kanal önerisi al."), icon: "wifi", category: .system),
-        .init(id: "screen-time", title: String(localized: "Ekran Süresi"), description: String(localized: "Hangi uygulamada ne kadar zaman geçirdiğini gör; boşta ve kilitli süre sayılmaz, veriler bu Mac’te kalır."), icon: "hourglass", category: .productivity),
-        .init(id: "hosts", title: String(localized: "Hosts Dosyası"), description: String(localized: "Alan adlarını yönlendir veya engelle; satırları ve grupları tek tıkla aç/kapat."), icon: "list.bullet.rectangle.portrait", category: .system),
-        .init(id: "peripherals", title: String(localized: "USB ve Thunderbolt"), description: String(localized: "Takılı aygıtları, bağlantı hızlarını ve çektikleri gücü gör; yavaş kablo veya portu fark et."), icon: "cable.connector", category: .system),
-        .init(id: "usb-eject", title: String(localized: "USB Çıkarma Yöneticisi"), description: String(localized: "Harici diskleri güvenle çıkar; diski kullanan uygulamaları gör, seçili diskleri birlikte çıkar."), icon: "eject.circle", category: .files),
-        .init(id: "listening-ports", title: String(localized: "Port Yöneticisi"), description: String(localized: "Hangi sürecin hangi portu dinlediğini ve ağa açık olup olmadığını gör; gerekirse durdur."), icon: "network", category: .system),
-        .init(id: "disk-health", title: String(localized: "Disk Sağlığı"), description: String(localized: "SSD’nin yıpranmasını, yazılan veriyi, sıcaklığını ve hata sayaçlarını gör."), icon: "internaldrive.fill", category: .files),
-        .init(id: "disk-info", title: String(localized: "Disk Bilgileri"), description: String(localized: "Dosya sistemi, disk özellikleri ve desteklenen sağlık verilerini oku."), icon: "internaldrive", category: .files),
-        .init(id: "spotlight", title: String(localized: "Spotlight Durumu"), description: String(localized: "Arama indekslemesinin sistemdeki durumunu incele."), icon: "magnifyingglass", category: .system),
-        .init(id: "dns", title: String(localized: "DNS Yapılandırması"), description: String(localized: "Sistemin etkin DNS çözümleyici yapılandırmasını incele."), icon: "globe", category: .system),
-        .init(id: "routes", title: String(localized: "Ağ Rotaları"), description: String(localized: "Etkin yönlendirme tablosunu incele."), icon: "arrow.triangle.branch", category: .system),
-        .init(id: "os-updates", title: String(localized: "macOS Güncellemeleri"), description: String(localized: "Yüklü sistem güncellemelerini incele ve sistem ayarlarına git."), icon: "arrow.down.circle", category: .system),
-        .init(id: "privacy-check", title: String(localized: "Gizlilik Kontrolü"), description: String(localized: "Mikrofon ya da kamera kullanılmaya başladığında bildirim al; hangi uygulamanın dinlediğini gör."), icon: "eye.trianglebadge.exclamationmark", category: .privacy),
-        .init(id: "security", title: String(localized: "Sistem Güvenliği"), description: String(localized: "SIP ve Gatekeeper durumunu salt okunur olarak incele."), icon: "lock.shield", category: .privacy),
-        .init(id: "task-manager", title: String(localized: "Görev Yöneticisi"), description: String(localized: "Süreçleri ve kaynak kullanımını incele, seçtiğin uygulamayı sonlandır."), icon: "list.bullet.rectangle", category: .system),
-        .init(id: "hidden-settings", title: String(localized: "Gizli Ayarlar"), description: String(localized: "Sistem Ayarları’nda olmayan Dock, Finder, ekran görüntüsü ve klavye ayarlarını Terminal’e girmeden değiştir."), icon: "terminal", category: .system),
-        .init(id: "support-report", title: String(localized: "Destek Raporu"), description: String(localized: "Mac’in durumunu kişisel bilgileri gizleyerek tek tıkla paylaşılabilir bir rapora dök."), icon: "doc.text.below.ecg", category: .system),
-        .init(id: "system-reports", title: String(localized: "Sistem Raporları"), description: String(localized: "Bellek, ağ, açık dosyalar ve güç için salt okunur tanılar."), icon: "terminal", category: .system),
-        .init(id: "keep-awake", title: String(localized: "Mac'i Uyanık Tut"), description: String(localized: "Süreli veya sen durdurana kadar uyanık tut. Ekranı ayrıca açık tutabilirsin."), icon: "cup.and.saucer", category: .productivity),
-        .init(id: "freezer", title: String(localized: "Uygulama Dondurucu"), description: String(localized: "Arka planda bekleyen uygulamaları dondurup işlemci ve pili koru; öne geldiklerinde anında çözülsünler."), icon: "snowflake", category: .system),
-        .init(id: "displays", title: String(localized: "Ekran Ayarları"), description: String(localized: "Çözünürlük, yenileme hızı, ana ekran ve yansıtma; gizli keskin HiDPI modları dahil, 15 sn onaylı."), icon: "display.2", category: .system),
-        .init(id: "bluetooth-battery", title: String(localized: "Bluetooth Pilleri"), description: String(localized: "Klavye, trackpad, fare (Logitech dahil) ve AirPods pillerini gör; azalınca bildirim al."), icon: "battery.75percent", category: .productivity),
-        .init(id: "screenshot", title: String(localized: "Ekran Görüntüsü"), description: String(localized: "Alan, pencere ya da tam ekran çek; önizlemeden kopyala, kaydet, sürükle; ok, vurgulayıcı, pikselleştirme ve metinle işaretle."), icon: "camera.viewfinder", category: .productivity),
-        .init(id: "recorder", title: String(localized: "Ekran Kaydı"), description: String(localized: "Ekranı sistem sesi ve mikrofonla birlikte kaydet; kısayolla başlat, glass göstergeyle durdur."), icon: "record.circle", category: .productivity),
-        .init(id: "screen-grab", title: String(localized: "Ekrandan Al"), description: String(localized: "Ekrandaki metni oku, QR kodunu çöz, rengi HEX/RGB/HSL/SwiftUI olarak al; hepsi bu Mac’te, kısayolla."), icon: "text.viewfinder", category: .productivity),
-        .init(id: "mixer", title: String(localized: "Ses Mikseri"), description: String(localized: "Her uygulamanın sesini ayrı ayarla, sustur ya da %150’ye kadar yükselt; sürücü gerekmez."), icon: "slider.vertical.3", category: .productivity),
-        .init(id: "audio", title: String(localized: "Ses Çıkışı"), description: String(localized: "Hoparlör, kulaklık ve monitör arasında kısayolla geç; kulaklık ayrılınca ses kendiliğinden kısılsın."), icon: "hifispeaker.2", category: .productivity),
-        .init(id: "mouse-scroll", title: String(localized: "Fare Kaydırma"), description: String(localized: "Fare tekerleğinin yönünü, hızını ve yumuşaklığını trackpad’den bağımsız ayarla."), icon: "computermouse", category: .productivity),
-        .init(id: "snippets", title: String(localized: "Metin Kısaltmaları"), description: String(localized: "Kısa bir kelime yaz, imzana, adresine ya da bugünün tarihine dönüşsün; her uygulamada."), icon: "text.badge.plus", category: .productivity),
-        .init(id: "macros", title: String(localized: "Makrolar"), description: String(localized: "Tekrarlanan işleri kaydet, düzenle ve kısayola bağla; uygulamaya özel tetikleyiciler, AppleScript, Kestirmeler ve komutlar."), icon: "wand.and.stars", category: .productivity),
-        .init(id: "quick-actions", title: String(localized: "Hızlı İşlemler"), description: String(localized: "Ekranı kilitle, Mac’i uyut, görünümü değiştir, diskleri çıkar, Çöp’ü boşalt: tek tıkla."), icon: "bolt.circle", category: .productivity),
-        .init(id: "brightness", title: String(localized: "Ekran Parlaklığı"), description: String(localized: "Harici monitörleri klavyenin parlaklık tuşlarıyla ayarla: DDC ile gerçek arka ışık, desteklemeyen ekranlarda yazılımsal karartma."), icon: "sun.max.fill", category: .system),
-        .init(id: "focus", title: String(localized: "Odak Oturumu"), description: String(localized: "Süre seç, odaklan: Mac uyanık kalır, masaüstü sadeleşir, diğer ekranlar kararır; bitince her şey geri döner."), icon: "scope", category: .productivity),
-        .init(id: "quit-guard", title: String(localized: "Kapatma Koruması"), description: String(localized: "⌘Q ve ⌘W yanlışlıkla basılınca uygulama kapanmasın: basılı tutma veya çift basış iste, uygulama bazında ayarla."), icon: "hand.raised.fill", category: .productivity),
-        .init(id: "clipboard", title: String(localized: "Pano Geçmişi"), description: String(localized: "Kopyaladıklarını ara, sabitle, düz metin olarak yapıştır; bağlantılardaki izleme parametrelerini temizle."), icon: "doc.on.clipboard", category: .productivity),
-        .init(id: "workspaces", title: String(localized: "Masa Düzenleri"), description: String(localized: "Açık pencerelerin yerleşimini adıyla kaydet, tek kısayolla geri getir; kapalı uygulamalar da açılsın."), icon: "rectangle.3.group", category: .productivity),
-        .init(id: "window-layout", title: String(localized: "Pencere Yerleşimi"), description: String(localized: "Pencereleri kısayollarla yarıya, çeyreğe, üçte bire veya başka ekrana yerleştir; aralığı ve kısayolları özelleştir."), icon: "rectangle.split.2x1", category: .productivity),
-        .init(id: "window-switcher", title: String(localized: "Pencere Geçişi"), description: String(localized: "Açık pencereler arasında klavyeyle geçiş yap."), icon: "macwindow.on.rectangle", category: .productivity),
-        .init(id: "app-leftovers", title: String(localized: "Uygulama Kalıntıları"), description: String(localized: "Kaldırılan uygulamaların geride bıraktığı öğeleri bul."), icon: "square.dashed", category: .applications),
-        .init(id: "app-updater", title: String(localized: "Uygulama Güncelleme"), description: String(localized: "Kurulum kanalına göre uygulama güncellemelerini incele."), icon: "arrow.triangle.2.circlepath", category: .applications),
-        .init(id: "downloads", title: String(localized: "İndirilenler"), description: String(localized: "İndirilmiş dosyaları boyut ve tarihe göre ayıkla."), icon: "arrow.down.circle", category: .files),
-        .init(id: "duplicates", title: String(localized: "Yinelenen Dosyalar"), description: String(localized: "İçeriği aynı dosyaları karşılaştırarak alan kazan."), icon: "doc.on.doc", category: .files),
-        .init(id: "large-old", title: String(localized: "Büyük ve Eski Dosyalar"), description: String(localized: "Diskte yer kaplayan büyük ve eski dosyaları bul."), icon: "doc.badge.clock", category: .files),
-        .init(id: "screen-cleaning", title: String(localized: "Ekran Temizleme Modu"), description: String(localized: "Ekranları kısa süre karart; MacPocket içindeki yanlış girişleri önle. Escape veya iki saniye basılı tutarak çık."), icon: "display", category: .productivity),
-        .init(id: "similar-images", title: String(localized: "Benzer Görseller"), description: String(localized: "Görsel benzerliği bulunan adayları yan yana karşılaştır."), icon: "photo.on.rectangle", category: .files),
-        .init(id: "system-junk", title: String(localized: "Sistem Gereksiz Dosyaları"), description: String(localized: "Önbellek ve log adaylarını kategorileriyle incele."), icon: "externaldrive.badge.minus", category: .system),
-        .init(id: "time-machine", title: String(localized: "Time Machine Anlık Görüntüleri"), description: String(localized: "Yerel snapshot listesini ve Time Machine durumunu incele."), icon: "clock.arrow.circlepath", category: .system),
-        .init(id: "trash", title: String(localized: "Çöp Kutuları"), description: String(localized: "Erişilebilen çöp konumlarını tek yerde incele."), icon: "trash", category: .files),
-        .init(id: "uninstaller", title: String(localized: "Tam Uygulama Kaldırma"), description: String(localized: "Uygulama ve ilişkili dosyalar için kaldırma planı oluştur."), icon: "app.badge", category: .applications),
+        .init(id: "dock-preview", title: "Dock Önizlemeleri", description: "Dock simgesinde bekle; uygulamanın pencerelerini gör, seç ve yerleştir.", icon: "dock.rectangle", category: .productivity),
+        .init(id: "shelf", title: "Dosya Rafı", description: "Dosya, metin ve bağlantıları topla; başka uygulamalara birlikte taşı.", icon: "tray.2", category: .productivity),
+        .init(id: "command-bar", title: "Komut Çubuğu", description: "Araçlar, uygulamalar, pencereler, pano ve metin kısaltmaları tek aramada; kısayolla her yerden aç.", icon: "command", category: .productivity),
+        .init(id: "practical-tools", title: "Pratik Araçlar", description: "Case Converter, JSON, Base64, URL, JWT, hash, UUID, parola, tarih, metin karşılaştırma ve QR: çevrimdışı çalışma alanı.", icon: "square.grid.3x3", category: .productivity),
+        .init(id: "mac-utilities", title: "macOS Araçları", description: "Sistem raporları ve macOS ayarlarına hızlı erişim.", icon: "hammer", category: .system),
+        .init(id: "maintenance", title: "Bakım", description: "Önbellekleri sıfırla, başlangıç diskini doğrula, DNS’i temizle; yönetici gerektirenler tek parolayla çalışır.", icon: "wrench.and.screwdriver", category: .system),
+        .init(id: "startup-items", title: "Başlangıç Öğeleri", description: "Oturum açılışında ve Mac başlarken kendiliğinden çalışan öğeleri, sahipleriyle ve durumlarıyla gör.", icon: "power", category: .system),
+        .init(id: "launch-jobs", title: "Başlatma Görevleri", description: "Kullanıcı oturumunun launchd görevlerini incele.", icon: "list.bullet", category: .system),
+        .init(id: "speed-test", title: "Ağ Hız Testi", description: "İndirme, yükleme ve yanıt verme hızını macOS’un yerleşik aracıyla ölç; sonuçları karşılaştır.", icon: "speedometer", category: .system),
+        .init(id: "network-traffic", title: "Ağ Trafiği", description: "Hangi uygulamanın şu an ne kadar indirip yüklediğini canlı gör; yardımcı süreçler uygulamada toplanır.", icon: "arrow.up.arrow.down.circle", category: .system),
+        .init(id: "local-network", title: "Yerel Ağ", description: "Ağa bağlı cihazları adları, IP ve MAC adresleri ve türleriyle gör; yeni katılanları fark et.", icon: "network.badge.shield.half.filled", category: .system),
+        .init(id: "power-schedule", title: "Güç Zamanlaması", description: "Mac’in belirli saatlerde uyanmasını, açılmasını, uyumasını veya kapanmasını planla.", icon: "calendar.badge.clock", category: .system),
+        .init(id: "wifi", title: "Wi-Fi Analizi", description: "Sinyal gücünü, paraziti ve çevredeki ağların kanal yoğunluğunu gör; modem için kanal önerisi al.", icon: "wifi", category: .system),
+        .init(id: "screen-time", title: "Ekran Süresi", description: "Hangi uygulamada ne kadar zaman geçirdiğini gör; boşta ve kilitli süre sayılmaz, veriler bu Mac’te kalır.", icon: "hourglass", category: .productivity),
+        .init(id: "hosts", title: "Hosts Dosyası", description: "Alan adlarını yönlendir veya engelle; satırları ve grupları tek tıkla aç/kapat.", icon: "list.bullet.rectangle.portrait", category: .system),
+        .init(id: "peripherals", title: "USB ve Thunderbolt", description: "Takılı aygıtları, bağlantı hızlarını ve çektikleri gücü gör; yavaş kablo veya portu fark et.", icon: "cable.connector", category: .system),
+        .init(id: "usb-eject", title: "USB Çıkarma Yöneticisi", description: "Harici diskleri güvenle çıkar; diski kullanan uygulamaları gör, seçili diskleri birlikte çıkar.", icon: "eject.circle", category: .files),
+        .init(id: "listening-ports", title: "Port Yöneticisi", description: "Hangi sürecin hangi portu dinlediğini ve ağa açık olup olmadığını gör; gerekirse durdur.", icon: "network", category: .system),
+        .init(id: "disk-health", title: "Disk Sağlığı", description: "SSD’nin yıpranmasını, yazılan veriyi, sıcaklığını ve hata sayaçlarını gör.", icon: "internaldrive.fill", category: .files),
+        .init(id: "disk-info", title: "Disk Bilgileri", description: "Dosya sistemi, disk özellikleri ve desteklenen sağlık verilerini oku.", icon: "internaldrive", category: .files),
+        .init(id: "spotlight", title: "Spotlight Durumu", description: "Arama indekslemesinin sistemdeki durumunu incele.", icon: "magnifyingglass", category: .system),
+        .init(id: "dns", title: "DNS Yapılandırması", description: "Sistemin etkin DNS çözümleyici yapılandırmasını incele.", icon: "globe", category: .system),
+        .init(id: "routes", title: "Ağ Rotaları", description: "Etkin yönlendirme tablosunu incele.", icon: "arrow.triangle.branch", category: .system),
+        .init(id: "os-updates", title: "macOS Güncellemeleri", description: "Yüklü sistem güncellemelerini incele ve sistem ayarlarına git.", icon: "arrow.down.circle", category: .system),
+        .init(id: "privacy-check", title: "Gizlilik Kontrolü", description: "Mikrofon ya da kamera kullanılmaya başladığında bildirim al; hangi uygulamanın dinlediğini gör.", icon: "eye.trianglebadge.exclamationmark", category: .privacy),
+        .init(id: "security", title: "Sistem Güvenliği", description: "SIP ve Gatekeeper durumunu salt okunur olarak incele.", icon: "lock.shield", category: .privacy),
+        .init(id: "task-manager", title: "Görev Yöneticisi", description: "Süreçleri ve kaynak kullanımını incele, seçtiğin uygulamayı sonlandır.", icon: "list.bullet.rectangle", category: .system),
+        .init(id: "hidden-settings", title: "Gizli Ayarlar", description: "Sistem Ayarları’nda olmayan Dock, Finder, ekran görüntüsü ve klavye ayarlarını Terminal’e girmeden değiştir.", icon: "terminal", category: .system),
+        .init(id: "support-report", title: "Destek Raporu", description: "Mac’in durumunu kişisel bilgileri gizleyerek tek tıkla paylaşılabilir bir rapora dök.", icon: "doc.text.below.ecg", category: .system),
+        .init(id: "system-reports", title: "Sistem Raporları", description: "Bellek, ağ, açık dosyalar ve güç için salt okunur tanılar.", icon: "terminal", category: .system),
+        .init(id: "keep-awake", title: "Mac'i Uyanık Tut", description: "Süreli veya sen durdurana kadar uyanık tut. Ekranı ayrıca açık tutabilirsin.", icon: "cup.and.saucer", category: .productivity),
+        .init(id: "freezer", title: "Uygulama Dondurucu", description: "Arka planda bekleyen uygulamaları dondurup işlemci ve pili koru; öne geldiklerinde anında çözülsünler.", icon: "snowflake", category: .system),
+        .init(id: "displays", title: "Ekran Ayarları", description: "Çözünürlük, yenileme hızı, ana ekran ve yansıtma; gizli keskin HiDPI modları dahil, 15 sn onaylı.", icon: "display.2", category: .system),
+        .init(id: "bluetooth-battery", title: "Bluetooth Pilleri", description: "Klavye, trackpad, fare (Logitech dahil) ve AirPods pillerini gör; azalınca bildirim al.", icon: "battery.75percent", category: .productivity),
+        .init(id: "screenshot", title: "Ekran Görüntüsü", description: "Alan, pencere ya da tam ekran çek; önizlemeden kopyala, kaydet, sürükle; ok, vurgulayıcı, pikselleştirme ve metinle işaretle.", icon: "camera.viewfinder", category: .productivity),
+        .init(id: "recorder", title: "Ekran Kaydı", description: "Ekranı sistem sesi ve mikrofonla birlikte kaydet; kısayolla başlat, glass göstergeyle durdur.", icon: "record.circle", category: .productivity),
+        .init(id: "screen-grab", title: "Ekrandan Al", description: "Ekrandaki metni oku, QR kodunu çöz, rengi HEX/RGB/HSL/SwiftUI olarak al; hepsi bu Mac’te, kısayolla.", icon: "text.viewfinder", category: .productivity),
+        .init(id: "mixer", title: "Ses Mikseri", description: "Her uygulamanın sesini ayrı ayarla, sustur ya da %150’ye kadar yükselt; sürücü gerekmez.", icon: "slider.vertical.3", category: .productivity),
+        .init(id: "audio", title: "Ses Çıkışı", description: "Hoparlör, kulaklık ve monitör arasında kısayolla geç; kulaklık ayrılınca ses kendiliğinden kısılsın.", icon: "hifispeaker.2", category: .productivity),
+        .init(id: "mouse-buttons", title: "Fare Tuşları", description: "Yan tuşlara ve yan tekere kısayol ata; uygulamaya özel profiller oluştur.", icon: "computermouse", category: .productivity),
+        .init(id: "mouse-scroll", title: "Fare Kaydırma", description: "Fare tekerleğinin yönünü, hızını ve yumuşaklığını trackpad’den bağımsız ayarla.", icon: "computermouse", category: .productivity),
+        .init(id: "snippets", title: "Metin Kısaltmaları", description: "Kısa bir kelime yaz, imzana, adresine ya da bugünün tarihine dönüşsün; her uygulamada.", icon: "text.badge.plus", category: .productivity),
+        .init(id: "macros", title: "Makrolar", description: "Tekrarlanan işleri kaydet, düzenle ve kısayola bağla; uygulamaya özel tetikleyiciler, AppleScript, Kestirmeler ve komutlar.", icon: "wand.and.stars", category: .productivity),
+        .init(id: "quick-actions", title: "Hızlı İşlemler", description: "Ekranı kilitle, Mac’i uyut, görünümü değiştir, diskleri çıkar, Çöp’ü boşalt: tek tıkla.", icon: "bolt.circle", category: .productivity),
+        .init(id: "brightness", title: "Ekran Parlaklığı", description: "Harici monitörleri klavyenin parlaklık tuşlarıyla ayarla: DDC ile gerçek arka ışık, desteklemeyen ekranlarda yazılımsal karartma.", icon: "sun.max.fill", category: .system),
+        .init(id: "focus", title: "Odak Oturumu", description: "Süre seç, odaklan: Mac uyanık kalır, masaüstü sadeleşir, diğer ekranlar kararır; bitince her şey geri döner.", icon: "scope", category: .productivity),
+        .init(id: "quit-guard", title: "Kapatma Koruması", description: "⌘Q ve ⌘W yanlışlıkla basılınca uygulama kapanmasın: basılı tutma veya çift basış iste, uygulama bazında ayarla.", icon: "hand.raised.fill", category: .productivity),
+        .init(id: "clipboard", title: "Pano Geçmişi", description: "Kopyaladıklarını ara, sabitle, düz metin olarak yapıştır; bağlantılardaki izleme parametrelerini temizle.", icon: "doc.on.clipboard", category: .productivity),
+        .init(id: "workspaces", title: "Masa Düzenleri", description: "Açık pencerelerin yerleşimini adıyla kaydet, tek kısayolla geri getir; kapalı uygulamalar da açılsın.", icon: "rectangle.3.group", category: .productivity),
+        .init(id: "window-layout", title: "Pencere Yerleşimi", description: "Pencereleri kısayollarla yarıya, çeyreğe, üçte bire veya başka ekrana yerleştir; aralığı ve kısayolları özelleştir.", icon: "rectangle.split.2x1", category: .productivity),
+        .init(id: "window-switcher", title: "Pencere Geçişi", description: "Açık pencereler arasında klavyeyle geçiş yap.", icon: "macwindow.on.rectangle", category: .productivity),
+        .init(id: "app-leftovers", title: "Uygulama Kalıntıları", description: "Kaldırılan uygulamaların geride bıraktığı öğeleri bul.", icon: "square.dashed", category: .applications),
+        .init(id: "app-updater", title: "Uygulama Güncelleme", description: "Kurulum kanalına göre uygulama güncellemelerini incele.", icon: "arrow.triangle.2.circlepath", category: .applications),
+        .init(id: "downloads", title: "İndirilenler", description: "İndirilmiş dosyaları boyut ve tarihe göre ayıkla.", icon: "arrow.down.circle", category: .files),
+        .init(id: "duplicates", title: "Yinelenen Dosyalar", description: "İçeriği aynı dosyaları karşılaştırarak alan kazan.", icon: "doc.on.doc", category: .files),
+        .init(id: "large-old", title: "Büyük ve Eski Dosyalar", description: "Diskte yer kaplayan büyük ve eski dosyaları bul.", icon: "doc.badge.clock", category: .files),
+        .init(id: "screen-cleaning", title: "Ekran Temizleme Modu", description: "Ekranları kısa süre karart; MacPocket içindeki yanlış girişleri önle. Escape veya iki saniye basılı tutarak çık.", icon: "display", category: .productivity),
+        .init(id: "similar-images", title: "Benzer Görseller", description: "Görsel benzerliği bulunan adayları yan yana karşılaştır.", icon: "photo.on.rectangle", category: .files),
+        .init(id: "system-junk", title: "Sistem Gereksiz Dosyaları", description: "Önbellek ve log adaylarını kategorileriyle incele.", icon: "externaldrive.badge.minus", category: .system),
+        .init(id: "time-machine", title: "Time Machine Anlık Görüntüleri", description: "Yerel snapshot listesini ve Time Machine durumunu incele.", icon: "clock.arrow.circlepath", category: .system),
+        .init(id: "trash", title: "Çöp Kutuları", description: "Erişilebilen çöp konumlarını tek yerde incele.", icon: "trash", category: .files),
+        .init(id: "uninstaller", title: "Tam Uygulama Kaldırma", description: "Uygulama ve ilişkili dosyalar için kaldırma planı oluştur.", icon: "app.badge", category: .applications),
     ]
 }

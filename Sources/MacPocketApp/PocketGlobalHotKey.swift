@@ -11,28 +11,32 @@ final class PocketGlobalHotKey {
     private static var nextID: UInt32 = 1
 
     private let id: UInt32
+    private let action: () -> Void
     private var reference: EventHotKeyRef?
     private(set) var registered: KeyCombo?
 
     init(action: @escaping () -> Void) {
         id = Self.nextID
         Self.nextID += 1
-        Self.actions[id] = action
-        Self.installHandler()
+        self.action = action
     }
+
+    isolated deinit { unregister() }
 
     /// Registers `combo`, replacing any previous one. Returns false when macOS refuses it (another app owns it).
     @discardableResult
     func register(_ combo: KeyCombo) -> Bool {
         if registered == combo, reference != nil { return true }
         unregister()
-        guard combo.isValidGlobalShortcut, Self.handler != nil else { return false }
+        Self.installHandler()
+        guard combo.isValidGlobalShortcut, Self.handler != nil else { Self.removeUnusedHandler(); return false }
         var newReference: EventHotKeyRef?
         let status = RegisterEventHotKey(UInt32(combo.keyCode), combo.carbonFlags, EventHotKeyID(signature: Self.signature, id: id),
                                          GetEventDispatcherTarget(), 0, &newReference)
-        guard status == noErr, let newReference else { return false }
+        guard status == noErr, let newReference else { Self.removeUnusedHandler(); return false }
         reference = newReference
         registered = combo
+        Self.actions[id] = action
         return true
     }
 
@@ -40,7 +44,21 @@ final class PocketGlobalHotKey {
         if let reference { UnregisterEventHotKey(reference) }
         reference = nil
         registered = nil
+        Self.actions[id] = nil
+        Self.removeUnusedHandler()
     }
+
+    private static func removeUnusedHandler() {
+        guard actions.isEmpty, let handler else { return }
+        RemoveEventHandler(handler)
+        Self.handler = nil
+    }
+
+    #if DEBUG
+    static var diagnosticResources: [String: Int] {
+        ["actions": actions.count, "handler": handler == nil ? 0 : 1]
+    }
+    #endif
 
     private static func installHandler() {
         guard handler == nil else { return }

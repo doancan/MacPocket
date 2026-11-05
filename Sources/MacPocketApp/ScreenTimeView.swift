@@ -14,6 +14,10 @@ import SwiftUI
 @MainActor
 final class ScreenTimeService: ObservableObject {
     static let shared = ScreenTimeService()
+    #if DEBUG
+    private let moduleProbe = ModuleServiceProbe("ScreenTimeService")
+    #endif
+    private(set) var moduleRunning = false
     static let enabledKey = "MacPocket.screenTime.enabled"
     static let idleKey = "MacPocket.screenTime.idleSeconds"
 
@@ -31,22 +35,38 @@ final class ScreenTimeService: ObservableObject {
 
     enum PauseReason { case idle, locked, asleep }
 
+    #if DEBUG
+    private let store = UsageStore(url: ModuleRuntimeAudit.dataURL("usage.json"))
+    #else
     private let store = UsageStore()
+    #endif
     private var observers: [NSObjectProtocol] = []
     private var timer: Timer?
     private var loaded = false
+    private var loading = false
     private var dirty = false
     private var lastSave = Date.distantPast
     private var locked = false
     private var asleep = false
 
+    func stopForModule() {
+        moduleRunning = false
+        end()
+    }
+
     func start() {
+        guard !moduleRunning, PocketModule.screenTime.isAvailable() else { return }
+        moduleRunning = true
+        if loaded { if enabled { begin() }; return }
+        guard !loading else { return }
+        loading = true
         Task {
             var stored = await store.load()
             stored.prune()
             ledger = stored
             loaded = true
-            if enabled { begin() }
+            loading = false
+            if enabled, moduleRunning { begin() }
         }
     }
 
@@ -80,13 +100,13 @@ final class ScreenTimeService: ObservableObject {
     func flush() {
         closeSegment(at: Date())
         save(force: true)
-        if enabled && pausedReason == nil { openSegment() }
+        if moduleRunning && enabled && pausedReason == nil { openSegment() }
     }
 
     // MARK: Tracking
 
     private func begin() {
-        guard loaded, observers.isEmpty else { return }
+        guard moduleRunning, loaded, observers.isEmpty else { return }
         let workspace = NSWorkspace.shared.notificationCenter
         func on(_ center: NotificationCenter, _ name: Notification.Name, _ action: @escaping @MainActor @Sendable () -> Void) {
             observers.append(center.addObserver(forName: name, object: nil, queue: .main) { _ in
@@ -140,7 +160,7 @@ final class ScreenTimeService: ObservableObject {
     }
 
     private func resumeIfPossible() {
-        guard enabled, !locked, !asleep else { return }
+        guard moduleRunning, enabled, !locked, !asleep else { return }
         pausedReason = nil
         openSegment()
     }
@@ -485,3 +505,9 @@ private struct ScreenTimeAppRow: View {
         .accessibilityElement(children: .combine)
     }
 }
+
+#if DEBUG
+extension ScreenTimeService {
+    var moduleDiagnosticResources: [String: Int] { ["observers": observers.count, "timer": timer?.isValid == true ? 1 : 0, "current": current == nil ? 0 : 1] }
+}
+#endif

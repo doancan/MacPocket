@@ -1,3 +1,4 @@
+import MacPocketCore
 import AppKit
 import SwiftUI
 
@@ -31,12 +32,16 @@ enum PocketTool: String, Identifiable {
     case quitGuard = "Kapatma Koruması", brightness = "Ekran Parlaklığı", macros = "Makrolar"
     case freezer = "Uygulama Dondurucu", supportReport = "Destek Raporu", focus = "Odak Oturumu"
     case workspaces = "Masa Düzenleri", snippets = "Metin Kısaltmaları", screenGrab = "Ekrandan Al"
+    case mouseButtons = "Fare Tuşları"
     case mouseScroll = "Fare Kaydırma", audio = "Ses Çıkışı", mixer = "Ses Mikseri"
     case recorder = "Ekran Kaydı", privacy = "Gizlilik Kontrolü", screenshot = "Ekran Görüntüsü", bluetoothBattery = "Bluetooth Pilleri", displays = "Ekran Ayarları"
     case networkTraffic = "Ağ Trafiği", peripherals = "USB ve Thunderbolt", diskHealth = "Disk Sağlığı"
     case wifi = "Wi-Fi Analizi", hosts = "Hosts Dosyası", screenTime = "Ekran Süresi", localNetwork = "Yerel Ağ", powerSchedule = "Güç Zamanlaması"
     case startupItems = "Başlangıç Öğeleri", maintenance = "Bakım"
     case usbEject = "USB Çıkarma Yöneticisi"
+    case commandBar = "Komut Çubuğu"
+    case shelf = "Dosya Rafı"
+    case dockPreview = "Dock Önizlemeleri"
     var id: String { rawValue }
 }
 
@@ -46,6 +51,7 @@ final class PocketNavigation: ObservableObject {
     /// Starts on the page chosen in Settings → General.
     @Published private(set) var page = PocketPage.launchPage
     @Published var tool: PocketTool?
+    @Published var utility = MacUtility.timeMachine
     var title: String { page == .tools ? tool?.localizedTitle ?? page.localizedTitle : page.localizedTitle }
     func select(_ page: PocketPage) {
         guard self.page != page || tool != nil else { return }

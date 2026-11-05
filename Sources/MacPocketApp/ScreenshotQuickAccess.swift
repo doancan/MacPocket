@@ -23,6 +23,10 @@ final class ScreenshotQuickAccess {
         cards.removeAll { $0 === card }
         layout(animated: true)
     }
+    func closeAll() {
+        for card in cards { card.dismiss(animated: false) }
+        cards = []
+    }
 
     private func layout(animated: Bool) {
         guard let screen = NSScreen.screens.first(where: { NSMouseInRect(NSEvent.mouseLocation, $0.frame, false) }) ?? NSScreen.main else { return }
@@ -67,8 +71,11 @@ final class QuickAccessCard {
         }
     }
 
-    func dismiss() {
+    func dismiss(animated: Bool = true) {
+        model.cancelOutput()
         closeWork?.cancel()
+        closeWork = nil
+        if !animated { panel.orderOut(nil); panel.contentView = nil; return }
         let panel = panel
         NSAnimationContext.runAnimationGroup({ context in
             context.duration = 0.18
@@ -86,6 +93,7 @@ final class QuickAccessCard {
 }
 
 private final class QuickAccessPanel: NSPanel, ScreenshotChrome {
+    override var canBecomeKey: Bool { true }
     init() {
         super.init(contentRect: NSRect(origin: .zero, size: ScreenshotQuickAccess.cardSize), styleMask: [.borderless, .nonactivatingPanel],
                    backing: .buffered, defer: false)
@@ -103,6 +111,9 @@ private final class QuickAccessPanel: NSPanel, ScreenshotChrome {
 final class QuickAccessModel: ObservableObject {
     @Published var capture: ScreenshotCapture
     @Published var savedFlash = false
+    @Published private(set) var working = false
+    private var outputTask: Task<Void, Never>?
+    private var active = true
     var close: (() -> Void)?
     var hoverChanged: ((Bool) -> Void)?
 
@@ -114,29 +125,60 @@ final class QuickAccessModel: ObservableObject {
     }
 
     func copy() {
-        ScreenshotService.shared.copy(capture.image, scale: capture.scale)
-        PocketToast.show(String(localized: "Panoya kopyalandı"), symbol: "doc.on.doc")
-        close?()
+        guard active, !working else { return }
+        let capture = capture
+        working = true
+        outputTask = Task { [weak self] in
+            guard let self else { return }
+            defer { self.working = false; self.outputTask = nil }
+            do {
+                let data = try await ScreenshotAsyncOutput.encode(capture.image, format: .png, quality: 1, scale: Double(capture.scale))
+                try Task.checkCancellation(); guard self.active else { return }
+                NSPasteboard.general.clearContents(); NSPasteboard.general.setData(data, forType: .png)
+                PocketToast.show(String(localized: "Panoya kopyalandı"), symbol: "doc.on.doc")
+                self.close?()
+            } catch is CancellationError {} catch { self.showError(error) }
+        }
     }
 
     func save() {
+        guard active, !working else { return }
         if let url = capture.fileURL {
             NSWorkspace.shared.activateFileViewerSelecting([url])
             return
         }
-        if let url = ScreenshotService.shared.save(capture) {
-            capture.fileURL = url
-            savedFlash = true
+        let capture = capture
+        working = true
+        outputTask = Task { [weak self] in
+            guard let self else { return }
+            defer { self.working = false; self.outputTask = nil }
+            do {
+                let url = try await ScreenshotService.shared.saveAsync(capture)
+                try Task.checkCancellation(); guard self.active else { return }
+                self.capture.fileURL = url; self.savedFlash = true
+            } catch is CancellationError {} catch { self.showError(error) }
         }
     }
 
+    func cancelOutput() { active = false; outputTask?.cancel() }
+    private func showError(_ error: Error) {
+        guard active else { return }
+        PocketToast.show(String(localized: "Görüntü dışa aktarılamadı: \(error.localizedDescription)"), symbol: "exclamationmark.triangle")
+    }
+
     func edit() {
+        guard active, !working else { return }
         ScreenshotEditor.open(capture) { [weak self] updated in self?.capture = updated }
         close?()
     }
+    func pin() { guard active, !working else { return }; if ScreenshotService.shared.pin(capture) { close?() } }
 
-    /// The file a drag hands over: the saved one, otherwise a temporary copy.
-    func dragFile() -> URL? { capture.fileURL ?? ScreenshotService.shared.temporaryFile(for: capture) }
+    /// Saved files are immediate; unsaved long images use AppKit's background file-promise protocol.
+    func dragWriter() -> (any NSPasteboardWriting)? {
+        guard active, !working else { return nil }
+        if let url = capture.fileURL, FileManager.default.fileExists(atPath: url.path) { return url as NSURL }
+        return ScreenshotFilePromise(capture: capture, settings: ScreenshotService.shared.settings).provider()
+    }
 
     func dragEnded(moved: Bool) {
         if moved && ScreenshotService.shared.settings.closeOverlayAfterDrag { close?() }
@@ -158,8 +200,12 @@ private struct QuickAccessCardView: View {
                         action("Kopyala", symbol: "doc.on.doc") { model.copy() }
                         action(model.capture.fileURL == nil ? "Kaydet" : "Göster", symbol: model.capture.fileURL == nil ? "square.and.arrow.down" : "folder") { model.save() }
                     }
-                    action("Düzenle", symbol: "pencil.tip.crop.circle") { model.edit() }
+                    HStack(spacing: 8) {
+                        action("Düzenle", symbol: "pencil.tip.crop.circle") { model.edit() }
+                        action("Sabitle", symbol: "pin") { model.pin() }
+                    }
                 }
+                .disabled(model.working)
                 VStack {
                     HStack {
                         Button { model.close?() } label: {
@@ -180,7 +226,16 @@ private struct QuickAccessCardView: View {
         .padding(4)
         .glassEffect(.regular, in: .rect(cornerRadius: 16))
         .onHover { hovering = $0; model.hoverChanged?($0) }
+        .onChange(of: model.working) { model.hoverChanged?(model.working || hovering) }
         .animation(.easeOut(duration: 0.15), value: hovering)
+        .contextMenu {
+            Button("Ekranda sabitle") { model.pin() }
+            Button("Kopyala") { model.copy() }
+            Button("Düzenle") { model.edit() }
+            Button("Kapat") { model.close?() }
+        }
+        .overlay { if model.working { ProgressView().padding(12).background(.regularMaterial, in: RoundedRectangle(cornerRadius: 12)) } }
+        .accessibilityAction(named: Text("Ekranda sabitle")) { model.pin() }
     }
 
     private func action(_ title: LocalizedStringKey, symbol: String, run: @escaping () -> Void) -> some View {
@@ -229,12 +284,14 @@ private struct QuickAccessDragArea: NSViewRepresentable {
         override func mouseDown(with event: NSEvent) { downPoint = event.locationInWindow }
 
         override func mouseDragged(with event: NSEvent) {
-            guard let start = downPoint, hypot(event.locationInWindow.x - start.x, event.locationInWindow.y - start.y) > 4,
-                  let url = MainActor.assumeIsolated({ model.dragFile() }) else { return }
-            downPoint = nil
-            let item = NSDraggingItem(pasteboardWriter: url as NSURL)
-            item.setDraggingFrame(bounds, contents: image)
-            beginDraggingSession(with: [item], event: event, source: self)
+            MainActor.assumeIsolated {
+                guard let start = downPoint, hypot(event.locationInWindow.x - start.x, event.locationInWindow.y - start.y) > 4,
+                      let writer = model.dragWriter() else { return }
+                downPoint = nil
+                let item = NSDraggingItem(pasteboardWriter: writer)
+                item.setDraggingFrame(bounds, contents: image)
+                beginDraggingSession(with: [item], event: event, source: self)
+            }
         }
 
         override func mouseUp(with event: NSEvent) {

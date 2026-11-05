@@ -196,7 +196,7 @@ enum ToolUIAudit {
         model.navigation.select(.tools)
     }
 
-    private static func accessibilityNodes(_ root: NSObject) -> [[String: String]] {
+    static func accessibilityNodes(_ root: NSObject) -> [[String: String]] {
         var seen = Set<ObjectIdentifier>(), result: [[String: String]] = []
         var pending: [NSObject] = [root]
         func attribute(_ element: NSObject, _ name: String) -> Any? {

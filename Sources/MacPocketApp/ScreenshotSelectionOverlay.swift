@@ -9,6 +9,7 @@ protocol ScreenshotChrome: NSWindow {}
 enum ScreenshotSelection {
     /// A rectangle in points, origin top-left of that screen.
     case area(display: CGDirectDisplayID, rect: CGRect)
+    case scrolling(display: CGDirectDisplayID, rect: CGRect)
     case window(CGWindowID)
     case fullscreen(CGDirectDisplayID)
     case previousArea
@@ -35,6 +36,7 @@ final class ScreenshotSelectionOverlay {
     private var panels: [SelectionPanel] = []
     private var completion: ((ScreenshotSelection?) -> Void)?
     private var windowMode: Bool
+    private(set) var scrollingMode = false
     private let windows: [FrozenWindow]
     private let showsModeBar: Bool
     private let hasPreviousArea: Bool
@@ -70,12 +72,18 @@ final class ScreenshotSelectionOverlay {
 
     var canUsePreviousArea: Bool { hasPreviousArea }
 
+    func setScrollingMode(_ on: Bool) {
+        scrollingMode = on
+        if on { windowMode = false }
+        panels.forEach { $0.selectionView.windowMode = windowMode; $0.selectionView.needsDisplay = true }
+    }
     func toggleWindowMode() {
+        scrollingMode = false
         windowMode.toggle()
         panels.forEach { $0.selectionView.windowMode = windowMode; $0.selectionView.needsDisplay = true }
     }
 
-    func setWindowMode(_ on: Bool) { if windowMode != on { toggleWindowMode() } }
+    func setWindowMode(_ on: Bool) { scrollingMode = false; windowMode = on; panels.forEach { $0.selectionView.windowMode = on; $0.selectionView.needsDisplay = true } }
 
     func pointerMoved() { panels.forEach { $0.selectionView.needsDisplay = true } }
 
@@ -148,7 +156,8 @@ private final class SelectionView: NSView {
     private func updateModeBar() {
         if showsModeBar, modeBar == nil {
             let bar = NSHostingView(rootView: makeModeBar())
-            bar.frame = NSRect(x: (bounds.width - 600) / 2, y: 90, width: 600, height: 64)
+            let width = min(740, max(100, bounds.width - 24))
+            bar.frame = NSRect(x: (bounds.width - width) / 2, y: min(90, max(12, bounds.height - 120)), width: width, height: 108)
             addSubview(bar)
             modeBar = bar
         } else if !showsModeBar {
@@ -158,11 +167,12 @@ private final class SelectionView: NSView {
     }
 
     private func makeModeBar() -> ScreenshotModeBar {
-        ScreenshotModeBar(windowMode: windowMode, previousAvailable: owner?.canUsePreviousArea ?? false) { [weak self] choice in
+        ScreenshotModeBar(windowMode: windowMode, scrollingMode: owner?.scrollingMode == true, previousAvailable: owner?.canUsePreviousArea ?? false) { [weak self] choice in
             guard let self, let owner = self.owner else { return }
             switch choice {
             case .area: owner.setWindowMode(false)
             case .window: owner.setWindowMode(true)
+            case .scrolling: owner.setScrollingMode(true)
             case .fullscreen: owner.finish(.fullscreen(self.screen.display))
             case .previous: owner.finish(.previousArea)
             case .cancel: owner.finish(nil)
@@ -209,7 +219,8 @@ private final class SelectionView: NSView {
         guard rect.width >= 3, rect.height >= 3 else { needsDisplay = true; return }
         // To top-left origin, points.
         let topLeft = CGRect(x: rect.minX, y: bounds.height - rect.maxY, width: rect.width, height: rect.height)
-        owner?.finish(.area(display: screen.display, rect: topLeft))
+        if owner?.scrollingMode == true { owner?.finish(.scrolling(display: screen.display, rect: topLeft)) }
+        else { owner?.finish(.area(display: screen.display, rect: topLeft)) }
     }
 
     // MARK: Drawing
@@ -329,15 +340,27 @@ private final class SelectionView: NSView {
 // MARK: - Mode bar
 
 struct ScreenshotModeBar: View {
-    enum Choice { case area, window, fullscreen, previous, cancel }
+    enum Choice { case area, window, fullscreen, previous, scrolling, cancel }
     let windowMode: Bool
+    let scrollingMode: Bool
     let previousAvailable: Bool
     let choose: (Choice) -> Void
 
     var body: some View {
-        HStack(spacing: 6) {
-            button("Alan", symbol: "rectangle.dashed", selected: !windowMode) { choose(.area) }
+        ViewThatFits(in: .horizontal) {
+            HStack(spacing: 6) { areaButtons; utilityButtons }
+            VStack(spacing: 6) { HStack(spacing: 6) { areaButtons }; HStack(spacing: 6) { utilityButtons } }
+        }
+        .padding(.horizontal, 10).padding(.vertical, 8)
+        .glassEffect(.regular, in: .rect(cornerRadius: 24))
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+    @ViewBuilder private var areaButtons: some View {
+            button("Alan", symbol: "rectangle.dashed", selected: !windowMode && !scrollingMode) { choose(.area) }
             button("Pencere", symbol: "macwindow", selected: windowMode) { choose(.window) }
+            button("Kaydırmalı", symbol: "rectangle.expand.vertical", selected: scrollingMode) { choose(.scrolling) }
+    }
+    @ViewBuilder private var utilityButtons: some View {
             button("Tam Ekran", symbol: "display", selected: false) { choose(.fullscreen) }
             button("Önceki Alan", symbol: "arrow.uturn.backward.square", selected: false) { choose(.previous) }
                 .disabled(!previousAvailable)
@@ -345,11 +368,6 @@ struct ScreenshotModeBar: View {
             Button { choose(.cancel) } label: { Image(systemName: "xmark").font(.system(size: 13, weight: .semibold)).frame(width: 30, height: 30) }
                 .buttonStyle(.plain)
                 .help("Vazgeç (Esc)")
-        }
-        .padding(.horizontal, 10)
-        .padding(.vertical, 8)
-        .glassEffect(.regular, in: .capsule)
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
     private func button(_ title: LocalizedStringKey, symbol: String, selected: Bool, action: @escaping () -> Void) -> some View {

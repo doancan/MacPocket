@@ -35,13 +35,19 @@ final class WindowSwitcherModel: ObservableObject {
     private var activationObserver: AnyCancellable?
     private var thumbnailGeneration = UUID()
 
-    init() {
+    func startObserving() {
+        guard activationObserver == nil else { return }
         activationObserver = NSWorkspace.shared.notificationCenter.publisher(for: NSWorkspace.didActivateApplicationNotification)
             .sink { [weak self] notification in
                 guard let app = notification.userInfo?[NSWorkspace.applicationUserInfoKey] as? NSRunningApplication else { return }
                 let pid = app.processIdentifier
                 Task { @MainActor [weak self] in await self?.catalog.noteApplicationActivation(pid) }
             }
+    }
+
+    func stopObserving() {
+        activationObserver = nil
+        clearThumbnails()
     }
 
     var excludedPaths: Set<String> {

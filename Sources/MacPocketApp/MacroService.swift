@@ -8,6 +8,10 @@ import SwiftUI
 @MainActor
 final class MacroService: ObservableObject {
     static let shared = MacroService()
+    #if DEBUG
+    private let moduleProbe = ModuleServiceProbe("MacroService")
+    #endif
+    private(set) var moduleRunning = false
 
     @Published var library = MacroLibrary() {
         didSet {
@@ -30,7 +34,12 @@ final class MacroService: ObservableObject {
     /// Suspends triggers while a shortcut is being recorded in the editor.
     var editingShortcut = false
 
+    #if DEBUG
+    private let archive = ModuleRuntimeAudit.dataURL("macros.json").map { MacroArchive(file: $0) } ?? .standard
+    #else
     private let archive = MacroArchive.standard
+    #endif
+    private var activationObserver: NSObjectProtocol?
     private var tap: CFMachPort?
     private var tapSource: CFRunLoopSource?
     private var runTask: Task<Void, Never>?
@@ -44,11 +53,23 @@ final class MacroService: ObservableObject {
 
     private init() {}
 
+    func stopForModule() {
+        moduleRunning = false
+        stop()
+        stopRecording()
+        launcherHotKey.unregister()
+        launcher.close()
+        if let activationObserver { NotificationCenter.default.removeObserver(activationObserver) }
+        activationObserver = nil
+    }
+
     func start() {
+        guard !moduleRunning, PocketModule.macros.isAvailable() else { return }
+        moduleRunning = true
         do { library = try archive.load() } catch { lastError = String(localized: "Makrolar okunamadı: \(error.localizedDescription)") }
         configureTap()
         registerLauncher()
-        NotificationCenter.default.addObserver(forName: NSApplication.didBecomeActiveNotification, object: nil, queue: .main) { [weak self] _ in
+        activationObserver = NotificationCenter.default.addObserver(forName: NSApplication.didBecomeActiveNotification, object: nil, queue: .main) { [weak self] _ in
             MainActor.assumeIsolated { self?.configureTap() }
         }
     }
@@ -61,7 +82,7 @@ final class MacroService: ObservableObject {
     }
 
     private func registerLauncher() {
-        if let launcherShortcut { launcherHotKey.register(launcherShortcut) } else { launcherHotKey.unregister() }
+        if let launcherShortcut, moduleRunning { launcherHotKey.register(launcherShortcut) } else { launcherHotKey.unregister() }
     }
 
     private func save() {
@@ -73,7 +94,7 @@ final class MacroService: ObservableObject {
     // MARK: Tap
 
     func configureTap() {
-        let wanted = (!library.triggers.isEmpty || recording) && AXIsProcessTrusted()
+        let wanted = moduleRunning && (!library.triggers.isEmpty || recording) && AXIsProcessTrusted()
         if wanted && tap == nil {
             let mask = CGEventMask(1 << CGEventType.keyDown.rawValue)
             let callback: CGEventTapCallBack = { _, type, event, context in
@@ -93,6 +114,7 @@ final class MacroService: ObservableObject {
             }
         } else if !wanted, let tap {
             CGEvent.tapEnable(tap: tap, enable: false)
+            CFMachPortInvalidate(tap)
             if let tapSource { CFRunLoopRemoveSource(CFRunLoopGetMain(), tapSource, .commonModes) }
             self.tap = nil
             tapSource = nil
@@ -140,6 +162,7 @@ final class MacroService: ObservableObject {
     // MARK: Recording
 
     func startRecording() {
+        guard moduleRunning else { return }
         guard AXIsProcessTrusted() else {
             lastError = String(localized: "Kayıt için MacPocket’e Erişilebilirlik izni ver.")
             return
@@ -159,6 +182,7 @@ final class MacroService: ObservableObject {
     // MARK: Running
 
     func run(_ macro: Macro) {
+        guard moduleRunning else { return }
         guard running == nil else { return }
         if macro.needsReview == true {
             lastError = String(localized: "“\(macro.name)” içe aktarıldı; çalıştırmadan önce adımlarını inceleyip etkinleştir.")
@@ -356,3 +380,9 @@ private struct MacroHUDSurface: ViewModifier {
         content.glassEffect(.regular, in: .capsule)
     }
 }
+
+#if DEBUG
+extension MacroService {
+    var moduleDiagnosticResources: [String: Int] { ["observer": activationObserver == nil ? 0 : 1, "tap": tapActive ? 1 : 0, "recording": recording ? 1 : 0] }
+}
+#endif

@@ -4,9 +4,11 @@ public enum ApplicationChannel: String, Codable, Sendable {
     case system = "macOS", appStore = "App Store", setapp = "Setapp", sparkle = "Uygulama içi", unknown = "Üretici"
 
     /// Display name; the raw value is the stable identifier.
-    public var title: String {
+    public var localizedTitle: String {
         switch self {
-        case .system, .appStore, .setapp: rawValue
+        case .system: String(localized: "macOS")
+        case .appStore: String(localized: "App Store")
+        case .setapp: String(localized: "Setapp")
         case .sparkle: String(localized: "Uygulama içi")
         case .unknown: String(localized: "Üretici")
         }

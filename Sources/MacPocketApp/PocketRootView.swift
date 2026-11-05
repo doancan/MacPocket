@@ -4,8 +4,8 @@ import SwiftUI
 
 struct PocketRootView: View {
     let model: PocketModel
+    @ObservedObject private var modules = PocketModuleRuntime.shared
     @ObservedObject private var navigation: PocketNavigation
-    @State private var utility = MacUtility.timeMachine
     @State private var columnVisibility = NavigationSplitViewVisibility.all
     @Environment(\.openWindow) private var openWindow
     @Environment(\.openSettings) private var openSettings
@@ -136,115 +136,63 @@ struct PocketRootView: View {
             PracticalToolsView()
             #endif
         case .tools:
-            switch navigation.tool {
-            case .similarImages: SimilarImagesView()
-            case .screenCleaning: ScreenCleaningView()
-            case .utilities: MacUtilitiesView(initialTool: utility).id(utility)
-            case .leftovers: ApplicationLeftoversView()
-            case .taskManager: TaskManagerView(model: model)
-            case .diagnostics: SystemToolsView()
-            case .windowSwitcher: WindowSwitcherView()
-            case .hiddenSettings: HiddenSettingsView()
-            case .clipboard: ClipboardHistoryView()
-            case .windowLayout: WindowLayoutView()
-            case .speedTest: SpeedTestView()
-            case .ports: PortManagerView(model: model)
-            case .quickActions: QuickActionsView()
-            case .quitGuard: QuitGuardView()
-            case .brightness: DisplayBrightnessView()
-            case .macros: MacrosView()
-            case .freezer: AppFreezerView()
-            case .supportReport: SupportReportView(model: model)
-            case .focus: FocusSessionView()
-            case .workspaces: WorkspacesView()
-            case .snippets: SnippetsView()
-            case .screenGrab: ScreenGrabView()
-            case .mouseScroll: MouseScrollView()
-            case .audio: AudioOutputView()
-            case .mixer: VolumeMixerView()
-            case .recorder: ScreenRecorderView()
-            case .screenshot: ScreenshotView()
-            case .bluetoothBattery: BluetoothBatteryView()
-            case .displays: DisplaySettingsView()
-            case .networkTraffic: NetworkTrafficView()
-            case .peripherals: PeripheralsView()
-            case .usbEject: USBEjectView()
-            case .diskHealth: DiskHealthView()
-            case .wifi: WiFiView()
-            case .hosts: HostsView()
-            case .screenTime: ScreenTimeView()
-            case .localNetwork: LANScannerView()
-            case .powerSchedule: PowerScheduleView()
-            case .privacy: PrivacyCheckView()
-            case .startupItems: StartupItemsView()
-            case .maintenance: MaintenanceView()
-            case .none: ToolsHubView(model: model, openTool: openCatalogTool)
+            if let module = navigation.tool?.module, !modules.available.contains(module) {
+                DisabledModuleView(module: module)
+            } else {
+                switch navigation.tool {
+                case .similarImages: SimilarImagesView()
+                case .screenCleaning: ScreenCleaningView()
+                case .utilities: MacUtilitiesView(initialTool: navigation.utility).id(navigation.utility)
+                case .leftovers: ApplicationLeftoversView()
+                case .taskManager: TaskManagerView(model: model)
+                case .diagnostics: SystemToolsView()
+                case .windowSwitcher: WindowSwitcherView()
+                case .hiddenSettings: HiddenSettingsView()
+                case .clipboard: ClipboardHistoryView()
+                case .windowLayout: WindowLayoutView()
+                case .speedTest: SpeedTestView()
+                case .ports: PortManagerView(model: model)
+                case .quickActions: QuickActionsView()
+                case .quitGuard: QuitGuardView()
+                case .brightness: DisplayBrightnessView()
+                case .macros: MacrosView()
+                case .freezer: AppFreezerView()
+                case .supportReport: SupportReportView(model: model)
+                case .focus: FocusSessionView()
+                case .workspaces: WorkspacesView()
+                case .snippets: SnippetsView()
+                case .screenGrab: ScreenGrabView()
+                case .mouseScroll: MouseScrollView()
+                case .mouseButtons: MouseButtonsView()
+                case .audio: AudioOutputView()
+                case .mixer: VolumeMixerView()
+                case .recorder: ScreenRecorderView()
+                case .screenshot: ScreenshotView()
+                case .bluetoothBattery: BluetoothBatteryView()
+                case .displays: DisplaySettingsView()
+                case .networkTraffic: NetworkTrafficView()
+                case .peripherals: PeripheralsView()
+                case .usbEject: USBEjectView()
+                case .diskHealth: DiskHealthView()
+                case .wifi: WiFiView()
+                case .hosts: HostsView()
+                case .screenTime: ScreenTimeView()
+                case .localNetwork: LANScannerView()
+                case .powerSchedule: PowerScheduleView()
+                case .privacy: PrivacyCheckView()
+                case .startupItems: StartupItemsView()
+                case .maintenance: MaintenanceView()
+                case .commandBar: CommandBarSettingsView()
+                case .shelf: ShelfSettingsView()
+                case .dockPreview: DockPreviewSettingsView()
+                case .none: ToolsHubView(model: model, openTool: openCatalogTool)
+                }
             }
         }
     }
 
-    private func openCatalogTool(_ id: String) {
-        let home = FileManager.default.homeDirectoryForCurrentUser
-        switch id {
-        case "practical-tools": navigation.select(.practical)
-        case "similar-images": navigation.open(.similarImages)
-        case "screen-cleaning": navigation.open(.screenCleaning)
-        case "app-leftovers": navigation.open(.leftovers)
-        case "mac-utilities", "time-machine": utility = .timeMachine; navigation.open(.utilities)
-        case "launch-jobs": utility = .launchJobs; navigation.open(.utilities)
-        case "listening-ports": navigation.open(.ports)
-        case "quick-actions": navigation.open(.quickActions)
-        case "quit-guard": navigation.open(.quitGuard)
-        case "brightness": navigation.open(.brightness)
-        case "macros": navigation.open(.macros)
-        case "freezer": navigation.open(.freezer)
-        case "support-report": navigation.open(.supportReport)
-        case "focus": navigation.open(.focus)
-        case "workspaces": navigation.open(.workspaces)
-        case "snippets": navigation.open(.snippets)
-        case "screen-grab": navigation.open(.screenGrab)
-        case "mouse-scroll": navigation.open(.mouseScroll)
-        case "audio": navigation.open(.audio)
-        case "mixer": navigation.open(.mixer)
-        case "recorder": navigation.open(.recorder)
-        case "screenshot": navigation.open(.screenshot)
-        case "bluetooth-battery": navigation.open(.bluetoothBattery)
-        case "displays": navigation.open(.displays)
-        case "network-traffic": navigation.open(.networkTraffic)
-        case "peripherals": navigation.open(.peripherals)
-        case "usb-eject": navigation.open(.usbEject)
-        case "disk-health": navigation.open(.diskHealth)
-        case "wifi": navigation.open(.wifi)
-        case "hosts": navigation.open(.hosts)
-        case "screen-time": navigation.open(.screenTime)
-        case "local-network": navigation.open(.localNetwork)
-        case "power-schedule": navigation.open(.powerSchedule)
-        case "privacy-check": navigation.open(.privacy)
-        case "startup-items": navigation.open(.startupItems)
-        case "maintenance": navigation.open(.maintenance)
-        case "disk-info": utility = .diskInfo; navigation.open(.utilities)
-        case "spotlight": utility = .spotlight; navigation.open(.utilities)
-        case "dns": utility = .dns; navigation.open(.utilities)
-        case "routes": utility = .routes; navigation.open(.utilities)
-        case "os-updates": utility = .updateHistory; navigation.open(.utilities)
-        case "security": utility = .systemIntegrity; navigation.open(.utilities)
-        case "task-manager": navigation.open(.taskManager)
-        case "system-reports": navigation.open(.diagnostics)
-        case "window-switcher": navigation.open(.windowSwitcher)
-        case "hidden-settings": navigation.open(.hiddenSettings)
-        case "clipboard": navigation.open(.clipboard)
-        case "window-layout": navigation.open(.windowLayout)
-        case "speed-test": navigation.open(.speedTest)
-        case "uninstaller": model.applications.showUpdates = false; navigation.select(.applications)
-        case "app-updater": model.applications.showUpdates = true; navigation.select(.applications)
-        case "downloads": model.storage.useRoot(home.appendingPathComponent("Downloads")); navigation.select(.storage)
-        case "duplicates": model.storage.scope = .duplicates; navigation.select(.storage)
-        case "large-old": model.storage.scope = .old; navigation.select(.storage)
-        case "system-junk": navigation.select(.cleanup)
-        case "trash": navigation.select(.cleanup)
-        default: break
-        }
-    }
+    private func openCatalogTool(_ id: String) { model.openCatalogTool(id) }
+
 }
 
 private struct PocketSidebarBrand: View {
@@ -366,6 +314,16 @@ struct PocketCommands: Commands {
                 .keyboardShortcut("f", modifiers: .command)
         }
         CommandMenu("Git") {
+            Button("Dosya Rafı’nı Aç") {
+                if PocketModule.shelf.isAvailable() { ShelfService.shared.show() }
+                else { navigation.open(.shelf); showPocketWindow(openWindow) }
+            }
+            Button("Komut Çubuğu’nu Aç") {
+                if PocketModule.commandBar.isAvailable() { CommandBarService.shared.show() }
+                else { navigation.open(.commandBar); showPocketWindow(openWindow) }
+            }
+            .keyboardShortcut("k", modifiers: [.command, .shift])
+            Divider()
             Button("Hızlı Bakışı Göster") { NotificationCenter.default.post(name: .pocketQuickLook, object: nil) }
                 .keyboardShortcut("m", modifiers: [.command, .shift]).disabled(!showMenuBar)
             Divider()

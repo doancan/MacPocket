@@ -20,6 +20,10 @@ extension PrivacyActivity {
 @MainActor
 final class PrivacyMonitorService: NSObject, ObservableObject, UNUserNotificationCenterDelegate {
     static let shared = PrivacyMonitorService()
+    #if DEBUG
+    private let moduleProbe = ModuleServiceProbe("PrivacyMonitorService")
+    #endif
+    private(set) var moduleRunning = false
 
     private nonisolated static let notificationPrefix = "MacPocket.privacy."
     private nonisolated static let ignoreAction = "MacPocket.privacy.ignore"
@@ -45,7 +49,20 @@ final class PrivacyMonitorService: NSObject, ObservableObject, UNUserNotificatio
 
     private override init() { super.init() }
 
+    func stopForModule() {
+        moduleRunning = false
+        pollTask?.cancel()
+        pollTask = nil
+        activities = []
+        tracker = PrivacyChangeTracker()
+        if PocketAlertNotifier.isAvailable, UNUserNotificationCenter.current().delegate === self {
+            UNUserNotificationCenter.current().delegate = nil
+        }
+    }
+
     func start() {
+        guard !moduleRunning, PocketModule.privacy.isAvailable() else { return }
+        moduleRunning = true
         if PocketAlertNotifier.isAvailable {
             let ignore = UNNotificationAction(identifier: Self.ignoreAction, title: String(localized: "Bu uygulama için bildirme"), options: [])
             let category = UNNotificationCategory(identifier: Self.ignorableCategory, actions: [ignore], intentIdentifiers: [])
@@ -82,7 +99,7 @@ final class PrivacyMonitorService: NSObject, ObservableObject, UNUserNotificatio
     }
 
     private func updatePolling() {
-        let wanted = settings.isEnabled || viewers > 0
+        let wanted = moduleRunning && (settings.isEnabled || viewers > 0)
         if wanted, pollTask == nil {
             pollTask = Task { [weak self] in
                 while !Task.isCancelled {
@@ -302,3 +319,9 @@ struct PrivacyCheckView: View {
         .pocketCard()
     }
 }
+
+#if DEBUG
+extension PrivacyMonitorService {
+    var moduleDiagnosticResources: [String: Int] { ["pollTask": pollTask == nil ? 0 : 1] }
+}
+#endif

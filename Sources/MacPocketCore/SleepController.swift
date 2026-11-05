@@ -7,6 +7,20 @@ public struct AwakeSession: Codable, Equatable, Sendable {
     public let endsAt: Date?
     public let keepDisplayAwake: Bool
     public let active: Bool
+    public init(id: UUID = UUID(), startedAt: Date, endsAt: Date?, keepDisplayAwake: Bool, active: Bool = true) {
+        self.id = id; self.startedAt = startedAt; self.endsAt = endsAt; self.keepDisplayAwake = keepDisplayAwake; self.active = active
+    }
+}
+
+public protocol IdleSleepControlling: Sendable {
+    func status() async -> AwakeSession?
+    func startIfIdle(sessionID: UUID, durationSeconds: Double, keepDisplayAwake: Bool) async throws -> AwakeSession?
+    @discardableResult func stop(sessionID: UUID) async throws -> Bool
+}
+
+public protocol SleepControlling: IdleSleepControlling {
+    func start(durationSeconds: Double?, keepDisplayAwake: Bool) async throws -> AwakeSession
+    func stop() async throws
 }
 
 public enum SleepControllerError: Error, LocalizedError, Sendable {
@@ -25,7 +39,7 @@ public enum SleepControllerError: Error, LocalizedError, Sendable {
 
 /// Owns temporary idle-sleep assertions only. Manual sleep and lid-close behavior
 /// remain controlled by macOS; no persistent power setting is changed.
-public actor SleepController {
+public actor SleepController: SleepControlling {
     /// A finite session can last up to seven days. Nil means until manually stopped.
     public static let maximumDurationSeconds: Double = 7 * 24 * 60 * 60
 
@@ -40,6 +54,18 @@ public actor SleepController {
 
     public init() {}
 
+    /// Claims an idle controller atomically; a concurrent manual session always keeps ownership.
+    public func startIfIdle(sessionID: UUID = UUID(), durationSeconds: Double, keepDisplayAwake: Bool) throws -> AwakeSession? {
+        guard status() == nil else { return nil }
+        return try replace(sessionID: sessionID, durationSeconds: durationSeconds, keepDisplayAwake: keepDisplayAwake)
+    }
+
+    /// An expired automation/focus operation must never stop a replacement session.
+    @discardableResult public func stop(sessionID: UUID) throws -> Bool {
+        guard session?.id == sessionID else { return false }
+        try stop(); return true
+    }
+
     deinit {
         expiryTask?.cancel()
         for assertion in assertions { IOPMAssertionRelease(assertion.id) }
@@ -47,6 +73,10 @@ public actor SleepController {
 
     /// Replaces the controller's previous session; invalid input leaves it intact.
     public func start(durationSeconds: Double?, keepDisplayAwake: Bool) throws -> AwakeSession {
+        try replace(sessionID: UUID(), durationSeconds: durationSeconds, keepDisplayAwake: keepDisplayAwake)
+    }
+
+    private func replace(sessionID id: UUID, durationSeconds: Double?, keepDisplayAwake: Bool) throws -> AwakeSession {
         if let durationSeconds {
             guard durationSeconds.isFinite, durationSeconds > 0,
                   durationSeconds <= Self.maximumDurationSeconds else {
@@ -54,7 +84,9 @@ public actor SleepController {
             }
         }
         try stop()
-        let id = UUID()
+        // Publish ownership before acquiring handles so a failed creation AND failed rollback
+        // still has a UUID that its caller can clean up without touching a manual replacement.
+        session = AwakeSession(id: id, startedAt: Date(), endsAt: nil, keepDisplayAwake: keepDisplayAwake)
         do {
             assertions.append(try Self.makeAssertion(sessionID: id, display: false))
             if keepDisplayAwake {
