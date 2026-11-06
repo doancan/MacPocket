@@ -251,7 +251,7 @@ struct PracticalToolsView: View {
                     .frame(minWidth: 0, maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
                     .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { detailWidth = $0 }
             }
-            .pocketCard(padding: 0, radius: PocketRadius.medium)
+            .pocketCard(padding: 0)
             Text("İçerikler otomatik kaydedilmez. Panodan alma, kopyalama ve dışa aktarma sen istediğinde yapılır.")
                 .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
         }
@@ -573,7 +573,7 @@ struct PracticalToolsView: View {
                     Text(verbatim: String(repeating: "•", count: min(result.text.count, 32))).font(.system(.title3, design: .monospaced))
                     Spacer(minLength: 4)
                     Button("Göster") { revealPassword = true }
-                }.padding(PocketSpacing.m).pocketCard()
+                }.pocketCard(padding: PocketSpacing.m)
             } else if result.text.isEmpty {
                 Text("İşlem tamamlandı; sonuç boş bir metin.").font(.callout).foregroundStyle(.secondary)
             } else {
@@ -592,7 +592,7 @@ struct PracticalToolsView: View {
                     }
                 }
                 .frame(maxWidth: .infinity, alignment: .leading).frame(height: tool == .caseConverter ? 140 : 230)
-                .padding(PocketSpacing.m).pocketCard(padding: 0)
+                .pocketCard(padding: PocketSpacing.m)
                 if tool == .password { Button("Gizle") { revealPassword = false }.controlSize(.small) }
             }
             if !result.casePreviews.isEmpty { casePreviewList(result.casePreviews) }

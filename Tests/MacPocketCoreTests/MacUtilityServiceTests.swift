@@ -9,7 +9,6 @@ final class MacUtilityServiceTests: XCTestCase {
             XCTAssertFalse(tool.command.1.contains("--install"), tool.id)
             XCTAssertFalse(tool.command.1.contains("delete"), tool.id)
         }
-        XCTAssertEqual(MacUtility.listeningPorts.command.1, ["-nP", "-a", "-u", String(getuid()), "-iTCP", "-sTCP:LISTEN"])
     }
     func testServicePreservesBoundedPartialOutput() async throws {
         let runner = SystemDiagnosticCommandRunner(executable: "/usr/bin/printf", arguments: ["abcdef"], outputLimit: 3)

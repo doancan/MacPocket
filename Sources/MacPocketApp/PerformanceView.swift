@@ -19,6 +19,7 @@ struct PerformanceView: View {
                 cpuChart
                 ViewThatFits(in: .horizontal) {
                     HStack(alignment: .top, spacing: PocketSpacing.l) { memoryCard; systemCard }
+                    .fixedSize(horizontal: false, vertical: true)
                     VStack(spacing: PocketSpacing.l) { memoryCard; systemCard }
                 }
                 PocketSensorsCard(system: model.system)
@@ -114,7 +115,7 @@ struct PerformanceView: View {
                 PocketProgressRow(message: "Bellek örneği bekleniyor…")
             }
         }
-        .frame(maxWidth: .infinity, alignment: .topLeading)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .pocketCard()
     }
 
@@ -138,7 +139,7 @@ struct PerformanceView: View {
                 PocketProgressRow(message: "Sistem örneği bekleniyor…")
             }
         }
-        .frame(maxWidth: .infinity, alignment: .topLeading)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .pocketCard()
     }
 

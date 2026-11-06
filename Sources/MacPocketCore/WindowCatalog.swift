@@ -294,6 +294,11 @@ public actor WindowCatalog {
         }
         guard activated else { throw WindowCatalogError.expired }
         try Task.checkCancellation()
+        // The switcher panel never activates MacPocket, so cooperative activation alone can be ignored;
+        // asking the target app to be frontmost through Accessibility always works for a trusted process.
+        if AXIsProcessTrusted() {
+            AXUIElementSetAttributeValue(AXUIElementCreateApplication(info.pid), kAXFrontmostAttribute as CFString, kCFBooleanTrue)
+        }
         if let window = handle.window {
             try raise(window)
         } else if let windowID = handle.windowID, AXIsProcessTrusted() {

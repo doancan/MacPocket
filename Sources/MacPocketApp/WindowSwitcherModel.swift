@@ -78,6 +78,9 @@ final class WindowSwitcherModel: ObservableObject {
         let old = selection
         let report = await catalog.snapshot()
         windows = report.windows
+        // Thumbnails outlive a session so the next one opens with images already in place.
+        let present = Set(report.windows.map(\.id))
+        if thumbnails.keys.contains(where: { !present.contains($0) }) { thumbnails = thumbnails.filter { present.contains($0.key) } }
         trusted = report.accessibilityGranted
         partial = report.partial
         otherSpacesVisible = report.otherSpacesVisible
@@ -157,9 +160,9 @@ final class WindowSwitcherModel: ObservableObject {
         selectedPreview = (window.id, NSImage(cgImage: image.cgImage, size: .zero))
     }
 
+    /// Stops in-flight captures; cached images stay for the next session.
     func clearThumbnails() {
         thumbnailGeneration = UUID()
-        thumbnails = [:]
         selectedPreview = nil
     }
 

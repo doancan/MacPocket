@@ -138,7 +138,7 @@ enum ToolUIAudit {
         let originalFrame = window.frame
         var rows: [[String: Any]] = []
         let changed = ["startup-items", "network-traffic", "peripherals", "usb-eject", "disk-health", "bluetooth-battery",
-                       "audio", "recorder", "support-report", "task-manager", "system-reports", "local-network", "quick-actions", "screen-cleaning"]
+                       "audio", "recorder", "support-report", "task-manager", "system-reports", "local-network", "screen-cleaning"]
         let tools = CommandLine.arguments.contains("--audit-tools-changed") ? changed : ToolsHubView.diagnosticCatalogIDs
         func save() {
             let report: [String: Any] = ["rows": rows, "scope": "read-only navigation and in-process accessibility tree",
@@ -150,7 +150,7 @@ enum ToolUIAudit {
         }
         for width in [960.0, 1280.0] {
             window.setContentSize(NSSize(width: width, height: width == 960 ? 680 : 820))
-            for id in tools where id != "keep-awake" {
+            for id in tools {
                 NotificationCenter.default.post(name: .pocketOpenTool, object: id)
                 do { try await Task.sleep(for: .milliseconds(650)) } catch { return }
                 window.contentView?.layoutSubtreeIfNeeded()
@@ -182,15 +182,8 @@ enum ToolUIAudit {
             NotificationCenter.default.post(name: .pocketFind, object: nil)
             try? await Task.sleep(for: .milliseconds(150))
             let hubFocus = window.firstResponder is NSTextView || window.firstResponder is NSTextField
-            NotificationCenter.default.post(name: Notification.Name("MacPocket.debug.showAwake"), object: true)
-            try? await Task.sleep(for: .milliseconds(650))
-            let sheet = window.attachedSheet
-            rows.append(["tool": "keep-awake", "width": width, "navigation": model.navigation.title,
-                         "sheetShown": sheet != nil, "searchFocusAfterFind": hubFocus,
-                         "elements": sheet.map { accessibilityNodes($0).count } ?? 0])
+            rows.append(["tool": "hub", "width": width, "navigation": model.navigation.title, "searchFocusAfterFind": hubFocus])
             save()
-            NotificationCenter.default.post(name: Notification.Name("MacPocket.debug.showAwake"), object: false)
-            try? await Task.sleep(for: .milliseconds(250))
         }
         window.setFrame(originalFrame, display: true)
         model.navigation.select(.tools)

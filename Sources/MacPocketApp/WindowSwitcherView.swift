@@ -98,8 +98,8 @@ private struct SwitcherSettingsForm: View {
     @AppStorage("switcher.style") private var style = SwitcherStyle.thumbnails.rawValue
     @AppStorage("switcher.autoSize") private var autoSize = true
     @AppStorage("switcher.size") private var size = 1.0
-    @AppStorage("switcher.previewSelected") private var previewSelected = true
-    @AppStorage("switcher.liveThumbnails") private var liveThumbnails = true
+    @AppStorage("switcher.previewSelected") private var previewSelected = false
+    @AppStorage("switcher.liveThumbnails") private var liveThumbnails = false
     @AppStorage("switcher.hoverSelects") private var hoverSelects = true
     @AppStorage("switcher.sort") private var sort = "recent"
     @AppStorage("switcher.excludedPaths") private var excludedPaths = ""

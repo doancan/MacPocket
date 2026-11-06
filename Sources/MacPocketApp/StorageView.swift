@@ -295,8 +295,7 @@ struct StorageOverviewPanel: View {
             PocketSectionHeader("Kategoriler", icon: "square.grid.2x2") {
                 Text("Diskte kapladığı gerçek alan (ayrılmış boyut)")
             }
-            LazyVGrid(columns: [GridItem(.adaptive(minimum: 300), spacing: PocketSpacing.m, alignment: .top)],
-                      alignment: .leading, spacing: PocketSpacing.m) {
+            PocketEqualHeightGrid(minimumWidth: 300, spacing: PocketSpacing.m) {
                 ForEach(measured) { usage in
                     StorageCategoryCard(usage: usage, share: Double(usage.bytes) / used, highlighted: hovered == usage.category,
                                         openInLens: openInLens)

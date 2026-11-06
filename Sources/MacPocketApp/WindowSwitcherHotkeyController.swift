@@ -50,6 +50,12 @@ final class WindowSwitcherHotkeyController: NSObject, ObservableObject {
     private var lastInvocationBackwards = false
     private var lastPrewarm = Date.distantPast
     private var gestureFingers = -1
+    private var showTask: Task<Void, Never>?
+    private var thumbnailsWanted = false
+    private var modifierTimer: Timer?
+    private var outsideClickMonitor: Any?
+    /// A quick tap switches without ever drawing the panel, like the system switcher.
+    private static let showDelay: Duration = .milliseconds(110)
 
     private static let signature: OSType = 0x4D505357 // 'MPSW'
 
@@ -122,8 +128,8 @@ final class WindowSwitcherHotkeyController: NSObject, ObservableObject {
     var style: SwitcherStyle { SwitcherStyle(rawValue: UserDefaults.standard.string(forKey: "switcher.style") ?? "") ?? .thumbnails }
     private var autoSize: Bool { UserDefaults.standard.object(forKey: "switcher.autoSize") as? Bool ?? true }
     private var sizeScale: Double { UserDefaults.standard.object(forKey: "switcher.size") as? Double ?? 1 }
-    private var previewSelectedEnabled: Bool { UserDefaults.standard.object(forKey: "switcher.previewSelected") as? Bool ?? true }
-    private var liveThumbnails: Bool { UserDefaults.standard.object(forKey: "switcher.liveThumbnails") as? Bool ?? true }
+    private var previewSelectedEnabled: Bool { UserDefaults.standard.object(forKey: "switcher.previewSelected") as? Bool ?? false }
+    private var liveThumbnails: Bool { UserDefaults.standard.object(forKey: "switcher.liveThumbnails") as? Bool ?? false }
     var hoverSelects: Bool { UserDefaults.standard.object(forKey: "switcher.hoverSelects") as? Bool ?? true }
     private var disabledBundleIDs: Set<String> {
         Set((UserDefaults.standard.string(forKey: "switcher.disabledApps") ?? "").split(separator: "\n").map(String.init))
@@ -351,6 +357,7 @@ final class WindowSwitcherHotkeyController: NSObject, ObservableObject {
     func gestureEnded() { requestCommit() }
 
     private func step(backwards: Bool, by count: Int = 1) {
+        if let id = sessionID, panel?.isVisible != true { showTask?.cancel(); presentPanel(sessionID: id) }
         if preparing {
             pendingSteps += backwards ? -count : count
             model.selection = WindowSwitchSelection.initial(model.filtered, foregroundPID: sessionForegroundPID,
@@ -382,7 +389,14 @@ final class WindowSwitcherHotkeyController: NSObject, ObservableObject {
         sessionForegroundPID = holdsModifiers ? foregroundPID : nil
         model.selection = WindowSwitchSelection.initial(model.filtered, foregroundPID: sessionForegroundPID,
                                                         backwards: backwards, queuedSteps: 0)
-        presentPanel(sessionID: id)
+        if holdsModifiers, shortcut.releaseToChoose, !model.filtered.isEmpty {
+            showTask = Task { [weak self] in
+                try? await Task.sleep(for: Self.showDelay)
+                guard !Task.isCancelled, let self, sessionID == id else { return }
+                presentPanel(sessionID: id)
+            }
+        } else { presentPanel(sessionID: id) }
+        startModifierWatch(shortcut)
         openingTask = Task { [weak self] in
             guard let self else { return }
             await model.refresh()
@@ -392,27 +406,56 @@ final class WindowSwitcherHotkeyController: NSObject, ObservableObject {
             preparing = false
             let released = !heldModifiers.isEmpty && NSEvent.modifierFlags.intersection(heldModifiers).isEmpty
             if commitWhenReady || (released && shortcut.releaseToChoose) { activateSelection(); return }
-            startThumbnails()
+            if panel?.isVisible == true { startThumbnails() } else { thumbnailsWanted = true }
         }
     }
 
     private func presentPanel(sessionID id: UUID) {
         if panel == nil {
-            let panel = SwitcherCardPanel(contentRect: .zero, styleMask: [.borderless, .fullSizeContentView], backing: .buffered, defer: false)
+            // Non-activating: the app in front stays active, so nothing flickers and MacPocket's own windows
+            // never come forward. The panel still becomes key to receive navigation and search keys.
+            let panel = SwitcherCardPanel(contentRect: .zero, styleMask: [.borderless, .fullSizeContentView, .nonactivatingPanel],
+                                          backing: .buffered, defer: false)
             panel.title = String(localized: "MacPocket · Pencere Geçişi")
             panel.setAccessibilityLabel(String(localized: "MacPocket pencere geçişi"))
             panel.backgroundColor = .clear; panel.isOpaque = false; panel.hasShadow = true
-            panel.level = .popUpMenu; panel.isReleasedWhenClosed = false; panel.hidesOnDeactivate = true
+            panel.level = .popUpMenu; panel.isReleasedWhenClosed = false; panel.hidesOnDeactivate = false
+            panel.becomesKeyOnlyIfNeeded = false
             panel.collectionBehavior = [.moveToActiveSpace, .fullScreenAuxiliary, .transient]
-            panel.animationBehavior = .utilityWindow
+            panel.animationBehavior = .none
             self.panel = panel
         }
         relayout(force: true)
         panel?.contentView = NSHostingView(rootView: WindowSwitcherOverlayView(model: model, controller: self, choose: { [weak self] target in
             self?.model.selection = target; self?.requestCommit()
         }).id(id))
+        let animate = !PocketReduceMotion.isEnabled
+        panel?.alphaValue = animate ? 0 : 1
         panel?.makeKeyAndOrderFront(nil)
-        NSApp.activate(ignoringOtherApps: true)
+        if animate { NSAnimationContext.runAnimationGroup { $0.duration = 0.09; panel?.animator().alphaValue = 1 } }
+        if outsideClickMonitor == nil {
+            // Clicks inside the panel are local events; anything reaching this monitor landed elsewhere.
+            outsideClickMonitor = NSEvent.addGlobalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown, .otherMouseDown]) { [weak self] _ in
+                Task { @MainActor [weak self] in self?.dismiss() }
+            }
+        }
+        if thumbnailsWanted || !preparing { thumbnailsWanted = false; startThumbnails() }
+        updatePreview()
+    }
+
+    /// Releasing the held modifiers chooses, even before the panel is visible or key (`flagsChanged` alone
+    /// misses fast taps). `NSEvent.modifierFlags` needs no permission.
+    private func startModifierWatch(_ shortcut: SwitcherShortcut) {
+        modifierTimer?.invalidate(); modifierTimer = nil
+        guard !heldModifiers.isEmpty, shortcut.releaseToChoose else { return }
+        let timer = Timer(timeInterval: 1.0 / 60, repeats: true) { [weak self] _ in
+            MainActor.assumeIsolated {
+                guard let self, self.sessionID != nil, !self.heldModifiers.isEmpty, self.model.sessionSearch.isEmpty else { return }
+                if NSEvent.modifierFlags.intersection(self.heldModifiers).isEmpty { self.requestCommit() }
+            }
+        }
+        RunLoop.main.add(timer, forMode: .common)
+        modifierTimer = timer
     }
 
     /// Search or refresh can filter out the selected window; keep a valid selection so ↩ always has a target.
@@ -432,7 +475,7 @@ final class WindowSwitcherHotkeyController: NSObject, ObservableObject {
         guard let panel else { return }
         let size = next.panelSize
         let frame = NSRect(x: area.midX - size.width / 2, y: area.midY - size.height / 2, width: size.width, height: size.height)
-        if panel.frame != frame { panel.setFrame(frame, display: true, animate: panel.isVisible && !PocketReduceMotion.isEnabled) }
+        if panel.frame != frame { panel.setFrame(frame, display: true) }
     }
 
     private func startThumbnails() {
@@ -475,7 +518,8 @@ final class WindowSwitcherHotkeyController: NSObject, ObservableObject {
 
     private func requestCommit() {
         guard sessionID != nil else { return }
-        if preparing { commitWhenReady = true } else { activateSelection() }
+        // A warm cache already names a target; only an empty first scan has to be waited for.
+        if preparing && model.filtered.isEmpty { commitWhenReady = true } else { activateSelection() }
     }
 
     private func activateSelection() {
@@ -494,7 +538,7 @@ final class WindowSwitcherHotkeyController: NSObject, ObservableObject {
             guard let self else { return }
             await model.action(action, id: target.id)
             // Keep the panel key: hiding or quitting an app may move focus elsewhere.
-            if sessionID != nil { panel?.makeKeyAndOrderFront(nil); NSApp.activate(ignoringOtherApps: true) }
+            if sessionID != nil { panel?.makeKeyAndOrderFront(nil) }
             if !model.filtered.contains(where: { $0.id == model.selection }) { model.selection = model.filtered.first?.id }
         }
     }
@@ -517,6 +561,11 @@ final class WindowSwitcherHotkeyController: NSObject, ObservableObject {
         let previous = restorePrevious ? previousApplication : nil
         sessionID = nil; preparing = false; commitWhenReady = false
         openingTask?.cancel(); openingTask = nil
+        showTask?.cancel(); showTask = nil
+        modifierTimer?.invalidate(); modifierTimer = nil
+        thumbnailsWanted = false
+        if let outsideClickMonitor { NSEvent.removeMonitor(outsideClickMonitor) }
+        outsideClickMonitor = nil
         thumbnailTask?.cancel(); thumbnailTask = nil
         previewTask?.cancel(); previewTask = nil
         activeShortcut = nil
@@ -525,7 +574,8 @@ final class WindowSwitcherHotkeyController: NSObject, ObservableObject {
         model.clearThumbnails()
         previewPanel?.orderOut(nil)
         panel?.orderOut(nil)
-        if let previous, !previous.isTerminated, previous.processIdentifier != ProcessInfo.processInfo.processIdentifier { previous.activate(options: []) }
+        if let previous, !previous.isTerminated, !previous.isActive,
+           previous.processIdentifier != ProcessInfo.processInfo.processIdentifier { previous.activate(options: []) }
     }
 
     private static func eventFlags(_ modifiers: SwitcherModifiers) -> NSEvent.ModifierFlags {

@@ -283,7 +283,7 @@ struct PocketProgressRow: View {
                 .monospacedDigit()
             Spacer(minLength: 0)
         }
-        .pocketCard(padding: PocketSpacing.m, radius: PocketRadius.medium)
+        .pocketCard(padding: PocketSpacing.m)
         .accessibilityElement(children: .combine)
     }
 }
@@ -668,4 +668,50 @@ struct PocketButtonStyle: PrimitiveButtonStyle {
 extension PrimitiveButtonStyle where Self == PocketButtonStyle {
     static var pocketPrimary: PocketButtonStyle { PocketButtonStyle(kind: .primary) }
     static var pocketSecondary: PocketButtonStyle { PocketButtonStyle(kind: .secondary) }
+}
+
+// MARK: - Equal-height grid
+
+/// Adaptive grid whose cells in one row share the tallest cell's height (LazyVGrid sizes each cell
+/// on its own). Cells that declare `.frame(maxHeight: .infinity)` fill the row; use for short, non-lazy card lists.
+struct PocketEqualHeightGrid: Layout {
+    var minimumWidth: CGFloat
+    var spacing: CGFloat = PocketSpacing.m
+
+    private func columnCount(for width: CGFloat) -> Int {
+        max(1, Int(((width + spacing) / (minimumWidth + spacing)).rounded(.down)))
+    }
+
+    private func rowHeights(subviews: Subviews, columns: Int, columnWidth: CGFloat) -> [CGFloat] {
+        var heights: [CGFloat] = []
+        for start in stride(from: 0, to: subviews.count, by: columns) {
+            let row = subviews[start ..< min(start + columns, subviews.count)]
+            heights.append(row.map { $0.sizeThatFits(ProposedViewSize(width: columnWidth, height: nil)).height }.max() ?? 0)
+        }
+        return heights
+    }
+
+    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
+        let width = proposal.width ?? minimumWidth
+        let columns = columnCount(for: width)
+        let columnWidth = (width - spacing * CGFloat(columns - 1)) / CGFloat(columns)
+        let heights = rowHeights(subviews: subviews, columns: columns, columnWidth: columnWidth)
+        let total = heights.reduce(0, +) + spacing * CGFloat(max(0, heights.count - 1))
+        return CGSize(width: width, height: total)
+    }
+
+    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
+        let columns = columnCount(for: bounds.width)
+        let columnWidth = (bounds.width - spacing * CGFloat(columns - 1)) / CGFloat(columns)
+        let heights = rowHeights(subviews: subviews, columns: columns, columnWidth: columnWidth)
+        var y = bounds.minY
+        for (rowIndex, start) in stride(from: 0, to: subviews.count, by: columns).enumerated() {
+            for offset in 0 ..< min(columns, subviews.count - start) {
+                subviews[start + offset].place(at: CGPoint(x: bounds.minX + CGFloat(offset) * (columnWidth + spacing), y: y),
+                                               anchor: .topLeading,
+                                               proposal: ProposedViewSize(width: columnWidth, height: heights[rowIndex]))
+            }
+            y += heights[rowIndex] + spacing
+        }
+    }
 }

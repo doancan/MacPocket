@@ -50,7 +50,6 @@ extension PocketModel {
         case "spotlight": navigation.utility = .spotlight; navigation.open(.utilities)
         case "dns": navigation.utility = .dns; navigation.open(.utilities)
         case "routes": navigation.utility = .routes; navigation.open(.utilities)
-        case "os-updates": navigation.utility = .updateHistory; navigation.open(.utilities)
         case "security": navigation.utility = .systemIntegrity; navigation.open(.utilities)
         case "task-manager": navigation.open(.taskManager)
         case "system-reports": navigation.open(.diagnostics)

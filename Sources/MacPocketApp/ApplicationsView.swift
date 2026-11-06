@@ -93,7 +93,7 @@ struct ApplicationsView: View {
                 .foregroundStyle(PocketTone.success.color)
         }
         .font(.callout)
-        .pocketCard(padding: PocketSpacing.m, radius: PocketRadius.medium)
+        .pocketCard(padding: PocketSpacing.m)
     }
 
     // MARK: Installed
@@ -220,7 +220,7 @@ struct ApplicationsView: View {
                 .disabled(update.pinned || model.updatingToken != nil || model.checkingUpdates)
                 .help("\(name) uygulamasını Homebrew ile güncelle")
         }
-        .pocketCard(padding: PocketSpacing.m, radius: PocketRadius.medium)
+        .pocketCard(padding: PocketSpacing.m)
         .accessibilityElement(children: .contain)
     }
 }
@@ -388,7 +388,7 @@ private struct UninstallPlanView: View {
                     }
                 }
             }
-            .pocketCard(padding: 0, radius: PocketRadius.medium)
+            .pocketCard(padding: 0)
             Label("Paylaşılan üretici/App Group klasörleri ve doğrulanamayan yardımcılar plana eklenmez. Çalışan uygulama önce kapatılmalıdır.",
                   systemImage: "info.circle")
                 .font(.subheadline).foregroundStyle(.secondary)

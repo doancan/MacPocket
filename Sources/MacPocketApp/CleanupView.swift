@@ -168,11 +168,11 @@ struct CleanupView: View {
         .padding(PocketSpacing.xl)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background {
-            RoundedRectangle(cornerRadius: 18, style: .continuous)
+            RoundedRectangle(cornerRadius: PocketRadius.large, style: .continuous)
                 .fill(LinearGradient(colors: [tint.opacity(0.16), tint.opacity(0.04)], startPoint: .topLeading, endPoint: .bottomTrailing))
         }
-        .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
-        .overlay { RoundedRectangle(cornerRadius: 18, style: .continuous).strokeBorder(tint.opacity(0.2), lineWidth: 0.75) }
+        .clipShape(RoundedRectangle(cornerRadius: PocketRadius.large, style: .continuous))
+        .overlay { RoundedRectangle(cornerRadius: PocketRadius.large, style: .continuous).strokeBorder(tint.opacity(0.2), lineWidth: 0.75) }
         .onChange(of: model.scanning) { _, scanning in if !scanning, model.report != nil { celebration += 1 } }
         .onChange(of: model.summary) { _, summary in if summary != nil { celebration += 1 } }
     }
@@ -325,7 +325,7 @@ private struct CleanupTargetCard: View {
                 itemList
             }
         }
-        .pocketCard(padding: 0, radius: PocketRadius.large)
+        .pocketCard(padding: 0)
     }
 
     private var header: some View {

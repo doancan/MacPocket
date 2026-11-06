@@ -11,8 +11,6 @@ struct WindowSwitcherOverlayView: View {
     let choose: (String) -> Void
     @PocketReduceMotion private var reduceMotion
     @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
-    @Namespace private var selectionSpace
-    @State private var appeared = false
 
     private static let radius: CGFloat = 20
 
@@ -20,22 +18,17 @@ struct WindowSwitcherOverlayView: View {
         let layout = controller.layout
         surface(layout)
             .frame(width: layout.panelSize.width, height: layout.panelSize.height)
-            .onAppear { withAnimation(reduceMotion ? .linear(duration: 0.05) : .spring(response: 0.22, dampingFraction: 0.86)) { appeared = true } }
-            .animation(reduceMotion ? nil : .spring(response: 0.28, dampingFraction: 0.88), value: model.filtered.map(\.id))
             .accessibilityElement(children: .contain)
             .accessibilityLabel("Pencere geçişi")
     }
 
-    /// The panel is a Liquid Glass HUD that materializes over the desktop; the selection frame,
-    /// hover fills and search pill on it are plain fills (no glass on glass).
+    /// The panel is a Liquid Glass HUD, present from the first frame (the window itself fades in); the
+    /// selection frame, hover fills and search pill on it are plain fills (no glass on glass). List and
+    /// selection changes are instant, as in the system switcher.
     @ViewBuilder private func surface(_ layout: SwitcherLayout) -> some View {
         let shape = RoundedRectangle(cornerRadius: Self.radius, style: .continuous)
         GlassEffectContainer {
-            if appeared {
-                panel(layout)
-                    .glassEffect(.regular, in: shape)
-                    .glassEffectTransition(.materialize)
-            }
+            panel(layout).glassEffect(.regular, in: shape)
         }
     }
 
@@ -53,7 +46,7 @@ struct WindowSwitcherOverlayView: View {
                     .scrollIndicators(layout.rows > 1 ? .automatic : .never)
                     .onChange(of: model.selection) { _, id in
                         guard let id else { return }
-                        withAnimation(reduceMotion ? nil : .easeOut(duration: 0.15)) { reader.scrollTo(id) }
+                        reader.scrollTo(id)
                     }
                     .onAppear { if let id = model.selection { reader.scrollTo(id) } }
                 }
@@ -110,14 +103,13 @@ struct WindowSwitcherOverlayView: View {
             ForEach(windows) { window in
                 SwitcherItem(window: window, style: style, size: layout.itemSize,
                              selected: model.selection == window.id, thumbnail: model.thumbnails[window.id],
-                             selectionSpace: selectionSpace, reduceMotion: reduceMotion,
+                             reduceMotion: reduceMotion,
                              choose: { choose(window.id) },
                              hover: { controller.hover(window.id) },
                              close: { controller.act(.close, on: window.id) })
                     .id(window.id)
             }
         }
-        .animation(reduceMotion ? nil : .spring(response: 0.24, dampingFraction: 0.86), value: model.selection)
     }
 }
 
@@ -127,7 +119,6 @@ private struct SwitcherItem: View {
     let size: CGSize
     let selected: Bool
     let thumbnail: NSImage?
-    let selectionSpace: Namespace.ID
     let reduceMotion: Bool
     let choose: () -> Void
     let hover: () -> Void
@@ -149,14 +140,12 @@ private struct SwitcherItem: View {
                     RoundedRectangle(cornerRadius: radius, style: .continuous).fill(.primary.opacity(0.06))
                 }
                 if selected {
-                    // A single frame moves between items (matched geometry), like Windows' sliding highlight.
                     RoundedRectangle(cornerRadius: radius, style: .continuous)
                         .fill(Color.primary.opacity(0.10))
                         .overlay {
                             RoundedRectangle(cornerRadius: radius, style: .continuous)
                                 .strokeBorder(Color.accentColor, lineWidth: style == .titles ? 2 : 2.5)
                         }
-                        .matchedGeometryEffect(id: "selection", in: selectionSpace)
                 }
             }
         }
@@ -213,7 +202,6 @@ private struct SwitcherItem: View {
                         .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
                         .shadow(color: .black.opacity(0.22), radius: 4, y: 2)
                         .opacity(window.minimized ? 0.6 : 1)
-                        .transition(.opacity)
                 } else {
                     RoundedRectangle(cornerRadius: 6, style: .continuous).fill(.primary.opacity(0.05))
                     PocketAppIcon(url: window.applicationURL, size: min(64, size.height * 0.38))
@@ -221,8 +209,7 @@ private struct SwitcherItem: View {
                 }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .animation(reduceMotion ? nil : .easeOut(duration: 0.18), value: thumbnail != nil)
-        }
+            }
         .padding(8)
     }
 

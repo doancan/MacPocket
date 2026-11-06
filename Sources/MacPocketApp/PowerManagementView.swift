@@ -254,12 +254,14 @@ struct PowerOverviewPanel: View {
         VStack(alignment: .leading, spacing: PocketSpacing.l) {
             ViewThatFits(in: .horizontal) {
                 HStack(alignment: .top, spacing: PocketSpacing.l) { PowerKeepAwakeCard(model: model); statusCard }
+                    .fixedSize(horizontal: false, vertical: true)
                 VStack(spacing: PocketSpacing.l) { PowerKeepAwakeCard(model: model); statusCard }
             }
             PocketSensorsCard(system: model.system)
             if model.system?.fans?.isEmpty == false { FanControlCard() }
             ViewThatFits(in: .horizontal) {
                 HStack(alignment: .top, spacing: PocketSpacing.l) { topEnergy; scheduleCard }
+                    .fixedSize(horizontal: false, vertical: true)
                 VStack(spacing: PocketSpacing.l) { topEnergy; scheduleCard }
             }
             if let ups = center.overview?.upsSources, !ups.isEmpty { upsCard(ups) }
@@ -302,7 +304,7 @@ struct PowerOverviewPanel: View {
                 ProgressView().frame(maxWidth: .infinity)
             }
         }
-        .frame(maxWidth: .infinity, alignment: .topLeading)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .pocketCard()
     }
 
@@ -326,7 +328,7 @@ struct PowerOverviewPanel: View {
                 }
             }
         }
-        .frame(maxWidth: .infinity, alignment: .topLeading)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .pocketCard()
     }
 
@@ -362,7 +364,7 @@ struct PowerOverviewPanel: View {
             Text("Olaylar Sistem Ayarları veya `pmset schedule` ile eklenir.")
                 .font(.subheadline).foregroundStyle(.secondary)
         }
-        .frame(maxWidth: .infinity, alignment: .topLeading)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .pocketCard()
     }
 
@@ -442,7 +444,7 @@ struct PowerKeepAwakeCard: View {
             Divider()
             AwakeAutomationView(service: model.awakeAutomation)
         }
-        .frame(maxWidth: .infinity, alignment: .topLeading)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .pocketCard()
     }
 
@@ -469,6 +471,7 @@ struct PowerBatteryPanel: View {
             if let overview = center.overview, overview.hasBattery {
                 ViewThatFits(in: .horizontal) {
                     HStack(alignment: .top, spacing: PocketSpacing.l) { healthCard(overview); electricalCard(overview) }
+                    .fixedSize(horizontal: false, vertical: true)
                     VStack(spacing: PocketSpacing.l) { healthCard(overview); electricalCard(overview) }
                 }
                 chargeHistory
@@ -512,7 +515,7 @@ struct PowerBatteryPanel: View {
             if let serial = registry?.serial { PowerFactRow(title: "Seri numarası", value: "\(serial)") }
             if let device = registry?.deviceName { PowerFactRow(title: "Pil denetleyicisi", value: "\(device)") }
         }
-        .frame(maxWidth: .infinity, alignment: .topLeading)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .pocketCard()
     }
 
@@ -547,7 +550,7 @@ struct PowerBatteryPanel: View {
                 if let serial = adapter.serial { PowerFactRow(title: "Adaptör seri no.", value: "\(serial)") }
             }
         }
-        .frame(maxWidth: .infinity, alignment: .topLeading)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .pocketCard()
     }
 

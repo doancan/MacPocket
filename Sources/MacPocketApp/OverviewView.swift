@@ -29,8 +29,8 @@ struct OverviewView: View {
                     healthBadge
                 }
                 if let error = model.error { PocketMessage(error, tone: .critical) }
-                LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: PocketSpacing.m, alignment: .top), count: columnCount),
-                          spacing: PocketSpacing.m) {
+                LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: PocketSpacing.l, alignment: .top), count: columnCount),
+                          spacing: PocketSpacing.l) {
                     CPUTile(model: model, open: { navigation.select(.performance) })
                     MemoryTile(model: model, open: { navigation.select(.performance) })
                     DiskTile(model: model, open: { navigation.select(.storage) })

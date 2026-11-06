@@ -27,14 +27,10 @@ struct MacUtilitiesView: View {
             PocketPageHeading(title: "macOS Araçları",
                               subtitle: "Disk, ağ, oturum ve güvenlik için gerçek sistem sorguları.",
                               icon: "wrench.and.screwdriver") {
-                Menu {
-                    Button("Gizlilik ve Güvenlik…") { openSettings("x-apple.systempreferences:com.apple.preference.security") }
-                    Button("Yazılım Güncelleme…") { openSettings("x-apple.systempreferences:com.apple.Software-Update-Settings.extension") }
-                } label: {
-                    Label("Sistem Ayarları", systemImage: "gearshape")
+                Button { openSettings("x-apple.systempreferences:com.apple.preference.security") } label: {
+                    Label("Gizlilik ve Güvenlik…", systemImage: "gearshape")
                 }
-                .fixedSize()
-                .help("İlgili macOS Sistem Ayarları bölümünü aç")
+                .help("macOS Sistem Ayarları’nda Gizlilik ve Güvenlik bölümünü aç")
             }
             HStack(spacing: 0) {
                 sidebar

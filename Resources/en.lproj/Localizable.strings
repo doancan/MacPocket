@@ -4179,3 +4179,5 @@
 "İlk Hesabı Ekle" = "Add Your First Account";
 
 "Son veri: %@" = "Last data: %@";
+"macOS Sistem Ayarları’nda Gizlilik ve Güvenlik bölümünü aç" = "Open Privacy & Security in macOS System Settings";
+"Time Machine, Spotlight, disk, DNS, ağ rotaları ve sistem güvenliği için salt okunur sistem sorguları." = "Read-only system queries for Time Machine, Spotlight, disks, DNS, network routes and system security.";
