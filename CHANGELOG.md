@@ -2,6 +2,16 @@
 
 ## Yayımlanmamış
 
+## 0.1.5 — 6 Kasım 2026
+
+- **DMG kurulum penceresi:** MacPocket’ın kendi simgesi, Uygulamalar klasörüne sürükle-bırak kurulumu, Retina arka planı ve Türkçe/İngilizce yönergeler. İmzalı ve Apple tarafından notarize edilmiş DMG indirmesi; otomatik güncellemeler için mevcut ZIP ve Sparkle akışı korunur.
+- **SSH Yöneticisi:** Tek çalışma alanında SSH config düzenleme, bağlantı ve ProxyJump testleri, Terminal/iTerm2/Ghostty ile bağlantı, anahtar ve known_hosts yönetimi, yedekler ve global kısayollu hızlı bağlantı. Türkçe/İngilizce arayüz ve mevcut SSH yöneticisinden tercih/yedek aktarımı eklendi.
+- **AI kullanım takibi:** Claude, Codex/ChatGPT ve Grok hesaplarının kotaları ayrı ayrı menü çubuğu, kullanım ekranı ve küçük yüzen panelden izlenebilir. Claude için ayrı profiller, profil klasörü keşfi, açık kullanıcı eylemiyle giriş, hesap yönetimi, kota uyarıları ve hesap başına yenileme bekleme politikası bulunur.
+- **Komut Çubuğu, Dosya Rafı ve Dock Önizlemeleri:** Araçlara ve içeriklere hızlı erişim, dosya/metin/görselleri toplama ve aktarma, Dock üzerinden pencere önizlemeleri eklendi.
+- **Ekran görüntüsü ve fare araçları:** Kaydırmalı ekran görüntüsü, ekrana sabitlenen çekimler ve uygulamaya özel fare tuşu atamaları eklendi.
+- **Modül ve izin yönetimi:** Modülleri ayrı açma/kapatma, kapalı modüllerin kaynaklarını bırakma ve izinlerin hangi özellikler tarafından kullanıldığını gösterme geliştirildi. Uygulama başına ses yönlendirmesi, kanal bazlı güncelleme kaynakları ve koşullu uyanık tutma iyileştirildi.
+- **Araçlar ve pencere geçişi:** Yan menüde veya sistem ayarlarında bulunan işlevlerin yinelenen araç kartları kaldırıldı; sekmelerdeki kart hizaları düzenlendi. Alt+Tab seçiminde panel uygulama odağını almadan açılır; hızlı seçim, gecikmeli panel gösterimi ve Alt bırakılınca seçilen pencereye geçiş iyileştirildi.
+
 ## 0.1.4 — 5 Kasım 2026
 
 - **Case Converter:** 14 metin/kod biçimi; Türkçe/İngilizce İ/ı kuralları, 300 ms beklemeli canlı önizleme, satır satır toplu dönüşüm, kısaltma/sayı ayrıştırma ve Latin harflerini sadeleştirme. Tüm biçimleri karşılaştırma, tek tek/toplu kopyalama, seçilen sonucu girdi yapma ve metin istatistikleri. İşlem yereldir; 64 KiB girdi sınırı ve iptal/eski sonuç koruması bulunur.

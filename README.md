@@ -14,7 +14,7 @@
   <img alt="Platform" src="https://img.shields.io/badge/macOS-27%2B-black?logo=apple">
   <img alt="Apple Silicon" src="https://img.shields.io/badge/Apple%20Silicon-arm64-blue">
   <img alt="Swift" src="https://img.shields.io/badge/Swift-6-orange?logo=swift">
-  <img alt="Testler" src="https://img.shields.io/badge/testler-639-brightgreen">
+  <img alt="Testler" src="https://img.shields.io/badge/testler-1116-brightgreen">
   <img alt="Diller" src="https://img.shields.io/badge/dil-T%C3%BCrk%C3%A7e%20%C2%B7%20English-lightgrey">
 </p>
 
@@ -32,6 +32,7 @@
 ## Öne çıkanlar
 
 - **SSH Yöneticisi** — kayıpsız config düzenleme, bağlantı/ProxyJump testleri, Terminal/iTerm2/Ghostty, anahtarlar, known_hosts, yedekler ve global kısayollu hızlı bağlantı. SSHConfigManager kaynakları yerel paketlerle bu projeye taşındı; [aktarım ve doğrulama notları](docs/SSH_INTEGRATION.md).
+- **AI kullanım takibi** — Claude, Codex/ChatGPT ve Grok için çoklu hesap kotaları, menü çubuğu göstergeleri, yüzen panel ve kota uyarıları; [kapsam ve doğrulama](docs/AI_USAGE.md).
 - **Pratik Araçlar** — ayrı çalışma alanında 14 biçimli Case Converter, JSON, Base64, URL, JWT, hash, UUID, parola, Unix zamanı, metin karşılaştırma ve QR/Wi-Fi QR; çevrimdışı, arama ve favorilerle.
 - **Canlı sistem izleme** — CPU, RAM, disk, ağ ve sensörler; en sıcak sensörün trendi ve menü çubuğunda istediğin göstergeler.
 - **Uygulama başına ağ trafiği** — hangi uygulamanın şu an ne kadar indirip yüklediği, yardımcı süreçler uygulamada toplanmış halde.
@@ -48,7 +49,9 @@
 ## İndirme
 
 İmzalı ve notarize edilmiş paket [GitHub Releases](https://github.com/doancan/MacPocket/releases/latest)
-sayfasındadır: `MacPocket-0.1.4-macOS-arm64.zip` dosyasını aç, uygulamayı **Uygulamalar** klasörüne taşı.
+sayfasındadır: `MacPocket-0.1.5-macOS-arm64.dmg` dosyasını aç, kurulum penceresinde **MacPocket** ikonunu
+**Applications / Uygulamalar** klasörüne sürükle. Kopyalama bitince uygulamayı Uygulamalar’dan açıp disk görüntüsünü çıkarabilirsin.
+Türkçe/İngilizce yönergeler kurulum penceresindedir. ZIP paketi de alternatif indirme ve otomatik güncellemeler için sunulur.
 Apple Silicon ve macOS 27 gerekir. 0.1.3’ten itibaren yeni sürümler uygulama içinden (Sparkle) kurulur.
 
 ## Araçlar
@@ -71,8 +74,8 @@ sunar; Ayarlar’daki canlı düzenleyicide sürükle-bırak sıralanır, görü
 
 | | |
 | --- | --- |
-| Sürüm | **0.1.3** |
-| Testler | 562 çekirdek testi; 3 gerçek disk taraması testi isteğe bağlıdır |
+| Sürüm | **0.1.5** |
+| Testler | 1.116 uygulama testi; 4 gerçek disk/sistem testi isteğe bağlıdır. SSHConfigKit: 384, AIUsageKit: 420 test (3 isteğe bağlı atlama). |
 | Yerelleştirme | Türkçe (kaynak) ve İngilizce, eksik anahtar yok |
 | Belgeler | [Native macOS davranışları](docs/NATIVE_MACOS.md) · [Derleme ve canlı doğrulama](docs/NATIVE_BUILD.md) · [Alt+Tab kart geçişi](docs/WINDOW_SWITCHER.md) · [Devam eden geliştirme](docs/CONTINUED_DEVELOPMENT.md) |
 
@@ -107,6 +110,7 @@ make test
 make probe
 make app           # Debugger erişimi olan geliştirme uygulaması
 make app-release   # Optimize uygulama, debugger entitlement olmadan
+make dmg           # Optimize uygulama ve sürükle-bırak DMG kurulum penceresi
 swift run macpocket-probe processes
 swift run macpocket-probe diagnostic swap
 ```

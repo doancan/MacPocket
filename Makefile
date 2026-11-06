@@ -1,4 +1,4 @@
-.PHONY: setup check smoke debug build test probe app app-release
+.PHONY: setup check smoke debug build test probe app app-release dmg
 
 setup:
 	./scripts/setup.sh
@@ -30,3 +30,6 @@ app:
 
 app-release:
 	./scripts/build-app.sh release
+
+dmg: app-release
+	./scripts/build-dmg.sh

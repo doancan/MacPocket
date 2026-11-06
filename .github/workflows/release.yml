@@ -88,6 +88,33 @@ jobs:
           ditto -c -k --keepParent "$app" "dist/MacPocket-$VERSION-macOS-arm64.zip"
           cd dist
           shasum -a 256 *.zip > SHA256SUMS
+      - name: Build and notarize disk image
+        env:
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          dmg="dist/MacPocket-$VERSION-macOS-arm64.dmg"
+          scripts/build-dmg.sh .build/MacPocket.app "$dmg"
+          codesign --force --sign "$SIGNING_IDENTITY" --timestamp "$dmg"
+          codesign --verify --strict --verbose=2 "$dmg"
+          xcrun notarytool submit "$dmg" \
+            --apple-id "$APPLE_ID" --team-id "$APPLE_TEAM_ID" \
+            --password "$APPLE_APP_SPECIFIC_PASSWORD" --wait --timeout 60m \
+            --output-format json > "$RUNNER_TEMP/dmg-notarization.json"
+          cat "$RUNNER_TEMP/dmg-notarization.json"
+          if [[ "$(jq -r .status "$RUNNER_TEMP/dmg-notarization.json")" != Accepted ]]; then
+            xcrun notarytool log "$(jq -r .id "$RUNNER_TEMP/dmg-notarization.json")" \
+              --apple-id "$APPLE_ID" --team-id "$APPLE_TEAM_ID" --password "$APPLE_APP_SPECIFIC_PASSWORD" || true
+            exit 1
+          fi
+          xcrun stapler staple "$dmg"
+          xcrun stapler validate "$dmg"
+          spctl --assess --type open --context context:primary-signature --verbose=2 "$dmg"
+          cd dist
+          shasum -a 256 *.zip *.dmg > SHA256SUMS
       - name: Sign update and build appcast
         env:
           SPARKLE_ED_PRIVATE_KEY: ${{ secrets.SPARKLE_ED_PRIVATE_KEY }}
@@ -99,7 +126,7 @@ jobs:
       - name: Publish GitHub release
         shell: bash
         run: |
-          gh release create "$GITHUB_REF_NAME" dist/*.zip dist/SHA256SUMS dist/appcast.xml \
+          gh release create "$GITHUB_REF_NAME" dist/*.zip dist/*.dmg dist/SHA256SUMS dist/appcast.xml \
             --verify-tag --title "MacPocket $VERSION" --generate-notes
       - name: Remove signing material
         if: always()
