@@ -90,11 +90,17 @@ struct PocketRootView: View {
         .frame(minWidth: 960, minHeight: 620)
         .onAppear {
             let windowAction = openWindow, settingsAction = openSettings
+            AIUsageIntegration.shared.openSettingsWindow = {
+                windowAction(id: "ai-usage"); NSApp.activate(ignoringOtherApps: true)
+            }
             model.openMainWindow = { showPocketWindow(windowAction) }
             model.openSettingsWindow = { settingsAction(); NSApp.activate(ignoringOtherApps: true) }
             model.mainWindowVisible = true
             if !PocketLaunch.handledFirstWindow {
                 PocketLaunch.handledFirstWindow = true
+                #if DEBUG
+                if CommandLine.arguments.contains("--open-ai-usage") { openWindow(id: "ai-usage") }
+                #endif
                 // First run (or a relaunch in the middle of granting permissions): the setup wizard comes first.
                 if OnboardingRecord.needsPresentation() {
                     openWindow(id: "onboarding")
@@ -315,6 +321,7 @@ struct PocketCommands: Commands {
                 .disabled(!UpdateService.shared.isAvailable)
         }
         CommandGroup(after: .appSettings) {
+            Button("AI Kotaları…") { openWindow(id: "ai-usage"); NSApp.activate(ignoringOtherApps: true) }
             Button("Kurulum Sihirbazı…") { openWindow(id: "onboarding"); NSApp.activate(ignoringOtherApps: true) }
         }
         CommandGroup(after: .textEditing) {

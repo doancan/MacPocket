@@ -143,7 +143,7 @@ final class MenuBarPreferencesTests: XCTestCase {
 
         let preferences = MenuBarPreferences.load(from: defaults)
         XCTAssertEqual(preferences.layout, .separate)
-        XCTAssertEqual(preferences.order, [.power, .disk, .cpu, .memory, .gpu, .network, .weather])
+        XCTAssertEqual(preferences.order, [.power, .disk, .cpu, .memory, .gpu, .network, .weather, .aiUsage])
         XCTAssertEqual(preferences.enabledModules, [.power, .memory])
 
         let memory = preferences.settings(for: .memory)
@@ -199,7 +199,7 @@ final class MenuBarPreferencesTests: XCTestCase {
         XCTAssertEqual(loaded.groupedStyle, .ring)
         XCTAssertEqual(loaded.groupedMetric, .power)
         XCTAssertFalse(loaded.groupedBadge)
-        XCTAssertEqual(loaded.order, [.network, .cpu, .gpu, .memory, .disk, .power, .weather])
+        XCTAssertEqual(loaded.order, [.network, .cpu, .gpu, .memory, .disk, .power, .weather, .aiUsage])
         XCTAssertEqual(loaded.enabledModules, [.network, .disk])
         XCTAssertFalse(loaded.binaryUnits)
         XCTAssertEqual(loaded.settings(for: .network), preferences.modules[.network])

@@ -248,7 +248,7 @@ struct MenuBarModuleDetail: View {
             HStack {
                 Text(module.title).font(.headline).accessibilityAddTraits(.isHeader)
                 Spacer(minLength: PocketSpacing.s)
-                if module != .weather { PocketDetailLevelSwitch(level: $level).controlSize(.small) }
+                if module != .weather && module != .aiUsage { PocketDetailLevelSwitch(level: $level).controlSize(.small) }
             }
             switch module {
             case .cpu: CPUDetail(model: model, history: history, advanced: advanced)
@@ -258,6 +258,7 @@ struct MenuBarModuleDetail: View {
             case .network: NetworkDetail(model: model, history: history, binary: binaryUnits, advanced: advanced)
             case .power: PowerDetail(model: model, advanced: advanced)
             case .weather: WeatherDetail()
+            case .aiUsage: AIUsageDetailView()
             }
         }
     }

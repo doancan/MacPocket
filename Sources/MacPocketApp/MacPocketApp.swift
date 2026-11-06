@@ -1,6 +1,7 @@
 import AppKit
 import Combine
 import SwiftUI
+import MacPocketAIUsage
 import MacPocketCore
 import MacPocketSSH
 
@@ -36,6 +37,13 @@ struct MacPocketApplication: App {
         .defaultPosition(.center)
         .restorationBehavior(.disabled)
 
+        Window("AI Kotaları", id: "ai-usage") {
+            AIUsageSettingsView()
+                .pocketAppearanceRoot()
+                .frame(minWidth: 620, idealWidth: 680, minHeight: 560, idealHeight: 720)
+        }
+        .defaultSize(width: 680, height: 720)
+
         Settings {
             PocketSettingsView(model: state.model, loginItem: state.loginItem)
                 .pocketAppearanceRoot(rebuildsOnTokenChange: false)
@@ -65,6 +73,9 @@ final class PocketAppDelegate: NSObject, NSApplicationDelegate {
         #if DEBUG
         // Exercise the ordinary scan from the signed app, whose identifier the root helper requires.
         let arguments = CommandLine.arguments
+        if let index = arguments.firstIndex(of: "--audit-ai-usage"), arguments.indices.contains(index + 1) {
+            Task { @MainActor in await AIUsageRuntimeAudit.run(destination: URL(fileURLWithPath: arguments[index + 1])) }
+        }
         if let index = arguments.firstIndex(of: "--audit-modules"), arguments.indices.contains(index + 1) {
             Task { @MainActor in await ModuleRuntimeAudit.run(destination: URL(fileURLWithPath: arguments[index + 1])) }
         }
@@ -189,6 +200,7 @@ final class PocketAppDelegate: NSObject, NSApplicationDelegate {
     }
 
     func applicationWillTerminate(_ notification: Notification) {
+        AIUsageIntegration.shared.stop()
         SSHRuntime.shared.stop()
         PocketModuleRuntime.shared.shutdown()
         PocketRelaunch.spawnIfPending()

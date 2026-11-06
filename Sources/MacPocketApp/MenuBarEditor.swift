@@ -1,6 +1,7 @@
 import AppKit
 import Combine
 import MacPocketCore
+import MacPocketAIUsage
 import SwiftUI
 import UniformTypeIdentifiers
 
@@ -11,6 +12,7 @@ struct MenuBarEditor: View {
     @Binding var selection: MenuBarModule?
     @ObservedObject private var store = MenuBarSettingsStore.shared
     @ObservedObject private var history = MenuBarHistory.shared
+    @ObservedObject private var aiUsage = AIUsageService.shared
     @Environment(\.colorScheme) private var systemScheme
     @State private var appearance: PreviewAppearance = .system
     @State private var dragging: MenuBarModule?
@@ -94,8 +96,8 @@ struct MenuBarEditor: View {
                     }
                 } else {
                     groupedItem(foreground)
-                    if preferences.enabled.contains(.weather) {
-                        barItem(.weather, image: moduleImage(.weather), foreground: foreground)
+                    ForEach([MenuBarModule.weather, .aiUsage].filter { preferences.enabled.contains($0) }) { module in
+                        barItem(module, image: moduleImage(module), foreground: foreground)
                     }
                 }
             }
@@ -217,8 +219,12 @@ struct MenuBarEditor: View {
     }
 
     private func moduleImage(_ module: MenuBarModule) -> NSImage {
-        let settings = preferences.settings(for: module)
-        let reading = MenuBarFormatter.reading(module, settings: settings, snapshot: model.system, binaryUnits: preferences.binaryUnits, weather: WeatherService.shared.snapshot)
+        var settings = preferences.settings(for: module)
+        if module == .aiUsage {
+            settings.warningThreshold = aiUsage.settings.warning; settings.criticalThreshold = aiUsage.settings.critical
+            if let image = AIUsageMenuBarImage.make(service: aiUsage, settings: settings, dark: dark) { return image }
+        }
+        let reading = MenuBarFormatter.reading(module, settings: settings, snapshot: model.system, binaryUnits: preferences.binaryUnits, weather: WeatherService.shared.snapshot, aiUsage: aiUsage.menuBarReading)
         return MenuBarRenderer.module(module, settings: settings, reading: reading, snapshot: model.system, history: history)
     }
 }

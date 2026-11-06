@@ -1,6 +1,7 @@
 import AppKit
 import Combine
 import MacPocketCore
+import MacPocketAIUsage
 import SwiftUI
 
 /// Owns the menu bar status items and their popover, independently of the main window.
@@ -45,10 +46,19 @@ final class PocketStatusItemController: NSObject, NSPopoverDelegate {
                 self?.refresh()
                 self?.updatePing()
                 self?.updateWeather()
+                if let self { AIUsageIntegration.shared.configure(preferences: self.store.preferences) }
             }
         }.store(in: &subscriptions)
         updatePing()
         updateWeather()
+        AIUsageService.shared.objectWillChange.receive(on: RunLoop.main).sink { [weak self] _ in
+            MainActor.assumeIsolated {
+                guard let self else { return }
+                AIUsageIntegration.shared.configure(preferences: self.store.preferences)
+                self.refresh()
+            }
+        }.store(in: &subscriptions)
+        AIUsageIntegration.shared.configure(preferences: store.preferences)
         WeatherService.shared.objectWillChange.receive(on: RunLoop.main).sink { [weak self] _ in
             MainActor.assumeIsolated { self?.refresh() }
         }.store(in: &subscriptions)
@@ -96,7 +106,9 @@ final class PocketStatusItemController: NSObject, NSPopoverDelegate {
         let enabled = preferences.enabledModules
         // With nothing enabled the grouped glyph stays, so MacPocket is always reachable.
         if preferences.layout == .separate && !enabled.isEmpty { return enabled.map(\.rawValue) }
-        return [Self.groupedKey] + (preferences.enabled.contains(.weather) ? [MenuBarModule.weather.rawValue] : [])
+        return [Self.groupedKey]
+            + (preferences.enabled.contains(.weather) ? [MenuBarModule.weather.rawValue] : [])
+            + (preferences.enabled.contains(.aiUsage) ? [MenuBarModule.aiUsage.rawValue] : [])
     }
 
     private func refresh() {
@@ -110,16 +122,26 @@ final class PocketStatusItemController: NSObject, NSPopoverDelegate {
             let renderKey: MenuBarRenderer.Key
             let spoken: String
             if let module = MenuBarModule(rawValue: key) {
-                let settings = preferences.settings(for: module)
+                var settings = preferences.settings(for: module)
+                if module == .aiUsage {
+                    settings.warningThreshold = AIUsageService.shared.settings.warning
+                    settings.criticalThreshold = AIUsageService.shared.settings.critical
+                }
                 let reading = MenuBarFormatter.reading(module, settings: settings, snapshot: snapshot,
-                                                       binaryUnits: preferences.binaryUnits, weather: WeatherService.shared.snapshot)
-                renderKey = MenuBarRenderer.moduleKey(module, settings: settings, reading: reading, snapshot: snapshot, history: history)
-                image = { MenuBarRenderer.module(module, settings: settings, reading: reading, snapshot: snapshot, history: self.history) }
+                                                       binaryUnits: preferences.binaryUnits, weather: WeatherService.shared.snapshot, aiUsage: AIUsageService.shared.menuBarReading)
+                let dark = button.effectiveAppearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua
+                var moduleKey = MenuBarRenderer.moduleKey(module, settings: settings, reading: reading, snapshot: snapshot, history: history)
+                if module == .aiUsage { moduleKey.parts.append(dark ? "ai-dark" : "ai-light") }
+                renderKey = moduleKey
+                image = {
+                    if module == .aiUsage, let image = AIUsageMenuBarImage.make(service: .shared, settings: settings, dark: dark) { return image }
+                    return MenuBarRenderer.module(module, settings: settings, reading: reading, snapshot: snapshot, history: self.history)
+                }
                 spoken = reading.accessibility
             } else {
                 let readings = preferences.enabledModules.map {
                     ($0, MenuBarFormatter.reading($0, settings: preferences.settings(for: $0), snapshot: snapshot,
-                                                  binaryUnits: preferences.binaryUnits, weather: WeatherService.shared.snapshot))
+                                                  binaryUnits: preferences.binaryUnits, weather: WeatherService.shared.snapshot, aiUsage: AIUsageService.shared.menuBarReading))
                 }
                 let reasons = MenuBarAttention.reasons(snapshot, diskFreeThreshold: diskFreeThreshold)
                 let state = MenuBarRenderer.groupedState(preferences: preferences, snapshot: snapshot, history: history,
@@ -208,6 +230,12 @@ final class PocketStatusItemController: NSObject, NSPopoverDelegate {
 
 
     #if DEBUG
+    func showAIUsageForDiagnostics() -> NSWindow? {
+        showPopover(for: MenuBarModule.aiUsage.rawValue)
+        return popover.contentViewController?.view.window
+    }
+    var aiUsageDiagnosticImage: NSImage? { items[MenuBarModule.aiUsage.rawValue]?.button?.image }
+    func closeDiagnosticPopover() { popover.performClose(nil) }
     func showWeatherForDiagnostics() -> [String: Any] {
         showPopover(for: MenuBarModule.weather.rawValue)
         let image = items[MenuBarModule.weather.rawValue]?.button?.image
@@ -289,6 +317,7 @@ final class PocketApplicationState: ObservableObject {
     init() {
         #if DEBUG
         ModuleRuntimeAudit.prepareIfRequested()
+        AIUsageRuntimeAudit.prepareIfRequested()
         #endif
         let model = PocketModel()
         self.model = model
@@ -296,7 +325,7 @@ final class PocketApplicationState: ObservableObject {
         statusItem = PocketStatusItemController(model: model)
         PocketModuleRuntime.shared.start(model: model)
         #if DEBUG
-        if !ModuleRuntimeAudit.requested { _ = UpdateService.shared }
+        if !ModuleRuntimeAudit.requested && !AIUsageFixtures.requested { _ = UpdateService.shared }
         #else
         _ = UpdateService.shared
         #endif

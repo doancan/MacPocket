@@ -1,0 +1,11 @@
+{
+  "repository": "https://github.com/gilador/gas",
+  "revision": "c686deb942fe0bc5c903fec678dc561837554151",
+  "integration": "Read-only provider transport, decoders, scheduling and tests; MacPocket owns profiles and UI. No CLI installers, automatic renewals or updater are started.",
+  "ui_assets": "Claude and OpenAI template PNGs copied from App/Assets.xcassets to Resources/AIProvider*.png; MIT license shipped in app Licenses/AIUsageKit.txt.",
+  "local_changes": [
+    "Package directory and bundled license renamed to AIUsageKit.",
+    "Removed unused standalone updater implementation, tests and release fixture; MacPocket uses its own Sparkle integration.",
+    "Scoped runtime logging to MacPocket and neutralized diagnostic/test labels."
+  ]
+}

@@ -14,6 +14,7 @@ extension MenuBarModule {
         case .network: Color(hex: 0x00A6C8)
         case .power: PocketTheme.power
         case .weather: .orange
+        case .aiUsage: .mint
         }
     }
 
@@ -101,10 +102,14 @@ struct StatusBarPreferencesView: View {
                         Text("Menü çubuğunda").foregroundStyle(.secondary)
                         Toggle("Menü çubuğunda", isOn: store.enabled(module)).toggleStyle(.switch).controlSize(.small).labelsHidden()
                     }
-                    ModuleSettingsEditor(module: module, settings: store.settings(module), volumes: model.system?.volumes ?? [],
-                                         sensors: (model.system?.temperatures ?? [])
-                                             .filter { TemperatureGroup.classify($0.name) != nil }.sorted { $0.name < $1.name },
-                                         layout: store.preferences.layout)
+                    if module == .aiUsage {
+                        AIUsageSettingsView(embedded: true)
+                    } else {
+                        ModuleSettingsEditor(module: module, settings: store.settings(module), volumes: model.system?.volumes ?? [],
+                                             sensors: (model.system?.temperatures ?? [])
+                                                 .filter { TemperatureGroup.classify($0.name) != nil }.sorted { $0.name < $1.name },
+                                             layout: store.preferences.layout)
+                    }
                 } header: { Text("Seçili modül") } footer: {
                     Text("Pil bilgileri yalnız pili olan Mac’lerde, fan hızı yalnız fanlı Mac’lerde gösterilir. Sığmayan öğeleri macOS ekran alanına göre gizleyebilir.")
                         .font(.subheadline).foregroundStyle(.secondary)
@@ -118,7 +123,7 @@ struct StatusBarPreferencesView: View {
                         .frame(maxWidth: 220)
                 }
                 Text(store.preferences.layout == .grouped
-                     ? "Sistem modülleri tek simgede toplanır; hava durumu etkinse ayrı gösterilir. Tıklayınca modülün ayrıntıları açılır."
+                     ? "Sistem modülleri tek simgede toplanır; hava durumu ve AI kotaları etkinse ayrı gösterilir. Tıklayınca modülün ayrıntıları açılır."
                      : "Her etkin modül kendi menü çubuğu öğesini ve kendi ayarlarını kullanır. Gerçek menü çubuğunda öğeler ⌘ basılıyken de sürüklenebilir.")
                     .font(.subheadline).foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
@@ -148,7 +153,7 @@ struct StatusBarPreferencesView: View {
         }
         if store.preferences.groupedStyle.isLive {
             Picker("Göstergenin izlediği", selection: $store.preferences.groupedMetric) {
-                ForEach(MenuBarModule.allCases.filter { $0 != .weather }) { module in
+                ForEach(MenuBarModule.allCases.filter { $0 != .weather && $0 != .aiUsage }) { module in
                     Label(module.title, systemImage: module.symbol).tag(module)
                 }
             }

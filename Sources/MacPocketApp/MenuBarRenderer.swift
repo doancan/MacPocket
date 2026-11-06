@@ -66,7 +66,7 @@ final class MenuBarHistory: ObservableObject {
             return values.map { min(1, $0 / ceiling) }
         }
         switch module {
-        case .weather: return []
+        case .weather, .aiUsage: return []
         case .cpu:
             return recent.map { sample in
                 switch settings.value {

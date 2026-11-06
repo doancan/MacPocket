@@ -34,8 +34,11 @@ ditto "$macpocket_binary_dir/Sparkle.framework" "$macpocket_app_dir/Contents/Fra
 install_name_tool -add_rpath "@executable_path/../Frameworks" "$macpocket_app_dir/Contents/MacOS/MacPocket"
 install -m 644 Resources/AppIcon.icns "$macpocket_app_dir/Contents/Resources/AppIcon.icns"
 install -m 644 Resources/SSHManagerIcon.icns "$macpocket_app_dir/Contents/Resources/SSHManagerIcon.icns"
+install -m 644 Resources/AIProviderClaude.png "$macpocket_app_dir/Contents/Resources/AIProviderClaude.png"
+install -m 644 Resources/AIProviderOpenAI.png "$macpocket_app_dir/Contents/Resources/AIProviderOpenAI.png"
 mkdir -p "$macpocket_app_dir/Contents/Resources/Licenses"
 install -m 644 Packages/KeyboardShortcuts/license "$macpocket_app_dir/Contents/Resources/Licenses/KeyboardShortcuts.txt"
+install -m 644 Packages/AIUsageKit/LICENSE "$macpocket_app_dir/Contents/Resources/Licenses/AIUsageKit.txt"
 # SwiftPM libraries can load their own resource bundles (for example the shortcut recorder's translations).
 for macpocket_resource_bundle in "$macpocket_binary_dir"/*.bundle; do
     [ -d "$macpocket_resource_bundle" ] || continue
