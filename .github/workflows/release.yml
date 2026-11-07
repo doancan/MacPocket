@@ -53,12 +53,23 @@ jobs:
           echo "SIGNING_IDENTITY=$identity" >> "$GITHUB_ENV"
           rm "$RUNNER_TEMP/certificate.p12"
       - name: Build signed Apple Silicon app
+        env:
+          FILTER_HOST_PROFILE: ${{ secrets.MACPOCKET_FILTER_HOST_PROFILE }}
+          FILTER_PROVIDER_PROFILE: ${{ secrets.MACPOCKET_FILTER_PROVIDER_PROFILE }}
         shell: bash
         run: |
           set -euo pipefail
+          [[ -n "$FILTER_HOST_PROFILE" && -n "$FILTER_PROVIDER_PROFILE" ]] || { echo "Network filter provisioning profiles are missing" >&2; exit 1; }
+          printf '%s' "$FILTER_HOST_PROFILE" | base64 --decode > "$RUNNER_TEMP/filter-host.provisionprofile"
+          printf '%s' "$FILTER_PROVIDER_PROFILE" | base64 --decode > "$RUNNER_TEMP/filter-provider.provisionprofile"
+          export MACPOCKET_FILTER_HOST_PROFILE="$RUNNER_TEMP/filter-host.provisionprofile"
+          export MACPOCKET_FILTER_PROVIDER_PROFILE="$RUNNER_TEMP/filter-provider.provisionprofile"
           MACPOCKET_SIGN_IDENTITY="$SIGNING_IDENTITY" scripts/build-app.sh release
           app=.build/MacPocket.app
           [[ "$(lipo -archs "$app/Contents/MacOS/MacPocket")" == arm64 ]]
+          filter="$app/Contents/Library/SystemExtensions/com.doancan.MacPocket.NetworkFilter.systemextension"
+          [[ -f "$filter/Contents/MacOS/MacPocketNetworkFilter" ]]
+          codesign --verify --strict --verbose=2 "$filter"
           codesign --verify --strict --deep --verbose=2 "$app"
           codesign -dvv "$app" 2>&1 | grep -q 'flags=0x10000(runtime)'
       - name: Notarize and staple
@@ -126,11 +137,22 @@ jobs:
       - name: Publish GitHub release
         shell: bash
         run: |
+          set -euo pipefail
+          python3 - "$VERSION" "$GITHUB_REPOSITORY" "$GITHUB_REF_NAME" "$RUNNER_TEMP/release-notes.md" <<'PY'
+          import pathlib,re,sys
+          version,repository,tag,destination=sys.argv[1:]
+          text=pathlib.Path('CHANGELOG.md').read_text()
+          match=re.search(r'^## '+re.escape(version)+r' —[^\n]*\n(.*?)(?=^## |\Z)',text,re.M|re.S)
+          if not match or not match.group(1).strip(): raise SystemExit('Release notes are missing')
+          body=match.group(1).strip()
+          body=re.sub(r'\]\((docs/[^)]+)\)',lambda m: ']('+f'https://github.com/{repository}/blob/{tag}/'+m.group(1)+')',body)
+          pathlib.Path(destination).write_text(body+'\n')
+          PY
           gh release create "$GITHUB_REF_NAME" dist/*.zip dist/*.dmg dist/SHA256SUMS dist/appcast.xml \
-            --verify-tag --title "MacPocket $VERSION" --generate-notes
+            --verify-tag --title "MacPocket $VERSION" --notes-file "$RUNNER_TEMP/release-notes.md"
       - name: Remove signing material
         if: always()
         shell: bash
         run: |
           security delete-keychain "$RUNNER_TEMP/release.keychain-db" || true
-          rm -f "$RUNNER_TEMP/certificate.p12"
+          rm -f "$RUNNER_TEMP/certificate.p12" "$RUNNER_TEMP/filter-host.provisionprofile" "$RUNNER_TEMP/filter-provider.provisionprofile"

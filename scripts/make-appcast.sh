@@ -42,6 +42,13 @@ def section(text, version):
 
 def inline(text):
     text = html.escape(text, quote=False)
+    def link(match):
+        label, target = match.groups()
+        if target.startswith('docs/'):
+            target = f'{repository}/blob/v{version}/{target}'
+        if not target.startswith('https://'): return label
+        return f'<a href="{html.escape(target, quote=True)}">{label}</a>'
+    text = re.sub(r'\[([^\]]+)\]\(([^)]+)\)', link, text)
     return re.sub(r"\*\*(.+?)\*\*", r"<strong>\1</strong>", text)
 
 body, in_list = [], False

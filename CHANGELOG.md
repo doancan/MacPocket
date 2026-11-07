@@ -2,11 +2,19 @@
 
 ## Yayımlanmamış
 
+## 0.1.6 — 7 Kasım 2026
+
+- **Alt+Tab pencere geçişi:** animasyonlu önizleme kartları, Alt basılıyken Tab/Shift+Tab ile seçim ve Alt bırakıldığında pencereyi öne getirme. Dokuz kısayol için bağımsız filtre/görünüm/bırakma ayarları ve özelleştirilebilir pencere eylemleri geliştirildi. Fiziksel klavye/trackpad ve tüm Space/tam ekran kombinasyonları için kabul kapsamı ayrıca izleniyor; tam AltTab eşdeğerliği iddia edilmiyor.
+
 - **Kablo Etki Haritası:** seçilen USB/Thunderbolt aygıtının bağlı disklerini, açık dosyalarını, yerel adresle eşleşen TCP/SSH oturumlarını ve ekran/ses etkilerini birlikte gösterir. Donanım kanıtı ile kullanıcı eşleştirmeleri ayrıdır; araç salt okunurdur. [Kapsam ve kabul sınırları](docs/CABLE_IMPACT.md).
 
 - **Menü çubuğu düzenleyici:** uygulamaları gizli grupta toplama, ok düğmesiyle gizleme/gösterme, aranabilir liste ve simgeyi açma. macOS 27 özel görünürlük arayüzü çalışma anında denetlenir; sistem panelleriyle uyum sınırı araçta açıklanır.
 - **Bağımsız güncelleme merkezi:** Homebrew dışındaki uygulamalar için Sparkle, isteğe bağlı App Store ve uygulamaya bağlanan herkese açık GitHub sürüm kaynakları. Denetim elle başlatılır; kurulum üreticinin akışında devam eder.
-- **İnternet kontrolü:** imzalı uygulama kimliğiyle izin/engel kuralları, bağlantı listesi, gerçek Network Extension hedefi ve profil denetimli paketleme. Sistem filtresi etkinleştirilmedi; notarization/kurulum/onay sonrası gerçek engelleme kabulü bekliyor. [Kapsam ve doğrulama](docs/PRODUCT_EXPANSION.md).
+- **İnternet kontrolü — deneysel:** imzalı uygulama kimliğiyle izin/engel kuralları, bağlantı listesi ve Network Extension uzantısı. Filtre başlangıçta kapalıdır; kullanım macOS uzantı/ağ filtresi onayı gerektirir. Kurallar yeni bağlantılar içindir; gerçek engelleme kabulü henüz tamamlanmadı. [Kapsam ve doğrulama](docs/PRODUCT_EXPANSION.md).
+
+- **Doğrulama:** 1.467 testte 0 hata, donanıma bağlı 5 isteğe bağlı atlama. Türkçe/İngilizce kontrolünde eksik çeviri yok. Kablo Etki Haritası için 32 canlı kontrol geçti; fiziksel kablo çıkarma testi yapılmadı.
+
+- **Dağıtım notu:** depo özel olduğu için indirme GitHub erişimi gerektirir. Anonim Sparkle güncelleme adresi erişilebilir olmadığından bu sürüm Release sayfasından indirilerek kurulmalıdır.
 
 ## 0.1.5 — 6 Kasım 2026
 
