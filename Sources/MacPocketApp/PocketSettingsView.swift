@@ -6,21 +6,22 @@ import UniformTypeIdentifiers
 struct PocketSettingsView: View {
     @ObservedObject var model: PocketModel
     @ObservedObject var loginItem: LoginItemController
+    @ObservedObject private var navigation = PocketSettingsNavigation.shared
 
     var body: some View {
-        TabView {
+        TabView(selection: $navigation.section) {
             PocketGeneralSettings(model: model, loginItem: loginItem)
-                .tabItem { Label("Genel", systemImage: "gearshape") }
+                .tabItem { Label("Genel", systemImage: "gearshape") }.tag(PocketSettingsNavigation.Section.general)
             PocketAppearanceSettings()
-                .tabItem { Label("Görünüm", systemImage: "paintbrush") }
+                .tabItem { Label("Görünüm", systemImage: "paintbrush") }.tag(PocketSettingsNavigation.Section.appearance)
             StatusBarPreferencesView(model: model)
-                .tabItem { Label("Menü Çubuğu", systemImage: "menubar.rectangle") }
+                .tabItem { Label("Menü Çubuğu", systemImage: "menubar.rectangle") }.tag(PocketSettingsNavigation.Section.menuBar)
             PocketMonitoringSettings(model: model)
-                .tabItem { Label("İzleme", systemImage: "waveform.path.ecg") }
+                .tabItem { Label("İzleme", systemImage: "waveform.path.ecg") }.tag(PocketSettingsNavigation.Section.monitoring)
             PocketModuleSettings()
-                .tabItem { Label("Modüller", systemImage: "square.grid.3x3") }
+                .tabItem { Label("Modüller", systemImage: "square.grid.3x3") }.tag(PocketSettingsNavigation.Section.modules)
             PocketAdvancedSettings(model: model)
-                .tabItem { Label("Gelişmiş", systemImage: "gearshape.2") }
+                .tabItem { Label("Gelişmiş", systemImage: "gearshape.2") }.tag(PocketSettingsNavigation.Section.advanced)
         }
         .frame(width: 760, height: 620)
         .onAppear { loginItem.refresh() }
@@ -28,6 +29,13 @@ struct PocketSettingsView: View {
             loginItem.refresh()
         }
     }
+}
+
+/// Shared navigation is transient UI state; it is never included in an exported preference file.
+@MainActor final class PocketSettingsNavigation: ObservableObject {
+    enum Section: Int { case general,appearance,menuBar,monitoring,modules,advanced }
+    static let shared = PocketSettingsNavigation()
+    @Published var section = Section.general
 }
 
 // MARK: - General
@@ -329,6 +337,8 @@ private struct PocketAdvancedSettings: View {
     @State private var confirmReset = false
     @State private var confirmClearHistory = false
     @State private var needsRelaunch = false
+    @State private var filePanel: NSSavePanel?
+    @State private var filePanelAnchor = SettingsFilePanelAnchor()
 
     var body: some View {
         Form {
@@ -338,6 +348,7 @@ private struct PocketAdvancedSettings: View {
                         Button("Dışa Aktar…", action: exportSettings)
                         Button("İçe Aktar…", action: importSettings)
                     }
+                    .disabled(filePanel != nil)
                 }
                 Text("Görünüm, menü çubuğu, izleme ve pencere geçişi ayarları JSON dosyasına yazılır. İçe aktarma mevcut ayarların yerini alır.")
                     .font(.callout).foregroundStyle(.secondary)
@@ -346,6 +357,8 @@ private struct PocketAdvancedSettings: View {
                 }
                 if let message {
                     PocketMessage(message.text, tone: message.tone)
+                        .accessibilityElement(children: .combine)
+                        .accessibilityLabel(Text(verbatim: message.text))
                 }
                 if needsRelaunch {
                     HStack {
@@ -368,6 +381,11 @@ private struct PocketAdvancedSettings: View {
             } header: { Text("Veriler") }
         }
         .formStyle(.grouped)
+        .background(SettingsFilePanelWindowReader(anchor: filePanelAnchor).frame(width: 0,height: 0).accessibilityHidden(true))
+        .onDisappear {
+            let panel = filePanel;filePanel = nil
+            panel?.cancel(nil);panel?.orderOut(nil)
+        }
         .confirmationDialog("Tüm ayarlar sıfırlansın mı?", isPresented: $confirmReset) {
             Button("Ayarları Sıfırla", role: .destructive, action: resetSettings)
         } message: {
@@ -387,33 +405,63 @@ private struct PocketAdvancedSettings: View {
     }
 
     private func exportSettings() {
+        guard filePanel == nil else { return }
         let panel = NSSavePanel()
         panel.allowedContentTypes = [.json]
         panel.nameFieldStringValue = String(localized: "MacPocket Ayarları") + ".json"
         panel.prompt = String(localized: "Dışa Aktar")
-        guard panel.runModal() == .OK, let url = panel.url else { return }
-        do {
-            let data = try SettingsTransfer.exportData(from: SettingsTransfer.currentValues(.standard, domain: PocketDefaults.domain))
-            try data.write(to: url, options: .atomic)
-            message = PocketSettingsMessage(key: "Ayarlar dışa aktarıldı.", tone: .success)
-        } catch {
-            message = PocketSettingsMessage(verbatim: error.localizedDescription, tone: .critical)
+        #if DEBUG
+        SwitcherTransferRuntimeAudit.prepareFilePanelForAudit(panel)
+        #endif
+        presentFilePanel(panel) {
+            guard let url = panel.url else { return }
+            do {
+                let data = try SettingsTransfer.exportData(from: SettingsTransfer.currentValues(.standard, domain: PocketDefaults.domain))
+                try data.write(to: url, options: .atomic)
+                message = PocketSettingsMessage(key: "Ayarlar dışa aktarıldı.", tone: .success)
+            } catch {
+                message = PocketSettingsMessage(verbatim: error.localizedDescription, tone: .critical)
+            }
         }
     }
 
     private func importSettings() {
+        guard filePanel == nil else { return }
         let panel = NSOpenPanel()
         panel.allowedContentTypes = [.json]
         panel.allowsMultipleSelection = false
+        panel.canChooseFiles = true;panel.canChooseDirectories = false
         panel.prompt = String(localized: "İçe Aktar")
-        guard panel.runModal() == .OK, let url = panel.url else { return }
-        do {
-            let values = try SettingsTransfer.importValues(from: Data(contentsOf: url))
-            SettingsTransfer.apply(values, to: .standard, domain: PocketDefaults.domain)
-            settingsDidChange()
-            message = PocketSettingsMessage(key: "Ayarlar içe aktarıldı.", tone: .success)
-        } catch {
-            message = PocketSettingsMessage(verbatim: error.localizedDescription, tone: .critical)
+        #if DEBUG
+        SwitcherTransferRuntimeAudit.prepareFilePanelForAudit(panel)
+        #endif
+        presentFilePanel(panel) {
+            guard let url = panel.url else { return }
+            do {
+                let data = try SettingsTransfer.readImportData(from: url)
+                try SettingsTransfer.importAndApply(data,to: .standard,domain: PocketDefaults.domain)
+                settingsDidChange()
+                message = PocketSettingsMessage(key: "Ayarlar içe aktarıldı.", tone: .success)
+            } catch {
+                message = PocketSettingsMessage(verbatim: error.localizedDescription, tone: .critical)
+            }
+        }
+    }
+
+    private func presentFilePanel(_ panel: NSSavePanel,accepted: @escaping @MainActor () -> Void) {
+        guard filePanel == nil,let window = filePanelAnchor.view?.window else {
+            message = PocketSettingsMessage(key: "Dosya seçicisi açılamadı. Ayarlar penceresinde yeniden dene.",tone: .critical)
+            return
+        }
+        filePanel = panel
+        panel.beginSheetModal(for: window) { response in
+            panel.orderOut(nil)
+            guard filePanel === panel else { return }
+            filePanel = nil
+            if response == .OK { accepted() }
+            else if response != .cancel {
+                message = PocketSettingsMessage(key: "Dosya seçicisi açılamadı. Ayarlar penceresinde yeniden dene.",tone: .critical)
+            }
         }
     }
 
@@ -440,6 +488,13 @@ private struct PocketAdvancedSettings: View {
             NSWorkspace.shared.open(folder.deletingLastPathComponent())
         }
     }
+}
+
+@MainActor private final class SettingsFilePanelAnchor { weak var view: NSView? }
+private struct SettingsFilePanelWindowReader: NSViewRepresentable {
+    let anchor: SettingsFilePanelAnchor
+    func makeNSView(context: Context) -> NSView { let view = NSView();anchor.view = view;return view }
+    func updateNSView(_ nsView: NSView,context: Context) { anchor.view = nsView }
 }
 
 private struct PocketSettingsMessage {

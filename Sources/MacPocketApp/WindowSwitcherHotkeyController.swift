@@ -17,15 +17,29 @@ final class WindowSwitcherHotkeyController: NSObject, ObservableObject {
     @Published private(set) var shortcuts: [SwitcherShortcut] = []
     @Published private(set) var layout = SwitcherLayout.compute(count: 1, style: .thumbnails, available: CGSize(width: 1440, height: 900), autoSize: true)
     @Published private(set) var activeShortcut: SwitcherShortcut?
+    @Published private(set) var activePresentation: SwitcherPresentation?
+    @Published private(set) var activeNavigation: SwitcherNavigationOptions?
+    private(set) var activeCursorPolicy: SwitcherCursorPolicy?
+    @Published private(set) var actionBindings = SwitcherActionBinding.defaults
+    @Published private(set) var shortcutEditingError: String?
+    @Published private(set) var actionEditingError: String?
     @Published private(set) var suspendedForApplication: String?
 
-    let model = WindowSwitcherModel()
+    let model: WindowSwitcherModel
+    private let foregroundApplication: @MainActor () -> NSRunningApplication?
+    private let currentModifierFlags: @MainActor () -> NSEvent.ModifierFlags
     private var keyRefs: [EventHotKeyRef] = []
     /// Carbon hotkey id → (shortcut index, reverse).
     private var hotkeyMap: [UInt32: (index: Int, backwards: Bool)] = [:]
     private var handler: EventHandlerRef?
     private var registeredSignature = ""
-    private var recordingShortcut = false
+    private var nativeKeyLease: (any SwitcherNativeKeyOwning)?
+    private let registration: SwitcherHotkeyRegistration
+    private let shortcutSettings: UserDefaults
+    private var nativeKeyTimer: Timer?
+    private var nativeFailureSignature: String?
+    private var nativeFailureMessage: String?
+    @Published private(set) var recordingShortcut = false
     private var subscriptions = Set<AnyCancellable>()
     private var monitor: Any?
 
@@ -34,8 +48,10 @@ final class WindowSwitcherHotkeyController: NSObject, ObservableObject {
     private var previewPanel: SwitcherPreviewPanel?
     private var sessionID: UUID?
     private var preparing = false
+    private enum PreparationOrigin { case opening, retaining(String?) }
+    private var preparationOrigin = PreparationOrigin.opening
     private var commitWhenReady = false
-    private var pendingSteps = 0
+    private var pendingNavigation: [WindowNavigationIntent] = []
     private var sessionBackwards = false
     /// Foreground PID captured before the panel takes focus; nil when opened from settings.
     private var sessionForegroundPID: Int32?
@@ -44,22 +60,82 @@ final class WindowSwitcherHotkeyController: NSObject, ObservableObject {
     private var openedAtMouse = NSPoint.zero
     private var openingTask: Task<Void, Never>?
     private var thumbnailTask: Task<Void, Never>?
+    private var badgeTask: Task<Void,Never>?
     private var previewTask: Task<Void, Never>?
-    private var lastInvocationTime: TimeInterval = -.infinity
-    private var lastInvocationSource = ""
-    private var lastInvocationBackwards = false
+    private var invocations = SwitcherInvocationDeduplicator()
     private var lastPrewarm = Date.distantPast
-    private var gestureFingers = -1
+    private var environmentGeneration = UUID()
+    private var preparedEnvironment: UUID?
+    private var prewarmTask: Task<Void, Never>?
+    private var prewarmID: UUID?
+    private struct ConditionalExceptionContext: Equatable {
+        let application: SwitcherForegroundApplication
+        let rules: [SwitcherExceptionRule]
+    }
+    private var conditionalExceptionContext: ConditionalExceptionContext?
+    private var conditionalExceptionTask: Task<Void, Never>?
+    private var conditionalFullscreen: Bool?
+    private let exceptionApplication: @MainActor () -> SwitcherForegroundApplication?
+    private let fullscreenReader: @Sendable (SwitcherForegroundApplication) async -> Bool?
+    private let gestureMonitor: any SwitcherGestureMonitoring
+    private let gestureSettings: UserDefaults
+    private let gestureFeedback: @MainActor () -> Void
+    private var configuredGestureOptions: SwitcherGestureOptions?
+    private var gestureOwner: (id: UUID,session: UUID,haptics: Bool)?
+    private var blockedGestureID: UUID?
+    private var gestureFeedbackSelection: String?
     private var showTask: Task<Void, Never>?
+    private var dismissalTask: Task<Void, Never>?
+    private var closingSnapshot: NSPanel?
+    private var focusTask: Task<Void, Never>?
+    private var focusID: UUID?
     private var thumbnailsWanted = false
     private var modifierTimer: Timer?
     private var outsideClickMonitor: Any?
+#if DEBUG
+    private var syntheticAuditInput = false
+    var onCarbonInvocationForAudit: ((UInt32,UUID?) -> Void)?
+    var onModifierReleaseCommitForAudit: ((UUID) -> Void)?
+    private var auditNativeKeysLost = false
+    private var auditReduceTransparency: Bool?
+#endif
+    private var transparencyOverride: Bool? {
+#if DEBUG
+        return auditReduceTransparency
+#else
+        return nil
+#endif
+    }
+    private var watchesExternalClicks: Bool {
+#if DEBUG
+        if syntheticAuditInput { return false }
+#endif
+        return true
+    }
     /// A quick tap switches without ever drawing the panel, like the system switcher.
-    private static let showDelay: Duration = .milliseconds(110)
 
     private static let signature: OSType = 0x4D505357 // 'MPSW'
 
-    private override init() {
+    init(model: WindowSwitcherModel = WindowSwitcherModel(),
+         foregroundApplication: @escaping @MainActor () -> NSRunningApplication? = { NSWorkspace.shared.frontmostApplication },
+         modifierFlags: @escaping @MainActor () -> NSEvent.ModifierFlags = { NSEvent.modifierFlags },
+         exceptionApplication: (@MainActor () -> SwitcherForegroundApplication?)? = nil,
+         gestureMonitor: any SwitcherGestureMonitoring = TrackpadSwipeMonitor.shared,
+         gestureSettings: UserDefaults = .standard,
+         gestureFeedback: @escaping @MainActor () -> Void = { NSHapticFeedbackManager.defaultPerformer.perform(.alignment,performanceTime: .now) },
+         registration: SwitcherHotkeyRegistration = .system,
+         shortcutSettings: UserDefaults = .standard,
+         fullscreenReader: @escaping @Sendable (SwitcherForegroundApplication) async -> Bool? = { await SwitcherForegroundWindowReader.shared.isFullscreen($0) }) {
+        self.model = model
+        self.registration = registration;self.shortcutSettings = shortcutSettings
+        self.gestureMonitor = gestureMonitor;self.gestureSettings = gestureSettings;self.gestureFeedback = gestureFeedback
+        self.foregroundApplication = foregroundApplication
+        self.currentModifierFlags = modifierFlags
+        self.fullscreenReader = fullscreenReader
+        self.exceptionApplication = exceptionApplication ?? {
+            guard let app = foregroundApplication(), !app.isTerminated else { return nil }
+            return SwitcherForegroundApplication(app)
+        }
         super.init()
     }
 
@@ -69,12 +145,13 @@ final class WindowSwitcherHotkeyController: NSObject, ObservableObject {
         guard !moduleRunning, PocketModule.windowSwitcher.isAvailable() else { return }
         moduleRunning = true
         model.startObserving()
-        let defaults = UserDefaults.standard
+        let defaults = shortcutSettings
         if !defaults.bool(forKey: "switcher.cardOverlayConfigured") {
             defaults.set(true, forKey: "switcher.globalEnabled")
             defaults.set(true, forKey: "switcher.cardOverlayConfigured")
         }
         shortcuts = SwitcherShortcutStore.load(defaults)
+        if defaults.data(forKey: SwitcherShortcutStore.key) == nil { SwitcherShortcutStore.save(shortcuts, defaults) }
 
         NotificationCenter.default.publisher(for: NSApplication.didResignActiveNotification)
             .sink { [weak self] _ in Task { @MainActor [weak self] in self?.dismiss() } }
@@ -85,14 +162,27 @@ final class WindowSwitcherHotkeyController: NSObject, ObservableObject {
                 Task { @MainActor [weak self] in self?.applicationActivated(bundleID) }
             }
             .store(in: &subscriptions)
+        observeEnvironmentChanges()
         NotificationCenter.default.publisher(for: UserDefaults.didChangeNotification)
             .receive(on: RunLoop.main)
             .sink { [weak self] _ in MainActor.assumeIsolated { self?.configure() } }
             .store(in: &subscriptions)
+        observeModelChanges()
+
+        installCarbonHandler()
+        installLocalMonitor()
+        configure()
+        schedulePrewarm()
+    }
+
+    private func observeModelChanges() {
         // Card count changes (search, refresh) resize the panel around its center.
         model.$windows.combineLatest(model.$sessionSearch)
             .receive(on: RunLoop.main)
             .sink { [weak self] _, _ in MainActor.assumeIsolated { self?.listChanged() } }
+            .store(in: &subscriptions)
+        model.$exceptionRules.dropFirst().receive(on: RunLoop.main)
+            .sink { [weak self] _ in MainActor.assumeIsolated { self?.listChanged() } }
             .store(in: &subscriptions)
         model.$selection
             .removeDuplicates()
@@ -100,17 +190,102 @@ final class WindowSwitcherHotkeyController: NSObject, ObservableObject {
             .sink { [weak self] _ in MainActor.assumeIsolated { self?.selectionChanged() } }
             .store(in: &subscriptions)
 
-        installCarbonHandler()
-        installLocalMonitor()
+    }
+
+    private func observeEnvironmentChanges() {
+        NotificationCenter.default.publisher(for: WindowLifecycleObservation.didChangeNotification)
+            .receive(on: RunLoop.main)
+            .sink { [weak self] _ in MainActor.assumeIsolated { self?.environmentChanged(screensChanged: false) } }
+            .store(in: &subscriptions)
+        NSWorkspace.shared.notificationCenter.publisher(for: NSWorkspace.activeSpaceDidChangeNotification)
+            .receive(on: RunLoop.main)
+            .sink { [weak self] _ in MainActor.assumeIsolated { self?.environmentChanged(screensChanged: false) } }
+            .store(in: &subscriptions)
+        NotificationCenter.default.publisher(for: NSApplication.didChangeScreenParametersNotification)
+            .receive(on: RunLoop.main)
+            .sink { [weak self] _ in MainActor.assumeIsolated { self?.environmentChanged(screensChanged: true) } }
+            .store(in: &subscriptions)
+    }
+
+    /// Refresh only an open session; a closed switcher does no new AX scan for these events.
+    /// Preparation begins immediately, so releasing Option during the debounce cannot choose
+    /// from the old Space. A burst of environment notifications owes one fresh scan.
+    func environmentChanged(screensChanged: Bool) {
+        guard moduleRunning else { return }
         configure()
-        Task { [weak self] in await self?.model.refresh() }
+        environmentGeneration = UUID()
+        lastPrewarm = .distantPast
+        cancelPrewarm()
+        model.invalidateSnapshot()
+        guard let id = sessionID else { return }
+        if !preparing { preparationOrigin = .retaining(model.selection); pendingNavigation = [] }
+        preparing = true
+        openingTask?.cancel()
+        if screensChanged {
+            let currentID = model.sessionDisplayID
+            sessionScreen = NSScreen.screens.first { Self.displayID($0) == currentID } ?? screenForSession()
+            model.sessionDisplayID = sessionScreen.flatMap(Self.displayID)
+            openedAtMouse = NSEvent.mouseLocation
+            relayout(force: true)
+        }
+        // Do not leave a full-size image at coordinates belonging to a removed display/old Space.
+        previewTask?.cancel(); previewTask = nil; previewPanel?.orderOut(nil)
+        openingTask = Task { [weak self] in
+            try? await Task.sleep(for: .milliseconds(180))
+            guard !Task.isCancelled, let self, sessionID == id else { return }
+            await model.refresh()
+            guard !Task.isCancelled, sessionID == id else { return }
+            completePreparation(sessionID: id)
+        }
+    }
+
+    private static func displayID(_ screen: NSScreen) -> UInt32? {
+        (screen.deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] as? NSNumber)?.uint32Value
+    }
+
+    private func preparationSelection() -> String? {
+        let base: String?
+        switch preparationOrigin {
+        case .opening:
+            base = WindowSwitchSelection.initial(model.filtered, foregroundPID: sessionForegroundPID, backwards: sessionBackwards)
+        case .retaining(let id): base = WindowSwitchSelection.refreshed(model.filtered, preserving: id)
+        }
+        return WindowSwitchSelection.applying(pendingNavigation,to: model.filtered,preserving: base,columns: layout.columns)
+    }
+
+    private func completePreparation(sessionID id: UUID) {
+        relayout()
+        model.selection = preparationSelection()
+        preparing = false
+        provideGestureFeedback()
+        preparedEnvironment = environmentGeneration
+        if commitWhenReady { activateSelection(); return }
+        handleModifierState(currentModifierFlags())
+        guard sessionID == id else { return }
+        if panel?.isVisible == true { startThumbnails() } else { thumbnailsWanted = true }
+        updatePreview()
     }
 
     func stopForModule() {
+        cancelFocus()
+        cancelDismissal()
         moduleRunning = false
-        dismiss()
+        cancelConditionalExceptions()
+        suspendedForApplication = nil
+        cancelPrewarm()
+        environmentGeneration = UUID(); preparedEnvironment = nil
+        recordingShortcut = false
+        dismiss(animated: false)
+#if DEBUG
+        syntheticAuditInput = false
+        auditNativeKeysLost = false
+        auditReduceTransparency = nil
+#endif
         subscriptions = []
-        for ref in keyRefs { UnregisterEventHotKey(ref) }
+        nativeKeyTimer?.invalidate();nativeKeyTimer = nil
+        if nativeKeyLease?.stop() == true { nativeKeyLease = nil }
+        nativeFailureSignature = nil;nativeFailureMessage = nil
+        for ref in keyRefs { registration.unregister(ref) }
         keyRefs = []
         hotkeyMap = [:]
         registeredSignature = ""
@@ -118,52 +293,70 @@ final class WindowSwitcherHotkeyController: NSObject, ObservableObject {
         handler = nil
         if let monitor { NSEvent.removeMonitor(monitor) }
         monitor = nil
-        if gestureFingers > 0 { TrackpadSwipeMonitor.shared.stop() }
-        gestureFingers = -1
+        if configuredGestureOptions != nil { gestureMonitor.stop() }
+        configuredGestureOptions = nil;blockedGestureID = nil;gestureFeedbackSelection = nil
         model.stopObserving()
     }
 
     // MARK: Settings
 
-    var style: SwitcherStyle { SwitcherStyle(rawValue: UserDefaults.standard.string(forKey: "switcher.style") ?? "") ?? .thumbnails }
-    private var autoSize: Bool { UserDefaults.standard.object(forKey: "switcher.autoSize") as? Bool ?? true }
-    private var sizeScale: Double { UserDefaults.standard.object(forKey: "switcher.size") as? Double ?? 1 }
-    private var previewSelectedEnabled: Bool { UserDefaults.standard.object(forKey: "switcher.previewSelected") as? Bool ?? false }
-    private var liveThumbnails: Bool { UserDefaults.standard.object(forKey: "switcher.liveThumbnails") as? Bool ?? false }
-    var hoverSelects: Bool { UserDefaults.standard.object(forKey: "switcher.hoverSelects") as? Bool ?? true }
-    private var disabledBundleIDs: Set<String> {
-        Set((UserDefaults.standard.string(forKey: "switcher.disabledApps") ?? "").split(separator: "\n").map(String.init))
+    var presentation: SwitcherPresentation { activePresentation ?? SwitcherPresentation.load() }
+    var style: SwitcherStyle { presentation.effectiveStyle }
+    private var autoSize: Bool { presentation.autoSize }
+    private var sizeScale: Double { presentation.sizeScale }
+    private var previewSelectedEnabled: Bool { presentation.previewSelected }
+    private var colorScheme: ColorScheme? {
+        switch presentation.theme { case .system: nil; case .light: .light; case .dark: .dark }
     }
+    private var liveThumbnails: Bool { UserDefaults.standard.object(forKey: "switcher.liveThumbnails") as? Bool ?? true }
+    var hoverSelects: Bool { UserDefaults.standard.object(forKey: "switcher.hoverSelects") as? Bool ?? true }
 
     func saveShortcuts(_ list: [SwitcherShortcut]) {
-        SwitcherShortcutStore.save(list)
-        shortcuts = SwitcherShortcutStore.load()
+        let problems = SwitcherShortcutValidation.problems(list)
+        guard problems.isEmpty else { shortcutEditingError = problems.joined(separator: " "); return }
+        shortcutEditingError = nil
+        SwitcherShortcutStore.save(list,shortcutSettings)
+        shortcuts = SwitcherShortcutStore.load(shortcutSettings)
         configure()
+    }
+
+    func saveActionBindings(_ bindings: [SwitcherActionBinding]) {
+        let problems = SwitcherActionBindings.problems(bindings)
+        guard problems.isEmpty else { actionEditingError = problems.joined(separator: " "); return }
+        actionEditingError = nil
+        SwitcherActionBindings.save(bindings,shortcutSettings)
+        actionBindings = SwitcherActionBindings.load(shortcutSettings)
     }
 
     /// The recorder needs raw key events, so registered hotkeys are released while it listens.
-    func setRecording(_ recording: Bool) {
+    @discardableResult func setRecording(_ recording: Bool) -> Bool {
+        // Grant a single recorder even before SwiftUI has redrawn disabled sibling buttons.
+        if recording && recordingShortcut { return false }
         recordingShortcut = recording
         configure()
+        return true
     }
 
     var sessionHint: String {
-        // Narrow panels (few windows, search) get a short form so the hint is never truncated.
-        if layout.panelSize.width < 900 {
-            let symbols = activeShortcut?.modifiers.symbols ?? ""
-            let choose = activeShortcut.map { !heldModifiers.isEmpty && $0.releaseToChoose && model.sessionSearch.isEmpty } == true
-                ? String(localized: "\(symbols) bırak") : String(localized: "↩ seç")
-            return String(localized: "⇥ gezin · \(choose) · yaz: ara · esc")
+        let choose: String
+        if gestureOwner != nil { choose = String(localized: "Parmakları kaldır: seç") }
+        else if let shortcut = activeShortcut, !heldModifiers.isEmpty, !model.isSearching, shortcut.releaseBehavior != .hold {
+            let symbols = shortcut.effectiveHoldModifiers.symbols
+            choose = shortcut.releaseBehavior == .search ? String(localized: "\(symbols) bırak: ara") : String(localized: "\(symbols) bırak: seç")
+        } else if let binding = actionBindings.first(where: { $0.action == .choose && $0.keyCode != nil }) {
+            choose = String(localized: "\(binding.displayName) seç")
+        } else { choose = String(localized: "Tıklayarak seç") }
+        if activeNavigation?.vim == true, !model.isSearching {
+            return String(localized: "Vim · ⇥ gezin · yaz: ara · \(choose) · esc")
         }
-        var parts = [String(localized: "⇥ ilerle"), String(localized: "⇧⇥ geri")]
-        if let shortcut = activeShortcut, !heldModifiers.isEmpty, shortcut.releaseToChoose, model.sessionSearch.isEmpty {
-            let symbols = shortcut.modifiers.symbols
-            parts.append(String(localized: "\(symbols) bırak: seç"))
-        } else {
-            parts.append(String(localized: "↩ seç"))
+        if layout.panelSize.width < 900 { return String(localized: "⇥ gezin · \(choose) · yaz: ara · esc") }
+        var parts = [String(localized: "⇥ ilerle"), String(localized: "⇧⇥ geri"), choose, String(localized: "yaz: ara")]
+        for action in [SwitcherActiveAction.close, .minimizeRestore, .quit] {
+            if let binding = actionBindings.first(where: { $0.action == action && $0.keyCode != nil }) {
+                parts.append("\(binding.displayName) \(action.localizedTitle)")
+            }
         }
-        parts += [String(localized: "yaz: ara"), String(localized: "⌘W kapat"), String(localized: "⌘M küçült"),
-                  String(localized: "⌘Q çık"), "esc"]
+        parts.append("esc")
         return parts.joined(separator: " · ")
     }
 
@@ -187,68 +380,210 @@ final class WindowSwitcherHotkeyController: NSObject, ObservableObject {
 
     private func configure() {
         guard moduleRunning else { return }
-        let defaults = UserDefaults.standard
-        let fingers = defaults.integer(forKey: "switcher.gestureFingers")
-        if fingers != gestureFingers {
-            gestureFingers = fingers
-            TrackpadSwipeMonitor.shared.configure(fingers: fingers)
-        }
+        model.reloadExceptions()
+        updateShortcutExceptions()
+#if DEBUG
+        // Owned fixture audits exercise the policy without taking global keys or trackpad input.
+        if syntheticAuditInput { return }
+#endif
+        let defaults = shortcutSettings
+        let bindings = SwitcherActionBindings.load(defaults)
+        if bindings != actionBindings { actionBindings = bindings }
         let stored = SwitcherShortcutStore.load(defaults)
         if stored != shortcuts { shortcuts = stored }
         let enabled = defaults.bool(forKey: "switcher.globalEnabled")
         let active = enabled && !recordingShortcut && suspendedForApplication == nil
-        let signature = active ? (try? JSONEncoder().encode(shortcuts)).map { String(decoding: $0, as: UTF8.self) } ?? "" : "off"
+        let gestures = SwitcherGestureOptions.load(gestureSettings)
+        configureGestureInput(active ? gestures : .init())
+        let wantsNativeKeys = active && shortcuts.contains(where: Self.usesNativeCommandTab)
+        configureNativeKeyWatch(enabled: wantsNativeKeys)
+        let signature = active ? shortcuts.map { "\($0.id):\($0.keyCode):\($0.modifiers.rawValue)" }.joined(separator: ",") : "off"
+        if !enabled { registrationMessage = String(localized: "Global kısayol kapalı.") }
+        else if recordingShortcut { registrationMessage = String(localized: "Kısayol kaydediliyor…") }
+        else if let app = suspendedForApplication { registrationMessage = String(localized: "\(app) öndeyken kısayollar devre dışı.") }
         guard signature != registeredSignature else { return }
         registeredSignature = signature
-        for ref in keyRefs { UnregisterEventHotKey(ref) }
+        if nativeFailureSignature != signature { nativeFailureSignature = nil;nativeFailureMessage = nil }
+        // Restore system switching before releasing our Carbon pair, including recorders,
+        // exceptions and module shutdown. A guardian still exiting cannot overlap a new owner.
+        if nativeKeyLease?.stop() == true { nativeKeyLease = nil }
+        if !active,activeShortcut.map(Self.usesNativeCommandTab) == true { dismiss(animated: false) }
+        for ref in keyRefs { registration.unregister(ref) }
         keyRefs = []; hotkeyMap = [:]
         guard enabled else { registrationMessage = String(localized: "Global kısayol kapalı."); return }
         if recordingShortcut { registrationMessage = String(localized: "Kısayol kaydediliyor…"); return }
         if let app = suspendedForApplication { registrationMessage = String(localized: "\(app) öndeyken kısayollar devre dışı."); return }
         guard handler != nil else { registrationMessage = String(localized: "macOS kısayol dinleyicisini başlatamadı."); return }
         let problems = SwitcherShortcutValidation.problems(shortcuts)
+        guard problems.isEmpty else { registrationMessage = problems.joined(separator: " "); return }
         var failures: [String] = []
+        var nativeErrors: [String] = []
         for (index, shortcut) in shortcuts.enumerated() where index < SwitcherShortcut.maximumCount {
+            let commandTab = Self.usesNativeCommandTab(shortcut)
+            if commandTab,nativeFailureSignature == signature,let message = nativeFailureMessage {
+                nativeErrors.append(message);continue
+            }
+            var pair: [(id: UInt32, ref: EventHotKeyRef, backwards: Bool)] = []
+            var failed = false
             for backwards in [false, true] {
                 let id = UInt32(index * 2 + (backwards ? 2 : 1))
-                var ref: EventHotKeyRef?
                 let flags = shortcut.modifiers.carbonFlags | (backwards ? SwitcherModifiers.carbonShift : 0)
-                let status = RegisterEventHotKey(UInt32(shortcut.keyCode), flags, EventHotKeyID(signature: Self.signature, id: id),
-                                                 GetEventDispatcherTarget(), 0, &ref)
+                let (status,ref) = registration.register(shortcut.keyCode,flags,EventHotKeyID(signature: Self.signature,id: id))
                 if status == noErr, let ref {
-                    keyRefs.append(ref); hotkeyMap[id] = (index, backwards)
-                } else if !backwards {
-                    failures.append("\(shortcut.displayName) (\(status))")
+                    pair.append((id, ref, backwards))
+                } else {
+                    failed = true
+                    failures.append("\(backwards ? "⇧" : "")\(shortcut.displayName) (\(status))")
                 }
             }
+            if !failed,commandTab {
+                do {
+                    guard nativeKeyLease == nil else { throw SwitcherNativeKeyError.unavailable }
+                    nativeKeyLease = try registration.acquireNative()
+                } catch {
+                    failed = true
+                    nativeFailureSignature = signature;nativeFailureMessage = error.localizedDescription
+                    nativeErrors.append(error.localizedDescription)
+                }
+            }
+            if failed { for entry in pair { registration.unregister(entry.ref) } }
+            else { for entry in pair { keyRefs.append(entry.ref); hotkeyMap[entry.id] = (index, entry.backwards) } }
         }
         if !failures.isEmpty {
             let list = failures.joined(separator: ", ")
             registrationMessage = String(localized: "Kaydedilemedi: \(list). Başka bir uygulama (ör. AltTab) aynı kısayolu kullanıyor olabilir.")
-        } else if !problems.isEmpty {
-            registrationMessage = problems.joined(separator: " ")
         } else {
             let list = shortcuts.map(\.displayName).joined(separator: ", ")
             registrationMessage = String(localized: "\(list) etkin. Shift ile ters yönde gezin.")
         }
+        if !nativeErrors.isEmpty {
+            let ordinaryFailure = failures.isEmpty ? "" : registrationMessage + " "
+            registrationMessage = ordinaryFailure + nativeErrors.joined(separator: " ")
+        }
+    }
+
+    private static func usesNativeCommandTab(_ shortcut: SwitcherShortcut) -> Bool {
+        shortcut.keyCode == SwitcherKeys.tab && shortcut.modifiers == .command
+    }
+
+    private func ownsNativeKeys(for shortcut: SwitcherShortcut) -> Bool {
+        guard Self.usesNativeCommandTab(shortcut) else { return true }
+#if DEBUG
+        if syntheticAuditInput { return !auditNativeKeysLost }
+#endif
+        return nativeKeyLease?.isActive == true
+    }
+
+    var canRetryNativeKeys: Bool { nativeFailureMessage != nil }
+    func retryNativeKeys() {
+        nativeFailureSignature = nil;nativeFailureMessage = nil;registeredSignature = ""
+        configure()
+    }
+
+    private func configureNativeKeyWatch(enabled: Bool) {
+        guard enabled else { nativeKeyTimer?.invalidate();nativeKeyTimer = nil;return }
+        guard nativeKeyTimer == nil else { return }
+        let timer = Timer(timeInterval: 1,repeats: true) { [weak self] _ in
+            MainActor.assumeIsolated { self?.checkNativeKeys() }
+        }
+        nativeKeyTimer = timer
+        RunLoop.main.add(timer,forMode: .common)
+    }
+
+    private func checkNativeKeys() {
+        guard moduleRunning else { return }
+        guard let lease = nativeKeyLease,!lease.pulse() else { return }
+        // Do not restart an unexpectedly dead guardian repeatedly. A preference
+        // transition permits another acquisition; ordinary Option shortcuts remain registered.
+        nativeFailureSignature = registeredSignature
+        nativeFailureMessage = SwitcherNativeKeyError.unavailable.localizedDescription
+        registeredSignature = ""
+        if activeShortcut.map(Self.usesNativeCommandTab) == true { dismiss(animated: false) }
+        configure()
     }
 
     private func applicationActivated(_ bundleID: String?) {
-        let disabled = bundleID.map { disabledBundleIDs.contains($0) } ?? false
-        let name = disabled ? NSWorkspace.shared.frontmostApplication?.localizedName ?? bundleID : nil
-        if name != suspendedForApplication {
-            suspendedForApplication = name
-            configure()
-        }
+        configure()
         // Keep the catalog warm so the switcher opens with current windows instantly. MacPocket itself
         // becoming active needs no rescan (nobody is switching), and the scan walks every app via AX.
         let isSelf = bundleID == Bundle.main.bundleIdentifier
         if sessionID == nil, !isSelf, !keyRefs.isEmpty, Date().timeIntervalSince(lastPrewarm) > 5 {
             lastPrewarm = Date()
-            Task { [weak self] in
-                try? await Task.sleep(for: .milliseconds(400))
-                await self?.model.refresh()
+            schedulePrewarm(delay: .milliseconds(400))
+        }
+    }
+
+    private var mayObserveConditionalExceptions: Bool {
+#if DEBUG
+        if syntheticAuditInput { return !recordingShortcut }
+#endif
+        return !recordingShortcut && shortcutSettings.bool(forKey: "switcher.globalEnabled")
+    }
+
+    private func cancelConditionalExceptions() {
+        conditionalExceptionTask?.cancel(); conditionalExceptionTask = nil
+        conditionalExceptionContext = nil; conditionalFullscreen = nil
+    }
+
+    /// Recomputed on startup, preference edits, application/Space changes and conditional samples.
+    /// Only a matching fullscreen rule owns a timer; unknown AX state leaves keys available.
+    private func updateShortcutExceptions() {
+        guard let application = exceptionApplication() else {
+            cancelConditionalExceptions(); suspendedForApplication = nil; return
+        }
+        let rules = model.exceptionRules.filter { $0.matches(bundleIdentifier: application.bundleIdentifier, applicationPath: application.applicationPath) }
+        let always = rules.contains { $0.shortcuts == .alwaysDisable }
+        let conditional = rules.filter { $0.shortcuts == .fullscreen }
+        if always || conditional.isEmpty || !mayObserveConditionalExceptions {
+            cancelConditionalExceptions()
+        } else {
+            let context = ConditionalExceptionContext(application: application, rules: conditional)
+            if context != conditionalExceptionContext {
+                cancelConditionalExceptions()
+                conditionalExceptionContext = context
+                conditionalExceptionTask = Task { [weak self, fullscreenReader] in
+                    while !Task.isCancelled {
+                        let sample = await fullscreenReader(application)
+                        guard !Task.isCancelled, self?.acceptConditionalSample(sample, context: context) == true else { return }
+                        try? await Task.sleep(for: .milliseconds(250))
+                    }
+                }
             }
+        }
+        let disabled = rules.contains { $0.disablesShortcuts(bundleIdentifier: application.bundleIdentifier, applicationPath: application.applicationPath, fullscreen: conditionalFullscreen) }
+        let name = disabled ? (application.name ?? application.bundleIdentifier ?? String(localized: "Uygulama")) : nil
+        if suspendedForApplication != name { suspendedForApplication = name }
+    }
+
+    private func acceptConditionalSample(_ fullscreen: Bool?, context: ConditionalExceptionContext) -> Bool {
+        guard moduleRunning, conditionalExceptionContext == context else { return false }
+        guard exceptionApplication() == context.application else {
+            configure()
+            return false
+        }
+        if conditionalFullscreen != fullscreen {
+            conditionalFullscreen = fullscreen
+            configure()
+        }
+        return conditionalExceptionContext == context
+    }
+
+    private func cancelPrewarm() {
+        prewarmTask?.cancel(); prewarmTask = nil; prewarmID = nil
+    }
+
+    private func schedulePrewarm(delay: Duration = .zero) {
+        cancelPrewarm()
+        let id = UUID(), environment = environmentGeneration
+        prewarmID = id
+        prewarmTask = Task { [weak self] in
+            try? await Task.sleep(for: delay)
+            guard let self else { return }
+            defer { if prewarmID == id { prewarmTask = nil; prewarmID = nil } }
+            guard !Task.isCancelled, moduleRunning, sessionID == nil, environment == environmentGeneration else { return }
+            await model.refresh()
+            guard !Task.isCancelled, moduleRunning, sessionID == nil, environment == environmentGeneration else { return }
+            preparedEnvironment = environment
         }
     }
 
@@ -276,122 +611,259 @@ final class WindowSwitcherHotkeyController: NSObject, ObservableObject {
         let flags = event.modifierFlags
         let pressed: SwitcherModifiers = [flags.contains(.control) ? .control : [], flags.contains(.option) ? .option : [],
                                           flags.contains(.command) ? .command : []]
-        return shortcuts.firstIndex { $0.keyCode == event.keyCode && $0.modifiers == pressed }
+        return shortcuts.indices.first { index in
+            shortcuts[index].keyCode == event.keyCode && shortcuts[index].modifiers == pressed
+                && ownsNativeKeys(for: shortcuts[index])
+                && hotkeyMap.values.contains(where: { $0.index == index })
+        }
     }
 
     private func handleFlags(_ event: NSEvent) -> Bool {
-        guard let shortcut = activeShortcut, shortcut.releaseToChoose, !heldModifiers.isEmpty,
-              event.modifierFlags.intersection(heldModifiers).isEmpty, model.sessionSearch.isEmpty else { return false }
-        requestCommit()
+        handleModifierState(event.modifierFlags)
+    }
+
+    @discardableResult private func handleModifierState(_ flags: NSEvent.ModifierFlags) -> Bool {
+        guard sessionID != nil, let shortcut = activeShortcut, !heldModifiers.isEmpty,
+              flags.intersection(heldModifiers).isEmpty else { return false }
+        guard ownsNativeKeys(for: shortcut) else { dismiss(animated: false);return true }
+        heldModifiers = []
+        modifierTimer?.invalidate(); modifierTimer = nil
+        switch SwitcherReleaseDecision.resolve(shortcut.releaseBehavior, isSearching: model.isSearching) {
+        case .choose:
+#if DEBUG
+            if let id = sessionID { onModifierReleaseCommitForAudit?(id) }
+#endif
+            requestCommit()
+        case .beginSearch:
+            revealHeldPanel()
+            model.beginSearch()
+        case .keepOpen: revealHeldPanel()
+        }
         return true
     }
 
+    private func revealHeldPanel() {
+        guard let id = sessionID, panel?.isVisible != true else { return }
+        showTask?.cancel(); showTask = nil
+        presentPanel(sessionID: id)
+    }
+
     private func handleKey(_ event: NSEvent) -> Bool {
+        if !heldModifiers.isEmpty,let shortcut = activeShortcut,!ownsNativeKeys(for: shortcut) {
+            dismiss(animated: false);return true
+        }
         let flags = event.modifierFlags
-        switch Int(event.keyCode) {
-        case kVK_Escape:
-            if !model.sessionSearch.isEmpty { model.sessionSearch = "" } else { dismiss(restorePrevious: true) }
+        let command = SwitcherPanelInput.command(keyCode: event.keyCode, characters: event.charactersIgnoringModifiers ?? "",
+            modifiers: Self.switcherModifiers(flags), shift: flags.contains(.shift), held: Self.switcherModifiers(heldModifiers),
+            isSearching: model.isSearching, options: activeNavigation ?? SwitcherNavigationOptions.load(), bindings: actionBindings)
+        if let command {
+            switch command {
+            case .move(let backwards, let count): step(backwards: backwards, by: count)
+            case .row(let backwards): stepRow(backwards: backwards)
+            case .ignore: break
+            case .action(let action):
+                switch action {
+                case .choose: requestCommit()
+                case .previous: step(backwards: true)
+                case .cancel: cancelOrClearSearch()
+                case .search: model.beginSearch()
+                case .close: perform(.close)
+                case .minimizeRestore: perform(model.selected?.minimized == true ? .restore : .minimize)
+                case .fullScreen: perform(.toggleFullScreen)
+                case .hide: perform(.hideApplication)
+                case .quit: perform(.quitApplication)
+                }
+            }
             return true
-        case kVK_Return, kVK_ANSI_KeypadEnter: requestCommit(); return true
-        case kVK_Tab: step(backwards: flags.contains(.shift)); return true
-        case kVK_RightArrow: step(backwards: false); return true
-        case kVK_LeftArrow: step(backwards: true); return true
-        case kVK_DownArrow: step(backwards: false, by: layout.columns); return true
-        case kVK_UpArrow: step(backwards: true, by: layout.columns); return true
+        }
+        switch Int(event.keyCode) {
         case kVK_Delete:
             if !model.sessionSearch.isEmpty { model.sessionSearch.removeLast() }
             return true
         default: break
         }
-        let characters = (event.charactersIgnoringModifiers ?? "").lowercased()
-        // ⌘-letter acts on the selected window unless ⌘ is the shortcut's own held modifier.
-        if flags.contains(.command), !heldModifiers.contains(.command) {
-            let action: WindowAction?
-            switch characters {
-            case "w": action = .close
-            case "m": action = model.selected?.minimized == true ? .restore : .minimize
-            case "f": action = .toggleFullScreen
-            case "h": action = .hideApplication
-            case "q": action = .quitApplication
-            default: action = nil
-            }
-            if let action { perform(action) }
-            return true
-        }
+        if flags.contains(.command), !heldModifiers.contains(.command) { return true }
         guard let character = event.charactersIgnoringModifiers, !character.isEmpty,
               character.unicodeScalars.allSatisfy({ CharacterSet.alphanumerics.union(.punctuationCharacters).union(.symbols).union(.whitespaces).contains($0) })
         else { return false }
+        model.beginSearch()
         model.sessionSearch += character
         return true
+    }
+
+    private func cancelOrClearSearch() {
+        if !model.sessionSearch.isEmpty { model.sessionSearch = "" } else { dismiss(restorePrevious: true) }
     }
 
     private func receiveHotkey(_ id: UInt32, source: String, timestamp: TimeInterval) {
         guard let entry = hotkeyMap[id] else { return }
         receiveShortcut(index: entry.index, backwards: entry.backwards, source: source, timestamp: timestamp)
+#if DEBUG
+        if source == "carbon" { onCarbonInvocationForAudit?(id,sessionID) }
+#endif
     }
 
     private func receiveShortcut(index: Int, backwards: Bool, source: String, timestamp: TimeInterval) {
         guard !keyRefs.isEmpty, shortcuts.indices.contains(index) else { return }
+        guard ownsNativeKeys(for: shortcuts[index]) else { return }
         // Some delivery paths provide both Carbon and NSEvent for one physical press.
-        if source != lastInvocationSource && backwards == lastInvocationBackwards && abs(timestamp - lastInvocationTime) < 0.05 { return }
-        lastInvocationTime = timestamp; lastInvocationSource = source; lastInvocationBackwards = backwards
+        guard invocations.accepts(id: shortcuts[index].id, backwards: backwards, source: source, timestamp: timestamp) else { return }
         summon(shortcut: shortcuts[index], backwards: backwards, holdsModifiers: true)
     }
 
     // MARK: Session
 
+    var commandPanelVisible: Bool { panel?.isVisible == true }
+    func hideFromCommand() { cancelFocus();dismiss(animated: false) }
+    func showFromCommand(profile: Int) -> Bool {
+        guard moduleRunning,!recordingShortcut,shortcuts.indices.contains(profile-1) else { return false }
+        let target = shortcuts[profile-1]
+        // Repeated show is idempotent: it must not cycle the selection like another Tab press.
+        if sessionID != nil,activeShortcut == target,activePresentation == target.presentation.resolve(over: SwitcherPresentation.load()) { return true }
+        show(shortcut: target)
+        return sessionID != nil
+    }
+
     /// Opens the switcher from the settings preview button.
-    func show() {
-        summon(shortcut: shortcuts.first ?? .defaultOptionTab, backwards: false, holdsModifiers: false)
+    func show(shortcut: SwitcherShortcut? = nil) {
+        let target = shortcut ?? shortcuts.first ?? .defaultOptionTab
+        if sessionID != nil, activeShortcut != target || activePresentation != target.presentation.resolve(over: SwitcherPresentation.load()) {
+            dismiss(animated: false)
+        }
+        summon(shortcut: target, backwards: false, holdsModifiers: false)
     }
 
-    /// Trackpad swipe: opens on the first step, moves on later steps, and selects when fingers lift.
-    func gestureStep(backwards: Bool) {
-        if sessionID == nil {
-            var shortcut = shortcuts.first ?? .defaultOptionTab
-            shortcut.releaseToChoose = false
-            summon(shortcut: shortcut, backwards: backwards, holdsModifiers: false)
-        } else { step(backwards: backwards) }
+    private var gestureInputAllowed: Bool {
+        moduleRunning && !recordingShortcut && suspendedForApplication == nil
+            && gestureSettings.bool(forKey: "switcher.globalEnabled")
     }
 
-    func gestureEnded() { requestCommit() }
+    private func configureGestureInput(_ options: SwitcherGestureOptions) {
+        guard options != configuredGestureOptions else { return }
+        if gestureOwner != nil { dismiss(animated: false) }
+        configuredGestureOptions = options
+        if options.enabled {
+            gestureMonitor.configure(options: options) { [weak self] in self?.receiveGesture($0) }
+        } else { gestureMonitor.stop() }
+    }
+
+    /// A gesture owns only the panel it opened. Lift/cancel cannot commit an unrelated keyboard
+    /// session, and Escape suppresses subsequent frames of that same held gesture.
+    private func receiveGesture(_ event: SwitcherGestureEvent) {
+        switch event {
+        case .step(let id,let axis,let backwards,let count):
+            guard gestureInputAllowed,let options = configuredGestureOptions,options.enabled,
+                  options.axis == axis,(1...32).contains(count),blockedGestureID != id else { return }
+            var remaining = count
+            if gestureOwner == nil {
+                guard sessionID == nil else { blockedGestureID = id;return }
+                var shortcut = shortcuts.first ?? .defaultOptionTab
+                shortcut.releaseBehavior = .hold
+                summon(shortcut: shortcut,backwards: backwards,holdsModifiers: false,skipsForeground: true)
+                guard let sessionID else { blockedGestureID = id;return }
+                gestureOwner = (id,sessionID,options.haptics);gestureFeedbackSelection = nil
+                remaining -= 1
+            }
+            guard gestureOwner?.id == id,gestureOwner?.session == sessionID else { return }
+            if remaining > 0 {
+                if axis == .horizontal { step(backwards: backwards,by: remaining) }
+                else { for _ in 0..<remaining { stepRow(backwards: backwards) } }
+            }
+            provideGestureFeedback()
+        case .ended(let id):
+            if blockedGestureID == id { blockedGestureID = nil }
+            guard gestureOwner?.id == id,gestureOwner?.session == sessionID else { return }
+            gestureOwner = nil;gestureFeedbackSelection = nil
+            guard gestureInputAllowed else { dismiss(animated: false);return }
+            // Typing/search intentionally retains the HUD on keyboard modifier release too.
+            // Lifting fingers must not commit a partially entered query.
+            guard !model.isSearching else { return }
+            requestCommit()
+        case .cancelled(let id):
+            if blockedGestureID == id { blockedGestureID = nil }
+            guard gestureOwner?.id == id,gestureOwner?.session == sessionID else { return }
+            gestureOwner = nil;gestureFeedbackSelection = nil
+            dismiss(animated: false)
+        }
+    }
+
+    private func provideGestureFeedback() {
+        guard let owner = gestureOwner,owner.session == sessionID,owner.haptics,!preparing,
+              let selection = model.selected?.id,selection != gestureFeedbackSelection else { return }
+        gestureFeedbackSelection = selection
+        gestureFeedback()
+    }
 
     private func step(backwards: Bool, by count: Int = 1) {
         if let id = sessionID, panel?.isVisible != true { showTask?.cancel(); presentPanel(sessionID: id) }
         if preparing {
-            pendingSteps += backwards ? -count : count
-            model.selection = WindowSwitchSelection.initial(model.filtered, foregroundPID: sessionForegroundPID,
-                                                            backwards: sessionBackwards, queuedSteps: pendingSteps)
+            pendingNavigation.append(.linear(backwards ? -count : count))
+            model.selection = preparationSelection()
         } else { model.cycle(backwards: backwards, by: count) }
     }
 
-    private func summon(shortcut: SwitcherShortcut, backwards: Bool, holdsModifiers: Bool) {
+    private func stepRow(backwards: Bool) {
+        if let id = sessionID, panel?.isVisible != true { showTask?.cancel(); presentPanel(sessionID: id) }
+        if preparing {
+            pendingNavigation.append(.row(backwards: backwards))
+            model.selection = preparationSelection()
+        } else { model.moveRow(backwards: backwards,columns: layout.columns) }
+    }
+
+    private func summon(shortcut: SwitcherShortcut, backwards: Bool, holdsModifiers: Bool,skipsForeground: Bool = false) {
         guard moduleRunning else { return }
-        if sessionID != nil { step(backwards: backwards); return }
+        if sessionID != nil {
+            var current = activeShortcut
+            // Gestures retain the HUD until fingers lift, but the keyboard must recover the
+            // profile's original release behavior when taking over that same session.
+            if gestureOwner != nil { current?.releaseBehavior = shortcut.releaseBehavior }
+            if current == shortcut, activePresentation == shortcut.presentation.resolve(over: SwitcherPresentation.load()) {
+                if holdsModifiers {
+                    if let owner = gestureOwner { blockedGestureID = owner.id }
+                    gestureOwner = nil; gestureFeedbackSelection = nil
+                    activeShortcut = shortcut
+                    heldModifiers = Self.eventFlags(shortcut.effectiveHoldModifiers)
+                    startModifierWatch(shortcut)
+                }
+                step(backwards: backwards)
+                if holdsModifiers { handleModifierState(currentModifierFlags()) }
+                return
+            }
+            dismiss()
+        }
+        cancelFocus()
+        cancelDismissal()
         let id = UUID()
         sessionID = id; preparing = true; commitWhenReady = false
+        preparationOrigin = .opening
         activeShortcut = shortcut
-        heldModifiers = holdsModifiers ? Self.eventFlags(shortcut.modifiers) : []
-        previousApplication = NSWorkspace.shared.frontmostApplication
+        activePresentation = shortcut.presentation.resolve(over: SwitcherPresentation.load())
+        activeNavigation = SwitcherNavigationOptions.load()
+        activeCursorPolicy = SwitcherCursorPolicy.load()
+        heldModifiers = holdsModifiers ? Self.eventFlags(shortcut.effectiveHoldModifiers) : []
+        previousApplication = foregroundApplication()
         let foregroundPID = previousApplication?.processIdentifier
-        let screen = NSScreen.screens.first { $0.frame.contains(NSEvent.mouseLocation) } ?? NSScreen.main
+        let screen = screenForSession()
         sessionScreen = screen
         openedAtMouse = NSEvent.mouseLocation
+        model.captureSessionPointer(at: Self.coreGraphicsPoint(openedAtMouse))
         model.foregroundPID = foregroundPID
-        model.sessionSearch = ""
+        model.resetSessionSearch()
         model.failure = nil
         model.sessionFilter = shortcut.filter
-        model.sessionDisplayID = (screen?.deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] as? NSNumber)?.uint32Value
+        model.sessionOrder = presentation.order
+        model.sessionDisplayID = screen.flatMap(Self.displayID)
         model.clearThumbnails()
         // The cached list (kept warm in the background) appears immediately; a fresh snapshot follows.
-        pendingSteps = 0
+        pendingNavigation = []
         sessionBackwards = backwards
-        sessionForegroundPID = holdsModifiers ? foregroundPID : nil
+        sessionForegroundPID = holdsModifiers || skipsForeground ? foregroundPID : nil
         model.selection = WindowSwitchSelection.initial(model.filtered, foregroundPID: sessionForegroundPID,
                                                         backwards: backwards, queuedSteps: 0)
-        if holdsModifiers, shortcut.releaseToChoose, !model.filtered.isEmpty {
+        if holdsModifiers, !model.filtered.isEmpty {
+            let delay = presentation.openingDelayMilliseconds
             showTask = Task { [weak self] in
-                try? await Task.sleep(for: Self.showDelay)
+                try? await Task.sleep(for: .milliseconds(delay))
                 guard !Task.isCancelled, let self, sessionID == id else { return }
                 presentPanel(sessionID: id)
             }
@@ -401,12 +873,7 @@ final class WindowSwitcherHotkeyController: NSObject, ObservableObject {
             guard let self else { return }
             await model.refresh()
             guard !Task.isCancelled, sessionID == id else { return }
-            model.selection = WindowSwitchSelection.initial(model.filtered, foregroundPID: sessionForegroundPID,
-                                                            backwards: sessionBackwards, queuedSteps: pendingSteps)
-            preparing = false
-            let released = !heldModifiers.isEmpty && NSEvent.modifierFlags.intersection(heldModifiers).isEmpty
-            if commitWhenReady || (released && shortcut.releaseToChoose) { activateSelection(); return }
-            if panel?.isVisible == true { startThumbnails() } else { thumbnailsWanted = true }
+            completePreparation(sessionID: id)
         }
     }
 
@@ -425,20 +892,28 @@ final class WindowSwitcherHotkeyController: NSObject, ObservableObject {
             panel.animationBehavior = .none
             self.panel = panel
         }
+        cancelDismissal()
+        panel?.ignoresMouseEvents = false
         relayout(force: true)
+        switch presentation.theme {
+        case .system: panel?.appearance = nil
+        case .light: panel?.appearance = NSAppearance(named: .aqua)
+        case .dark: panel?.appearance = NSAppearance(named: .darkAqua)
+        }
         panel?.contentView = NSHostingView(rootView: WindowSwitcherOverlayView(model: model, controller: self, choose: { [weak self] target in
             self?.model.selection = target; self?.requestCommit()
-        }).id(id))
-        let animate = !PocketReduceMotion.isEnabled
-        panel?.alphaValue = animate ? 0 : 1
+        }, thumbnailSessionID: model.thumbnailSessionID, reduceTransparencyOverride: transparencyOverride).preferredColorScheme(colorScheme).id(id))
+        let duration = SwitcherMotionPlan(presentation: presentation, reduceMotion: PocketReduceMotion.isEnabled).opening
+        NSAnimationContext.runAnimationGroup { context in context.duration = 0; panel?.animator().alphaValue = duration > 0 ? 0 : 1 }
         panel?.makeKeyAndOrderFront(nil)
-        if animate { NSAnimationContext.runAnimationGroup { $0.duration = 0.09; panel?.animator().alphaValue = 1 } }
-        if outsideClickMonitor == nil {
+        if duration > 0 { NSAnimationContext.runAnimationGroup { $0.duration = duration; panel?.animator().alphaValue = 1 } }
+        if outsideClickMonitor == nil, watchesExternalClicks {
             // Clicks inside the panel are local events; anything reaching this monitor landed elsewhere.
             outsideClickMonitor = NSEvent.addGlobalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown, .otherMouseDown]) { [weak self] _ in
                 Task { @MainActor [weak self] in self?.dismiss() }
             }
         }
+        startApplicationBadges()
         if thumbnailsWanted || !preparing { thumbnailsWanted = false; startThumbnails() }
         updatePreview()
     }
@@ -447,11 +922,11 @@ final class WindowSwitcherHotkeyController: NSObject, ObservableObject {
     /// misses fast taps). `NSEvent.modifierFlags` needs no permission.
     private func startModifierWatch(_ shortcut: SwitcherShortcut) {
         modifierTimer?.invalidate(); modifierTimer = nil
-        guard !heldModifiers.isEmpty, shortcut.releaseToChoose else { return }
+        guard !heldModifiers.isEmpty, shortcut.releaseBehavior != .hold else { return }
         let timer = Timer(timeInterval: 1.0 / 60, repeats: true) { [weak self] _ in
             MainActor.assumeIsolated {
-                guard let self, self.sessionID != nil, !self.heldModifiers.isEmpty, self.model.sessionSearch.isEmpty else { return }
-                if NSEvent.modifierFlags.intersection(self.heldModifiers).isEmpty { self.requestCommit() }
+                guard let self else { return }
+                self.handleModifierState(self.currentModifierFlags())
             }
         }
         RunLoop.main.add(timer, forMode: .common)
@@ -464,6 +939,25 @@ final class WindowSwitcherHotkeyController: NSObject, ObservableObject {
         guard sessionID != nil else { return }
         let visible = model.filtered
         if !visible.contains(where: { $0.id == model.selection }) { model.selection = visible.first?.id }
+        model.requestThumbnails()
+    }
+
+    private func screenForSession() -> NSScreen? {
+        let screens = NSScreen.screens
+        let descriptors = screens.compactMap { screen in Self.displayID(screen).map { ($0, screen.frame) } }
+        var activeFrame: CGRect?
+        if presentation.screen == .activeWindow, let pid = previousApplication?.processIdentifier {
+            let rows = CGWindowListCopyWindowInfo([.optionOnScreenOnly, .excludeDesktopElements], 0) as? [[String: Any]] ?? []
+            for row in rows {
+                guard row[kCGWindowOwnerPID as String] as? Int32 == pid, row[kCGWindowLayer as String] as? Int == 0,
+                      let bounds = row[kCGWindowBounds as String] as? [String: Any], let frame = CGRect(dictionaryRepresentation: bounds as CFDictionary),
+                      frame.width > 40, frame.height > 40 else { continue }
+                activeFrame = Self.cocoaRect(frame); break
+            }
+        }
+        let id = presentation.screen.displayID(screens: descriptors, pointer: NSEvent.mouseLocation,
+            activeWindowFrame: activeFrame, primaryDisplayID: CGMainDisplayID())
+        return screens.first { Self.displayID($0) == id } ?? screens.first
     }
 
     private func relayout(force: Bool = false) {
@@ -478,9 +972,16 @@ final class WindowSwitcherHotkeyController: NSObject, ObservableObject {
         if panel.frame != frame { panel.setFrame(frame, display: true) }
     }
 
+    private func startApplicationBadges() {
+        badgeTask?.cancel();badgeTask = nil;model.stopApplicationBadges()
+        guard sessionID != nil,panel?.isVisible == true,presentation.showBadges else { return }
+        let epoch = model.beginApplicationBadges()
+        badgeTask = Task { [weak self] in await self?.model.runApplicationBadges(session: epoch) }
+    }
+
     private func startThumbnails() {
         thumbnailTask?.cancel()
-        guard style != .titles else { return }
+        guard style == .thumbnails else { return }
         let scale = sessionScreen?.backingScaleFactor ?? 2
         let size = CGSize(width: layout.itemSize.width * scale, height: layout.itemSize.height * scale)
         let live = liveThumbnails
@@ -489,6 +990,7 @@ final class WindowSwitcherHotkeyController: NSObject, ObservableObject {
 
     private func selectionChanged() {
         guard sessionID != nil else { return }
+        model.requestThumbnails()
         if let window = model.selected, NSWorkspace.shared.isVoiceOverEnabled {
             NSAccessibility.post(element: NSApp as Any, notification: .announcementRequested,
                                  userInfo: [.announcement: "\(window.application), \(window.title)", .priority: NSAccessibilityPriorityLevel.high.rawValue])
@@ -499,6 +1001,8 @@ final class WindowSwitcherHotkeyController: NSObject, ObservableObject {
     /// Shows the selected window at its real position and size behind the switcher.
     private func updatePreview() {
         previewTask?.cancel()
+        // Hide the old target immediately, including while the new target's capture is pending.
+        previewPanel?.orderOut(nil)
         guard sessionID != nil, previewSelectedEnabled, let window = model.selected, let frame = window.frame, !window.minimized else {
             previewPanel?.orderOut(nil); return
         }
@@ -512,33 +1016,45 @@ final class WindowSwitcherHotkeyController: NSObject, ObservableObject {
                 return
             }
             if previewPanel == nil { previewPanel = SwitcherPreviewPanel() }
-            previewPanel?.show(preview.image, at: Self.cocoaRect(frame))
+            let duration = SwitcherMotionPlan(presentation: presentation, reduceMotion: PocketReduceMotion.isEnabled).preview
+            previewPanel?.show(preview.image, at: Self.cocoaRect(frame), animationDuration: duration)
         }
     }
 
     private func requestCommit() {
         guard sessionID != nil else { return }
-        // A warm cache already names a target; only an empty first scan has to be waited for.
-        if preparing && model.filtered.isEmpty { commitWhenReady = true } else { activateSelection() }
+        // A warm cache is usable only within the same Space/display environment. Changes while
+        // closed also require a fresh scan before release can choose from a nonempty cached list.
+        if preparing && (model.filtered.isEmpty || preparedEnvironment != environmentGeneration) {
+            commitWhenReady = true
+        } else { activateSelection() }
     }
 
     private func activateSelection() {
         guard let target = model.selected?.id else { dismiss(); return }
+        let cursorPolicy = activeCursorPolicy ?? .never
         dismiss()
-        Task { [weak self] in
-            guard let self else { return }
-            await model.focus(id: target)
+        cancelFocus()
+        let id = UUID(); focusID = id
+        focusTask = Task { [weak self] in
+            guard !Task.isCancelled, let self, focusID == id else { return }
+            defer { if focusID == id { focusTask = nil; focusID = nil } }
+            await model.focus(id: target,cursorPolicy: cursorPolicy)
+            guard !Task.isCancelled, focusID == id else { return }
             if let failure = model.failure { registrationMessage = failure }
         }
     }
 
+    private func cancelFocus() { focusTask?.cancel(); focusTask = nil; focusID = nil }
+
     private func perform(_ action: WindowAction) {
-        guard let target = model.selected else { return }
+        guard let target = model.selected, !model.actionBusy, let actionSession = sessionID else { return }
         Task { [weak self] in
             guard let self else { return }
             await model.action(action, id: target.id)
             // Keep the panel key: hiding or quitting an app may move focus elsewhere.
-            if sessionID != nil { panel?.makeKeyAndOrderFront(nil) }
+            guard sessionID == actionSession else { return }
+            panel?.makeKeyAndOrderFront(nil)
             if !model.filtered.contains(where: { $0.id == model.selection }) { model.selection = model.filtered.first?.id }
         }
     }
@@ -557,9 +1073,17 @@ final class WindowSwitcherHotkeyController: NSObject, ObservableObject {
         perform(action)
     }
 
-    private func dismiss(restorePrevious: Bool = false) {
+    private func dismiss(restorePrevious: Bool = false, animated: Bool = true) {
+        let closingDuration = animated ? SwitcherMotionPlan(presentation: presentation, reduceMotion: PocketReduceMotion.isEnabled).closing : 0
+        cancelDismissal()
+        let snapshot = closingDuration > 0 ? panel.flatMap(makeClosingSnapshot) : nil
         let previous = restorePrevious ? previousApplication : nil
+        if let owner = gestureOwner { blockedGestureID = owner.id }
+        gestureOwner = nil;gestureFeedbackSelection = nil
         sessionID = nil; preparing = false; commitWhenReady = false
+        pendingNavigation = []
+        model.cancelActionReconciliation()
+        preparationOrigin = .opening
         openingTask?.cancel(); openingTask = nil
         showTask?.cancel(); showTask = nil
         modifierTimer?.invalidate(); modifierTimer = nil
@@ -567,15 +1091,55 @@ final class WindowSwitcherHotkeyController: NSObject, ObservableObject {
         if let outsideClickMonitor { NSEvent.removeMonitor(outsideClickMonitor) }
         outsideClickMonitor = nil
         thumbnailTask?.cancel(); thumbnailTask = nil
+        badgeTask?.cancel();badgeTask = nil;model.stopApplicationBadges()
         previewTask?.cancel(); previewTask = nil
         activeShortcut = nil
+        activePresentation = nil
+        activeNavigation = nil
+        activeCursorPolicy = nil
         model.sessionFilter = nil
-        model.sessionSearch = ""
+        model.sessionOrder = nil
+        model.captureSessionPointer(at: nil)
+        model.resetSessionSearch()
         model.clearThumbnails()
         previewPanel?.orderOut(nil)
         panel?.orderOut(nil)
+        if let snapshot {
+            closingSnapshot = snapshot
+            snapshot.orderFront(nil)
+            NSAnimationContext.runAnimationGroup { $0.duration = closingDuration; snapshot.animator().alphaValue = 0 }
+            dismissalTask = Task { [weak self, weak snapshot] in
+                try? await Task.sleep(for: .seconds(closingDuration))
+                guard !Task.isCancelled, let self, sessionID == nil, let snapshot, closingSnapshot === snapshot else { return }
+                snapshot.orderOut(nil); closingSnapshot = nil; dismissalTask = nil
+            }
+        }
         if let previous, !previous.isTerminated, !previous.isActive,
            previous.processIdentifier != ProcessInfo.processInfo.processIdentifier { previous.activate(options: []) }
+    }
+
+    private func cancelDismissal() {
+        dismissalTask?.cancel(); dismissalTask = nil
+        closingSnapshot?.orderOut(nil); closingSnapshot = nil
+    }
+
+    /// The live panel relinquishes AppKit key-window ownership immediately. Fade only an owned,
+    /// click-through image; calling resignKey() directly leaves AppKit's key-window bookkeeping stale.
+    private func makeClosingSnapshot(_ panel: NSPanel) -> NSPanel? {
+        guard panel.isVisible, let view = panel.contentView,
+              let bitmap = view.bitmapImageRepForCachingDisplay(in: view.bounds) else { return nil }
+        view.cacheDisplay(in: view.bounds, to: bitmap)
+        let image = NSImage(size: view.bounds.size); image.addRepresentation(bitmap)
+        let snapshot = SwitcherClosingPanel(contentRect: panel.frame, styleMask: [.borderless, .nonactivatingPanel], backing: .buffered, defer: false)
+        snapshot.isReleasedWhenClosed = false; snapshot.backgroundColor = .clear; snapshot.isOpaque = false
+        snapshot.hasShadow = panel.hasShadow; snapshot.level = panel.level; snapshot.ignoresMouseEvents = true
+        snapshot.collectionBehavior = panel.collectionBehavior; snapshot.animationBehavior = .none
+        snapshot.setAccessibilityElement(false)
+        let imageView = NSImageView(frame: NSRect(origin: .zero, size: view.bounds.size))
+        imageView.image = image; imageView.imageScaling = .scaleAxesIndependently
+        imageView.setAccessibilityElement(false)
+        snapshot.contentView = imageView
+        return snapshot
     }
 
     private static func eventFlags(_ modifiers: SwitcherModifiers) -> NSEvent.ModifierFlags {
@@ -586,16 +1150,29 @@ final class WindowSwitcherHotkeyController: NSObject, ObservableObject {
         return flags
     }
 
+    private static func switcherModifiers(_ flags: NSEvent.ModifierFlags) -> SwitcherModifiers {
+        [flags.contains(.control) ? .control : [], flags.contains(.option) ? .option : [], flags.contains(.command) ? .command : []]
+    }
+
     /// CoreGraphics (top-left origin) → AppKit (bottom-left origin) global coordinates.
     static func cocoaRect(_ rect: CGRect) -> NSRect {
         let primaryHeight = NSScreen.screens.first?.frame.maxY ?? rect.maxY
         return NSRect(x: rect.minX, y: primaryHeight - rect.maxY, width: rect.width, height: rect.height)
+    }
+
+    private static func coreGraphicsPoint(_ point: NSPoint) -> CGPoint {
+        CGPoint(x: point.x, y: (NSScreen.screens.first?.frame.maxY ?? 0) - point.y)
     }
 }
 
 @MainActor
 private final class SwitcherCardPanel: NSPanel {
     override var canBecomeKey: Bool { true }
+    override var canBecomeMain: Bool { false }
+}
+
+@MainActor private final class SwitcherClosingPanel: NSPanel {
+    override var canBecomeKey: Bool { false }
     override var canBecomeMain: Bool { false }
 }
 
@@ -619,15 +1196,98 @@ final class SwitcherPreviewPanel: NSPanel {
         setAccessibilityElement(false)
     }
 
-    func show(_ image: NSImage, at frame: NSRect) {
+    func show(_ image: NSImage, at frame: NSRect, animationDuration: TimeInterval = 0) {
         imageView.image = image
         setFrame(frame, display: true)
+        NSAnimationContext.runAnimationGroup { $0.duration = 0; animator().alphaValue = animationDuration > 0 ? 0 : 1 }
         orderFront(nil)
+        if animationDuration > 0 { NSAnimationContext.runAnimationGroup { $0.duration = animationDuration; animator().alphaValue = 1 } }
     }
 }
 
 #if DEBUG
 extension WindowSwitcherHotkeyController {
-    var moduleDiagnosticResources: [String: Int] { ["hotKeys": keyRefs.count, "handler": handler == nil ? 0 : 1, "monitor": monitor == nil ? 0 : 1, "subscriptions": subscriptions.count] }
+    func beginPhysicalInputAudit() {
+        guard !moduleRunning else { return }
+        moduleRunning = true
+        observeModelChanges();observeEnvironmentChanges()
+        installCarbonHandler();installLocalMonitor();configure()
+    }
+    func beginRegistrationAudit() {
+        guard !moduleRunning else { return }
+        moduleRunning = true
+        installCarbonHandler()
+        configure()
+    }
+    func refreshRegistrationForAudit() { configure() }
+    func checkNativeKeysForAudit() { checkNativeKeys() }
+    func loseNativeKeysForAudit() { guard syntheticAuditInput else { return };auditNativeKeysLost = true }
+    var moduleDiagnosticResources: [String: Int] { ["nativeKeyLease": nativeKeyLease?.isRunning == true ? 1 : 0, "nativeKeyTimer": nativeKeyTimer == nil ? 0 : 1, "hotKeys": keyRefs.count, "handler": handler == nil ? 0 : 1, "monitor": monitor == nil ? 0 : 1, "subscriptions": subscriptions.count, "prewarmTask": prewarmTask == nil ? 0 : 1, "focusTask": focusTask == nil ? 0 : 1, "dismissalTask": dismissalTask == nil ? 0 : 1, "conditionalExceptionTask": conditionalExceptionTask == nil ? 0 : 1, "gestureMonitor": configuredGestureOptions?.enabled == true && gestureMonitor.isRunning ? 1 : 0, "badgeTask": badgeTask == nil ? 0 : 1] }
+    func beginGestureAudit() {
+        syntheticAuditInput = true;auditReduceTransparency = true;moduleRunning = true
+        if subscriptions.isEmpty { observeModelChanges();observeEnvironmentChanges() }
+        if monitor == nil { installLocalMonitor() }
+        shortcuts = SwitcherShortcutStore.load(gestureSettings)
+        configureGestureInput(gestureInputAllowed ? SwitcherGestureOptions.load(gestureSettings) : .init())
+    }
+    func updateGestureSettingsForAudit() {
+        configureGestureInput(gestureInputAllowed ? SwitcherGestureOptions.load(gestureSettings) : .init())
+    }
+    var gestureOwnedForAudit: Bool { gestureOwner != nil }
+    func updateExceptionsForAudit() {
+        syntheticAuditInput = true; moduleRunning = true
+        if subscriptions.isEmpty { observeEnvironmentChanges() }
+        configure()
+    }
+    func schedulePrewarmForAudit(delay: Duration) { moduleRunning = true; schedulePrewarm(delay: delay) }
+
+    /// Isolated visual fixture: ordinary overlay and event monitor, no global hotkey registration,
+    /// no catalog refresh, and no handles that could mutate other applications' windows.
+    func beginVisualAudit(reduceTransparency: Bool, shortcut: SwitcherShortcut = .defaultOptionTab) -> NSPanel? {
+        syntheticAuditInput = true
+        auditReduceTransparency = reduceTransparency
+        cancelFocus()
+        cancelDismissal()
+        moduleRunning = true
+        if subscriptions.isEmpty { observeModelChanges(); observeEnvironmentChanges() }
+        if monitor == nil { installLocalMonitor() }
+        let id = UUID()
+        sessionID = id
+        activeShortcut = shortcut
+        activePresentation = shortcut.presentation.resolve(over: SwitcherPresentation.load())
+        activeNavigation = SwitcherNavigationOptions.load()
+        activeCursorPolicy = SwitcherCursorPolicy.load()
+        previousApplication = foregroundApplication()
+        sessionScreen = screenForSession()
+        model.sessionDisplayID = sessionScreen.flatMap(Self.displayID)
+        openedAtMouse = NSEvent.mouseLocation
+        model.captureSessionPointer(at: Self.coreGraphicsPoint(openedAtMouse))
+        model.sessionFilter = shortcut.filter
+        model.sessionOrder = presentation.order
+        presentPanel(sessionID: id)
+        panel?.contentView = NSHostingView(rootView: WindowSwitcherOverlayView(model: model, controller: self, choose: { _ in },
+                                                                            thumbnailSessionID: model.thumbnailSessionID,
+                                                                            reduceTransparencyOverride: reduceTransparency)
+            .preferredColorScheme(colorScheme))
+        return panel
+    }
+
+    var auditPanel: NSPanel? { panel }
+    func beginHeldAudit(shortcut: SwitcherShortcut) {
+        syntheticAuditInput = true; auditReduceTransparency = true; moduleRunning = true
+        if subscriptions.isEmpty { observeModelChanges(); observeEnvironmentChanges() }
+        if monitor == nil { installLocalMonitor() }
+        summon(shortcut: shortcut, backwards: false, holdsModifiers: true)
+    }
+    func dismissForAudit() { dismiss() }
+    func commitForAudit() { requestCommit() }
+    var previewVisibleForAudit: Bool { previewPanel?.isVisible == true }
+    var closingSnapshotVisibleForAudit: Bool { closingSnapshot?.isVisible == true }
+    var preparingForAudit: Bool { preparing }
+    func releaseModifiersForAudit() {
+        guard let activeShortcut else { return }
+        heldModifiers = Self.eventFlags(activeShortcut.effectiveHoldModifiers)
+        handleModifierState([])
+    }
 }
 #endif

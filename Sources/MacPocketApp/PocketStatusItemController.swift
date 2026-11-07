@@ -317,6 +317,7 @@ final class PocketApplicationState: ObservableObject {
     init() {
         #if DEBUG
         ModuleRuntimeAudit.prepareIfRequested()
+        WindowSwitcherRuntimeAudit.prepareIfRequested()
         AIUsageRuntimeAudit.prepareIfRequested()
         #endif
         let model = PocketModel()

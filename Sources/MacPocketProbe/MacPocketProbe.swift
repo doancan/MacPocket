@@ -9,6 +9,11 @@ struct MacPocketProbe {
         do {
             let arguments = Array(CommandLine.arguments.dropFirst())
             switch arguments.first ?? "help" {
+            case "switcher":
+                let request = SwitcherCLIRequest(command: try SwitcherCLICommand.parse(Array(arguments.dropFirst())))
+                let response = try await Task.detached { try SwitcherCLITransport.send(request) }.value
+                try output(response)
+                if response.errorCode != nil { exit(2) }
             case "usb-eject":
                 let disks = try await USBEject.load()
                 try output(disks.map { ["id": $0.id, "name": $0.name, "mounts": $0.mountPaths.joined(separator: ", ")] })
@@ -177,6 +182,10 @@ struct MacPocketProbe {
                   diagnostic <name> [PID]      Fixed read-only diagnostic; PID/self for openFiles
                   terminate <PID> [--force]    Signal an eligible same-user process
                   windows [--all]              Switchable windows on every Space (--all adds windowless apps)
+                  switcher list [--detailed]
+                  switcher focus <id> | switcher focus --mru <n>
+                  switcher show [1…9] | switcher hide | switcher status
+                  \(String(localized: "Komutlar çalışan MacPocket'a bağlanır. Profil ve MRU sırası 1'den başlar; show paneli açar, hide seçim yapmadan kapatır. status panelin görünürlüğünü bildirir."))
                   focus <windowID|id>          Bring a window to the front (switches Space when needed)
                   thumbnail <windowID> <png>   Capture one window (Screen Recording access required)
                   startup                      launchd startup items by class (read-only)

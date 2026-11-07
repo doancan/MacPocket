@@ -12,7 +12,16 @@ struct MacPocketApplication: App {
     @StateObject private var state = PocketApplicationState.shared
 
     init() {
-        // Must run before any localized string is resolved.
+        SwitcherNativeKeyEntry.runIfRequested()
+        #if DEBUG
+        // StateObject's wrapped-value thunk has not run: inspect existing TCC grants without
+        // loading application state, changing preferences, opening windows, or starting modules.
+        WindowSwitcherPermissionProbe.runIfRequested()
+        WindowExternalRuntimeAudit.runIfRequested()
+        WindowLifecycleAuditProducer.runIfRequested()
+        #endif
+        SwitcherCLIEntry.runIfRequested()
+        // Must run before the ordinary app resolves localized strings. CLI clients do not migrate defaults.
         PocketDefaults.applyLanguageDefault()
     }
 
@@ -55,10 +64,15 @@ struct MacPocketApplication: App {
 @MainActor
 final class PocketAppDelegate: NSObject, NSApplicationDelegate {
     private var defaultsObserver: NSObjectProtocol?
+    private var switcherCommandListener: SwitcherCLIListener?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         _ = PocketRelaunch.languageAtLaunch
         PocketDock.apply()
+        let commandService = SwitcherCommandService(controller: .shared)
+        switcherCommandListener = try? SwitcherCLIListener(portName: SwitcherCLITransport.portName(bundleIdentifier: Bundle.main.bundleIdentifier ?? "com.doancan.MacPocket")) { request in
+            await commandService.execute(request)
+        }
         // The Dock icon must come back if the menu bar item is hidden from anywhere (Settings, menu, import).
         defaultsObserver = NotificationCenter.default.addObserver(forName: UserDefaults.didChangeNotification, object: nil,
                                                                   queue: .main) { _ in
@@ -73,6 +87,9 @@ final class PocketAppDelegate: NSObject, NSApplicationDelegate {
         #if DEBUG
         // Exercise the ordinary scan from the signed app, whose identifier the root helper requires.
         let arguments = CommandLine.arguments
+        if let index = arguments.firstIndex(of: "--audit-switcher"), arguments.indices.contains(index + 1) {
+            Task { @MainActor in await WindowSwitcherRuntimeAudit.run(destination: URL(fileURLWithPath: arguments[index + 1])) }
+        }
         if let index = arguments.firstIndex(of: "--audit-ai-usage"), arguments.indices.contains(index + 1) {
             Task { @MainActor in await AIUsageRuntimeAudit.run(destination: URL(fileURLWithPath: arguments[index + 1])) }
         }
@@ -200,6 +217,7 @@ final class PocketAppDelegate: NSObject, NSApplicationDelegate {
     }
 
     func applicationWillTerminate(_ notification: Notification) {
+        switcherCommandListener?.stop();switcherCommandListener = nil
         AIUsageIntegration.shared.stop()
         SSHRuntime.shared.stop()
         PocketModuleRuntime.shared.shutdown()

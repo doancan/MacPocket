@@ -14,7 +14,7 @@
   <img alt="Platform" src="https://img.shields.io/badge/macOS-27%2B-black?logo=apple">
   <img alt="Apple Silicon" src="https://img.shields.io/badge/Apple%20Silicon-arm64-blue">
   <img alt="Swift" src="https://img.shields.io/badge/Swift-6-orange?logo=swift">
-  <img alt="Testler" src="https://img.shields.io/badge/testler-1116-brightgreen">
+  <img alt="Testler" src="https://img.shields.io/badge/testler-1439-brightgreen">
   <img alt="Diller" src="https://img.shields.io/badge/dil-T%C3%BCrk%C3%A7e%20%C2%B7%20English-lightgrey">
 </p>
 
@@ -39,7 +39,7 @@
 - **Wi-Fi analizi** — sinyal, gürültü, BSSID, çevredeki ağların kanal yoğunluğu ve modem için kanal önerisi.
 - **Disk sağlığı** — SSD’nin kendi bildirdiği yıpranma, yazılan veri ve sıcaklık (NVMe SMART), yönetici izni gerekmeden.
 - **Temizlik ve uygulama bakımı** — büyük/eski ve aynı içerikli dosyalar, uygulama kalıntıları, Homebrew güncelleme/kaldırma.
-- **Alt+Tab pencere geçişi** — Windows’taki gibi animasyonlu önizleme kartları.
+- **Alt+Tab pencere geçişi** — animasyonlu önizleme kartları; dokuz kısayol için bağımsız filtre, görünüm ve bırakma davranışı; özelleştirilebilir pencere eylemleri.
 - **Gizli ayarlar** — Dock, Finder, ekran görüntüsü ve performans ayarlarını Terminal’e girmeden değiştir.
 - **Ekran Süresi** — hangi uygulamada ne kadar zaman geçirdiğin; boşta ve kilitli süre sayılmaz, veriler bu Mac’te kalır.
 - **Esnek menü çubuğu** — CPU, GPU, RAM, disk, ağ ve sensörler; sürükle-bırak düzenleyici ve eşik renkleri.
@@ -75,7 +75,7 @@ sunar; Ayarlar’daki canlı düzenleyicide sürükle-bırak sıralanır, görü
 | | |
 | --- | --- |
 | Sürüm | **0.1.5** |
-| Testler | 1.116 uygulama testi; 4 gerçek disk/sistem testi isteğe bağlıdır. SSHConfigKit: 384, AIUsageKit: 420 test (3 isteğe bağlı atlama). |
+| Testler | 1.439 uygulama testi; 4 gerçek disk/sistem testi ve 1 bağlı trackpad testi isteğe bağlıdır. SSHConfigKit: 384, AIUsageKit: 420 test (3 isteğe bağlı atlama). |
 | Yerelleştirme | Türkçe (kaynak) ve İngilizce, eksik anahtar yok |
 | Belgeler | [Native macOS davranışları](docs/NATIVE_MACOS.md) · [Derleme ve canlı doğrulama](docs/NATIVE_BUILD.md) · [Alt+Tab kart geçişi](docs/WINDOW_SWITCHER.md) · [Devam eden geliştirme](docs/CONTINUED_DEVELOPMENT.md) |
 
@@ -84,7 +84,7 @@ sunar; Ayarlar’daki canlı düzenleyicide sürükle-bırak sıralanır, görü
 
 - Geliştirme pilsiz bir Mac Studio’da yapılır; MacBook şarj sınırı/durdurma ve pil donanımı burada doğrulanmış sayılmaz.
 - Gelişmiş güç otomasyonları henüz tamamlanmadı.
-- Tam AltTab, iStat veya CleanMyMac eşdeğerliği iddia edilmez; özel Spaces davranışları ve bütün görünüm seçenekleri eşlenmedi.
+- Tam AltTab, iStat veya CleanMyMac eşdeğerliği iddia edilmez; fiziksel klavye/trackpad, haptik ve üçüncü taraf uygulama kapsamındaki açık kontroller [pencere geçişi belgesindedir](docs/WINDOW_SWITCHER.md#bekleyen-canlı-kabul).
 - Hosts dosyasını kaydetmek macOS yönetici onayı ister.
 - AI Dosyaları aracı kullanıcı isteğiyle kaldırıldı.
 
@@ -116,6 +116,9 @@ swift run macpocket-probe diagnostic swap
 ```
 
 Derlenen uygulama `.build/MacPocket.app` içindedir.
+Çalışan uygulamanın pencere geçişine terminalden erişmek için
+`.build/MacPocket.app/Contents/MacOS/MacPocket --switcher list --detailed` kullanılabilir.
+ID/MRU ile odaklama ve panel aç/kapat komutları [pencere geçişi belgesindedir](docs/WINDOW_SWITCHER.md#on-yedinci-aşama--çalışan-uygulamaya-bağlı-cli).
 Tasarım kaynağı `Design/macpocket-system-center.html` içindedir; HTML önizleme örnek veri kullanır.
 [Etkileşimli tasarımı aç](https://p.superdesign.dev/draft/dd6d81b7-5129-4332-966b-ae40c5b265f0).
 

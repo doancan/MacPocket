@@ -24,6 +24,7 @@ let package = Package(
         .executableTarget(name: "MacPocketApp", dependencies: ["MacPocketCore", "MacPocketSSH", "MacPocketAIUsage", .product(name: "Sparkle", package: "Sparkle")]),
         .executableTarget(name: "MacPocketHelper", dependencies: ["MacPocketCore"]),
         .testTarget(name: "MacPocketCoreTests", dependencies: ["MacPocketCore"]),
+        .testTarget(name: "MacPocketAppTests", dependencies: ["MacPocketApp", "MacPocketCore"]),
         .testTarget(name: "MacPocketAIUsageTests", dependencies: ["MacPocketAIUsage", .product(name: "UsageCore", package: "AIUsageKit")]),
         .testTarget(name: "MacPocketSSHTests", dependencies: ["MacPocketSSH", .product(name: "SSHConfigKit", package: "SSHConfigKit")]),
     ]

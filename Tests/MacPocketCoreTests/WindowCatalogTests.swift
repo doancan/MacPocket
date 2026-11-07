@@ -49,6 +49,30 @@ final class WindowCatalogTests: XCTestCase {
         do { try await catalog.focus("not-a-live-handle"); XCTFail("Unknown focus accepted") }
         catch WindowCatalogError.expired {} catch { XCTFail("Unexpected error: \(error)") }
     }
+
+    func testGeometryFallbackRequiresOneUnambiguousWindow() {
+        let frame = CGRect(x: 100, y: 100, width: 600, height: 400)
+        let first = ServerWindow(id: 1, pid: 10, frame: frame, title: "Same title", onScreen: true)
+        let duplicate = ServerWindow(id: 2, pid: 10, frame: frame, title: "Same title", onScreen: true)
+        let near = ServerWindow(id: 3, pid: 10, frame: frame.offsetBy(dx: 1, dy: 1), title: "Another tab", onScreen: false)
+        XCTAssertEqual(WindowCatalog.uniqueWindowID(matching: frame, candidates: [first]), 1)
+        XCTAssertNil(WindowCatalog.uniqueWindowID(matching: frame, candidates: [first, duplicate]))
+        XCTAssertNil(WindowCatalog.uniqueWindowID(matching: frame, candidates: [first, near]))
+        XCTAssertNil(WindowCatalog.uniqueWindowID(matching: frame.offsetBy(dx: 100, dy: 0), candidates: [first]))
+    }
+
+    func testEnvironmentRefreshRetainsTargetAndAppliesQueuedInputOnce() {
+        let old = [window("old"), window("kept"), window("last")]
+        let fresh = [window("new"), window("kept"), window("other")]
+        XCTAssertEqual(WindowSwitchSelection.refreshed(old, preserving: "kept", queuedSteps: 1), "last")
+        XCTAssertEqual(WindowSwitchSelection.refreshed(fresh, preserving: "kept", queuedSteps: 1), "other")
+        XCTAssertEqual(WindowSwitchSelection.refreshed(fresh, preserving: "kept", queuedSteps: -2), "other")
+        XCTAssertEqual(WindowSwitchSelection.refreshed(fresh, preserving: "gone"), "new")
+        XCTAssertEqual(WindowSwitchSelection.refreshed(fresh, preserving: "gone", queuedSteps: -1), "other")
+        XCTAssertNotNil(WindowSwitchSelection.refreshed(fresh, preserving: nil, queuedSteps: .max))
+        XCTAssertNotNil(WindowSwitchSelection.refreshed(fresh, preserving: nil, queuedSteps: .min))
+        XCTAssertNil(WindowSwitchSelection.refreshed([], preserving: "kept", queuedSteps: 100))
+    }
 }
 
 final class SwitcherConfigurationTests: XCTestCase {
@@ -90,7 +114,9 @@ final class SwitcherConfigurationTests: XCTestCase {
 
     func testValidationRejectsReservedDuplicateUnmodifiedAndTooMany() {
         XCTAssertTrue(SwitcherShortcutValidation.problems([.defaultOptionTab]).isEmpty)
-        XCTAssertFalse(SwitcherShortcutValidation.problems([.init(keyCode: SwitcherKeys.tab, modifiers: .command)]).isEmpty)
+        XCTAssertFalse(SwitcherShortcutValidation.problems([]).isEmpty)
+        XCTAssertFalse(SwitcherShortcutValidation.problems([.init(keyCode: SwitcherKeys.tab, modifiers: .init(rawValue: 128))]).isEmpty)
+        XCTAssertTrue(SwitcherShortcutValidation.problems([.init(keyCode: SwitcherKeys.tab, modifiers: .command)]).isEmpty)
         XCTAssertFalse(SwitcherShortcutValidation.problems([.init(keyCode: SwitcherKeys.tab, modifiers: [])]).isEmpty)
         XCTAssertFalse(SwitcherShortcutValidation.problems([.defaultOptionTab, .defaultOptionTab]).isEmpty)
         XCTAssertFalse(SwitcherShortcutValidation.problems([.init(keyCode: SwitcherKeys.escape, modifiers: .option)]).isEmpty)
@@ -105,7 +131,7 @@ final class SwitcherConfigurationTests: XCTestCase {
         defaults.set(true, forKey: "switcher.currentApplication")
         let migrated = SwitcherShortcutStore.load(defaults)
         XCTAssertEqual(migrated.count, 1)
-        XCTAssertEqual(migrated[0].displayName, "⌃⌥Space")
+        XCTAssertEqual(migrated[0].displayName, "⌃⌥" + String(localized: "Boşluk"))
         XCTAssertFalse(migrated[0].releaseToChoose)
         XCTAssertTrue(migrated[0].filter.currentApplicationOnly)
         var second = SwitcherShortcut(keyCode: SwitcherKeys.grave, modifiers: .option)

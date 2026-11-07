@@ -9,8 +9,12 @@ struct WindowSwitcherOverlayView: View {
     @ObservedObject var model: WindowSwitcherModel
     @ObservedObject var controller: WindowSwitcherHotkeyController
     let choose: (String) -> Void
+    let thumbnailSessionID: UUID
+    var reduceTransparencyOverride: Bool? = nil
     @PocketReduceMotion private var reduceMotion
-    @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
+    @Environment(\.accessibilityReduceTransparency) private var systemReduceTransparency
+    @Namespace private var selectionAnimation
+    private var reduceTransparency: Bool { reduceTransparencyOverride ?? systemReduceTransparency }
 
     private static let radius: CGFloat = 20
 
@@ -22,13 +26,17 @@ struct WindowSwitcherOverlayView: View {
             .accessibilityLabel("Pencere geçişi")
     }
 
-    /// The panel is a Liquid Glass HUD, present from the first frame (the window itself fades in); the
-    /// selection frame, hover fills and search pill on it are plain fills (no glass on glass). List and
-    /// selection changes are instant, as in the system switcher.
+    /// One glass surface; selection is a single moving frame rather than another glass layer.
+    /// Reduced transparency uses an opaque native window color, including action buttons.
     @ViewBuilder private func surface(_ layout: SwitcherLayout) -> some View {
         let shape = RoundedRectangle(cornerRadius: Self.radius, style: .continuous)
-        GlassEffectContainer {
-            panel(layout).glassEffect(.regular, in: shape)
+        if reduceTransparency {
+            panel(layout).background(Color(nsColor: .windowBackgroundColor), in: shape)
+                .overlay { shape.strokeBorder(.primary.opacity(0.18), lineWidth: 1) }
+        } else {
+            GlassEffectContainer {
+                panel(layout).glassEffect(.regular, in: shape)
+            }
         }
     }
 
@@ -61,11 +69,11 @@ struct WindowSwitcherOverlayView: View {
     /// Search appears only while typing, floating over the panel's top edge. It sits on the panel's
     /// surface, so it is an accent-tinted fill rather than a second layer of glass or material.
     @ViewBuilder private var searchPill: some View {
-        if !model.sessionSearch.isEmpty {
+        if model.isSearching {
             HStack(spacing: PocketSpacing.xs) {
                 Image(systemName: "magnifyingglass")
-                Text(model.sessionSearch).fontWeight(.semibold)
-                    .contentTransition(.interpolate)
+                if model.sessionSearch.isEmpty { Text("Aramak için yaz").foregroundStyle(.secondary) }
+                else { Text(model.sessionSearch).fontWeight(.semibold).contentTransition(.interpolate) }
             }
             .font(.callout)
             .padding(.horizontal, 12).padding(.vertical, 5)
@@ -78,12 +86,17 @@ struct WindowSwitcherOverlayView: View {
 
     /// One quiet line, shown only when something limits the result (permissions).
     @ViewBuilder private var statusLine: some View {
-        if !model.trusted {
+        if let failure = model.failure {
+            Label(failure, systemImage: "exclamationmark.triangle.fill")
+                .font(.caption).foregroundStyle(.red).lineLimit(1).help(failure)
+        } else if !model.trusted {
             Label("Pencere başlıkları için Erişilebilirlik izni gerekli", systemImage: "lock.fill")
                 .font(.caption).foregroundStyle(.secondary).frame(height: 16)
         } else if !WindowPreviewProvider.permitted {
             Label("Canlı önizleme için Ekran Kaydı izni gerekli", systemImage: "lock.fill")
                 .font(.caption).foregroundStyle(.secondary).frame(height: 16)
+        } else {
+            Text(controller.sessionHint).font(.caption).foregroundStyle(.secondary).lineLimit(1)
         }
     }
 
@@ -102,14 +115,20 @@ struct WindowSwitcherOverlayView: View {
         return LazyVGrid(columns: columns, spacing: style == .titles ? 4 : SwitcherLayout.spacing) {
             ForEach(windows) { window in
                 SwitcherItem(window: window, style: style, size: layout.itemSize,
+                             badge: controller.presentation.showBadges ? model.applicationBadge(for: window) : nil,
                              selected: model.selection == window.id, thumbnail: model.thumbnails[window.id],
-                             reduceMotion: reduceMotion,
+                             thumbnailUnavailable: model.unavailableThumbnails.contains(window.id) || !window.canCapturePreview,
+                             actionBusy: model.actionBusy, presentation: controller.presentation,
+                             reduceMotion: reduceMotion, reduceTransparency: reduceTransparency, selectionAnimation: selectionAnimation,
                              choose: { choose(window.id) },
                              hover: { controller.hover(window.id) },
-                             close: { controller.act(.close, on: window.id) })
+                             act: { controller.act($0, on: window.id) })
                     .id(window.id)
+                    .onAppear { model.thumbnailVisibilityChanged(window.id, visible: true, sessionID: thumbnailSessionID) }
+                    .onDisappear { model.thumbnailVisibilityChanged(window.id, visible: false, sessionID: thumbnailSessionID) }
             }
         }
+        .animation(reduceMotion || !controller.presentation.animateSelection ? nil : .easeOut(duration: 0.16), value: model.selection)
     }
 }
 
@@ -117,15 +136,22 @@ private struct SwitcherItem: View {
     let window: SwitchableWindow
     let style: SwitcherStyle
     let size: CGSize
+    let badge: DockApplicationBadge?
     let selected: Bool
     let thumbnail: NSImage?
+    let thumbnailUnavailable: Bool
+    let actionBusy: Bool
+    let presentation: SwitcherPresentation
     let reduceMotion: Bool
+    let reduceTransparency: Bool
+    let selectionAnimation: Namespace.ID
     let choose: () -> Void
     let hover: () -> Void
-    let close: () -> Void
+    let act: (WindowAction) -> Void
     @State private var hovering = false
 
     private var radius: CGFloat { style == .titles ? 8 : 12 }
+    private var showsActions: Bool { presentation.showActions && hovering && (window.canClose || window.canMinimize || window.canFullScreen) }
 
     var body: some View {
         Button(action: choose) {
@@ -146,32 +172,61 @@ private struct SwitcherItem: View {
                             RoundedRectangle(cornerRadius: radius, style: .continuous)
                                 .strokeBorder(Color.accentColor, lineWidth: style == .titles ? 2 : 2.5)
                         }
+                        .matchedGeometryEffect(id: "switcher-selection", in: selectionAnimation)
                 }
             }
         }
-        .overlay(alignment: .topTrailing) {
-            if hovering && window.canClose && style != .titles {
-                Button(action: close) {
-                    Image(systemName: "xmark").font(.system(size: 10, weight: .bold))
-                        .frame(width: 22, height: 22)
-                        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 6, style: .continuous))
-                }
-                .buttonStyle(.plain)
-                .help("Pencereyi kapat")
-                .accessibilityLabel("Pencereyi kapat")
-                .padding(6)
-                .transition(.opacity)
-            }
-        }
+        .overlay(alignment: .topTrailing) { if style != .thumbnails { actionControls } }
         .onHover { inside in
-            withAnimation(reduceMotion ? nil : .easeOut(duration: 0.12)) { hovering = inside }
+            withAnimation(reduceMotion || !presentation.animateSelection ? nil : .easeOut(duration: 0.12)) { hovering = inside }
             if inside { hover() }
         }
-        .accessibilityElement(children: .ignore)
+        .help("\(window.application), \(window.title)")
+        .accessibilityElement(children: .combine)
         .accessibilityLabel("\(window.application), \(window.title)")
         .accessibilityValue(stateDescription)
         .accessibilityAddTraits(selected ? [.isSelected, .isButton] : .isButton)
-        .accessibilityAction(named: "Pencereyi kapat") { close() }
+        .accessibilityActions {
+            if window.canClose { Button("Pencereyi kapat") { act(.close) } }
+            if window.canMinimize {
+                Button(window.minimized ? "Pencereyi geri getir" : "Pencereyi küçült") { act(window.minimized ? .restore : .minimize) }
+            }
+            if window.canFullScreen {
+                Button(window.fullScreen ? "Tam ekrandan çık" : "Tam ekrana geç") { act(.toggleFullScreen) }
+            }
+        }
+    }
+
+    @ViewBuilder private var actionControls: some View {
+        if showsActions {
+            HStack(spacing: 2) {
+                if window.canFullScreen {
+                    actionButton(window.fullScreen ? "Tam ekrandan çık" : "Tam ekrana geç",
+                                 symbol: window.fullScreen ? "arrow.down.right.and.arrow.up.left" : "arrow.up.left.and.arrow.down.right",
+                                 action: .toggleFullScreen)
+                }
+                if window.canMinimize {
+                    actionButton(window.minimized ? "Pencereyi geri getir" : "Pencereyi küçült",
+                                 symbol: window.minimized ? "plus" : "minus", action: window.minimized ? .restore : .minimize)
+                }
+                if window.canClose { actionButton("Pencereyi kapat", symbol: "xmark", action: .close) }
+            }
+            .disabled(actionBusy)
+            .padding(3)
+            .background {
+                if reduceTransparency { RoundedRectangle(cornerRadius: 8).fill(Color(nsColor: .windowBackgroundColor)) }
+                else { RoundedRectangle(cornerRadius: 8).fill(.regularMaterial) }
+            }
+            .padding(style == .titles ? 4 : style == .icons ? 1 : 6)
+            .transition(.opacity)
+        }
+    }
+
+    private func actionButton(_ title: LocalizedStringKey, symbol: String, action: WindowAction) -> some View {
+        Button { act(action) } label: {
+            Image(systemName: symbol).font(.system(size: 10, weight: .bold)).frame(width: 24, height: 24)
+        }
+        .buttonStyle(.plain).help(title).accessibilityLabel(title)
     }
 
     @ViewBuilder private var content: some View {
@@ -187,15 +242,19 @@ private struct SwitcherItem: View {
         VStack(alignment: .leading, spacing: 6) {
             HStack(spacing: 6) {
                 PocketAppIcon(url: window.applicationURL, size: 16)
-                Text(window.isRealWindow ? window.title : window.application)
-                    .font(.system(size: 12, weight: selected ? .semibold : .regular))
-                    .lineLimit(1).truncationMode(.tail)
+                VStack(alignment: .leading, spacing: 1) {
+                    Text(labels.primary).font(.system(size: 12, weight: selected ? .semibold : .regular))
+                        .lineLimit(1).truncationMode(truncation)
+                    if let secondary = labels.secondary { Text(secondary).font(.caption2).foregroundStyle(.secondary).lineLimit(1).truncationMode(truncation) }
+                }
+                .layoutPriority(1)
                 Spacer(minLength: 0)
+                notificationBadge
+                tabLabel
                 if let symbol = stateSymbol {
                     Image(systemName: symbol).font(.system(size: 10, weight: .semibold)).foregroundStyle(.secondary)
                 }
             }
-            .padding(.trailing, 22)
             ZStack {
                 if let thumbnail {
                     Image(nsImage: thumbnail).resizable().interpolation(.high).scaledToFit()
@@ -204,29 +263,57 @@ private struct SwitcherItem: View {
                         .opacity(window.minimized ? 0.6 : 1)
                 } else {
                     RoundedRectangle(cornerRadius: 6, style: .continuous).fill(.primary.opacity(0.05))
-                    PocketAppIcon(url: window.applicationURL, size: min(64, size.height * 0.38))
-                        .opacity(window.minimized || window.hidden ? 0.55 : 1)
+                    VStack(spacing: 6) {
+                        PocketAppIcon(url: window.applicationURL, size: min(64, size.height * 0.38))
+                            .opacity(window.minimized || window.hidden ? 0.55 : 1)
+                        if selected && window.isRealWindow {
+                            if window.minimized {
+                                Text("Küçültülmüş").font(.caption2).foregroundStyle(.secondary)
+                            } else if window.nativeTab?.selected == false {
+                                Text("Henüz sekme görüntüsü yok").font(.caption2).foregroundStyle(.secondary)
+                            } else if thumbnailUnavailable {
+                                Text("Önizleme alınamadı").font(.caption2).foregroundStyle(.secondary)
+                            }
+                        }
+                    }
                 }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .overlay(alignment: .topTrailing) { actionControls }
+            .overlay(alignment: .bottomTrailing) { spaceBadge.padding(4) }
+            .overlay(alignment: .bottomLeading) {
+                if thumbnail != nil && (window.minimized || thumbnailUnavailable) {
+                    Label("Son görüntü", systemImage: "clock").font(.caption2).foregroundStyle(.secondary)
+                        .padding(4).background(Color(nsColor: .windowBackgroundColor), in: RoundedRectangle(cornerRadius: 4))
+                        .padding(4)
+                }
             }
+        }
         .padding(8)
     }
 
     private var iconCard: some View {
         VStack(spacing: 6) {
             ZStack(alignment: .bottomTrailing) {
-                PocketAppIcon(url: window.applicationURL, size: min(size.width * 0.58, 76))
+                PocketAppIcon(url: window.applicationURL, size: min(size.width * 0.58, 76, max(18, size.height - (labels.secondary == nil ? 44 : 62))))
                     .opacity(window.minimized || window.hidden ? 0.6 : 1)
                 if let symbol = stateSymbol {
                     Image(systemName: symbol).font(.caption2.weight(.bold))
-                        .padding(3).background(.regularMaterial, in: Circle())
+                        .padding(3).background(Color(nsColor: .windowBackgroundColor), in: Circle())
                 }
             }
-            .frame(maxHeight: .infinity)
-            Text(window.isRealWindow ? window.title : window.application).font(.caption)
-                .fontWeight(selected ? .semibold : .regular)
-                .lineLimit(1).truncationMode(.tail)
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .overlay(alignment: .topLeading) {
+                if window.nativeTab != nil, !showsActions {
+                    tabLabel
+                        .padding(3).background(Color(nsColor: .windowBackgroundColor), in: RoundedRectangle(cornerRadius: 4))
+                }
+            }
+            .overlay(alignment: .topTrailing) { if !showsActions { notificationBadge } }
+            .overlay(alignment: .bottomLeading) { if !showsActions { spaceBadge } }
+            Text(labels.primary).font(.caption).fontWeight(selected ? .semibold : .regular)
+                .lineLimit(1).truncationMode(truncation)
+            if let secondary = labels.secondary { Text(secondary).font(.caption2).foregroundStyle(.secondary).lineLimit(1).truncationMode(truncation) }
         }
         .padding(8)
     }
@@ -234,29 +321,73 @@ private struct SwitcherItem: View {
     private var titleRow: some View {
         HStack(spacing: PocketSpacing.s) {
             PocketAppIcon(url: window.applicationURL, size: 22)
-            Text(window.isRealWindow ? window.title : window.application).font(.callout)
-                .fontWeight(selected ? .semibold : .regular).lineLimit(1)
+            Text(labels.primary).font(.callout).fontWeight(selected ? .semibold : .regular)
+                .lineLimit(1).truncationMode(truncation).layoutPriority(1)
             Spacer(minLength: PocketSpacing.s)
-            Text(window.application).font(.caption).foregroundStyle(.secondary).lineLimit(1)
+            if let secondary = labels.secondary { Text(secondary).font(.caption).foregroundStyle(.secondary).lineLimit(1).truncationMode(truncation) }
+            notificationBadge
+            tabLabel
+            spaceBadge
             if let symbol = stateSymbol { Image(systemName: symbol).font(.caption).foregroundStyle(.secondary) }
         }
         .padding(.horizontal, PocketSpacing.s)
+        .padding(.trailing, showsActions ? 88 : 0)
     }
 
     /// At most one small glyph; the full meaning is in the VoiceOver value, not on screen.
+    private var labels: (primary: String, secondary: String?) { presentation.titleMode.labels(for: window, style: style) }
+    private var truncation: Text.TruncationMode {
+        switch presentation.truncation { case .head: .head; case .middle: .middle; case .tail: .tail }
+    }
+    @ViewBuilder private var tabLabel: some View {
+        if let tab = window.nativeTab {
+            Text(size.width < 220 && style != .titles ? String(localized: "\(tab.ordinal)/\(tab.count)") : tab.localizedDescription)
+                .font(.caption2).foregroundStyle(.secondary).fixedSize()
+                .help(tab.localizedDescription).accessibilityHidden(true)
+        }
+    }
+    @ViewBuilder private var notificationBadge: some View {
+        if let badge {
+            Text(badge.displayText).font(.system(size: 10,weight: .semibold,design: .rounded))
+                .foregroundStyle(.white).lineLimit(1).fixedSize()
+                .padding(.horizontal,5).padding(.vertical,2)
+                .background(Color(red: 0.72,green: 0.10,blue: 0.14),in: Capsule())
+                .help(badge.localizedDescription).accessibilityHidden(true)
+        }
+    }
+    @ViewBuilder private var spaceBadge: some View {
+        if presentation.showSpaces {
+            Text(SwitcherSpaceBadge.text(window.spaceMembership)).font(.caption2.monospacedDigit())
+                .lineLimit(1).padding(.horizontal, 4).padding(.vertical, 2)
+                .background(Color(nsColor: .windowBackgroundColor), in: RoundedRectangle(cornerRadius: 4))
+                .help(window.spaceMembership?.localizedDescription ?? String(localized: "Masaüstü bilgisi bilinmiyor"))
+                .accessibilityHidden(true)
+        }
+    }
     private var stateSymbol: String? {
+        guard presentation.showStatus else { return nil }
         if window.minimized { return "minus.rectangle" }
         if window.hidden { return "eye.slash" }
-        if window.otherSpace { return "rectangle.on.rectangle" }
+        if window.isOnAnotherSpace { return "rectangle.on.rectangle" }
         if window.fullScreen { return "arrow.up.left.and.arrow.down.right" }
         return nil
     }
 
     private var stateDescription: String {
-        if window.minimized { return String(localized: "Küçültülmüş") }
-        if window.hidden { return String(localized: "Gizli") }
-        if window.otherSpace { return String(localized: "Diğer masaüstünde") }
-        if window.fullScreen { return String(localized: "Tam ekran") }
-        return window.isRealWindow ? "" : String(localized: "Penceresiz uygulama")
+        var parts: [String] = []
+        if let badge { parts.append(badge.localizedDescription) }
+        if window.minimized { parts.append(String(localized: "Küçültülmüş")) }
+        if window.hidden { parts.append(String(localized: "Gizli")) }
+        if window.isOnAnotherSpace { parts.append(String(localized: "Diğer masaüstünde")) }
+        if let membership = window.spaceMembership { parts.append(membership.localizedDescription) }
+        else if presentation.showSpaces { parts.append(String(localized: "Masaüstü bilgisi bilinmiyor")) }
+        if let tab = window.nativeTab {
+            parts.append(tab.localizedDescription)
+            if !tab.selected { parts.append(String(localized: "Arka plan sekmesi")) }
+        }
+        if window.fullScreen { parts.append(String(localized: "Tam ekran")) }
+        if !window.isRealWindow { parts.append(String(localized: "Penceresiz uygulama")) }
+        if thumbnail != nil && (window.minimized || thumbnailUnavailable) { parts.append(String(localized: "Son görüntü")) }
+        return parts.joined(separator: ", ")
     }
 }

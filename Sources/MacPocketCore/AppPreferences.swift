@@ -1,4 +1,5 @@
 import Foundation
+import CoreFoundation
 
 // MARK: - Language
 
@@ -44,12 +45,16 @@ public enum SettingsTransferError: Error, LocalizedError, Equatable, Sendable {
     case unreadable
     case wrongFormat
     case unsupportedVersion(Int)
+    case invalidValue(String)
+    case tooLarge
 
     public var errorDescription: String? {
         switch self {
         case .unreadable: String(localized: "Ayar dosyası okunamadı.")
         case .wrongFormat: String(localized: "Bu dosya bir MacPocket ayar dosyası değil.")
         case .unsupportedVersion(let version): String(localized: "Ayar dosyası sürümü desteklenmiyor (\(version)).")
+        case .invalidValue(let key): String(localized: "Ayar dosyasında geçersiz bir değer var (\(key)). Mevcut ayarlar korunuyor.")
+        case .tooLarge: String(localized: "Ayar dosyası çok büyük (en fazla 8 MB).")
         }
     }
 }
@@ -60,6 +65,7 @@ public enum SettingsTransfer {
     public static let format = "MacPocket.settings"
     public static let version = 1
     public static let keyPrefixes = ["MacPocket.", "switcher."]
+    public static let maximumFileBytes = 8 * 1024 * 1024
 
     public static func isTransferable(_ key: String) -> Bool {
         keyPrefixes.contains { key.hasPrefix($0) && key.count > $0.count }
@@ -73,34 +79,86 @@ public enum SettingsTransfer {
     public static func exportData(from values: [String: Any]) throws -> Data {
         let encoded = values.compactMapValues(encode).filter { isTransferable($0.key) }
         let document: [String: Any] = ["format": format, "version": version, "values": encoded]
-        return try JSONSerialization.data(withJSONObject: document, options: [.prettyPrinted, .sortedKeys])
+        let data = try JSONSerialization.data(withJSONObject: document, options: [.prettyPrinted, .sortedKeys])
+        guard data.count <= maximumFileBytes else { throw SettingsTransferError.tooLarge }
+        return data
     }
 
     public static func importValues(from data: Data) throws -> [String: Any] {
+        guard data.count <= maximumFileBytes else { throw SettingsTransferError.tooLarge }
         guard let object = try? JSONSerialization.jsonObject(with: data) else { throw SettingsTransferError.unreadable }
         guard let document = object as? [String: Any], document["format"] as? String == format,
               let values = document["values"] as? [String: Any] else { throw SettingsTransferError.wrongFormat }
-        let fileVersion = document["version"] as? Int ?? 0
+        let number = document["version"] as? NSNumber
+        let fileVersion = number.flatMap { n in
+            CFGetTypeID(n) != CFBooleanGetTypeID() && n.doubleValue == Double(n.intValue) ? n.intValue : nil
+        } ?? 0
         guard fileVersion >= 1 && fileVersion <= version else { throw SettingsTransferError.unsupportedVersion(fileVersion) }
-        return values.filter { isTransferable($0.key) }.compactMapValues(decode)
-    }
-
-    /// Replaces every transferable key: values missing from the import fall back to their defaults.
-    public static func apply(_ values: [String: Any], to defaults: UserDefaults, domain: String) {
-        reset(defaults, domain: domain)
-        for (key, value) in values where isTransferable(key) { defaults.set(value, forKey: key) }
-    }
-
-    /// Removes every transferable key from the app's own domain.
-    public static func reset(_ defaults: UserDefaults, domain: String) {
-        for key in (defaults.persistentDomain(forName: domain) ?? [:]).keys where isTransferable(key) {
-            defaults.removeObject(forKey: key)
+        var decoded: [String: Any] = [:]
+        for (key,value) in values where isTransferable(key) {
+            guard let result = decode(value),validSwitcherValue(result,for: key) else { throw SettingsTransferError.invalidValue(key) }
+            decoded[key] = result
         }
+        return decoded
     }
 
-    /// The transferable part of the app's own domain.
+    /// Read at most the admitted size, even when a selected file is much larger or changes size.
+    public static func readImportData(from url: URL) throws -> Data {
+        let file = try FileHandle(forReadingFrom: url)
+        defer { try? file.close() }
+        var data = Data()
+        while data.count <= maximumFileBytes {
+            let count = min(64 * 1024,maximumFileBytes + 1 - data.count)
+            guard let chunk = try file.read(upToCount: count),!chunk.isEmpty else { break }
+            data.append(chunk)
+        }
+        guard data.count <= maximumFileBytes else { throw SettingsTransferError.tooLarge }
+        return data
+    }
+
+    /// Parse and validate every selected value before any preference changes.
+    public static func importAndApply(_ data: Data,to defaults: UserDefaults,domain: String) throws {
+        let values = try importValues(from: data)
+        apply(values,to: defaults,domain: domain)
+    }
+
+    /// One domain replacement avoids exposing a reset-then-write intermediate state to observers.
+    /// Unrelated defaults, including the language and other applications' keys, are preserved.
+    public static func apply(_ values: [String: Any], to defaults: UserDefaults, domain: String) {
+        var next = defaults.persistentDomain(forName: domain) ?? [:]
+        next = next.filter { !isTransferable($0.key) }
+        next.merge(filtered(values)) { _,new in new }
+        // Imported disabled shortcuts must survive first module startup instead of being enabled
+        // again by the old first-run migration when the archive omitted this internal marker.
+        if values["switcher.globalEnabled"] != nil { next["switcher.cardOverlayConfigured"] = true }
+        defaults.setPersistentDomain(next,forName: domain)
+    }
+
+    public static func reset(_ defaults: UserDefaults, domain: String) {
+        let remaining = (defaults.persistentDomain(forName: domain) ?? [:]).filter { !isTransferable($0.key) }
+        defaults.setPersistentDomain(remaining,forName: domain)
+    }
+
     public static func currentValues(_ defaults: UserDefaults, domain: String) -> [String: Any] {
         filtered(defaults.persistentDomain(forName: domain) ?? [:])
+    }
+
+    private struct ImportedShortcutIdentity: Decodable { let id: UUID }
+    private static func validSwitcherValue(_ value: Any,for key: String) -> Bool {
+        switch key {
+        case SwitcherShortcutStore.key:
+            guard let data = value as? Data,let identities = try? JSONDecoder().decode([ImportedShortcutIdentity].self,from: data),
+                  let list = try? JSONDecoder().decode([SwitcherShortcut].self,from: data),identities.count == list.count else { return false }
+            return SwitcherShortcutValidation.problems(list).isEmpty && Set(list.map(\.id)).count == list.count
+        case SwitcherActionBindings.key:
+            guard let data = value as? Data,let list = try? JSONDecoder().decode([SwitcherActionBinding].self,from: data) else { return false }
+            let merged = SwitcherActionBinding.defaults.map { original in list.first { $0.action == original.action } ?? original }
+            return SwitcherActionBindings.problems(list).isEmpty && SwitcherActionBindings.problems(merged).isEmpty
+        case SwitcherExceptionStore.key:
+            guard let data = value as? Data,let list = try? JSONDecoder().decode([SwitcherExceptionRule].self,from: data) else { return false }
+            return list.count <= SwitcherExceptionStore.maximumCount && Set(list.map(\.id)).count == list.count && list.allSatisfy { $0.validationMessage == nil }
+        default: return true // Preserve compatible legacy and future preferences byte-for-byte.
+        }
     }
 
     private static func encode(_ value: Any) -> Any? {
@@ -122,8 +180,14 @@ public enum SettingsTransfer {
     private static func decode(_ value: Any) -> Any? {
         switch value {
         case let dictionary as [String: Any]:
-            if dictionary.count == 1, let base64 = dictionary["$data"] as? String { return Data(base64Encoded: base64) }
-            if dictionary.count == 1, let seconds = dictionary["$date"] as? Double { return Date(timeIntervalSince1970: seconds) }
+            if dictionary.count == 1,dictionary["$data"] != nil {
+                guard let base64 = dictionary["$data"] as? String else { return nil }
+                return Data(base64Encoded: base64)
+            }
+            if dictionary.count == 1,dictionary["$date"] != nil {
+                guard let seconds = dictionary["$date"] as? NSNumber,CFGetTypeID(seconds) != CFBooleanGetTypeID(),seconds.doubleValue.isFinite else { return nil }
+                return Date(timeIntervalSince1970: seconds.doubleValue)
+            }
             let items = dictionary.compactMapValues(decode)
             return items.count == dictionary.count ? items : nil
         case let array as [Any]:
@@ -131,7 +195,7 @@ public enum SettingsTransfer {
             return items.count == array.count ? items : nil
         case is NSNull: return nil
         case let string as String: return string
-        case let number as NSNumber: return number
+        case let number as NSNumber: return number.doubleValue.isFinite ? number : nil
         default: return nil
         }
     }

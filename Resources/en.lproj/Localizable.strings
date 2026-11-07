@@ -1492,6 +1492,10 @@
 "⌘Q çık" = "⌘Q quit";
 "⌘W kapat" = "⌘W close";
 "⌘⇥ macOS uygulama geçişine ayrılmıştır." = "⌘⇥ is reserved for the macOS app switcher.";
+"Güvenli Klavye Girişi açık" = "Secure Keyboard Entry is on";
+"Dosya seçicisi açılamadı. Ayarlar penceresinde yeniden dene." = "The file picker could not open. Try again in the Settings window.";
+"Başka bir uygulama" = "Another app";
+"%@ güvenli klavye girişini açık tutuyor. Bazı global kısayollar bu sırada çalışmayabilir. İlgili uygulamadaki parola veya kimlik doğrulama alanından çıktıktan sonra yeniden dene." = "%@ is keeping Secure Keyboard Entry on. Some global shortcuts may not work while it is active. Leave the password or authentication field in that app, then try again.";
 
 "Aramayı temizle" = "Clear search";
 "Bekleniyor: %@. macOS bir izin penceresi göstermiş olabilir; yanıt verince tarama sürer." = "Waiting for: %@. macOS may be showing a permission prompt; the scan continues once you answer.";
@@ -4186,3 +4190,234 @@
 "MacPocket’ı yükle" = "Install MacPocket";
 "MacPocket’ı Uygulamalar klasörüne sürükle." = "Drag MacPocket to Applications.";
 "Ardından Uygulamalar’dan açıp bu diski çıkarabilirsin." = "Then open it from Applications and eject this disk.";
+
+/* Window switcher actions and capture states. */
+"Pencereyi geri getir" = "Restore Window";
+"Tam ekrana geç" = "Enter Full Screen";
+"Tam ekrandan çık" = "Exit Full Screen";
+"Önizleme alınamadı" = "Preview Unavailable";
+"Son görüntü" = "Last Captured Image";
+
+/* Per-shortcut window switcher settings and active actions. */
+"%@ birden fazla eyleme atanmış." = "%@ is assigned to more than one action.";
+"%@ bırak: ara" = "release %@: search";
+"%@ kısayolunu değiştir" = "Change shortcut for %@";
+"%@: bu tuş gezinme veya vazgeçme için ayrılmıştır." = "%@: this key is reserved for navigation or canceling.";
+"Aramak için yaz" = "Type to search";
+"Aramaya geç" = "Start Search";
+"Aynı eylem birden fazla kez tanımlanamaz." = "An action cannot be defined more than once.";
+"Boyutlandırma" = "Sizing";
+"Bu bölüm genel görünümü belirler. Kısayollarda farklı bir görünüm seçebilirsin. Saydamlığı azalt tercihinde düz arka plan kullanılır." = "These are the global appearance settings. Each shortcut can use a different appearance. Reduce Transparency uses a solid background.";
+"Bu kısayolu önizle" = "Preview This Shortcut";
+"Desteklenmeyen değiştirici tuş." = "Unsupported modifier key.";
+"Eylem kısayollarını sıfırla" = "Reset Action Shortcuts";
+"Eylem kısayolunu kaldır" = "Remove Action Shortcut";
+"Genel ayarı izle" = "Use Global Setting";
+"Görünüm ve sıralama" = "Appearance and Order";
+"Her kısayolun kendi filtreleri, görünümü ve bırakma davranışı vardır. Özelleştirilmeyen seçenekler genel ayarları izler. Shift ters yönde gezer." = "Each shortcut has its own filters, appearance, and release behavior. Unchanged options follow the global settings. Shift cycles backward.";
+"Küçült veya geri getir" = "Minimize or Restore";
+"Panel açıkken kısayollar" = "Shortcuts While Open";
+"Paneli açık tut" = "Keep Switcher Open";
+"Sabit boyut" = "Fixed Size";
+"Seçili pencereye geç" = "Switch to Selected Window";
+"Tab/Shift+Tab ve oklar her zaman gezinir; Escape vazgeçer. Arama sırasında tek başına harfler metin yazar." = "Tab/Shift+Tab and arrow keys always navigate; Escape cancels. Bare letters enter text while searching.";
+"Tam boy önizleme" = "Full-size Preview";
+"Tam ekranı değiştir" = "Toggle Full Screen";
+"Tuşlar bırakılınca" = "After Releasing Keys";
+"Tıklayarak seç" = "Click to select";
+"Uygulamayı gizle" = "Hide Application";
+"Önceki pencere" = "Previous Window";
+"Özelleştirmeleri sıfırla" = "Reset Overrides";
+"En az bir kısayol tanımlanmalı." = "Define at least one shortcut.";
+"Seçim kısayolu için Enter, bir işlev tuşu veya değiştiricili bir tuş kullan." = "Use Enter, a function key, or a key with a modifier to select a window.";
+
+/* Window switcher advanced filters */
+"Tüm pencereler" = "All windows";
+"Sona taşı" = "Move to end";
+"Öndeki uygulama dışındakiler" = "Other applications";
+"İmleç altındaki uygulama" = "Application under the pointer";
+"İmleç altındaki pencereler" = "Windows under the pointer";
+"Görünür masaüstleri" = "Visible desktops";
+"Görünür olmayan masaüstleri" = "Non-visible desktops";
+"Uygulama başına bir pencere" = "One window per application";
+"Filtreler ve gruplama" = "Filters and grouping";
+"Tam ekran pencerelerini göster" = "Show full-screen windows";
+"Gruplama" = "Grouping";
+"İmleç konumu panel açılırken alınır. Uygulama gruplaması, her çalışan uygulamanın filtrelenmiş sıralamadaki ilk penceresini gösterir." = "The pointer position is captured when the panel opens. Application grouping shows the first window of each running application in the filtered order.";
+"Masaüstü filtresi görünürlük bilgisine dayanır; kesin Space üyeliği değildir. Konumu belirlenemeyen pencereler masaüstü ve ekran filtrelerinde korunur." = "The desktop filter uses visibility information rather than exact Space membership. Windows with an unknown location remain included in desktop and display filters.";
+
+/* Window switcher Space membership */
+"Tam ekran masaüstü %lld" = "Full-screen desktop %lld";
+"Masaüstü %lld" = "Desktop %lld";
+"Masaüstü bilgisi bilinmiyor" = "Desktop information unknown";
+"Masaüstü sırası" = "Desktop order";
+"Masaüstü filtresi macOS üyelik bilgisini kullanır; alınamazsa pencere görünürlüğüne döner. Konumu belirlenemeyen pencereler masaüstü ve ekran filtrelerinde korunur." = "The desktop filter uses macOS membership information and falls back to window visibility when it is unavailable. Windows with an unknown location remain included in desktop and display filters.";
+"Masaüstü bilgisi alınamayan pencereler listenin sonunda son kullanım sırasıyla gösterilir." = "Windows with unknown desktop information appear at the end of the list in recent-use order.";
+"MacPocket · Masaüstü testi" = "MacPocket · Desktop test";
+
+/* macOS native window tabs */
+"Sekme %lld/%lld" = "Tab %lld/%lld";
+"Başlıksız sekme" = "Untitled tab";
+"macOS pencere sekmelerini ayrı göster" = "Show macOS window tabs separately";
+"Desteklenen pencere sekmeleri varsayılan olarak tek kartta toplanır. Arka plan sekmelerinin görüntüsü yalnız daha önce seçilmişse bulunabilir; tarayıcı sayfaları pencere sekmesi sayılmaz." = "Supported window tabs are grouped into one card by default. A background tab may have an image only if it was selected before; browser pages are not treated as window tabs.";
+"Henüz sekme görüntüsü yok" = "No captured image for this tab yet";
+"Arka plan sekmesi" = "Background tab";
+
+"Oluşturulma sırası" = "Creation order";
+"Gözlem açıkken oluşturulan pencereler eskiden yeniye sıralanır. Önceden açık olanlar ve tarihi alınamayanlar sonda son kullanım sırasıyla gösterilir." = "Windows created while monitoring is active are ordered from oldest to newest. Previously open windows and those with unknown creation times follow in recent-use order.";
+
+"Liste kısmi olabilir. Yenileyebilirsin." = "The list may be incomplete. You can refresh it.";
+
+"Diğer masaüstlerindeki bazı pencereleri listelemek için Ekran Kaydı izni gerekir." = "Screen Recording permission is needed to list some windows on other desktops.";
+"Canlı küçük resimler, tam boy önizleme ve diğer masaüstlerindeki bazı pencereler için." = "For live thumbnails, full-size previews, and some windows on other desktops.";
+
+"Stile göre" = "Follow style";
+"Uygulama adı" = "Application name";
+"Başlık ve uygulama" = "Title and application";
+"Baştan kısalt" = "Truncate beginning";
+"Ortadan kısalt" = "Truncate middle";
+"Sondan kısalt" = "Truncate end";
+"Farenin bulunduğu ekran" = "Display under the pointer";
+"Öndeki pencerenin ekranı" = "Front window display";
+"Ana menü çubuğu ekranı" = "Primary menu bar display";
+"Kart ayrıntıları" = "Card details";
+"Panelin yeri ve gecikme" = "Panel placement and delay";
+"Başlığı kısalt" = "Truncate title";
+"Durum simgeleri" = "Status icons";
+"Masaüstü numaraları" = "Desktop numbers";
+"Fare üzerindeyken pencere düğmeleri" = "Window buttons on hover";
+"Küçük resimleri göster" = "Show thumbnails";
+"Paneli göster" = "Show panel on";
+"Gecikmeyi özelleştir" = "Customize delay";
+"Açılma gecikmesi: %lld ms" = "Opening delay: %lld ms";
+"Panel açılışı" = "Panel opening";
+"Panel kapanışı" = "Panel closing";
+"Seçim animasyonu" = "Selection animation";
+"Tam boy önizleme girişi" = "Full-size preview entry";
+"Yalnız panelin gösterildiği ekran" = "Only the display showing the panel";
+"%lld/%lld" = "%lld/%lld";
+"Küçük resimler kapalıysa küçük resim stili uygulama simgelerini gösterir ve küçük resim yakalamaz. Tam boy önizleme ayarı ayrıdır. Tam adlar yardım metninde ve erişilebilirlik adında korunur." = "When thumbnails are hidden, the thumbnail style shows app icons without capturing thumbnails. Full-size preview is a separate setting. Full names remain in help text and accessibility labels.";
+"Öndeki pencerenin ekranı belirlenemezse farenin ekranı kullanılır. Ekran filtresi panelin gösterildiği ekrana bağlıdır. Gecikme yalnız basılı tutarak açılışı bekletir; hızlı bırakma seçimi bekletmez." = "If the front window display is unknown, the pointer display is used. The display filter follows the panel display. Delay applies only when holding the shortcut; quick-release switching does not wait.";
+"Hareketi azalt açıkken bu animasyonlar kullanılmaz. Seçim ve klavye işlemleri animasyonun bitmesini beklemez." = "These animations are disabled when Reduce Motion is on. Selection and keyboard actions do not wait for animations to finish.";
+"İşlem sürüyor…" = "Working…";
+"Animasyonlar" = "Animations";
+"Pencere başlığı" = "Window title";
+
+/* Conditional window switcher exceptions */
+"%@ kuralı etkin" = "Enable rule for %@";
+"%@ kuralını düzenle" = "Edit rule for %@";
+"Açık penceresi yokken gizle" = "Hide when no windows are open";
+"Başlık metinleri (satır başına bir tane)" = "Title text (one per line)";
+"Başlıkta metin geçiyorsa gizle" = "Hide when the title contains text";
+"Bir gizleme veya kısayol kapatma davranışı seç." = "Choose a visibility or shortcut exception.";
+"Bir uygulama yolu veya bundle kimliği gir." = "Enter an application path or bundle identifier.";
+"Bu önekle başlayan bütün bundle kimlikleri eşleşir. Örneğin com.example. bir uygulama ailesini kapsar." = "Matches every bundle identifier starting with this prefix. For example, com.example. covers a family of applications.";
+"Bundle kimliği öneki" = "Bundle identifier prefix";
+"Bundle kimliğinde yalnız harf, rakam, nokta, kısa çizgi ve alt çizgi kullan." = "Use only letters, numbers, dots, hyphens and underscores in the bundle identifier.";
+"En fazla 32 başlık metni kullan; her metin 512 karakteri aşamaz." = "Use up to 32 title patterns, each no longer than 512 characters.";
+"Etkin bırak" = "Keep enabled";
+"Gizlenecek pencere başlığından en az bir metin gir." = "Enter at least one title pattern to hide.";
+"Global kısayollar" = "Global shortcuts";
+"Henüz istisna yok. Bir uygulamanın pencerelerini gizleyebilir veya öndeyken kısayolları ona bırakabilirsin." = "No exceptions yet. Hide an application's windows or let it receive the shortcuts while it is in front.";
+"Her zaman gizle" = "Always hide";
+"Kural etkin" = "Rule enabled";
+"Kuralları Sıfırla" = "Reset Rules";
+"Metinler büyük/küçük harfe duyarlıdır; herhangi biri başlıkta geçerse pencere gizlenir. Düzenli ifade kullanılmaz." = "Text is case sensitive. A window is hidden if its title contains any of these patterns. Regular expressions are not used.";
+"Okunamayan kayıt kaldırılır. Önceki basit istisnalar korunur." = "The unreadable record will be removed. Previous simple exceptions will be kept.";
+"Okunamayan kural kaydını sıfırla…" = "Reset Unreadable Rules…";
+"Okunamayan kurallar sıfırlansın mı?" = "Reset unreadable rules?";
+"Pencere geçişi istisnası" = "Window switcher exception";
+"Tam bundle kimliği" = "Exact bundle identifier";
+"Uygulama eşleştirmesi" = "Application matching";
+"Uygulama hedefi" = "Application target";
+"Uygulama hedefi 1024 karakteri aşamaz." = "The application target cannot exceed 1024 characters.";
+"Uygulama yolu" = "Application path";
+"Uygulama yolu / ile başlamalı ve .app ile bitmelidir." = "The application path must start with / and end with .app.";
+"Uygulamadan Doldur" = "Fill from Application";
+"Yalnız öndeki pencerenin gerçek tam ekran durumu kullanılır. Erişilebilirlik izni yoksa veya durum okunamazsa kısayollar etkin kalır." = "Uses only the focused window's actual fullscreen state. Shortcuts stay enabled if Accessibility permission is missing or the state cannot be read.";
+"Öndeki pencere tam ekrandayken kapat" = "Disable while the focused window is fullscreen";
+"Öndeyken kapat" = "Disable while in front";
+"İstisna Ekle" = "Add Exception";
+"İstisna kaydedilemedi. Kural sayısını ve uygulama hedefini kontrol et." = "The exception could not be saved. Check the rule count and application target.";
+"İstisna kuralları okunamadı. Kayıt korundu; önceki basit istisnalar kullanılıyor." = "Exception rules could not be read. The record was kept; previous simple exceptions are being used.";
+
+"İstisnayı Kaydet" = "Save Exception";
+"Yalnız tam ekranda kapat" = "Disable only in fullscreen";
+
+"Pencere görünürlüğü" = "Window visibility";
+"Gizleme kuralı yok" = "No hiding exception";
+"Eşleşen kurallardan biri pencereyi gizler veya kısayolları kapatırsa o sonuç uygulanır. Bir kural diğerini geçersiz kılmaz." = "If any matching rule hides a window or disables shortcuts, that result applies. Rules do not override one another.";
+
+/* Window switcher navigation */
+"Ok tuşlarıyla gezin" = "Navigate with arrow keys";
+"Tab/Shift+Tab her zaman gezinir; Escape vazgeçer. Oklar ve Vim gezinmesi Davranış bölümünden seçilir. Arama sırasında tek başına harfler metin yazar." = "Tab/Shift+Tab always navigate; Escape cancels. Configure arrow and Vim navigation under Behavior. Bare letters type text while searching.";
+"Vim tuşlarıyla gezin (h/j/k/l)" = "Navigate with Vim keys (h/j/k/l)";
+"Vim · ⇥ gezin · yaz: ara · %@ · esc" = "Vim · ⇥ navigate · type to search · %@ · esc";
+"h/l önceki/sonraki pencereyi, j/k alt/üst sırayı seçer. Vim açıkken / aramayı başlatır; aramada h/j/k/l normal metindir. Tab/Shift+Tab her zaman kullanılabilir. Değişiklikler sonraki panel açılışında uygulanır." = "h/l select the previous/next window; j/k select the row below/above. With Vim enabled, / starts searching; h/j/k/l type normal text in search. Tab/Shift+Tab remain available. Changes apply the next time the panel opens.";
+"Özel eylemler gezinmeden önce uygulanır: %@" = "Custom actions take precedence over navigation: %@";
+
+/* Cursor following after window selection */
+"Her geçişte" = "On every switch";
+"Yalnız imleç başka ekrandaysa" = "Only if the pointer is on another display";
+"İmleç seçimi izlesin" = "Cursor follows selection";
+"Başarılı geçişten sonra imleç, odaktaki pencerenin görünür bölümünün ortasına taşınır. Geçiş sırasında yeni bir tuşa basar, fareyi hareket ettirir, tıklar veya kaydırırsan taşıma yapılmaz. Ekran koşulu imlecin ve pencerenin ekranını karşılaştırır. Değişiklik sonraki panel açılışında uygulanır." = "After a successful switch, the pointer moves to the center of the focused window's visible area. Moving, clicking, scrolling or pressing another key during the switch cancels the move. The display condition compares the pointer's display with the window's display. Changes apply the next time the panel opens.";
+
+/* Window switcher trackpad controls */
+"Yatay" = "Horizontal";
+"Dikey" = "Vertical";
+"Kaydırma yönü" = "Swipe direction";
+"Seçim değiştiğinde haptik geri bildirim" = "Haptic feedback when selection changes";
+"Yatay hareket pencereler, dikey hareket satırlar arasında gezinir. Son parmağı kaldırmak seçer; arama başladıysa panel açık kalır. Escape vazgeçer. Haptik geri bildirim, destekleyen trackpad’lerde hareketle seçim değiştiğinde verilir." = "Horizontal swipes move between windows; vertical swipes move between rows. Lift the last finger to choose; the panel stays open if you started searching. Escape cancels. Supported trackpads provide haptic feedback when a swipe changes the selection.";
+"macOS aynı hareketi masaüstleri veya Mission Control için kullanıyorsa Sistem Ayarları > Trackpad > Diğer Hareketler’den değiştir. Hareketler yalnız global geçiş açıkken ve öndeki uygulamada izin veriliyorken çalışır. Ayar değişikliği devam eden hareketi iptal eder." = "If macOS uses the same gesture for desktops or Mission Control, change it in System Settings > Trackpad > More Gestures. Gestures work only when global switching is enabled and allowed for the frontmost app. Changing a setting cancels the current gesture.";
+"Parmakları kaldır: seç" = "Lift fingers: choose";
+
+/* Application-owned Dock badges in the switcher */
+"Dock bildirim rozetleri" = "Dock notification badges";
+"Uygulamanın Dock rozeti: %@" = "Application Dock badge: %@";
+"Rozet uygulamanın Dock etiketidir; pencereye özel okunmamış sayısı değildir. Panel açıkken yenilenir. Dock etiketi veya Erişilebilirlik izni yoksa rozet gösterilmez. Uzun etiketin tamamı yardım metninde ve erişilebilirlik açıklamasındadır." = "The badge is the application's Dock label, not an unread count for a specific window. It refreshes while the panel is open. No badge is shown if the Dock label or Accessibility permission is unavailable. The full text of a long label is available in help and the accessibility description.";
+
+/* Settings transfer integrity and switcher entry */
+"Ayar dosyasında geçersiz bir değer var (%@). Mevcut ayarlar korunuyor." = "The settings file contains an invalid value (%@). Your current settings are preserved.";
+"Ayar dosyası çok büyük (en fazla 8 MB)." = "The settings file is too large (maximum 8 MB).";
+"Ayar aktarımı" = "Settings transfer";
+"Ayar aktarımını aç…" = "Open settings transfer…";
+"Ayarlar > Gelişmiş bölümündeki aktarım; kısayolları, filtreleri, görünümü, eylemleri ve istisnaları diğer MacPocket ayarlarıyla birlikte taşır. İçe aktarma mevcut ayarların yerini alır." = "Transfer in Settings > Advanced includes shortcuts, filters, appearance, actions and exceptions along with other MacPocket settings. Importing replaces your current settings.";
+
+/* Window switcher CLI */
+"Geçersiz pencere geçişi komutu. list [--detailed], focus <id>, focus --mru <1…>, show [1…9], hide veya status kullan." = "Invalid window switcher command. Use list [--detailed], focus <id>, focus --mru <1…>, show [1…9], hide or status.";
+"MacPocket çalışmıyor veya komut bağlantısı hazır değil. Uygulamayı açıp yeniden dene." = "MacPocket is not running or its command connection is not ready. Open the app and try again.";
+"Pencere geçişi komut bağlantısı kurulamadı." = "The window switcher command connection could not be established.";
+"Pencere geçişi komutu zaman aşımına uğradı. İşlem sonucu doğrulanamadı." = "The window switcher command timed out. The result could not be verified.";
+"Pencere geçişi komutuna geçerli bir yanıt alınamadı." = "No valid response was received for the window switcher command.";
+"Pencere geçişi komutunun verisi boyut sınırını aşıyor." = "The window switcher command data exceeds the size limit.";
+"Pencere geçişi açılamadı. Modülün açık olduğunu, profil numarasını ve kısayol kaydının bitmiş olduğunu kontrol et." = "The window switcher could not be opened. Check that the module is enabled, the profile number is valid and shortcut recording has finished.";
+"Pencere bulunamadı. list komutuyla güncel kimliği veya MRU sırasını kontrol et." = "Window not found. Use list to check the current ID or MRU index.";
+"Komutlar çalışan MacPocket'a bağlanır. Profil ve MRU sırası 1'den başlar; show paneli açar, hide seçim yapmadan kapatır. status panelin görünürlüğünü bildirir." = "Commands connect to the running MacPocket app. Profile and MRU indexes start at 1; show opens the panel and hide closes it without choosing. status reports panel visibility.";
+"Liste kısayol filtrelerinden bağımsız gerçek pencereleri içerir. MRU sırası her çağrıda güncellenebilir; belirli bir pencere için list çıktısındaki id değerini kullan." = "The list contains real windows regardless of shortcut filters. MRU indexes may change between calls; use the id from list output to target a specific window.";
+
+/* Independent held modifiers */
+"Basılı tutulacak tuşlar, açma kısayolundaki ⌃, ⌥ veya ⌘ tuşlarından seçilmelidir." = "Held keys must be selected from the opening shortcut’s ⌃, ⌥ or ⌘ keys.";
+"Basılı tutulan tuşlar" = "Held keys";
+"Basılı tutulacak değiştiriciler" = "Modifiers to hold";
+"Açma kısayolunu izle" = "Follow the opening shortcut";
+"Yalnız %@" = "Only %@";
+"Açma: %@ · Basılı tut: %@" = "Open: %@ · Hold: %@";
+"Seçilen değiştiricilerin tamamı bırakılınca yukarıdaki bırakma davranışı uygulanır. Açma birleşimindeki diğer tuşlar basılı kalabilir. Örneğin ⌃⌥Tab ile açıp yalnız ⌥ bırakılınca seçebilirsin." = "The release behavior above applies when all selected modifiers are released. Other keys in the opening chord may remain held. For example, open with ⌃⌥Tab and choose when only ⌥ is released.";
+
+"Güvenli Klavye Girişi açıkken ⌘Tab başlatılamaz. İlgili uygulamadaki parola alanından çıktıktan sonra yeniden dene." = "Command-Tab cannot start while Secure Keyboard Input is enabled. Leave the password field in the relevant app and try again.";
+
+"⌘Tab için macOS kısayolu devralınamadı. Diğer kısayolları kullanabilir veya yeniden deneyebilirsin." = "Could not take over the macOS Command-Tab shortcut. Use the other shortcuts or try again.";
+
+"⌘Tab etkinken macOS uygulama geçişi yerine MacPocket kullanılır." = "While Command-Tab is enabled, MacPocket replaces the macOS app switcher.";
+
+"%@ güvenli klavye girişini açık tutuyor. Bu durum pencere geçişi kısayollarını kapatmaz." = "%@ is keeping Secure Keyboard Input enabled. This does not disable window-switching shortcuts.";
+
+"Hazır kısayollar" = "Shortcut presets";
+
+"Fiziksel kısayol testi" = "Physical shortcut test";
+
+"Değiştiriciyi basılı tutarak Tab'a bas. Kartlar görününce Shift+Tab'a bas, sonra değiştiriciyi bırak." = "Hold the modifier and press Tab. Once the cards appear, press Shift-Tab, then release the modifier.";
+
+"Yalnız iki test penceresi arasında geçiş yapılır." = "Only the two test windows are used.";
+"Gelişmiş ayarları göster" = "Show advanced settings";
+"Davranış, eylem tuşları, istisnalar, trackpad, ayar aktarımı ve komut satırı." = "Behavior, action shortcuts, exceptions, trackpad, settings transfer, and command line.";

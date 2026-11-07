@@ -26,15 +26,66 @@ public struct SwitcherShortcut: Codable, Identifiable, Hashable, Sendable {
     /// Virtual key code (kVK_*).
     public var keyCode: UInt16
     public var modifiers: SwitcherModifiers
-    /// Releasing the held modifiers activates the selection; otherwise the switcher stays open until Enter/click.
-    public var releaseToChoose = true
+    /// Nil preserves the original behavior: hold all opening modifiers. An explicit value is
+    /// a nonempty subset; opening-only modifiers can stay down without delaying selection.
+    public var holdModifiers: SwitcherModifiers?
+    public var effectiveHoldModifiers: SwitcherModifiers { holdModifiers ?? modifiers }
+    /// Explicit sets keep their identity if the opening chord later gains another modifier.
+    public var holdModifierChoices: [SwitcherModifiers] {
+        (1...7).map(SwitcherModifiers.init(rawValue:)).filter { modifiers.isSuperset(of: $0) }
+    }
+    public var releaseBehavior: SwitcherReleaseBehavior = .choose
+    /// Compatibility with the original two-state setting and callers.
+    public var releaseToChoose: Bool {
+        get { releaseBehavior == .choose }
+        set { releaseBehavior = newValue ? .choose : .hold }
+    }
     public var filter = WindowListFilter()
+    public var presentation = SwitcherPresentationOverrides()
 
-    public init(keyCode: UInt16, modifiers: SwitcherModifiers, releaseToChoose: Bool = true, filter: WindowListFilter = .init()) {
-        self.keyCode = keyCode; self.modifiers = modifiers; self.releaseToChoose = releaseToChoose; self.filter = filter
+    public init(keyCode: UInt16, modifiers: SwitcherModifiers, releaseToChoose: Bool = true, filter: WindowListFilter = .init(),
+                releaseBehavior: SwitcherReleaseBehavior? = nil, presentation: SwitcherPresentationOverrides = .init(),holdModifiers: SwitcherModifiers? = nil) {
+        self.keyCode = keyCode; self.modifiers = modifiers
+        self.holdModifiers = holdModifiers
+        self.releaseBehavior = releaseBehavior ?? (releaseToChoose ? .choose : .hold)
+        self.filter = filter; self.presentation = presentation
+    }
+
+    enum CodingKeys: String, CodingKey { case id, keyCode, modifiers, holdModifiers, releaseToChoose, releaseBehavior, filter, presentation }
+    public init(from decoder: any Decoder) throws {
+        let values = try decoder.container(keyedBy: CodingKeys.self)
+        id = try values.decodeIfPresent(UUID.self, forKey: .id) ?? UUID()
+        keyCode = try values.decode(UInt16.self, forKey: .keyCode)
+        modifiers = try values.decode(SwitcherModifiers.self, forKey: .modifiers)
+        holdModifiers = try values.decodeIfPresent(SwitcherModifiers.self,forKey: .holdModifiers)
+        let legacy = try values.decodeIfPresent(Bool.self, forKey: .releaseToChoose) ?? true
+        releaseBehavior = try values.decodeIfPresent(String.self, forKey: .releaseBehavior).flatMap(SwitcherReleaseBehavior.init(rawValue:))
+            ?? (legacy ? .choose : .hold)
+        filter = try values.decodeIfPresent(WindowListFilter.self, forKey: .filter) ?? .init()
+        presentation = try values.decodeIfPresent(SwitcherPresentationOverrides.self, forKey: .presentation) ?? .init()
+    }
+
+    public func encode(to encoder: any Encoder) throws {
+        var values = encoder.container(keyedBy: CodingKeys.self)
+        try values.encode(id, forKey: .id)
+        try values.encode(keyCode, forKey: .keyCode)
+        try values.encode(modifiers, forKey: .modifiers)
+        try values.encodeIfPresent(holdModifiers,forKey: .holdModifiers)
+        try values.encode(releaseToChoose, forKey: .releaseToChoose)
+        try values.encode(releaseBehavior, forKey: .releaseBehavior)
+        try values.encode(filter, forKey: .filter)
+        try values.encode(presentation, forKey: .presentation)
     }
 
     public var displayName: String { modifiers.symbols + SwitcherKeys.name(for: keyCode) }
+
+    /// Change the opening chord without replacing the independent profile settings or identity.
+    public func replacingOpeningChord(keyCode: UInt16,modifiers: SwitcherModifiers) -> Self {
+        var copy = self
+        copy.keyCode = keyCode;copy.modifiers = modifiers
+        if let held = copy.holdModifiers,!modifiers.isSuperset(of: held) { copy.holdModifiers = nil }
+        return copy
+    }
 
     public static let maximumCount = 9
     public static let defaultOptionTab = SwitcherShortcut(keyCode: SwitcherKeys.tab, modifiers: .option)
@@ -56,7 +107,10 @@ public enum SwitcherKeys {
         109: "F10", 103: "F11", 111: "F12", 123: "←", 124: "→", 125: "↓", 126: "↑",
     ]
 
-    public static func name(for keyCode: UInt16) -> String { names[keyCode] ?? String(localized: "Tuş \(keyCode)") }
+    public static func name(for keyCode: UInt16) -> String {
+        if keyCode == space { return String(localized: "Boşluk") }
+        return names[keyCode] ?? String(localized: "Tuş \(keyCode)")
+    }
     public static func isSupported(_ keyCode: UInt16) -> Bool { names[keyCode] != nil && keyCode != escape }
 }
 
@@ -64,12 +118,14 @@ public enum SwitcherShortcutValidation {
     /// Human-readable problems; empty means the list can be registered.
     public static func problems(_ shortcuts: [SwitcherShortcut]) -> [String] {
         var problems: [String] = []
+        if shortcuts.isEmpty { problems.append(String(localized: "En az bir kısayol tanımlanmalı.")) }
         if shortcuts.count > SwitcherShortcut.maximumCount { problems.append(String(localized: "En fazla \(SwitcherShortcut.maximumCount) kısayol tanımlanabilir.")) }
         var seen = Set<String>()
         for shortcut in shortcuts {
             if shortcut.modifiers.isEmpty { problems.append(String(localized: "\(shortcut.displayName): en az bir ⌃, ⌥ veya ⌘ tuşu gerekir.")) }
-            if shortcut.modifiers == .command && shortcut.keyCode == SwitcherKeys.tab {
-                problems.append(String(localized: "⌘⇥ macOS uygulama geçişine ayrılmıştır."))
+            if shortcut.modifiers.rawValue & ~7 != 0 { problems.append(String(localized: "Desteklenmeyen değiştirici tuş.")) }
+            if let held = shortcut.holdModifiers,held.isEmpty || held.rawValue & ~7 != 0 || !shortcut.modifiers.isSuperset(of: held) {
+                problems.append(String(localized: "Basılı tutulacak tuşlar, açma kısayolundaki ⌃, ⌥ veya ⌘ tuşlarından seçilmelidir."))
             }
             if !SwitcherKeys.isSupported(shortcut.keyCode) { problems.append(String(localized: "\(shortcut.displayName): bu tuş desteklenmiyor.")) }
             if !seen.insert("\(shortcut.modifiers.rawValue)-\(shortcut.keyCode)").inserted {
@@ -115,6 +171,13 @@ public enum SwitcherShortcutStore {
 
 public enum SwitcherStyle: String, CaseIterable, Codable, Sendable {
     case thumbnails, icons, titles
+    public var localizedTitle: String {
+        switch self {
+        case .thumbnails: String(localized: "Küçük resimler")
+        case .icons: String(localized: "Uygulama simgeleri")
+        case .titles: String(localized: "Başlık listesi")
+        }
+    }
 }
 
 /// Grid geometry for the switcher panel ("auto-size": cards shrink as the window count grows).
@@ -150,7 +213,7 @@ public struct SwitcherLayout: Equatable, Sendable {
         // Windows 11-sized previews: large enough to recognise window contents at a glance.
         let base: CGSize = style == .icons ? CGSize(width: 120, height: 124) : CGSize(width: 270, height: 200)
         let minimum: CGSize = style == .icons ? CGSize(width: 84, height: 92) : CGSize(width: 160, height: 124)
-        var item = CGSize(width: base.width * scale, height: base.height * scale)
+        var item = CGSize(width: max(minimum.width, base.width * scale), height: max(minimum.height, base.height * scale))
         func fits(_ size: CGSize, columns: Int) -> Bool {
             let rows = Int(ceil(Double(count) / Double(columns)))
             return CGFloat(columns) * size.width + CGFloat(columns - 1) * spacing + padding * 2 <= maxWidth
