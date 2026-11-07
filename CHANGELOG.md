@@ -2,6 +2,8 @@
 
 ## Yayımlanmamış
 
+- **Kablo Etki Haritası:** seçilen USB/Thunderbolt aygıtının bağlı disklerini, açık dosyalarını, yerel adresle eşleşen TCP/SSH oturumlarını ve ekran/ses etkilerini birlikte gösterir. Donanım kanıtı ile kullanıcı eşleştirmeleri ayrıdır; araç salt okunurdur. [Kapsam ve kabul sınırları](docs/CABLE_IMPACT.md).
+
 - **Menü çubuğu düzenleyici:** uygulamaları gizli grupta toplama, ok düğmesiyle gizleme/gösterme, aranabilir liste ve simgeyi açma. macOS 27 özel görünürlük arayüzü çalışma anında denetlenir; sistem panelleriyle uyum sınırı araçta açıklanır.
 - **Bağımsız güncelleme merkezi:** Homebrew dışındaki uygulamalar için Sparkle, isteğe bağlı App Store ve uygulamaya bağlanan herkese açık GitHub sürüm kaynakları. Denetim elle başlatılır; kurulum üreticinin akışında devam eder.
 - **İnternet kontrolü:** imzalı uygulama kimliğiyle izin/engel kuralları, bağlantı listesi, gerçek Network Extension hedefi ve profil denetimli paketleme. Sistem filtresi etkinleştirilmedi; notarization/kurulum/onay sonrası gerçek engelleme kabulü bekliyor. [Kapsam ve doğrulama](docs/PRODUCT_EXPANSION.md).

@@ -44,6 +44,7 @@ enum PocketTool: String, Identifiable {
     case commandBar = "Komut Çubuğu"
     case shelf = "Dosya Rafı"
     case menuBarOrganizer = "Menü Çubuğu Düzenleyici", updateCenter = "Güncelleme Merkezi", internetControl = "İnternet Kontrolü"
+    case cableImpact = "Kablo Etki Haritası"
     case dockPreview = "Dock Önizlemeleri"
     var id: String { rawValue }
 }

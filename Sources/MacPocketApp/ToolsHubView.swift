@@ -277,6 +277,7 @@ struct HubTool: Identifiable {
     }
 
     static let catalog: [HubTool] = [
+        .init(id: "cable-impact", title: "Kablo Etki Haritası", description: "Kabloyu çekmeden önce bağlı diskleri, ağ oturumlarını ve diğer kaynakları birlikte gör.", icon: "cable.connector", category: .system),
         .init(id: "menu-bar-organizer", title: "Menü Çubuğu Düzenleyici", description: "Diğer uygulamaların menü çubuğu simgelerini sırala, gizle ve yeniden aç.", icon: "menubar.rectangle", category: .productivity),
         .init(id: "update-center", title: "Güncelleme Merkezi", description: "Homebrew dışındaki uygulamaların güncellemelerini ve üretici kaynaklarını takip et.", icon: "arrow.triangle.2.circlepath", category: .system),
         .init(id: "internet-control", title: "İnternet Kontrolü", description: "Uygulamaların internet erişimi için izin ve engelleme kuralları oluştur.", icon: "network", category: .system),

@@ -14,7 +14,7 @@
   <img alt="Platform" src="https://img.shields.io/badge/macOS-27%2B-black?logo=apple">
   <img alt="Apple Silicon" src="https://img.shields.io/badge/Apple%20Silicon-arm64-blue">
   <img alt="Swift" src="https://img.shields.io/badge/Swift-6-orange?logo=swift">
-  <img alt="Testler" src="https://img.shields.io/badge/testler-1452-brightgreen">
+  <img alt="Testler" src="https://img.shields.io/badge/testler-1467-brightgreen">
   <img alt="Diller" src="https://img.shields.io/badge/dil-T%C3%BCrk%C3%A7e%20%C2%B7%20English-lightgrey">
 </p>
 
@@ -37,6 +37,7 @@
 - **Canlı sistem izleme** — CPU, RAM, disk, ağ ve sensörler; en sıcak sensörün trendi ve menü çubuğunda istediğin göstergeler.
 - **Uygulama başına ağ trafiği** — hangi uygulamanın şu an ne kadar indirip yüklediği, yardımcı süreçler uygulamada toplanmış halde.
 - **Wi-Fi analizi** — sinyal, gürültü, BSSID, çevredeki ağların kanal yoğunluğu ve modem için kanal önerisi.
+- **Kablo etki haritası** — kabloyu çekmeden önce bağlı diskleri, açık dosyaları, TCP/SSH oturumlarını ve ekran/ses etkilerini gör; otomatik bağlantılar ile elle eşleştirmeler ayrı gösterilir. [Kapsam ve doğrulama](docs/CABLE_IMPACT.md).
 - **Disk sağlığı** — SSD’nin kendi bildirdiği yıpranma, yazılan veri ve sıcaklık (NVMe SMART), yönetici izni gerekmeden.
 - **Temizlik ve uygulama bakımı** — büyük/eski ve aynı içerikli dosyalar, uygulama kalıntıları, Homebrew güncelleme/kaldırma.
 - **Alt+Tab pencere geçişi** — animasyonlu önizleme kartları; dokuz kısayol için bağımsız filtre, görünüm ve bırakma davranışı; özelleştirilebilir pencere eylemleri.
@@ -78,7 +79,7 @@ sunar; Ayarlar’daki canlı düzenleyicide sürükle-bırak sıralanır, görü
 | | |
 | --- | --- |
 | Sürüm | **0.1.5** |
-| Testler | 1.452 uygulama testi; 4 gerçek disk/sistem testi ve 1 bağlı trackpad testi isteğe bağlıdır. SSHConfigKit: 384, AIUsageKit: 420 test (3 isteğe bağlı atlama). |
+| Testler | 1.467 uygulama testi; 4 gerçek disk/sistem testi ve 1 bağlı trackpad testi isteğe bağlıdır. SSHConfigKit: 384, AIUsageKit: 420 test (3 isteğe bağlı atlama). |
 | Yerelleştirme | Türkçe (kaynak) ve İngilizce, eksik anahtar yok |
 | Belgeler | [Native macOS davranışları](docs/NATIVE_MACOS.md) · [Derleme ve canlı doğrulama](docs/NATIVE_BUILD.md) · [Alt+Tab kart geçişi](docs/WINDOW_SWITCHER.md) · [Devam eden geliştirme](docs/CONTINUED_DEVELOPMENT.md) |
 | Yeni araçlar | [Menü çubuğu, bağımsız güncellemeler ve internet kontrolü](docs/PRODUCT_EXPANSION.md) |

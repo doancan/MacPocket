@@ -37,6 +37,7 @@ extension PocketModel {
         case "menu-bar-organizer": navigation.open(.menuBarOrganizer)
         case "update-center": navigation.open(.updateCenter)
         case "internet-control": navigation.open(.internetControl)
+        case "cable-impact": navigation.open(.cableImpact)
         case "network-traffic": navigation.open(.networkTraffic)
         case "peripherals": navigation.open(.peripherals)
         case "usb-eject": navigation.open(.usbEject)

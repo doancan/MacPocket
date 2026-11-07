@@ -8,6 +8,9 @@ public enum BoundedProcess {
         public let status: Int32
         public let output: String
         public let errorOutput: String
+        public init(status: Int32, output: String, errorOutput: String) {
+            self.status = status; self.output = output; self.errorOutput = errorOutput
+        }
     }
 
     public enum Failure: Error, LocalizedError, Equatable {

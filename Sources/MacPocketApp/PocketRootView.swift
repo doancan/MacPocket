@@ -202,6 +202,7 @@ struct PocketRootView: View {
                 case .menuBarOrganizer: MenuBarOrganizerView()
                 case .updateCenter: IndependentUpdateCenterView()
                 case .internetControl: InternetControlView()
+                case .cableImpact: CableImpactView()
                 case .none: ToolsHubView(model: model, openTool: openCatalogTool)
                 }
             }

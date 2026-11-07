@@ -7,6 +7,9 @@ public struct EjectVolume: Identifiable, Equatable, Sendable {
     public let id: String
     public let name: String
     public let mountPath: String?
+    public init(id: String, name: String, mountPath: String?) {
+        self.id = id; self.name = name; self.mountPath = mountPath
+    }
 }
 
 public struct EjectDrive: Identifiable, Equatable, Sendable {
@@ -17,6 +20,10 @@ public struct EjectDrive: Identifiable, Equatable, Sendable {
     public let capacity: UInt64
     public let volumes: [EjectVolume]
     public var mountPaths: [String] { Array(Set(volumes.compactMap(\.mountPath))).sorted() }
+    public init(id: String, identity: String, name: String, connection: String, capacity: UInt64, volumes: [EjectVolume]) {
+        self.id = id; self.identity = identity; self.name = name; self.connection = connection
+        self.capacity = capacity; self.volumes = volumes
+    }
 }
 
 public struct DiskUser: Identifiable, Equatable, Sendable {

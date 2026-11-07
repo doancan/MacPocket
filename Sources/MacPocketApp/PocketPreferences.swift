@@ -203,6 +203,7 @@ extension PocketTool {
         case .menuBarOrganizer: String(localized: "Menü Çubuğu Düzenleyici")
         case .updateCenter: String(localized: "Güncelleme Merkezi")
         case .internetControl: String(localized: "İnternet Kontrolü")
+        case .cableImpact: String(localized: "Kablo Etki Haritası")
         case .diskHealth: String(localized: "Disk Sağlığı")
         case .wifi: String(localized: "Wi-Fi Analizi")
         case .hosts: String(localized: "Hosts Dosyası")
