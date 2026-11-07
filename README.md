@@ -14,7 +14,7 @@
   <img alt="Platform" src="https://img.shields.io/badge/macOS-27%2B-black?logo=apple">
   <img alt="Apple Silicon" src="https://img.shields.io/badge/Apple%20Silicon-arm64-blue">
   <img alt="Swift" src="https://img.shields.io/badge/Swift-6-orange?logo=swift">
-  <img alt="Testler" src="https://img.shields.io/badge/testler-1439-brightgreen">
+  <img alt="Testler" src="https://img.shields.io/badge/testler-1452-brightgreen">
   <img alt="Diller" src="https://img.shields.io/badge/dil-T%C3%BCrk%C3%A7e%20%C2%B7%20English-lightgrey">
 </p>
 
@@ -43,6 +43,9 @@
 - **Gizli ayarlar** — Dock, Finder, ekran görüntüsü ve performans ayarlarını Terminal’e girmeden değiştir.
 - **Ekran Süresi** — hangi uygulamada ne kadar zaman geçirdiğin; boşta ve kilitli süre sayılmaz, veriler bu Mac’te kalır.
 - **Esnek menü çubuğu** — CPU, GPU, RAM, disk, ağ ve sensörler; sürükle-bırak düzenleyici ve eşik renkleri.
+- **Menü çubuğu düzenleyici** — diğer uygulamaların simgelerini gizli grupta topla, ok düğmesiyle göster ve aranabilir listeden aç.
+- **Bağımsız güncelleme merkezi** — Sparkle, isteğe bağlı App Store ve uygulamaya bağlanan herkese açık GitHub kaynaklarından sürüm denetimi; kurulum üreticinin akışında devam eder.
+- **İnternet kontrolü** — imzalı uygulama kimliğine göre yeni bağlantılar için kurallar ve Network Extension uzantısı. Gerçek engellemenin sistem onayı ve canlı kabulü bekliyor; [kapsam, imzalama ve doğrulama](docs/PRODUCT_EXPANSION.md).
 - **Otomatik güncelleme** — imzalı güncellemeler uygulama içinden.
 - **İki dil** — arayüzün tamamı Türkçe ve İngilizce.
 
@@ -75,9 +78,10 @@ sunar; Ayarlar’daki canlı düzenleyicide sürükle-bırak sıralanır, görü
 | | |
 | --- | --- |
 | Sürüm | **0.1.5** |
-| Testler | 1.439 uygulama testi; 4 gerçek disk/sistem testi ve 1 bağlı trackpad testi isteğe bağlıdır. SSHConfigKit: 384, AIUsageKit: 420 test (3 isteğe bağlı atlama). |
+| Testler | 1.452 uygulama testi; 4 gerçek disk/sistem testi ve 1 bağlı trackpad testi isteğe bağlıdır. SSHConfigKit: 384, AIUsageKit: 420 test (3 isteğe bağlı atlama). |
 | Yerelleştirme | Türkçe (kaynak) ve İngilizce, eksik anahtar yok |
 | Belgeler | [Native macOS davranışları](docs/NATIVE_MACOS.md) · [Derleme ve canlı doğrulama](docs/NATIVE_BUILD.md) · [Alt+Tab kart geçişi](docs/WINDOW_SWITCHER.md) · [Devam eden geliştirme](docs/CONTINUED_DEVELOPMENT.md) |
+| Yeni araçlar | [Menü çubuğu, bağımsız güncellemeler ve internet kontrolü](docs/PRODUCT_EXPANSION.md) |
 
 <details>
 <summary><b>Bilinen sınırlar</b></summary>

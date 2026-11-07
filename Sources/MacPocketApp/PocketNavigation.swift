@@ -43,6 +43,7 @@ enum PocketTool: String, Identifiable {
     case usbEject = "USB Çıkarma Yöneticisi"
     case commandBar = "Komut Çubuğu"
     case shelf = "Dosya Rafı"
+    case menuBarOrganizer = "Menü Çubuğu Düzenleyici", updateCenter = "Güncelleme Merkezi", internetControl = "İnternet Kontrolü"
     case dockPreview = "Dock Önizlemeleri"
     var id: String { rawValue }
 }

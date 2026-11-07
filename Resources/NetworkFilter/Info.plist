@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>CFBundleIdentifier</key>
+	<string>com.doancan.MacPocket.NetworkFilter</string>
+	<key>CFBundleName</key>
+	<string>MacPocket Network Filter</string>
+	<key>CFBundleExecutable</key>
+	<string>MacPocketNetworkFilter</string>
+	<key>CFBundlePackageType</key>
+	<string>SYSX</string>
+	<key>CFBundleVersion</key>
+	<string>8</string>
+	<key>CFBundleShortVersionString</key>
+	<string>0.1.5</string>
+	<key>NSSystemExtensionUsageDescription</key>
+	<string>MacPocket, uygulama kurallarına göre ağ bağlantılarına izin verir veya engeller.</string>
+	<key>NetworkExtension</key>
+	<dict>
+		<key>NEProviderClasses</key>
+		<dict>
+			<key>com.apple.networkextension.filter-data</key>
+			<string>MacPocketNetworkFilter.MacPocketFilterDataProvider</string>
+		</dict>
+	</dict>
+</dict>
+</plist>

@@ -60,6 +60,7 @@ final class PocketModuleRuntime: ObservableObject {
             .privacy: .init(start: { PrivacyMonitorService.shared.start() }, stop: { PrivacyMonitorService.shared.stopForModule() }),
             .commandBar: .init(start: { [weak model] in if let model { CommandBarService.shared.start(model: model) } }, stop: { CommandBarService.shared.stopForModule() }),
             .shelf: .init(start: { ShelfService.shared.start() }, stop: { ShelfService.shared.stopForModule() }),
+            .menuBarOrganizer: .init(start: { MenuBarOrganizerService.shared.start() }, stop: { MenuBarOrganizerService.shared.stopForModule() }),
             .dockPreview: .init(start: { DockPreviewService.shared.start() }, stop: { DockPreviewService.shared.stopForModule() })
         ])
         reconcile()
@@ -142,6 +143,7 @@ extension PocketTool {
         case .commandBar: .commandBar
         case .shelf: .shelf
         case .dockPreview: .dockPreview
+        case .menuBarOrganizer: .menuBarOrganizer
         default: nil
         }
     }

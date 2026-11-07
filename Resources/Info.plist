@@ -31,4 +31,6 @@
   <key>NSAppleEventsUsageDescription</key><string>MacPocket, hızlı işlemler için Finder ve System Events’i, SSH bağlantılarını açmak için seçtiğiniz terminali kontrol eder.</string>
   <key>NSLocationUsageDescription</key><string>MacPocket, gece modunda gün doğumu ve gün batımı saatlerini hesaplamak için yaklaşık konumunu kullanır; konum bu Mac’ten çıkmaz.</string>
   <key>NSLocationWhenInUseUsageDescription</key><string>MacPocket, gece modunda gün doğumu ve gün batımı saatlerini hesaplamak için yaklaşık konumunu kullanır; konum bu Mac’ten çıkmaz.</string>
+    <key>NSSystemExtensionUsageDescription</key>
+    <string>MacPocket, uygulama kurallarına göre ağ bağlantılarına izin verir veya engeller.</string>
 </dict></plist>

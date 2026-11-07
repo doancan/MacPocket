@@ -2,6 +2,7 @@ import Foundation
 
 /// Availability is independent of a tool's own settings. Turning a module off preserves those settings.
 public enum PocketModule: String, CaseIterable, Identifiable, Sendable {
+    case menuBarOrganizer
     case windowSwitcher, windowLayout, clipboard, quitGuard, displays, macros, freezer, focus, workspaces
     case mouseButtons
     case snippets, screenGrab, screenshot, bluetoothBattery, screenTime, mouseScroll, audioOutput, mixer, recorder, privacy, commandBar, shelf, dockPreview
@@ -39,6 +40,7 @@ public enum PocketModule: String, CaseIterable, Identifiable, Sendable {
         case .commandBar: String(localized: "Komut Çubuğu")
         case .shelf: String(localized: "Dosya Rafı")
         case .dockPreview: String(localized: "Dock Önizlemeleri")
+        case .menuBarOrganizer: String(localized: "Menü Çubuğu Düzenleyici")
         }
     }
 }

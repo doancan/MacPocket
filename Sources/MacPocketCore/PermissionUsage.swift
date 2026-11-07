@@ -25,7 +25,7 @@ public enum PermissionUsageMap {
         let core: [CorePermissionFeature]
         switch permission {
         case .accessibility:
-            modules = [.windowSwitcher, .windowLayout, .dockPreview, .macros, .clipboard, .snippets, .mouseScroll, .mouseButtons, .commandBar]; core = []
+            modules = [.windowSwitcher, .windowLayout, .dockPreview, .macros, .clipboard, .snippets, .mouseScroll, .mouseButtons, .commandBar, .menuBarOrganizer]; core = []
         case .screenRecording:
             // The process-tap audio permission is checked by the mixer itself, not CGPreflightScreenCaptureAccess.
             modules = [.screenGrab, .screenshot, .recorder, .windowSwitcher, .dockPreview]; core = []

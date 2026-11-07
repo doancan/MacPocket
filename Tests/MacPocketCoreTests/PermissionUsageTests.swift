@@ -16,6 +16,8 @@ final class PermissionUsageTests: XCTestCase {
         XCTAssertTrue(PermissionUsageMap.usage(.accessibility, availableModules: [.mouseButtons]).isRelevant)
         XCTAssertFalse(PermissionUsageMap.usage(.inputMonitoring, availableModules: [.mouseButtons]).isRelevant)
         XCTAssertTrue(PermissionUsageMap.usage(.inputMonitoring, availableModules: [.bluetoothBattery]).isRelevant)
+        XCTAssertTrue(PermissionUsageMap.usage(.accessibility, availableModules: [.menuBarOrganizer]).isRelevant)
+        XCTAssertFalse(PermissionUsageMap.usage(.screenRecording, availableModules: [.menuBarOrganizer]).isRelevant)
     }
     func testModuleChangesPartitionDependenciesWithoutDuplicates() {
         for permission in OnboardingPermission.allCases {

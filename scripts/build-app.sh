@@ -74,12 +74,18 @@ codesign "${macpocket_sparkle_flags[@]}" --preserve-metadata=entitlements "$macp
 codesign "${macpocket_sparkle_flags[@]}" "$macpocket_sparkle/Versions/B/Autoupdate"
 codesign "${macpocket_sparkle_flags[@]}" "$macpocket_sparkle/Versions/B/Updater.app"
 codesign "${macpocket_sparkle_flags[@]}" "$macpocket_sparkle"
+macpocket_app_entitlements="Resources/MacPocket.entitlements"
+if [ "$macpocket_configuration" = release ]; then macpocket_app_entitlements="Resources/MacPocketRelease.entitlements"; fi
+if [ -n "${MACPOCKET_FILTER_HOST_PROFILE:-}${MACPOCKET_FILTER_PROVIDER_PROFILE:-}" ]; then
+    ./scripts/embed-network-filter.sh "$macpocket_app_dir" "$macpocket_configuration" "$macpocket_identity" "$macpocket_app_entitlements"
+    macpocket_app_entitlements="$macpocket_root/.build/network-filter-$macpocket_configuration/host.entitlements"
+fi
 if [ "$macpocket_configuration" = debug ]; then
-    codesign --force --sign "$macpocket_identity" --entitlements Resources/MacPocket.entitlements "$macpocket_app_dir"
+    codesign --force --sign "$macpocket_identity" --entitlements "$macpocket_app_entitlements" "$macpocket_app_dir"
 else
     # Hardened runtime is required for notarization; it needs no extra entitlements for this app.
     # Hardened runtime blocks Apple events to other apps (Finder, System Events) without this entitlement.
-    macpocket_sign_flags=(--force --options runtime --entitlements Resources/MacPocketRelease.entitlements --sign "$macpocket_identity")
+    macpocket_sign_flags=(--force --options runtime --entitlements "$macpocket_app_entitlements" --sign "$macpocket_identity")
     if [ "$macpocket_identity" != "-" ]; then macpocket_sign_flags+=(--timestamp); fi
     codesign "${macpocket_sign_flags[@]}" "$macpocket_app_dir"
 fi

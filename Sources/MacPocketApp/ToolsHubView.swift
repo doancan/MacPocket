@@ -277,6 +277,9 @@ struct HubTool: Identifiable {
     }
 
     static let catalog: [HubTool] = [
+        .init(id: "menu-bar-organizer", title: "Menü Çubuğu Düzenleyici", description: "Diğer uygulamaların menü çubuğu simgelerini sırala, gizle ve yeniden aç.", icon: "menubar.rectangle", category: .productivity),
+        .init(id: "update-center", title: "Güncelleme Merkezi", description: "Homebrew dışındaki uygulamaların güncellemelerini ve üretici kaynaklarını takip et.", icon: "arrow.triangle.2.circlepath", category: .system),
+        .init(id: "internet-control", title: "İnternet Kontrolü", description: "Uygulamaların internet erişimi için izin ve engelleme kuralları oluştur.", icon: "network", category: .system),
         .init(id: "dock-preview", title: "Dock Önizlemeleri", description: "Dock simgesinde bekle; uygulamanın pencerelerini gör, seç ve yerleştir.", icon: "dock.rectangle", category: .productivity),
         .init(id: "shelf", title: "Dosya Rafı", description: "Dosya, metin ve bağlantıları topla; başka uygulamalara birlikte taşı.", icon: "tray.2", category: .productivity),
         .init(id: "command-bar", title: "Komut Çubuğu", description: "Araçlar, uygulamalar, pencereler, pano ve metin kısaltmaları tek aramada; kısayolla her yerden aç.", icon: "command", category: .productivity),
@@ -285,7 +288,7 @@ struct HubTool: Identifiable {
         .init(id: "startup-items", title: "Başlangıç Öğeleri", description: "Oturum açılışında ve Mac başlarken kendiliğinden çalışan öğeleri, sahipleriyle ve durumlarıyla gör.", icon: "power", category: .system),
         .init(id: "speed-test", title: "Ağ Hız Testi", description: "İndirme, yükleme ve yanıt verme hızını macOS’un yerleşik aracıyla ölç; sonuçları karşılaştır.", icon: "speedometer", category: .system),
         .init(id: "network-traffic", title: "Ağ Trafiği", description: "Hangi uygulamanın şu an ne kadar indirip yüklediğini canlı gör; yardımcı süreçler uygulamada toplanır.", icon: "arrow.up.arrow.down.circle", category: .system),
-        .init(id: "local-network", title: "Yerel Ağ", description: "Ağa bağlı cihazları adları, IP ve MAC adresleri ve türleriyle gör; yeni katılanları fark et.", icon: "network.badge.shield.half.filled", category: .system),
+        .init(id: "local-network", title: "Yerel Ağ", description: "Ağa bağlı cihazları adları, IP ve MAC adresleri ve türleriyle gör; yeni katılanları fark et.", icon: "network", category: .system),
         .init(id: "power-schedule", title: "Güç Zamanlaması", description: "Mac’in belirli saatlerde uyanmasını, açılmasını, uyumasını veya kapanmasını planla.", icon: "calendar.badge.clock", category: .system),
         .init(id: "wifi", title: "Wi-Fi Analizi", description: "Sinyal gücünü, paraziti ve çevredeki ağların kanal yoğunluğunu gör; modem için kanal önerisi al.", icon: "wifi", category: .system),
         .init(id: "screen-time", title: "Ekran Süresi", description: "Hangi uygulamada ne kadar zaman geçirdiğini gör; boşta ve kilitli süre sayılmaz, veriler bu Mac’te kalır.", icon: "hourglass", category: .productivity),

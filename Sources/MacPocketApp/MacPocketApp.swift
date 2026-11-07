@@ -16,6 +16,7 @@ struct MacPocketApplication: App {
         #if DEBUG
         // StateObject's wrapped-value thunk has not run: inspect existing TCC grants without
         // loading application state, changing preferences, opening windows, or starting modules.
+        ProductExpansionRuntimeAudit.runNativeIfRequested()
         WindowSwitcherPermissionProbe.runIfRequested()
         WindowExternalRuntimeAudit.runIfRequested()
         WindowLifecycleAuditProducer.runIfRequested()
@@ -67,6 +68,9 @@ final class PocketAppDelegate: NSObject, NSApplicationDelegate {
     private var switcherCommandListener: SwitcherCLIListener?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+        #if DEBUG
+        if ProductExpansionRuntimeAudit.nativeRequested { ProductExpansionRuntimeAudit.launchNative(); return }
+        #endif
         _ = PocketRelaunch.languageAtLaunch
         PocketDock.apply()
         let commandService = SwitcherCommandService(controller: .shared)

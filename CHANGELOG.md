@@ -2,6 +2,10 @@
 
 ## Yayımlanmamış
 
+- **Menü çubuğu düzenleyici:** uygulamaları gizli grupta toplama, ok düğmesiyle gizleme/gösterme, aranabilir liste ve simgeyi açma. macOS 27 özel görünürlük arayüzü çalışma anında denetlenir; sistem panelleriyle uyum sınırı araçta açıklanır.
+- **Bağımsız güncelleme merkezi:** Homebrew dışındaki uygulamalar için Sparkle, isteğe bağlı App Store ve uygulamaya bağlanan herkese açık GitHub sürüm kaynakları. Denetim elle başlatılır; kurulum üreticinin akışında devam eder.
+- **İnternet kontrolü:** imzalı uygulama kimliğiyle izin/engel kuralları, bağlantı listesi, gerçek Network Extension hedefi ve profil denetimli paketleme. Sistem filtresi etkinleştirilmedi; notarization/kurulum/onay sonrası gerçek engelleme kabulü bekliyor. [Kapsam ve doğrulama](docs/PRODUCT_EXPANSION.md).
+
 ## 0.1.5 — 6 Kasım 2026
 
 - **DMG kurulum penceresi:** MacPocket’ın kendi simgesi, Uygulamalar klasörüne sürükle-bırak kurulumu, Retina arka planı ve Türkçe/İngilizce yönergeler. İmzalı ve Apple tarafından notarize edilmiş DMG indirmesi; otomatik güncellemeler için mevcut ZIP ve Sparkle akışı korunur.

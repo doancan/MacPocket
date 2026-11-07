@@ -199,6 +199,9 @@ struct PocketRootView: View {
                 case .commandBar: CommandBarSettingsView()
                 case .shelf: ShelfSettingsView()
                 case .dockPreview: DockPreviewSettingsView()
+                case .menuBarOrganizer: MenuBarOrganizerView()
+                case .updateCenter: IndependentUpdateCenterView()
+                case .internetControl: InternetControlView()
                 case .none: ToolsHubView(model: model, openTool: openCatalogTool)
                 }
             }

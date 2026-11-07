@@ -10,3 +10,9 @@ xcuserdata/
 .superdesign/tmp/
 *.swp
 replica/screens/
+
+# Apple signing inputs stay local or in CI secrets.
+*.provisionprofile
+*.mobileprovision
+*.p12
+*.p8
