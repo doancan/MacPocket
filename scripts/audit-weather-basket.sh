@@ -15,7 +15,8 @@ for macpocket_language in tr en; do
     rm -f "$macpocket_directory/report.json"
     macpocket_options=(-NSQuitAlwaysKeepsWindows NO)
     if [ "$macpocket_language" = en ]; then macpocket_options+=(--audit-dark); fi
-    open -n -g -W "$macpocket_root/.build/MacPocket.app" --args --audit-weather-basket "$macpocket_directory" -AppleLanguages "($macpocket_language)" "${macpocket_options[@]}"
+    # The native accessibility actions require an active host window.
+    open -n -W "$macpocket_root/.build/MacPocket.app" --args --audit-weather-basket "$macpocket_directory" -AppleLanguages "($macpocket_language)" "${macpocket_options[@]}"
     python3 - "$macpocket_directory/report.json" "$macpocket_language" <<'PYREPORT'
 import json,pathlib,sys
 r=json.loads(pathlib.Path(sys.argv[1]).read_text())

@@ -2,6 +2,8 @@
 
 ## Yayımlanmamış
 
+- **Hava durumu paneli:** büyük sıcaklık/koşul görünümü, kompakt nem-rüzgâr-basınç satırı, kaydırılabilir saatlik tahmin ve ortak ölçekli günlük sıcaklık çubukları. Konum ve kaynak ayarları ayrı görünüme alındı; seçili kaynak ve yenileme altta kaldı. Boş konum, yükleme, hata, anahtar eksikliği ve ayrıntılı tahmin bulunmaması için ayrı durumlar eklendi.
+
 - **Hava durumu kaynak sepeti:** 11 ücretsiz erişim seçeneğinden istenenler sepete eklenebilir; menü çubuğu yalnız seçili kaynağı sorgular. Visual Crossing, MET Norway ve Open-Meteo anahtarsız; ECMWF IFS/AIFS Single, GFS ve ICON ayrı model seçenekleridir. WeatherAPI.com, Pirate Weather, OpenWeather’ın ücretsiz mevcut hava/5 günlük tahmin uçları ve Tomorrow.io kişisel API anahtarıyla çalışır. Anahtarlar Anahtar Zinciri’nde tutulur. Sağlayıcıya özel önbellek, kalıcı seçim, kota/erişim hataları ve kapsam bağlantıları eklendi; mevcut kullanıcıların iStat bağlantısı ilk seçim değişikliğine kadar korunur.
 
 - **Kaldırma planı:** uygulama, önbellek/günlükler ve kullanıcı verileri ayrı gruplarda gösterilir. Grup seçimi, Finder’da gösterme ve sabit seçim özeti eklendi; kullanıcı verileri başlangıçta seçilmez.

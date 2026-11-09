@@ -4668,3 +4668,29 @@
 "Üç saatte bir otomatik yenilenir." = "Updates automatically every three hours.";
 "İstediğin kaynakları sepete ekle, ardından gösterilecek kaynağı seç. Yalnız seçili kaynaktan veri alınır." = "Add the sources you want to your basket, then choose which one to display. Only the selected source is queried.";
 "Weather.condition.clear" = "Clear";
+
+/* Forecast panel and weather settings */
+"%@ hPa" = "%@ hPa";
+"%@ için kendi ücretsiz API anahtarını ekle veya anahtarsız bir kaynak seç." = "Add your own free API key for %@, or choose a source that does not need one.";
+"API Anahtarı Ekle" = "Add API Key";
+"Aralıklar tahmin örneklerinden hesaplanır." = "Ranges are calculated from forecast samples.";
+"Basınç" = "Pressure";
+"Başka bir kaynak seçebilir veya daha sonra yeniden deneyebilirsin." = "Choose another source or try again later.";
+"Bu kaynak için ayrıntılı tahmin verisi yok." = "Detailed forecast data is not available from this source.";
+"Günlük Tahmin" = "Daily Forecast";
+"Hava Durumu" = "Weather";
+"Hava Durumu Ayarları" = "Weather Settings";
+"Hava Durumuna Dön" = "Back to Weather";
+"Hava durumu alınamadı" = "Weather Unavailable";
+"Henüz veri yok" = "No data yet";
+"Hissedilen %@" = "Feels like %@";
+"Kaynak Sepetini Düzenle" = "Edit Source Basket";
+"Kaynakları Düzenle" = "Manage Sources";
+"Kaynağı bağla" = "Connect Your Source";
+"Konum Seç" = "Choose Location";
+"Konum ve Kaynaklar" = "Location and Sources";
+"Konumunu seç" = "Choose Your Location";
+"Saatlik Tahmin" = "Hourly Forecast";
+"Son başarılı güncelleme" = "Last successful update";
+"Sıcaklık: %@ Celsius" = "Temperature: %@ Celsius";
+"Şehir veya ilçe ekleyerek hava durumunu menü çubuğundan takip et." = "Add a city or district to follow the weather from your menu bar.";
