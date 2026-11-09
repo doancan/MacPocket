@@ -22,7 +22,7 @@ final class PocketStatusItemController: NSObject {
     private var renderKeys: [String: MenuBarRenderer.Key] = [:]
     private var accessibilityTexts: [String: String] = [:]
     private let popover = NSPopover()
-    private lazy var presentation = StatusItemPopoverPresenter(popover: popover, button: { [weak self] in self?.items[$0]?.button },
+    private lazy var presentation = StatusItemPopoverPresenter(popover: popover, buttons: { [weak self] in self?.items.compactMapValues(\.button) ?? [:] },
         content: { [weak self] key in
             guard let self else { return nil }
             let content: MenuBarPopoverContent = MenuBarModule(rawValue: key).map { .module($0) } ?? .grouped
@@ -37,9 +37,7 @@ final class PocketStatusItemController: NSObject {
         self.model = model
         super.init()
         popover.behavior = .transient
-        // Status items behave like menus: opening, closing and changing items must be immediate.
-        // The presenter still serializes close notifications, without two sequential animations.
-        popover.animates = false
+        popover.animates = true
         updateAppearance()
         refresh()
         model.$system.receive(on: RunLoop.main).sink { [weak self] snapshot in
@@ -77,6 +75,10 @@ final class PocketStatusItemController: NSObject {
             .receive(on: RunLoop.main).sink { [weak self] _ in
                 MainActor.assumeIsolated { self?.updateAppearance() }
             }.store(in: &subscriptions)
+        NSWorkspace.shared.notificationCenter.publisher(for: NSWorkspace.accessibilityDisplayOptionsDidChangeNotification)
+            .receive(on: RunLoop.main).sink { [weak self] _ in
+                MainActor.assumeIsolated { self?.updateAppearance() }
+            }.store(in: &subscriptions)
         NotificationCenter.default.publisher(for: .pocketQuickLook)
             .receive(on: RunLoop.main).sink { [weak self] _ in
                 MainActor.assumeIsolated { self?.showPopover(for: nil) }
@@ -97,6 +99,7 @@ final class PocketStatusItemController: NSObject {
     }
 
     private func updateAppearance() {
+        popover.animates = !PocketReduceMotion.isEnabled
         let name = UserDefaults.standard.string(forKey: "MacPocket.appearance")
         guard name != appearanceName else { return }
         appearanceName = name

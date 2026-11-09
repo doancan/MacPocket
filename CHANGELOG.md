@@ -2,9 +2,9 @@
 
 ## Yayımlanmamış
 
-- **Menü çubuğu hızı:** panel açılışı, kapanışı ve boyut değişimindeki AppKit animasyonları kapatıldı. Simgeler arasında geçişte ardışık kapanış/açılış beklemesi kaldırıldı; tek tık ve son seçimi koruyan kapanış sıralaması devam eder.
+- **Animasyonlu menü çubuğu geçişi:** ilk açılış/kapanış ve boyut değişimlerinde yerel animasyonlar korunur. Başka bir MacPocket simgesine tıklamak açık panelin içeriğini ve bağlı olduğu simgeyi değiştirir; paneli kapatıp yeniden açmaz. Hareketi azalt tercihi uygulanır; dışarı tıklama ve Escape ile kapatma korunur.
 
-- **Menü çubuğu panel geçişi:** hava durumu, AI ve diğer simgeler arasında tıklarken kapanış animasyonu nedeniyle yeni panelin açılmaması düzeltildi. Yeni seçim kapanış tamamlanana kadar saklanır; hızlı geçişte son hedef açılır, aynı simgeye tekrar tıklama paneli kapatır.
+- **Menü çubuğu panel geçişi:** hava durumu, AI ve diğer simgeler arasında tıklarken açılma isteğinin kaybolması düzeltildi. Gerçek bir kapanış sırasında gelen seçim saklanır; hızlı geçişte son hedef açılır, aynı simgeye tekrar tıklama paneli kapatır.
 
 - **Saatlik hava ayrıntıları:** saat kartı ayrı bir ayrıntı sayfası açar. Kaynak sağlıyorsa yağış olasılığı/miktarı/şiddeti, hissedilen sıcaklık, nem, rüzgâr/hamle/yön, basınç, bulut örtüsü, görüş, UV ve çiy noktası gösterilir. Yağışın 1/3/6/12 saatlik dönemi korunur; eksik alanlar sıfırla doldurulmaz.
 
