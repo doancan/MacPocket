@@ -309,11 +309,19 @@ final class ApplicationWorkspaceModel: ObservableObject {
     private var additionalRoots: [URL] = []
     private let inventory = ApplicationInventory()
     private let homebrew = HomebrewApplications()
-    private let trashService = FileTrashService()
     private let updateScanner: ApplicationUpdateScanner
+    private let uninstallProcesses: any UninstallProcessManaging
+    private let uninstallTrash: @Sendable ([FileTrashRequest]) async -> [FileTrashResult]
     private var updateTask: Task<Void, Never>?
 
-    init(updateScanner: ApplicationUpdateScanner = ApplicationUpdateScanner()) { self.updateScanner = updateScanner }
+    init(updateScanner: ApplicationUpdateScanner = ApplicationUpdateScanner(),
+         uninstallProcesses: any UninstallProcessManaging = ApplicationUninstallProcesses(),
+         uninstallTrash: @escaping @Sendable ([FileTrashRequest]) async -> [FileTrashResult] = { await FileTrashService().trash($0) }) {
+        self.updateScanner = updateScanner; self.uninstallProcesses = uninstallProcesses; self.uninstallTrash = uninstallTrash
+    }
+    func uninstallPreparation(for application: InstalledApplication) -> UninstallPreparationModel {
+        .init(application: application, service: uninstallProcesses)
+    }
 
     var visibleRemoteUpdates: [ApplicationUpdateFinding] { remoteUpdates.filter { updateSettings.sources.contains($0.source) } }
     var visibleHomebrewUpdates: [HomebrewCask] { updateSettings.sources.contains(.homebrew) ? updates : [] }
@@ -401,34 +409,60 @@ final class ApplicationWorkspaceModel: ObservableObject {
         return applications.first { names.contains($0.url.lastPathComponent) && self.cask(for: $0)?.token == cask.token }
             ?? applications.first { names.contains($0.url.lastPathComponent) }
     }
-    func uninstall(_ plan: UninstallPlan, selected: Set<String>) async {
-        guard !busy, !checkingUpdates, updatingToken == nil else { return }
-        guard !NSWorkspace.shared.runningApplications.contains(where: { $0.bundleIdentifier == plan.application.bundleID }) else {
-            failure = String(localized: "Kaldırmadan önce \(plan.application.name) uygulamasını kapatmalısın."); return
+    @discardableResult
+    func uninstall(_ plan: UninstallPlan, selected: Set<String>) async -> Bool {
+        guard !busy, !checkingUpdates, updatingToken == nil else { return false }
+        guard !selected.isEmpty, selected.isSubset(of: Set(plan.candidates.map(\.id))) else {
+            failure = String(localized: "Kaldırılacak öğeleri geçerli plandan seç."); return false
         }
         busy = true
-        failure = nil
+        failure = nil; resultMessage = nil
         defer { busy = false; updatingToken = nil; PocketOperationState.shared.preventTermination = false }
-        var requests = plan.candidates.filter { selected.contains($0.id) }.map(\.request)
-        var packageResult = ""
-        if let cask = cask(for: plan.application), selected.contains(plan.application.id) {
-            updatingToken = cask.token; packageAction = String(localized: "kaldırılıyor")
-            PocketOperationState.shared.preventTermination = true
-            do {
-                try plan.candidates[0].request.validate()
-                packageResult = try await homebrew.uninstall(cask.token)
-                requests.removeAll { $0.url == plan.application.url }
+        var results: [FileTrashResult] = [], packageResult = "", operationFailure: String?
+        do {
+            try await requireStopped(plan.application, validateBundle: true)
+            // Graceful quit can save preferences. Refresh identities, retain only explicitly selected paths,
+            // and never select newly discovered files or user-data categories automatically.
+            let fresh = try UninstallPlanner.plan(plan.application, home: plan.home)
+            var requests = fresh.candidates.filter { selected.contains($0.id) }.map(\.request)
+            requests.sort { !$0.applicationBundle && $1.applicationBundle }
+            var removedByHomebrew = false
+            if let cask = cask(for: plan.application), selected.contains(plan.application.id) {
+                try await requireStopped(plan.application, validateBundle: true)
+                updatingToken = cask.token; packageAction = String(localized: "kaldırılıyor")
+                PocketOperationState.shared.preventTermination = true
+                packageResult = try await homebrew.uninstall(cask.token); removedByHomebrew = true
+                requests.removeAll { $0.applicationBundle }
                 casks = (try? await homebrew.installed()) ?? []
-            } catch { failure = error.localizedDescription; return }
+            }
+            for request in requests {
+                try Task.checkCancellation()
+                try await requireStopped(plan.application, validateBundle: !removedByHomebrew)
+                let moved = await uninstallTrash([request]); results += moved
+                if moved.count != 1 || moved.contains(where: { $0.trashURL == nil }) {
+                    operationFailure = moved.compactMap(\.error).first ?? String(localized: "Seçilen öğe taşınamadı; kalan öğelere dokunulmadı."); break
+                }
+            }
+        } catch is CancellationError { operationFailure = String(localized: "Kaldırma durduruldu; kalan öğelere dokunulmadı.") }
+        catch { operationFailure = error.localizedDescription }
+        if !results.isEmpty || !packageResult.isEmpty {
+            resultMessage = String(localized: "\(results.filter { $0.trashURL != nil }.count) öğe Çöp’e taşındı.") + (packageResult.isEmpty ? "" : "\nHomebrew: \(packageResult)")
         }
-        let results = await trashService.trash(requests)
-        let errors = results.compactMap(\.error)
-        resultMessage = String(localized: "\(results.filter { $0.trashURL != nil }.count) öğe Çöp’e taşındı.") + (packageResult.isEmpty ? "" : "\nHomebrew: \(packageResult)")
-        failure = errors.isEmpty ? nil : errors.prefix(3).joined(separator: "\n")
-        busy = false
-        await load()
-        if !errors.isEmpty { failure = errors.prefix(3).joined(separator: "\n") }
-        selection = nil
+        if !FileManager.default.fileExists(atPath: plan.application.url.path) {
+            applications.removeAll { $0.id == plan.application.id }
+        }
+        failure = operationFailure
+        if operationFailure == nil, resultMessage == nil { resultMessage = String(localized: "Seçili öğeler artık bu konumda yok.") }
+        if operationFailure == nil { selection = nil }
+        return operationFailure == nil
+    }
+    private func requireStopped(_ application: InstalledApplication, validateBundle: Bool) async throws {
+        let running = try await uninstallProcesses.inspect(application, validateBundle: validateBundle)
+        guard running.isEmpty else {
+            throw NSError(domain: "MacPocket.Uninstall", code: 3, userInfo: [NSLocalizedDescriptionKey:
+                String(localized: "\(application.name) veya yardımcı süreçleri çalışıyor. Dosyalar kaldırılmadan önce kapatılmaları gerekiyor.")])
+        }
+        try Task.checkCancellation()
     }
     func upgrade(_ cask: HomebrewCask) async {
         guard !busy, !checkingUpdates, updatingToken == nil, !cask.pinned else { return }

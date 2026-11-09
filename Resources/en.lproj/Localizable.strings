@@ -4567,3 +4567,54 @@
 "macOS çıkarılabilir USB veya Thunderbolt aygıtı bildirmedi. Bir aygıt bağlayıp listeyi yenile." = "macOS did not report a removable USB or Thunderbolt device. Connect a device and refresh the list.";
 "Çıkarılabilir bağlantı bulunamadı" = "No removable connections found";
 "%@: %lld" = "%@: %lld";
+
+/* Application removal and process shutdown */
+"Uygulamanın normal çıkış bağlantısı doğrulanamadı. Elle kapatıp yeniden dene." = "The app’s normal quit interface could not be verified. Quit it manually and try again.";
+"Homebrew, paketin kendi kaldırma yönergelerini de çalıştırır; bu yönergeler ek servisleri durdurabilir." = "Homebrew also runs the package’s uninstall instructions, which may stop additional services.";
+"%@ kapatma isteğini kabul etmedi." = "%@ did not accept the quit request.";
+"%@ veya yardımcı süreçleri çalışıyor. Dosyalar kaldırılmadan önce kapatılmaları gerekiyor." = "%@ or its helpers are running. They must exit before files can be removed.";
+"Ana uygulama hâlâ açık; yardımcı süreçler kapatılmadı." = "The main application is still open; helpers were left running.";
+"Bazı süreçler hâlâ çalışıyor. Dosyalar kaldırılmadı; yeniden dene veya ayrı onayla zorla kapat." = "Some processes are still running. No files were removed; try again or confirm a force quit separately.";
+"Beklemeyi Durdur" = "Stop Waiting";
+"Durumu Yenile" = "Refresh Status";
+"Elle kapatılmalı" = "Close manually";
+"Kaldırma durduruldu; kalan öğelere dokunulmadı." = "Removal stopped; remaining items were left unchanged.";
+"Kaldırma tamamlanamadı." = "Removal could not be completed.";
+"Kaldırılacak öğeleri geçerli plandan seç." = "Select items from the current removal plan.";
+"Kapat ve Devam Et" = "Quit and Continue";
+"Kapat ve Kaldır…" = "Quit and Uninstall…";
+"Listelenen süreçler zorla kapatılacak. Kaydedilmemiş çalışmalar kaybolabilir. Süreç listesi değişirse yeniden onay gerekir." = "The listed processes will be force quit. Unsaved work may be lost. A changed process list requires another confirmation.";
+"Seçilen öğe taşınamadı; kalan öğelere dokunulmadı." = "The selected item could not be moved; remaining items were left unchanged.";
+"Seçilen öğeler kaldırılsın mı?" = "Remove the selected items?";
+"Seçili öğeler artık bu konumda yok." = "The selected items are no longer at this location.";
+"Süreç listesi değişti veya güvenle kapatılamayan süreç var. Listeyi yeniden incele." = "The process list changed or includes a process that cannot be safely stopped. Review the list again.";
+"Süreçler denetleniyor…" = "Checking running processes…";
+"Uygulama kapanmadı. Kaydetme penceresini yanıtla; kapandığında yeniden dene." = "The application has not exited. Respond to any save dialog, then try again.";
+"Yalnız seçilen uygulama paketine ait süreçler kapatılır. Paylaşılan servisler ve paket dışındaki yardımcılar otomatik durdurulmaz." = "Only processes belonging to the selected app bundle are stopped. Shared services and helpers outside the bundle are not stopped automatically.";
+"Zorla Kapat ve Kaldır" = "Force Quit and Uninstall";
+"Zorla Kapat ve Kaldır…" = "Force Quit and Uninstall…";
+"Zorla kapatıp kaldırmak istiyor musun?" = "Force quit and uninstall?";
+"Çalışan süreç yok. Kaldırma öncesinde tekrar kontrol edilir." = "No running processes. This is checked again before removal.";
+"Çalışan süreçler" = "Running processes";
+"Çalışan uygulamaya önce normal çıkış isteği gönderilir. Kaydetme penceresi açılırsa yanıtla; uygulama ve yardımcıları kapanmadan dosyalar kaldırılmaz." = "A normal quit request is sent first. Respond to any save dialog; files are not removed until the app and its helpers have exited.";
+
+/* Uninstall plan groups and selection summary */
+"%@: Finder’da Göster" = "%@: Show in Finder";
+"Bu uygulamaya ait geçici ve tanılama dosyaları." = "Temporary and diagnostic files belonging to this application.";
+"Kaldırma başlamadan önce yeniden kontrol edilir." = "Checked again before removal starts.";
+"Kaldırma kapsamı" = "Removal scope";
+"Kapatma ve kaldırma işlemi sürüyor…" = "Quitting and removing…";
+"Kullanıcı verileri" = "User data";
+"Kullanıcı verisi seçilmedi." = "No user data selected.";
+"PID %@" = "PID %@";
+"Seçilen klasörler içerikleriyle birlikte taşınır. Paylaşılan üretici ve App Group klasörleri plana eklenmez." = "Selected folders are moved with their contents. Shared vendor and App Group folders are excluded.";
+"Seçilen öğe sayısı: %lld" = "Selected items: %lld";
+"Seçili kullanıcı verileri de kaldırılacak." = "Selected user data will also be removed.";
+"Tercihler ve kişisel içerik. Bu öğeler varsayılan olarak seçilmez." = "Preferences and personal content. These items are not selected by default.";
+"Uygulama kalacak; seçili kullanıcı verileri kaldırılacak." = "The application will remain installed; selected user data will be removed.";
+"Uygulama paketini kaldır." = "Remove the application bundle.";
+"Uygulama yüklü kalacak." = "The application will remain installed.";
+"Çalışan süreç bulunmadı" = "No running processes found";
+"Çalışan süreç sayısı: %lld" = "Running processes: %lld";
+"Önbellek ve günlükler" = "Cache and logs";
+"Önce uygulama kapatılacak" = "The application will quit first";

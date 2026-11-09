@@ -2,6 +2,9 @@
 
 ## Yayımlanmamış
 
+- **Kaldırma planı:** uygulama, önbellek/günlükler ve kullanıcı verileri ayrı gruplarda gösterilir. Grup seçimi, Finder’da gösterme ve sabit seçim özeti eklendi; kullanıcı verileri başlangıçta seçilmez.
+- **Çalışan uygulamalar:** kaldırma onayından sonra önce normal çıkış istenir. Uygulama ve paket içindeki yardımcı süreçler kapanmadan dosyalar taşınmaz. Kapanmayan süreçler için ayrı zorla kapatma onayı gerekir; hatada plan açık kalır. [Kapsam ve doğrulama](docs/APPLICATION_UNINSTALL.md).
+
 ## 0.1.6 — 7 Kasım 2026
 
 - **Alt+Tab pencere geçişi:** animasyonlu önizleme kartları, Alt basılıyken Tab/Shift+Tab ile seçim ve Alt bırakıldığında pencereyi öne getirme. Dokuz kısayol için bağımsız filtre/görünüm/bırakma ayarları ve özelleştirilebilir pencere eylemleri geliştirildi. Fiziksel klavye/trackpad ve tüm Space/tam ekran kombinasyonları için kabul kapsamı ayrıca izleniyor; tam AltTab eşdeğerliği iddia edilmiyor.

@@ -18,6 +18,7 @@ struct MacPocketApplication: App {
         // loading application state, changing preferences, opening windows, or starting modules.
         ProductExpansionRuntimeAudit.runNativeIfRequested()
         CableImpactRuntimeAudit.configureIfRequested()
+        UninstallRuntimeAudit.configureIfRequested()
         WindowSwitcherPermissionProbe.runIfRequested()
         WindowExternalRuntimeAudit.runIfRequested()
         WindowLifecycleAuditProducer.runIfRequested()
@@ -72,6 +73,7 @@ final class PocketAppDelegate: NSObject, NSApplicationDelegate {
         #if DEBUG
         if ProductExpansionRuntimeAudit.nativeRequested { ProductExpansionRuntimeAudit.launchNative(); return }
         if CableImpactRuntimeAudit.requested { CableImpactRuntimeAudit.launch(); return }
+        if UninstallRuntimeAudit.requested { UninstallRuntimeAudit.launch(); return }
         #endif
         _ = PocketRelaunch.languageAtLaunch
         PocketDock.apply()

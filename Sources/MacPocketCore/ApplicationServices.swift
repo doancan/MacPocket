@@ -90,13 +90,20 @@ public struct UninstallPlan: Identifiable, Sendable {
     public let application: InstalledApplication
     public let candidates: [UninstallCandidate]
     public let createdAt: Date
+    public let home: URL
 }
 
 public enum UninstallPlanner {
+    public static func validateApplication(_ application: InstalledApplication) throws {
+        guard !application.protected else { throw FileServiceError.protectedItem }
+        guard application.url.pathExtension.lowercased() == "app", application.identity.isDirectory,
+              !application.identity.isSymbolicLink else { throw FileServiceError.outsideScope }
+        guard try FileIdentity.read(application.url) == application.identity,
+              ApplicationInventory.read(application.url)?.bundleID == application.bundleID else { throw FileServiceError.changed }
+    }
     /// Exact bundle identifiers only. Shared vendor/App Group directories are never inferred.
     public static func plan(_ application: InstalledApplication, home: URL = FileManager.default.homeDirectoryForCurrentUser) throws -> UninstallPlan {
-        guard !application.protected else { throw FileServiceError.protectedItem }
-        guard try FileIdentity.read(application.url) == application.identity else { throw FileServiceError.changed }
+        try validateApplication(application)
         let id = application.bundleID
         guard id.range(of: #"^[A-Za-z0-9][A-Za-z0-9._-]+$"#, options: .regularExpression) != nil,
               !id.contains("..") else { throw FileServiceError.outsideScope }
@@ -119,7 +126,18 @@ public enum UninstallPlanner {
             candidates.append(.init(title: title, containsUserData: userData,
                                     request: .init(url: url, identity: identity, root: library)))
         }
-        return .init(application: application, candidates: candidates, createdAt: Date())
+        return .init(application: application, candidates: candidates, createdAt: Date(), home: home)
+    }
+}
+
+public enum UninstallProcessScope {
+    /// Executable containment is component-bounded. Names, bundle-ID prefixes and parent PIDs are not ownership proof.
+    public static func contains(_ executable: String, applicationURL: URL) -> Bool {
+        guard executable.hasPrefix("/"), applicationURL.isFileURL,
+              applicationURL.standardizedFileURL.pathExtension.lowercased() == "app" else { return false }
+        let root = applicationURL.standardizedFileURL.resolvingSymlinksInPath().path
+        let path = URL(fileURLWithPath: executable).standardizedFileURL.resolvingSymlinksInPath().path
+        return path.hasPrefix(root + "/")
     }
 }
 

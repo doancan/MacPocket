@@ -237,6 +237,9 @@ public struct FileTrashResult: Identifiable, Sendable {
     public let source: URL
     public let trashURL: URL?
     public let error: String?
+    public init(source: URL, trashURL: URL?, error: String?) {
+        self.source = source; self.trashURL = trashURL; self.error = error
+    }
 }
 
 public actor FileTrashService {
