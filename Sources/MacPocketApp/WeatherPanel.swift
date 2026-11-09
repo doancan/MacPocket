@@ -244,11 +244,11 @@ struct WeatherDetail: View {
                     } else { Text("Henüz veri yok").font(.caption2).foregroundStyle(.secondary) }
                 }.lineLimit(1)
             }.frame(maxWidth: .infinity, alignment: .leading)
-            TimelineView(.periodic(from: .now, by: 1)) { _ in
+            DeadlineRefreshView(deadline: service.nextRefreshAt) { date in
                 Button { service.refresh(manual: true) } label: {
                     if service.loading { ProgressView().controlSize(.mini).frame(width: 28, height: 28) }
                     else { Image(systemName: "arrow.clockwise").font(.system(size: 13)).frame(width: 28, height: 28) }
-                }.buttonStyle(.plain).disabled(!service.canRefresh).accessibilityLabel("Yenile")
+                }.buttonStyle(.plain).disabled(!service.canRefresh(at: date)).accessibilityLabel("Yenile")
                     .help(service.activeSource == .metNorway ? String(localized: "Üç saatte bir otomatik yenilenir.") : String(localized: "Saatte bir otomatik yenilenir."))
             }
         }

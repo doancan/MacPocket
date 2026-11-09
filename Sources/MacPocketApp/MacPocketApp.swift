@@ -416,8 +416,10 @@ final class PocketModel: ObservableObject {
             } catch { powerHistoryError = error.localizedDescription }
             if let user = system.cpuUserPercent, let kernel = system.cpuSystemPercent {
                 let memory = system.usedMemoryBytes.map { Double($0) / Double(max(1, system.physicalMemoryBytes)) }
-                samples.append(PocketSample(date: system.capturedAt, cpuUser: user, cpuSystem: kernel, memoryUsedFraction: memory))
-                if samples.count > Self.sampleCapacity { samples.removeFirst(samples.count - Self.sampleCapacity) }
+                var updated = samples
+                updated.append(PocketSample(date: system.capturedAt, cpuUser: user, cpuSystem: kernel, memoryUsedFraction: memory))
+                if updated.count > Self.sampleCapacity { updated.removeFirst(updated.count - Self.sampleCapacity) }
+                samples = updated
             }
             if error != nil { error = nil }
         } catch { self.error = error.localizedDescription }

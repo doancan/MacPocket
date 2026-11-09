@@ -2,6 +2,9 @@
 
 ## Yayımlanmamış
 
+- **Yinelenen arayüz yayınları:** sistem ve menü çubuğu geçmişi dolduğunda ekleme/kırpma tek güncelleme olarak yayımlanır. Her ölçümde iki yayın yerine bir yayın üretilir; tampon sınırı abonelere aşılmış olarak gösterilmez.
+- **Hava durumu düğmesinin zamanlaması:** saniyelik arayüz sorgusu yerine düğmenin yeniden kullanılabilir olacağı zamana tek bekleme planlanır. Kaynak/zaman değişimi veya görünümün kapanması eski beklemeyi iptal eder; manuel yeniden deneme ve API kota sınırları korunur.
+
 - **Arka plan süreç taraması:** Görev Yöneticisi gizlenince, küçültülünce veya tamamen örtülünce otomatik süreç okumaları durur; pencere geri gelince liste hemen yenilenir. Ana pencere açılışında ve süreç verisi kullanmayan sayfalarda gereksiz süreç taraması kaldırıldı. Açık menü çubuğu süreç paneli ve açıkça istenen rapor/port okumaları çalışır.
 
 - **Küçük canlı grafikler:** örnek başına ayrı grafik öğeleri oluşturan yapı tek Canvas çizimine taşındı. Yumuşak eğri, renkli alan, negatif Wi-Fi ölçeği ve otomatik üst sınır korunur. Geçersiz değerler çizime katılmaz; sensör ve menü çubuğu yenileme aralıkları değişmez.

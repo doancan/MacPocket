@@ -140,7 +140,10 @@ final class WeatherService: ObservableObject {
     }
 
     var canRefresh: Bool {
-        enabled && location != nil && !loading && now() >= (nextRefreshAt ?? .distantPast)
+        canRefresh(at: now())
+    }
+    func canRefresh(at date: Date) -> Bool {
+        enabled && location != nil && !loading && date >= (nextRefreshAt ?? .distantPast)
             && (!activeSource.requiresAPIKey || configuredKeys.contains(activeSource))
     }
 }

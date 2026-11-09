@@ -41,7 +41,8 @@ final class MenuBarHistory: ObservableObject {
     func record(_ snapshot: SystemSnapshot) {
         guard samples.last?.date != snapshot.capturedAt else { return }
         let memory = snapshot.usedMemoryBytes.map { Double($0) / Double(max(1, snapshot.physicalMemoryBytes)) }
-        samples.append(MenuBarSample(
+        var updated = samples
+        updated.append(MenuBarSample(
             date: snapshot.capturedAt, cpuUser: snapshot.cpuUserPercent, cpuSystem: snapshot.cpuSystemPercent,
             memoryFraction: memory, memoryPressure: snapshot.memoryPressurePercent,
             networkDown: snapshot.network?.receivedBytesPerSecond, networkUp: snapshot.network?.sentBytesPerSecond,
@@ -53,7 +54,8 @@ final class MenuBarHistory: ObservableObject {
             gpu: snapshot.gpu?.utilizationPercent, gpuRenderer: snapshot.gpu?.rendererPercent,
             gpuMemory: snapshot.gpu?.memoryInUseBytes.map { Double($0) / Double(max(1, snapshot.physicalMemoryBytes)) },
             ping: snapshot.connectivity?.pingMilliseconds, wifiRSSI: snapshot.connectivity?.wifiRSSI.map(Double.init)))
-        if samples.count > Self.capacity { samples.removeFirst(samples.count - Self.capacity) }
+        if updated.count > Self.capacity { updated.removeFirst(updated.count - Self.capacity) }
+        samples = updated
     }
 
     /// Recent values for a module's mini graph, normalised to 0…1.
