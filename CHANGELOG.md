@@ -2,6 +2,8 @@
 
 ## Yayımlanmamış
 
+- **Ekran Süresi hesaplamaları:** kartlar ve grafikler aynı gün/saat özetini paylaşır. Gün toplamları, aktif gün sayısı, ortalama ve ölçek için aynı uygulama süreleri tekrar tekrar toplanmaz. Düne göre karşılaştırma da aynı canlı kayıt anlık görüntüsünü kullanır.
+
 - **Pano listesindeki uzun metinler:** başlık için metnin tamamını satırlara ayırmak yerine ilk dolu satıra kadar ilerlenir. Başta boş satırlar, Unicode satır sonları, boşluk temizleme ve 200 karakterlik önizleme korunur. Uzun günlük metinlerinin görünmeyen devamı başlık hazırlanırken yeniden parçalanmaz.
 
 - **Pano geçmişinin disk yazımları:** içerik değişmedikçe kayıt planlanmaz ve kapanış/modül durdurma çağrısı arşivi yeniden yazmaz. Henüz yüklenmemiş geçmiş boş bellek durumuyla kaydedilmez. Gerçek değişiklikler mevcut gecikmeli kayıtla saklanır; başarısız kayıt yeniden denenebilir. Diskte saklama yeniden açılınca bellekteki geçmiş ve görseller kaydedilir; tümünü silmek boş arşivi yeniden oluşturmaz.

@@ -301,35 +301,37 @@ struct ScreenTimeView: View {
         let calendar = Calendar.current
         let endDate = range == .yesterday ? calendar.date(byAdding: .day, value: -1, to: now) ?? now : now
         let days = ledger.range(endingAt: endDate, count: range.dayCount)
-        let total = days.reduce(0) { $0 + $1.day.total }
-        let apps = UsageLedger.appTotals(days.map(\.day), names: ledger.names)
-        let activeDays = max(1, days.filter { $0.day.total > 0 }.count)
-        let hourly = UsageLedger.hourTotals(days.map(\.day))
+        let values = days.map(\.day)
+        let summary = UsagePeriodSummary(values)
+        let total = summary.total
+        let apps = UsageLedger.appTotals(values, names: ledger.names)
+        let activeDays = summary.activeDayCount
+        let hourly = summary.hourTotals
         // Today/yesterday trend by hour; longer ranges by day.
-        let trend = range.isSingleDay ? hourly : days.map(\.day.total)
+        let trend = range.isSingleDay ? hourly : summary.dayTotals
         let topTrend = apps.first.map { top in range.isSingleDay ? [] : days.map { $0.day.apps[top.app] ?? 0 } } ?? []
 
         statusLine
         HStack(spacing: PocketSpacing.m) {
-            PocketMetricTile(title: "Toplam", value: "\(UsageFormatter.duration(total))", detail: "\(totalDetail(days: days))",
+            PocketMetricTile(title: "Toplam", value: "\(UsageFormatter.duration(total))", detail: "\(totalDetail(today: summary.dayTotals.first, ledger: ledger))",
                              icon: "hourglass", color: PocketTheme.brand, history: trend, historyCeiling: nil)
             if range.isSingleDay {
                 PocketMetricTile(title: "Uygulama geçişi", value: "\(days.first?.day.switches ?? 0)",
                                  detail: "\(String(localized: "\(apps.count) uygulama kullanıldı"))",
                                  icon: "arrow.left.arrow.right", color: PocketTheme.brandSecondary, history: hourly, historyCeiling: nil)
             } else {
-                PocketMetricTile(title: "Günlük ortalama", value: "\(UsageFormatter.duration(total / Double(activeDays)))",
+                PocketMetricTile(title: "Günlük ortalama", value: "\(UsageFormatter.duration(summary.average))",
                                  detail: "\(String(localized: "\(activeDays) günlük kayıt"))",
                                  icon: "chart.bar", color: PocketTheme.brandSecondary, history: trend, historyCeiling: nil)
             }
             PocketMetricTile(title: "En çok", value: "\(apps.first.map { ledger.names[$0.app] ?? $0.app } ?? "—")",
                              detail: "\(apps.first.map { UsageFormatter.duration($0.seconds) } ?? String(localized: "Henüz kayıt yok"))",
                              icon: "crown", color: PocketTheme.power, history: topTrend, historyCeiling: nil)
-            PocketMetricTile(title: "En yoğun saat", value: "\(peakHour(days.map(\.day)))",
+            PocketMetricTile(title: "En yoğun saat", value: "\(peakHour(hourly))",
                              detail: "\(String(localized: "Saat dilimine göre"))", icon: "clock", color: PocketTheme.disk,
                              history: hourly, historyCeiling: nil)
         }
-        chart(days: days)
+        chart(days: days, summary: summary)
         appList(apps, total: total, ledger: ledger)
         footer
     }
@@ -357,28 +359,27 @@ struct ScreenTimeView: View {
         }
     }
 
-    private func totalDetail(days: [(date: Date, day: UsageDay)]) -> String {
-        guard range == .today, let today = days.first?.day.total else {
+    private func totalDetail(today: Double?, ledger: UsageLedger) -> String {
+        guard range == .today, let today else {
             return range.isSingleDay ? String(localized: "Ön plandaki süre") : String(localized: "Seçili dönemde")
         }
-        let yesterday = service.live.day(Calendar.current.date(byAdding: .day, value: -1, to: now) ?? now).total
+        let yesterday = ledger.day(Calendar.current.date(byAdding: .day, value: -1, to: now) ?? now).total
         guard yesterday > 0 else { return String(localized: "Dün kayıt yok") }
         let difference = today - yesterday
         let text = UsageFormatter.duration(abs(difference))
         return difference >= 0 ? String(localized: "Düne göre \(text) fazla") : String(localized: "Düne göre \(text) az")
     }
 
-    private func peakHour(_ days: [UsageDay]) -> String {
-        let hours = UsageLedger.hourTotals(days)
+    private func peakHour(_ hours: [Double]) -> String {
         guard let peak = hours.indices.max(by: { hours[$0] < hours[$1] }), hours[peak] > 0 else { return "—" }
         return String(format: "%02d:00", peak)
     }
 
-    @ViewBuilder private func chart(days: [(date: Date, day: UsageDay)]) -> some View {
+    @ViewBuilder private func chart(days: [(date: Date, day: UsageDay)], summary: UsagePeriodSummary) -> some View {
         VStack(alignment: .leading, spacing: PocketSpacing.s) {
             PocketSectionHeader(range.isSingleDay ? "Saatlere göre" : "Günlere göre", icon: "chart.bar.xaxis")
             if range.isSingleDay {
-                let hours = UsageLedger.hourTotals(days.map(\.day))
+                let hours = summary.hourTotals
                 Chart(Array(hours.enumerated()), id: \.offset) { hour, seconds in
                     BarMark(x: .value("Saat", hour), y: .value("Dakika", seconds / 60))
                         .foregroundStyle(PocketTheme.brandGradient)
@@ -394,10 +395,10 @@ struct ScreenTimeView: View {
                 } }
                 .frame(height: 170)
             } else {
-                let average = days.map(\.day.total).reduce(0, +) / Double(max(1, days.filter { $0.day.total > 0 }.count))
+                let average = summary.average
                 Chart {
-                    ForEach(days, id: \.date) { item in
-                        BarMark(x: .value("Gün", item.date, unit: .day), y: .value("Dakika", item.day.total / 60))
+                    ForEach(Array(days.enumerated()), id: \.element.date) { index, item in
+                        BarMark(x: .value("Gün", item.date, unit: .day), y: .value("Dakika", summary.dayTotals[index] / 60))
                             .foregroundStyle(Calendar.current.isDateInToday(item.date) ? AnyShapeStyle(PocketTheme.brandGradient) : AnyShapeStyle(PocketTheme.brand.opacity(0.55)))
                             .cornerRadius(3)
                     }
@@ -412,7 +413,7 @@ struct ScreenTimeView: View {
                 .chartXAxis { AxisMarks(values: .stride(by: .day, count: range == .week ? 1 : 5)) { _ in
                     AxisGridLine(); AxisValueLabel(format: .dateTime.day().month(.abbreviated), centered: true)
                 } }
-                .chartYScale(domain: 0...max(60, (days.map(\.day.total).max() ?? 0) / 60 * 1.15))
+                .chartYScale(domain: 0...max(60, summary.maximumDayTotal / 60 * 1.15))
                 .chartYAxis { AxisMarks(position: .leading, values: .automatic(desiredCount: 4)) { value in
                     AxisGridLine(); AxisValueLabel { if let minutes = value.as(Double.self) { Text(UsageFormatter.duration(minutes * 60)) } }
                 } }
