@@ -71,7 +71,7 @@ struct PocketMenuBarView: View {
         let wasWanted = model.menuBarProcessesWanted
         model.menuBarProcessesWanted = wanted
         if wanted && !wasWanted && !model.paused {
-            Task { await model.refresh(includeProcesses: true) }
+            Task { await model.refresh() }
         }
     }
 

@@ -269,7 +269,7 @@ final class PocketModel: ObservableObject {
     @Published var awakeError: String?
     @Published var powerHistory: [PowerHistoryEntry] = []
     @Published var powerHistoryError: String?
-    var mainWindowVisible = false
+    private(set) var mainWindowVisible = false
     /// Set by the menu bar while a popover showing top processes is open; process sampling is
     /// otherwise limited to the visible Task Manager.
     var menuBarProcessesWanted = false
@@ -298,10 +298,18 @@ final class PocketModel: ObservableObject {
     private let alerts = PocketAlertNotifier()
     private var subscriptions = Set<AnyCancellable>()
     private var refreshing = false
+    private var pendingAutomaticProcessRefresh = false
     private var pollingTask: Task<Void, Never>?
+    private let readSystemSnapshot: (@Sendable () async throws -> SystemSnapshot)?
+    private let readProcessSnapshot: (@Sendable () async throws -> ProcessSnapshot)?
 
-    init(sleepController: any SleepControlling = SleepController(), startMonitoring: Bool = true) {
+    init(sleepController: any SleepControlling = SleepController(), startMonitoring: Bool = true,
+         readSystemSnapshot: (@Sendable () async throws -> SystemSnapshot)? = nil,
+         readProcessSnapshot: (@Sendable () async throws -> ProcessSnapshot)? = nil,
+         historyStore: PowerHistoryStore? = nil) {
         self.sleepController = sleepController
+        self.readSystemSnapshot = readSystemSnapshot; self.readProcessSnapshot = readProcessSnapshot
+        if let historyStore { self.historyStore = historyStore }
         let interval = UserDefaults.standard.double(forKey: "MacPocket.refreshSeconds")
         if [1.0, 2.0, 5.0, 10.0].contains(interval) { refreshSeconds = interval }
         guard startMonitoring else { return }
@@ -325,6 +333,25 @@ final class PocketModel: ObservableObject {
 
     var cpuLabel: String { system?.cpuTotalPercent.map { pocketPercent($0) } ?? "—" }
 
+    var processSamplingWanted: Bool {
+        (mainWindowVisible && navigation.tool == .taskManager) || menuBarProcessesWanted
+    }
+
+    func setMainWindowVisible(_ visible: Bool) {
+        guard mainWindowVisible != visible else { return }
+        let wasWanted = processSamplingWanted
+        mainWindowVisible = visible
+        if visible && !wasWanted && processSamplingWanted && !paused {
+            if refreshing { pendingAutomaticProcessRefresh = true }
+            else {
+                Task { [weak self] in
+                    guard let self, self.processSamplingWanted, !self.paused else { return }
+                    await self.refresh()
+                }
+            }
+        }
+    }
+
     private func monitoringTick() async -> Double {
         let days = PowerHistoryRetention.days(from: .standard)
         if days != historyDays {
@@ -345,20 +372,37 @@ final class PocketModel: ObservableObject {
             await awakeAutomation.refreshPreferencesAndReconcile()
         }
         if !paused {
-            await refresh(includeProcesses: (mainWindowVisible && navigation.tool == .taskManager) || menuBarProcessesWanted)
+            await refresh()
         }
         return refreshSeconds
     }
 
-    func refresh(includeProcesses: Bool = true) async {
-        guard !refreshing else { return }
+    func refresh(includeProcesses: Bool? = nil) async {
+        guard !refreshing else {
+            if includeProcesses == nil && processSamplingWanted { pendingAutomaticProcessRefresh = true }
+            return
+        }
         refreshing = true
-        defer { refreshing = false }
+        defer {
+            refreshing = false
+            let retry = pendingAutomaticProcessRefresh
+            pendingAutomaticProcessRefresh = false
+            if retry {
+                Task { [weak self] in
+                    guard let self, self.processSamplingWanted, !self.paused else { return }
+                    await self.refresh()
+                }
+            }
+        }
         do {
-            let system = try await systemMonitor.snapshot()
+            let system = if let readSystemSnapshot { try await readSystemSnapshot() } else { try await systemMonitor.snapshot() }
             self.system = system
-            if includeProcesses {
-                let snapshot = try await processMonitor.snapshot()
+            // Resolve automatic demand after the await: the window may have become hidden meanwhile.
+            if includeProcesses ?? processSamplingWanted {
+                // All requests received so far are fulfilled by this read. A request arriving
+                // after it starts remains pending, including a restore during history I/O.
+                pendingAutomaticProcessRefresh = false
+                let snapshot = if let readProcessSnapshot { try await readProcessSnapshot() } else { try await processMonitor.snapshot() }
                 processes = snapshot.processes
                 if unreadableCount != snapshot.unreadableProcessCount { unreadableCount = snapshot.unreadableProcessCount }
                 let pids = Set(NSWorkspace.shared.runningApplications.filter { $0.activationPolicy == .regular }.map(\.processIdentifier))

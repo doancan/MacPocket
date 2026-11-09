@@ -88,6 +88,7 @@ struct PocketRootView: View {
             .frame(width: bounds.size.width, height: bounds.size.height)
         }
         .frame(minWidth: 960, minHeight: 620)
+        .background(MainWindowVisibility { model.setMainWindowVisible($0) }.frame(width: 1, height: 1).allowsHitTesting(false))
         .onAppear {
             let windowAction = openWindow, settingsAction = openSettings
             AIUsageIntegration.shared.openSettingsWindow = {
@@ -95,7 +96,6 @@ struct PocketRootView: View {
             }
             model.openMainWindow = { showPocketWindow(windowAction) }
             model.openSettingsWindow = { settingsAction(); NSApp.activate(ignoringOtherApps: true) }
-            model.mainWindowVisible = true
             if !PocketLaunch.handledFirstWindow {
                 PocketLaunch.handledFirstWindow = true
                 #if DEBUG
@@ -112,7 +112,7 @@ struct PocketRootView: View {
             }
             Task { await model.refresh() }
         }
-        .onDisappear { model.mainWindowVisible = false }
+        .onDisappear { model.setMainWindowVisible(false) }
     }
 
     private func sidebarRow(_ page: PocketPage) -> some View {
