@@ -98,8 +98,7 @@ public struct ClipboardItem: Codable, Identifiable, Hashable, Sendable {
     public var title: String {
         switch content {
         case let .text(text):
-            let line = text.split(whereSeparator: \.isNewline).first { !$0.trimmingCharacters(in: .whitespaces).isEmpty }
-            return String((line.map(String.init) ?? text).trimmingCharacters(in: .whitespaces).prefix(200))
+            return ClipboardTextPreview.title(text)
         case let .link(url): return url.absoluteString
         case let .image(image): return String(localized: "Görsel \(image.pixelWidth)×\(image.pixelHeight)")
         case let .files(urls):

@@ -2,6 +2,8 @@
 
 ## Yayımlanmamış
 
+- **Pano listesindeki uzun metinler:** başlık için metnin tamamını satırlara ayırmak yerine ilk dolu satıra kadar ilerlenir. Başta boş satırlar, Unicode satır sonları, boşluk temizleme ve 200 karakterlik önizleme korunur. Uzun günlük metinlerinin görünmeyen devamı başlık hazırlanırken yeniden parçalanmaz.
+
 - **Pano geçmişinin disk yazımları:** içerik değişmedikçe kayıt planlanmaz ve kapanış/modül durdurma çağrısı arşivi yeniden yazmaz. Henüz yüklenmemiş geçmiş boş bellek durumuyla kaydedilmez. Gerçek değişiklikler mevcut gecikmeli kayıtla saklanır; başarısız kayıt yeniden denenebilir. Diskte saklama yeniden açılınca bellekteki geçmiş ve görseller kaydedilir; tümünü silmek boş arşivi yeniden oluşturmaz.
 
 - **Uygulama kalıntısı eşleştirmesi:** her aday için tüm kurulu uygulamaları dolaşmak yerine adayın tam adı ve nokta/tire sınırlarındaki uygulama kimlikleri kümeden sorgulanır. Büyük/küçük harf, yardımcı uygulama sınırları ve aynı üretici uyarısı korunur; aynı başlangıca sahip farklı uygulamalar gizlenmez.
