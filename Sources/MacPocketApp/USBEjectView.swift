@@ -16,7 +16,35 @@ final class USBEjectModel: ObservableObject {
     @Published var selection: Set<String> = []
     @Published var expanded: Set<String> = []
 
+    typealias ObserveChanges = @MainActor (@escaping @MainActor () -> Void) -> (@MainActor () -> Void)?
+    private let loadDrives: @Sendable () async throws -> [EjectDrive]
+    private let observeChanges: ObserveChanges
+    private var refreshAgain = false
+    private var changes: AsyncStream<Void>.Continuation?
+    private var runGeneration = UUID()
+
+    init(loadDrives: @escaping @Sendable () async throws -> [EjectDrive] = { try await USBEject.load() },
+         observeChanges: @escaping ObserveChanges = DiskChangeObservation.observe) {
+        self.loadDrives = loadDrives
+        self.observeChanges = observeChanges
+    }
+
     func run() async {
+        let (events, continuation) = AsyncStream<Void>.makeStream(bufferingPolicy: .bufferingNewest(1))
+        let generation = UUID()
+        runGeneration = generation
+        changes = continuation
+        defer { if runGeneration == generation { changes = nil } }
+        if let stop = observeChanges({ continuation.yield(()) }) {
+            defer { stop(); continuation.finish() }
+            for await _ in events {
+                guard !Task.isCancelled else { return }
+                await refresh()
+            }
+            return
+        }
+        continuation.finish()
+        // Keep discovery working if Disk Arbitration cannot create a session.
         while !Task.isCancelled {
             await refresh()
             do { try await Task.sleep(for: .seconds(3)) } catch { return }
@@ -24,24 +52,31 @@ final class USBEjectModel: ObservableObject {
     }
 
     func refresh(force: Bool = false) async {
-        guard !refreshing, !ejecting || force else { return }
+        if refreshing { refreshAgain = true; return }
+        guard !ejecting || force else { return }
         refreshing = true
-        defer { refreshing = false; loaded = true }
-        do {
-            let latest = try await USBEject.load()
-            guard !Task.isCancelled else { return }
-            let previous = Set(drives.map(\.identity))
-            let unchanged = Set(latest.filter { previous.contains($0.identity) }.map(\.id))
-            usage = usage.filter { unchanged.contains($0.key) }
-            failures = failures.filter { unchanged.contains($0.key) }
-            if drives != latest { drives = latest }
-            // A replugged drive can reuse the same BSD id; it must not inherit the user's previous selection.
-            selection.formIntersection(unchanged)
-            expanded.formIntersection(unchanged)
-            error = nil
-        } catch {
-            if !Task.isCancelled { self.error = error.localizedDescription }
+        defer {
+            refreshing = false; loaded = true
+            if refreshAgain { changes?.yield(()) }
         }
+        repeat {
+            refreshAgain = false
+            do {
+                let latest = try await loadDrives()
+                guard !Task.isCancelled else { return }
+                let previous = Set(drives.map(\.identity))
+                let unchanged = Set(latest.filter { previous.contains($0.identity) }.map(\.id))
+                usage = usage.filter { unchanged.contains($0.key) }
+                failures = failures.filter { unchanged.contains($0.key) }
+                if drives != latest { drives = latest }
+                // A replugged drive can reuse the same BSD id; it must not inherit the user's previous selection.
+                selection.formIntersection(unchanged)
+                expanded.formIntersection(unchanged)
+                error = nil
+            } catch {
+                if !Task.isCancelled { self.error = error.localizedDescription }
+            }
+        } while refreshAgain && !Task.isCancelled
     }
 
     func inspect(_ drive: EjectDrive) async {
