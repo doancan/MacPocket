@@ -2,6 +2,8 @@
 
 ## Yayımlanmamış
 
+- **Pano geçmişinin disk yazımları:** içerik değişmedikçe kayıt planlanmaz ve kapanış/modül durdurma çağrısı arşivi yeniden yazmaz. Henüz yüklenmemiş geçmiş boş bellek durumuyla kaydedilmez. Gerçek değişiklikler mevcut gecikmeli kayıtla saklanır; başarısız kayıt yeniden denenebilir. Diskte saklama yeniden açılınca bellekteki geçmiş ve görseller kaydedilir; tümünü silmek boş arşivi yeniden oluşturmaz.
+
 - **Uygulama kalıntısı eşleştirmesi:** her aday için tüm kurulu uygulamaları dolaşmak yerine adayın tam adı ve nokta/tire sınırlarındaki uygulama kimlikleri kümeden sorgulanır. Büyük/küçük harf, yardımcı uygulama sınırları ve aynı üretici uyarısı korunur; aynı başlangıca sahip farklı uygulamalar gizlenmez.
 
 - **USB Çıkarma sayfası:** üç saniyede bir `diskutil` çalıştırmak yerine Disk Arbitration değişiklik bildirimleriyle yenilenir. Takma/çıkarma, bölüm ve bağlama noktası/ad değişiklikleri kısa bir beklemeyle birleştirilir. Sayfa kapanınca dinleyiciler kaldırılır; bildirim oturumu oluşturulamazsa önceki tarama yedek olarak çalışır. Yenileme sırasında gelen değişiklik kaybolmaz; yeniden takılan diskin eski seçimi korunmaz.
