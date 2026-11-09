@@ -2,6 +2,8 @@
 
 ## Yayımlanmamış
 
+- **Küçük canlı grafikler:** örnek başına ayrı grafik öğeleri oluşturan yapı tek Canvas çizimine taşındı. Yumuşak eğri, renkli alan, negatif Wi-Fi ölçeği ve otomatik üst sınır korunur. Geçersiz değerler çizime katılmaz; sensör ve menü çubuğu yenileme aralıkları değişmez.
+
 - **Animasyonlu menü çubuğu geçişi:** ilk açılış/kapanış ve boyut değişimlerinde yerel animasyonlar korunur. Başka bir MacPocket simgesine tıklamak açık panelin içeriğini ve bağlı olduğu simgeyi değiştirir; paneli kapatıp yeniden açmaz. Hareketi azalt tercihi uygulanır; dışarı tıklama ve Escape ile kapatma korunur.
 
 - **Menü çubuğu panel geçişi:** hava durumu, AI ve diğer simgeler arasında tıklarken açılma isteğinin kaybolması düzeltildi. Gerçek bir kapanış sırasında gelen seçim saklanır; hızlı geçişte son hedef açılır, aynı simgeye tekrar tıklama paneli kapatır.

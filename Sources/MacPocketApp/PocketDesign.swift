@@ -1,5 +1,4 @@
 import AppKit
-import Charts
 import MacPocketCore
 import SwiftUI
 import UniformTypeIdentifiers
@@ -344,21 +343,22 @@ struct PocketSparkline: View {
     var floor: Double = 0
 
     var body: some View {
-        Chart {
-            ForEach(Array(values.enumerated()), id: \.offset) { index, value in
-                AreaMark(x: .value(Text("Örnek"), index), yStart: .value(Text("Değer"), floor), yEnd: .value(Text("Değer"), value))
-                    .foregroundStyle(LinearGradient(colors: [color.opacity(0.28), color.opacity(0.02)], startPoint: .top, endPoint: .bottom))
-                    .interpolationMethod(.monotone)
-                LineMark(x: .value(Text("Örnek"), index), y: .value(Text("Değer"), value))
-                    .foregroundStyle(color)
-                    .lineStyle(StrokeStyle(lineWidth: 1.5, lineCap: .round, lineJoin: .round))
-                    .interpolationMethod(.monotone)
+        Canvas { context, size in
+            let curve = SparklineCurve(values: values, floor: floor, ceiling: ceiling, size: size)
+            guard let first = curve.points.first, let last = curve.points.last else { return }
+            var line = Path()
+            line.move(to: first)
+            for segment in curve.segments {
+                line.addCurve(to: segment.end, control1: segment.control1, control2: segment.control2)
             }
+            var area = line
+            area.addLine(to: CGPoint(x: last.x, y: size.height))
+            area.addLine(to: CGPoint(x: first.x, y: size.height))
+            area.closeSubpath()
+            context.fill(area, with: .linearGradient(Gradient(colors: [color.opacity(0.28), color.opacity(0.02)]),
+                startPoint: .zero, endPoint: CGPoint(x: 0, y: size.height)))
+            context.stroke(line, with: .color(color), style: StrokeStyle(lineWidth: 1.5, lineCap: .round, lineJoin: .round))
         }
-        .chartXAxis(.hidden)
-        .chartYAxis(.hidden)
-        .chartLegend(.hidden)
-        .chartYScale(domain: floor...max(floor + 1, ceiling ?? max(1, values.max() ?? 1)))
         .accessibilityHidden(true)
     }
 }
