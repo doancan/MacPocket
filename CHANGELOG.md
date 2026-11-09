@@ -2,6 +2,8 @@
 
 ## Yayımlanmamış
 
+- **Uygulama kalıntısı eşleştirmesi:** her aday için tüm kurulu uygulamaları dolaşmak yerine adayın tam adı ve nokta/tire sınırlarındaki uygulama kimlikleri kümeden sorgulanır. Büyük/küçük harf, yardımcı uygulama sınırları ve aynı üretici uyarısı korunur; aynı başlangıca sahip farklı uygulamalar gizlenmez.
+
 - **USB Çıkarma sayfası:** üç saniyede bir `diskutil` çalıştırmak yerine Disk Arbitration değişiklik bildirimleriyle yenilenir. Takma/çıkarma, bölüm ve bağlama noktası/ad değişiklikleri kısa bir beklemeyle birleştirilir. Sayfa kapanınca dinleyiciler kaldırılır; bildirim oturumu oluşturulamazsa önceki tarama yedek olarak çalışır. Yenileme sırasında gelen değişiklik kaybolmaz; yeniden takılan diskin eski seçimi korunmaz.
 
 - **Fan panelinin arka plan işi:** uygulama tarafında sıcaklık yalnız sıcaklığa bağlı profil için ve arayüz iş parçacığının dışında okunur. Otomatik/sabit profilde gereksiz sensör taraması kaldırıldı. Gizli panel otomatik profile dönünce fanlar sisteme bırakılır ve döngü durur; manuel profilin kalp atışı sürer. Bekleyen sıcaklık veya hedef yanıtı eski profili yeniden uygulamaz.

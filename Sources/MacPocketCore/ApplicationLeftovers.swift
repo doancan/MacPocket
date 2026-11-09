@@ -18,15 +18,11 @@ public actor ApplicationLeftoverScanner {
         var results: [ApplicationLeftover] = []
         // Bundle IDs are case-insensitive. Helpers named after an installed app (App.Helper, App-Helper)
         // belong to it; items sharing only the vendor prefix are flagged for review, not hidden.
-        let installed = Set(installedIDs.map { $0.lowercased() })
-        let vendors = Set(installed.compactMap { id -> String? in
+        let installed = InstalledBundleIndex(installedIDs)
+        let vendors = Set(installed.identifiers.compactMap { id -> String? in
             let parts = id.split(separator: ".")
             return parts.count >= 3 ? parts.prefix(2).joined(separator: ".") : nil
         })
-        func belongsToInstalled(_ id: String) -> Bool {
-            let id = id.lowercased()
-            return installed.contains(where: { id == $0 || id.hasPrefix($0 + ".") || id.hasPrefix($0 + "-") })
-        }
         func sharesVendor(_ id: String) -> Bool {
             let parts = id.lowercased().split(separator: ".")
             return parts.count >= 3 && vendors.contains(parts.prefix(2).joined(separator: "."))
@@ -49,7 +45,7 @@ public actor ApplicationLeftoverScanner {
                 if folder == "Saved Application State", id.hasSuffix(".savedState") { id = String(id.dropLast(11)) }
                 guard id.range(of: #"^[A-Za-z0-9_-]+(?:\.[A-Za-z0-9_-]+){2,}$"#, options: .regularExpression) != nil,
                       !id.hasPrefix("com.apple."), !id.hasPrefix("com.doancan.MacPocket"),
-                      !belongsToInstalled(id) else { continue }
+                      !installed.containsApplicationOrHelper(id) else { continue }
                 results.append(.init(bundleID: id, category: category, request: .init(url: url, identity: identity, root: library),
                                      sharedVendor: sharesVendor(id)))
                 await Task.yield()
