@@ -54,7 +54,9 @@ import SwiftUI
         guard let window = root as? NSWindow else { return false }
         let controls = [String(localized: "Hava Durumu Ayarları"): "weather.settings", String(localized: "Hava Durumuna Dön"): "weather.back",
             String(localized: "Open-Meteo modelleri"): "weather.models", String(localized: "Ücretsiz hesapla kullanılan kaynaklar"): "weather.accounts",
-            String(localized: "API Anahtarı Ekle"): "weather.connect", String(localized: "Konum Seç"): "weather.choose-location"]
+            String(localized: "API Anahtarı Ekle"): "weather.connect", String(localized: "Konum Seç"): "weather.choose-location",
+            String(localized: "Sonraki Saatler"): "weather.hours.next", String(localized: "Önceki Saatler"): "weather.hours.previous",
+            String(localized: "Saat Ayrıntısını Kapat"): "weather.hour-close"]
         let target = controls[label] ?? WeatherSource.allCases.first(where: { $0.localizedTitle == label }).map { "weather.source." + $0.rawValue }
         guard let target else { return false }
         return await WeatherUIProbe.click(target, in: window)
@@ -123,6 +125,19 @@ import SwiftUI
             try await capture(window, at: directory.appendingPathComponent("popover.png"))
             checks["auditWindowIsActive"] = NSApp.isActive && window.isKeyWindow
             checks["popoverUsesProductionWidth"] = abs(window.contentLayoutRect.width - 368) < 1
+            if let hour = service.snapshot?.hourly.first(where: { $0.time >= Date().timeIntervalSince1970 }) {
+                let id = "weather.hour." + String(hour.id)
+                let originalX = WeatherUIProbe.targets[id]?.frame.minX
+                let next = await press(String(localized: "Sonraki Saatler"), in: window)
+                try await Task.sleep(for: .milliseconds(250))
+                checks["hourlyNextActuallyScrolls"] = next && originalX != nil && (WeatherUIProbe.targets[id]?.frame.minX ?? .infinity) < originalX! - 20
+                let previous = await press(String(localized: "Önceki Saatler"), in: window)
+                try await Task.sleep(for: .milliseconds(250))
+                checks["hourlyPreviousRestoresFirstHours"] = previous && originalX != nil && abs((WeatherUIProbe.targets[id]?.frame.minX ?? .infinity) - originalX!) < 2
+                checks["hourCardClickOpensActualDetails"] = await WeatherUIProbe.click(id, in: window) && WeatherUIProbe.contains("weather.hour-detail")
+                try await capture(window, at: directory.appendingPathComponent("hour-details.png"))
+                checks["hourDetailsCanBeClosed"] = await press(String(localized: "Saat Ayrıntısını Kapat"), in: window) && !WeatherUIProbe.contains("weather.hour-detail")
+            } else { checks["hourlyNextActuallyScrolls"] = false }
             checks["nativeWeatherSettingsOpens"] = await press(String(localized: "Hava Durumu Ayarları"), in: window) && WeatherUIProbe.contains("weather.source-picker")
             try await Task.sleep(for: .milliseconds(200))
             checks["sourcePickerAndBasketPresent"] = WeatherUIProbe.contains("weather.source-picker") && WeatherUIProbe.contains("weather.basket")

@@ -4694,3 +4694,9 @@
 "Son başarılı güncelleme" = "Last successful update";
 "Sıcaklık: %@ Celsius" = "Temperature: %@ Celsius";
 "Şehir veya ilçe ekleyerek hava durumunu menü çubuğundan takip et." = "Add a city or district to follow the weather from your menu bar.";
+
+/* Interactive hourly forecast */
+"Önceki Saatler" = "Previous Hours";
+"Sonraki Saatler" = "Next Hours";
+"Saatin Tahminini Göster" = "Show Forecast for This Hour";
+"Saat Ayrıntısını Kapat" = "Close Hour Details";

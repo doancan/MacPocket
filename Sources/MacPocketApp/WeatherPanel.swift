@@ -7,6 +7,9 @@ struct WeatherDetail: View {
     @ObservedObject var service: WeatherService = .shared
     @State private var settings = false
     @State private var contentHeight: CGFloat = 360
+    @State private var hourViewport = WeatherHourViewport()
+    @State private var selectedHourID: Double?
+    @PocketReduceMotion private var reduceMotion
 
     var body: some View {
         VStack(alignment: .leading, spacing: PocketSpacing.m) {
@@ -130,25 +133,73 @@ struct WeatherDetail: View {
     }
     private func hourly(_ hours: [WeatherHour], snapshot: WeatherSnapshot) -> some View {
         VStack(alignment: .leading, spacing: PocketSpacing.s) {
-            HStack {
-                Text("Saatlik Tahmin").font(.caption.weight(.semibold)).foregroundStyle(.secondary)
-                Spacer()
-                Image(systemName: "arrow.right").font(.caption2).foregroundStyle(.tertiary).accessibilityHidden(true)
-            }
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: PocketSpacing.s) {
-                    ForEach(Array(hours.enumerated()), id: \.element.id) { index, hour in
-                        VStack(spacing: 6) {
-                            Text(date(hour.time, snapshot: snapshot, pattern: "HH")).font(.caption2).foregroundStyle(.secondary)
-                            WeatherConditionSymbol(symbol: hour.symbol, size: 17).frame(height: 20)
-                            Text(temperature(hour.temperature)).font(.system(size: 12, weight: .semibold)).monospacedDigit()
-                        }.frame(width: 42).padding(.vertical, 6)
-                            .background(index == 0 ? Color.primary.opacity(0.045) : .clear, in: RoundedRectangle(cornerRadius: PocketRadius.small))
-                            .accessibilityElement(children: .combine)
+            ScrollViewReader { proxy in
+                VStack(alignment: .leading, spacing: PocketSpacing.s) {
+                    HStack {
+                        Text("Saatlik Tahmin").font(.caption.weight(.semibold)).foregroundStyle(.secondary)
+                        Spacer()
+                        Button { moveHours(-1, hours: hours, proxy: proxy) } label: { Image(systemName: "chevron.left").frame(width: 24, height: 24) }
+                            .buttonStyle(.plain).disabled(!hourViewport.canGoBack)
+                            .help("Önceki Saatler").accessibilityLabel("Önceki Saatler").weatherAuditTarget("weather.hours.previous")
+                        Button { moveHours(1, hours: hours, proxy: proxy) } label: { Image(systemName: "chevron.right").frame(width: 24, height: 24) }
+                            .buttonStyle(.plain).disabled(!hourViewport.canGoForward)
+                            .help("Sonraki Saatler").accessibilityLabel("Sonraki Saatler").weatherAuditTarget("weather.hours.next")
                     }
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        HStack(spacing: PocketSpacing.s) {
+                            ForEach(Array(hours.enumerated()), id: \.element.id) { index, hour in
+                                Button { selectedHourID = hour.id } label: {
+                                    VStack(spacing: 6) {
+                                        Text(date(hour.time, snapshot: snapshot, pattern: "HH")).font(.caption2).foregroundStyle(.secondary)
+                                        WeatherConditionSymbol(symbol: hour.symbol, size: 17).frame(height: 20)
+                                        Text(temperature(hour.temperature)).font(.system(size: 12, weight: .semibold)).monospacedDigit()
+                                    }.frame(width: 42).padding(.vertical, 6)
+                                        .background(selectedHourID == hour.id ? Color.accentColor.opacity(0.13) : index == 0 ? Color.primary.opacity(0.045) : .clear,
+                                                    in: RoundedRectangle(cornerRadius: PocketRadius.small))
+                                        .contentShape(RoundedRectangle(cornerRadius: PocketRadius.small))
+                                }.buttonStyle(.plain).id(hour.id)
+                                    .accessibilityLabel(date(hour.time, snapshot: snapshot, pattern: "EEE d MMM, HH:mm"))
+                                    .accessibilityValue(temperature(hour.temperature) + "C")
+                                    .accessibilityAddTraits(selectedHourID == hour.id ? .isSelected : [])
+                                    .help("Saatin Tahminini Göster").weatherAuditTarget("weather.hour." + String(hour.id))
+                            }
+                        }
+                    }.onScrollGeometryChange(for: WeatherHourViewport.self) { geometry in
+                        .init(offset: geometry.visibleRect.minX, width: geometry.visibleRect.width, contentWidth: geometry.contentSize.width)
+                    } action: { _, value in hourViewport = value }
+                }
+                .onChange(of: hours.map(\.id)) {
+                    selectedHourID = nil
+                    if let first = hours.first { proxy.scrollTo(first.id, anchor: .leading) }
+                }
+                .onChange(of: service.activeSource) {
+                    selectedHourID = nil
+                    if let first = hours.first { proxy.scrollTo(first.id, anchor: .leading) }
                 }
             }
+            if let hour = hours.first(where: { $0.id == selectedHourID }) {
+                HStack(spacing: PocketSpacing.m) {
+                    WeatherConditionSymbol(symbol: hour.symbol, size: 24)
+                    VStack(alignment: .leading, spacing: PocketSpacing.xs) {
+                        Text(date(hour.time, snapshot: snapshot, pattern: "EEE d MMM, HH:mm")).font(.caption).foregroundStyle(.secondary)
+                        Text(temperature(hour.temperature) + "C").font(.callout.weight(.semibold)).monospacedDigit()
+                    }
+                    Spacer()
+                    Button { selectedHourID = nil } label: { Image(systemName: "xmark").frame(width: 24, height: 24) }
+                        .buttonStyle(.plain).help("Saat Ayrıntısını Kapat").accessibilityLabel("Saat Ayrıntısını Kapat").weatherAuditTarget("weather.hour-close")
+                }.padding(PocketSpacing.s)
+                    .background(.primary.opacity(0.035), in: RoundedRectangle(cornerRadius: PocketRadius.small))
+                    .weatherAuditTarget("weather.hour-detail")
+            }
         }
+    }
+    private func moveHours(_ direction: Int, hours: [WeatherHour], proxy: ScrollViewProxy) {
+        guard !hours.isEmpty else { return }
+        let stride = 42 + PocketSpacing.s
+        let first = Int(max(0, hourViewport.offset) / stride)
+        let page = max(1, Int(hourViewport.width / stride) - 1)
+        let index = min(hours.count - 1, max(0, first + direction * page))
+        withAnimation(reduceMotion ? nil : .easeOut(duration: 0.16)) { proxy.scrollTo(hours[index].id, anchor: .leading) }
     }
     private func daily(_ days: [WeatherDay], snapshot: WeatherSnapshot) -> some View {
         let minimum = days.compactMap(\.low).min() ?? 0, maximum = days.compactMap(\.high).max() ?? 1
@@ -220,6 +271,14 @@ struct WeatherDetail: View {
         var calendar = Calendar(identifier: .gregorian); calendar.timeZone = snapshot.timeZone
         return calendar.isDate(Date(timeIntervalSince1970: day.start), inSameDayAs: Date()) ? String(localized: "Bugün") : date(day.start, snapshot: snapshot, pattern: "EEE")
     }
+}
+
+private struct WeatherHourViewport: Equatable {
+    var offset: CGFloat = 0
+    var width: CGFloat = 0
+    var contentWidth: CGFloat = 0
+    var canGoBack: Bool { offset > 1 }
+    var canGoForward: Bool { width > 0 && offset + width < contentWidth - 1 }
 }
 
 private struct WeatherConditionSymbol: View {
