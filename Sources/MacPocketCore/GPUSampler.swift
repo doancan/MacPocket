@@ -53,12 +53,21 @@ struct GPUSampler {
         var best: GPUSnapshot?
         while case let service = IOIteratorNext(iterator), service != 0 {
             defer { IOObjectRelease(service) }
-            var unmanaged: Unmanaged<CFMutableDictionary>?
-            guard IORegistryEntryCreateCFProperties(service, &unmanaged, kCFAllocatorDefault, 0) == KERN_SUCCESS,
-                  let properties = unmanaged?.takeRetainedValue() as? [String: Any],
-                  let snapshot = GPUSnapshot(properties: properties) else { continue }
+            guard let snapshot = Self.snapshot(readProperty: { key in
+                IORegistryEntryCreateCFProperty(service, key as CFString, kCFAllocatorDefault, 0)?.takeRetainedValue()
+            }) else { continue }
             if best == nil || snapshot.utilizationPercent > best!.utilizationPercent { best = snapshot }
         }
         return best
+    }
+
+    /// Read current statistics and metadata without serializing the driver's entire property table.
+    static func snapshot(readProperty: (String) -> Any?) -> GPUSnapshot? {
+        guard let statistics = readProperty("PerformanceStatistics") as? [String: Any] else { return nil }
+        var properties: [String: Any] = ["PerformanceStatistics": statistics]
+        for key in ["model", "gpu-core-count"] {
+            if let value = readProperty(key) { properties[key] = value }
+        }
+        return GPUSnapshot(properties: properties)
     }
 }

@@ -2,6 +2,8 @@
 
 ## Yayımlanmamış
 
+- **GPU ölçüm maliyeti:** her okumada tüm sürücü özellik tablosunu kopyalamak yerine yalnız performans istatistikleri, model ve çekirdek sayısı okunur. GPU listesi ve değerler her ölçümde yeniden sorgulanır; en yoğun GPU seçimi korunur.
+
 - **Yinelenen arayüz yayınları:** sistem ve menü çubuğu geçmişi dolduğunda ekleme/kırpma tek güncelleme olarak yayımlanır. Her ölçümde iki yayın yerine bir yayın üretilir; tampon sınırı abonelere aşılmış olarak gösterilmez.
 - **Hava durumu düğmesinin zamanlaması:** saniyelik arayüz sorgusu yerine düğmenin yeniden kullanılabilir olacağı zamana tek bekleme planlanır. Kaynak/zaman değişimi veya görünümün kapanması eski beklemeyi iptal eder; manuel yeniden deneme ve API kota sınırları korunur.
 
