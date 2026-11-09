@@ -37,26 +37,33 @@ final class FanControlService: ObservableObject {
     @Published var profile: FanProfile {
         didSet {
             guard profile != oldValue else { return }
-            if let data = try? JSONEncoder().encode(profile) { UserDefaults.standard.set(data, forKey: Self.profileKey) }
+            if let data = try? JSONEncoder().encode(profile) { defaults.set(data, forKey: Self.profileKey) }
             curveState = FanCurveState()
-            if profile == .system, !lastTargets.isEmpty { releasePending = true }
+            if profile == .system { releasePending = true }
             lastTargets = [:]
             start()
         }
     }
 
     private let daemon = SMAppService.daemon(plistName: MacPocketHelperConstants.daemonPlistName)
-    private let temperatures = HottestTemperatureReader()
+    private let defaults: UserDefaults
+    private let temperatures: any FanTemperatureReading
+    private let helperOverride: (any MacPocketHelperXPC)?
     private var connection: NSXPCConnection?
     private var curveState = FanCurveState()
     private var lastTargets: [Int: Double] = [:]
     private var loop: Task<Void, Never>?
+    private var loopGeneration = UUID()
     private var visibleCount = 0
     /// Set when the user switched back to the system profile while fans were manual.
     private var releasePending = false
 
-    private init() {
-        profile = UserDefaults.standard.data(forKey: Self.profileKey)
+    init(defaults: UserDefaults = .standard, temperatures: any FanTemperatureReading = FanTemperatureReader(),
+         helper: (any MacPocketHelperXPC)? = nil) {
+        self.defaults = defaults
+        self.temperatures = temperatures
+        helperOverride = helper
+        profile = defaults.data(forKey: Self.profileKey)
             .flatMap { try? JSONDecoder().decode(FanProfile.self, from: $0) } ?? .system
         refreshAvailability()
         if profile != .system { start() }
@@ -68,6 +75,7 @@ final class FanControlService: ObservableObject {
     // MARK: Helper lifecycle
 
     func refreshAvailability() {
+        if helperOverride != nil { availability = .ready; return }
         switch daemon.status {
         // `notFound` also covers a bundle launchd hasn't looked at yet; registering reports the real reason.
         case .notRegistered, .notFound: if !isUnavailable { availability = .notInstalled }
@@ -125,17 +133,24 @@ final class FanControlService: ObservableObject {
 
     func viewDisappeared() {
         visibleCount = max(0, visibleCount - 1)
-        if visibleCount == 0, profile == .system { loop?.cancel(); loop = nil }
+        if !pollingWanted { loop?.cancel(); loop = nil }
     }
 
+    private var pollingWanted: Bool { visibleCount > 0 || profile != .system || releasePending }
+    var isPolling: Bool { loop != nil }
+
     private func start() {
-        guard loop == nil else { return }
+        guard loop == nil, pollingWanted else { return }
+        let generation = UUID()
+        loopGeneration = generation
         loop = Task { [weak self] in
             while !Task.isCancelled {
                 guard let self else { return }
                 await self.tick()
-                try? await Task.sleep(for: .seconds(Self.tickSeconds))
+                guard self.pollingWanted else { break }
+                do { try await Task.sleep(for: .seconds(Self.tickSeconds)) } catch { break }
             }
+            if let self, self.loopGeneration == generation { self.loop = nil }
         }
     }
 
@@ -143,6 +158,8 @@ final class FanControlService: ObservableObject {
         refreshAvailability()
         guard availability == .ready else { fans = []; return }
         guard let helper = proxy() else { return }
+        await releaseIfPending(helper)
+        guard !Task.isCancelled, pollingWanted else { return }
         let reading = await withCheckedContinuation { (continuation: CheckedContinuation<[Fan]?, Never>) in
             helper.status { values, error in
                 guard error == nil else { continuation.resume(returning: nil); return }
@@ -153,25 +170,31 @@ final class FanControlService: ObservableObject {
                 continuation.resume(returning: fans)
             }
         }
-        guard let reading else { return }
+        guard let reading, !Task.isCancelled else { return }
         fans = reading
         await apply(to: reading, helper: helper)
+        await releaseIfPending(helper)
     }
 
     private func apply(to fans: [Fan], helper: MacPocketHelperXPC) async {
-        let temperature = temperatures.celsius()
-        // Profiles that depend on temperature must never run blind.
-        if case .curve = profile, temperature == nil {
-            message = String(localized: "Sıcaklık okunamadığı için fanlar sistemde bırakıldı.")
-            await release(helper)
-            return
-        }
-        if releasePending {
-            releasePending = false
-            await release(helper)
-        }
+        await releaseIfPending(helper)
+        guard !Task.isCancelled else { return }
+        let selectedProfile = profile
+        guard selectedProfile != .system else { message = nil; return }
+        let temperature: Double?
+        if case .curve = selectedProfile {
+            temperature = await temperatures.celsius()
+            guard !Task.isCancelled, profile == selectedProfile else { return }
+            // Profiles that depend on temperature must never run blind.
+            guard temperature != nil else {
+                message = String(localized: "Sıcaklık okunamadığı için fanlar sistemde bırakıldı.")
+                await release(helper)
+                return
+            }
+        } else { temperature = nil }
         for fan in fans {
-            guard let target = curveState.targetRPM(profile: profile, temperature: temperature ?? 0, range: fan.range) else {
+            guard !Task.isCancelled, profile == selectedProfile else { return }
+            guard let target = curveState.targetRPM(profile: selectedProfile, temperature: temperature ?? 0, range: fan.range) else {
                 if lastTargets[fan.id] != nil { await release(helper) }
                 message = nil
                 return
@@ -183,6 +206,8 @@ final class FanControlService: ObservableObject {
             let failure = await withCheckedContinuation { (continuation: CheckedContinuation<String?, Never>) in
                 helper.setTarget(fan: fan.id, rpm: target) { continuation.resume(returning: $0) }
             }
+            guard !Task.isCancelled else { return }
+            guard profile == selectedProfile else { return }
             if let failure {
                 message = String(localized: "Fan hızı ayarlanamadı; sistem denetimine bırakıldı. (\(failure))")
                 profile = .system
@@ -202,7 +227,14 @@ final class FanControlService: ObservableObject {
         lastTargets = [:]
     }
 
+    private func releaseIfPending(_ helper: MacPocketHelperXPC) async {
+        guard releasePending else { return }
+        releasePending = false
+        await release(helper)
+    }
+
     private func proxy() -> MacPocketHelperXPC? {
+        if let helperOverride { return helperOverride }
         if connection == nil {
             let connection = NSXPCConnection(machServiceName: MacPocketHelperConstants.machServiceName, options: .privileged)
             connection.remoteObjectInterface = NSXPCInterface(with: MacPocketHelperXPC.self)

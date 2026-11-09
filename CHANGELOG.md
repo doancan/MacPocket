@@ -2,6 +2,8 @@
 
 ## Yayımlanmamış
 
+- **Fan panelinin arka plan işi:** uygulama tarafında sıcaklık yalnız sıcaklığa bağlı profil için ve arayüz iş parçacığının dışında okunur. Otomatik/sabit profilde gereksiz sensör taraması kaldırıldı. Gizli panel otomatik profile dönünce fanlar sisteme bırakılır ve döngü durur; manuel profilin kalp atışı sürer. Bekleyen sıcaklık veya hedef yanıtı eski profili yeniden uygulamaz.
+
 - **GPU ölçüm maliyeti:** her okumada tüm sürücü özellik tablosunu kopyalamak yerine yalnız performans istatistikleri, model ve çekirdek sayısı okunur. GPU listesi ve değerler her ölçümde yeniden sorgulanır; en yoğun GPU seçimi korunur.
 
 - **Yinelenen arayüz yayınları:** sistem ve menü çubuğu geçmişi dolduğunda ekleme/kırpma tek güncelleme olarak yayımlanır. Her ölçümde iki yayın yerine bir yayın üretilir; tampon sınırı abonelere aşılmış olarak gösterilmez.
