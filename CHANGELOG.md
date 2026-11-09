@@ -2,6 +2,8 @@
 
 ## Yayımlanmamış
 
+- **Menü çubuğu panel geçişi:** hava durumu, AI ve diğer simgeler arasında tıklarken kapanış animasyonu nedeniyle yeni panelin açılmaması düzeltildi. Yeni seçim kapanış tamamlanana kadar saklanır; hızlı geçişte son hedef açılır, aynı simgeye tekrar tıklama paneli kapatır.
+
 - **Saatlik hava ayrıntıları:** saat kartı ayrı bir ayrıntı sayfası açar. Kaynak sağlıyorsa yağış olasılığı/miktarı/şiddeti, hissedilen sıcaklık, nem, rüzgâr/hamle/yön, basınç, bulut örtüsü, görüş, UV ve çiy noktası gösterilir. Yağışın 1/3/6/12 saatlik dönemi korunur; eksik alanlar sıfırla doldurulmaz.
 
 - **Saatlik tahmin tıklamaları:** görsel ok yerine çalışan ileri/geri düğmeleri eklendi. Saat kartları tıklandığında kaynağın sunduğu tarih/saat ve Celsius sıcaklığı gösterilir; ayrıntı kapatılabilir. Kaydırma sınırlarında düğmeler devre dışı kalır; hareketi azalt tercihi korunur.

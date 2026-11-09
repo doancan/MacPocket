@@ -20,6 +20,7 @@ struct MacPocketApplication: App {
         CableImpactRuntimeAudit.configureIfRequested()
         UninstallRuntimeAudit.configureIfRequested()
         WeatherBasketRuntimeAudit.configureIfRequested()
+        StatusPopoverRuntimeAudit.configureIfRequested()
         WindowSwitcherPermissionProbe.runIfRequested()
         WindowExternalRuntimeAudit.runIfRequested()
         WindowLifecycleAuditProducer.runIfRequested()
@@ -76,6 +77,7 @@ final class PocketAppDelegate: NSObject, NSApplicationDelegate {
         if CableImpactRuntimeAudit.requested { CableImpactRuntimeAudit.launch(); return }
         if UninstallRuntimeAudit.requested { UninstallRuntimeAudit.launch(); return }
         if WeatherBasketRuntimeAudit.requested { WeatherBasketRuntimeAudit.launch(); return }
+        if StatusPopoverRuntimeAudit.requested { StatusPopoverRuntimeAudit.launch(); return }
         #endif
         _ = PocketRelaunch.languageAtLaunch
         PocketDock.apply()

@@ -11,7 +11,7 @@ import SwiftUI
 /// Images are re-rendered only when their inputs change (see `MenuBarRenderer.Key`), and the
 /// popover's hosting controller exists only while the popover is shown.
 @MainActor
-final class PocketStatusItemController: NSObject, NSPopoverDelegate {
+final class PocketStatusItemController: NSObject {
     private static let groupedKey = "grouped"
 
     private let model: PocketModel
@@ -22,7 +22,14 @@ final class PocketStatusItemController: NSObject, NSPopoverDelegate {
     private var renderKeys: [String: MenuBarRenderer.Key] = [:]
     private var accessibilityTexts: [String: String] = [:]
     private let popover = NSPopover()
-    private var popoverOwner: String?
+    private lazy var presentation = StatusItemPopoverPresenter(popover: popover, button: { [weak self] in self?.items[$0]?.button },
+        content: { [weak self] key in
+            guard let self else { return nil }
+            let content: MenuBarPopoverContent = MenuBarModule(rawValue: key).map { .module($0) } ?? .grouped
+            let hosting = NSHostingController(rootView: PocketMenuBarView(model: self.model, history: self.history, content: content))
+            hosting.sizingOptions = [.preferredContentSize]
+            return hosting
+        }, didClose: { [weak self] in self?.model.menuBarProcessesWanted = false })
     private var appearanceName: String?
     private var subscriptions = Set<AnyCancellable>()
 
@@ -31,7 +38,6 @@ final class PocketStatusItemController: NSObject, NSPopoverDelegate {
         super.init()
         popover.behavior = .transient
         popover.animates = true
-        popover.delegate = self
         updateAppearance()
         refresh()
         model.$system.receive(on: RunLoop.main).sink { [weak self] snapshot in
@@ -167,7 +173,7 @@ final class PocketStatusItemController: NSObject, NSPopoverDelegate {
     private var diskFreeThreshold: Double { ResourceAlertSettings.load(from: .standard).diskFreePercent }
 
     private func rebuildItems(_ keys: [String]) {
-        popover.performClose(nil)
+        presentation.close()
         for item in items.values { NSStatusBar.system.removeStatusItem(item) }
         items = [:]
         renderKeys = [:]
@@ -200,32 +206,19 @@ final class PocketStatusItemController: NSObject, NSPopoverDelegate {
     // MARK: Popover
 
     @objc private func togglePopover(_ sender: NSStatusBarButton) {
-        let key = items.first { $0.value.button === sender }?.key
-        if NSApp.currentEvent?.type == .rightMouseUp, let key {
-            popover.performClose(nil)
+        guard let key = items.first(where: { $0.value.button === sender })?.key else { return }
+        if NSApp.currentEvent?.type == .rightMouseUp {
+            presentation.close()
             showQuickMenu(for: key)
             return
         }
-        if popover.isShown {
-            let sameOwner = key == popoverOwner
-            popover.performClose(nil)
-            if sameOwner { return }
-        }
-        showPopover(for: key)
+        presentation.toggle(key)
     }
 
     /// Shows the popover under the item `key`, or under the first item when nil (⇧⌘M quick look).
     private func showPopover(for key: String?) {
-        guard !popover.isShown, let key = key ?? itemOrder.first, let button = items[key]?.button else { return }
-        let content: MenuBarPopoverContent = MenuBarModule(rawValue: key).map { .module($0) } ?? .grouped
-        let hosting = NSHostingController(rootView: PocketMenuBarView(model: model, history: history, content: content))
-        // The popover follows SwiftUI's ideal size, so switching tabs resizes it smoothly.
-        hosting.sizingOptions = [.preferredContentSize]
-        popover.contentViewController = hosting
-        popoverOwner = key
-        popover.show(relativeTo: button.bounds, of: button, preferredEdge: .minY)
-        button.highlight(true)
-        hosting.view.window?.makeKey()
+        guard let key = key ?? itemOrder.first else { return }
+        presentation.show(key)
     }
 
 
@@ -235,7 +228,7 @@ final class PocketStatusItemController: NSObject, NSPopoverDelegate {
         return popover.contentViewController?.view.window
     }
     var aiUsageDiagnosticImage: NSImage? { items[MenuBarModule.aiUsage.rawValue]?.button?.image }
-    func closeDiagnosticPopover() { popover.performClose(nil) }
+    func closeDiagnosticPopover() { presentation.close() }
     func showWeatherForDiagnostics() -> [String: Any] {
         showPopover(for: MenuBarModule.weather.rawValue)
         let image = items[MenuBarModule.weather.rawValue]?.button?.image
@@ -298,14 +291,6 @@ final class PocketStatusItemController: NSObject, NSPopoverDelegate {
 
     @objc private func quit() { NSApp.terminate(nil) }
 
-    func popoverDidClose(_ notification: Notification) {
-
-        // Releasing the hosted view stops all popover rendering while it is hidden.
-        popover.contentViewController = nil
-        model.menuBarProcessesWanted = false
-        if let owner = popoverOwner { items[owner]?.button?.highlight(false) }
-        popoverOwner = nil
-    }
 }
 
 @MainActor
