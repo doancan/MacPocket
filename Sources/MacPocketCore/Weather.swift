@@ -31,6 +31,18 @@ public struct WeatherIcon: Decodable, Sendable {
     public let icon: String?
     public let name: String?
     public var symbol: String { symbol(isNight: false) }
+    public var localizedDescription: String? {
+        guard let token = icon?.lowercased() else { return name }
+        if token.contains("thunder") || token.contains("storm") { return String(localized: "Gök gürültülü") }
+        if token.contains("snow") { return String(localized: "Karlı") }
+        if token.contains("sleet") { return String(localized: "Karla karışık yağmurlu") }
+        if token.contains("rain") || token.contains("drizzle") { return String(localized: "Yağmurlu") }
+        if token.contains("fog") || token.contains("mist") { return String(localized: "Sisli") }
+        if token.contains("partly") { return String(localized: "Parçalı bulutlu") }
+        if token.contains("cloud") { return String(localized: "Bulutlu") }
+        if token.contains("clear") || token.contains("sun") { return String(localized: "Weather.condition.clear", defaultValue: "Açık") }
+        return name
+    }
     public func symbol(isNight: Bool) -> String {
         let name = icon?.lowercased() ?? ""
         let night = isNight || name.contains("night")
@@ -54,8 +66,39 @@ public struct WeatherHour: Decodable, Sendable, Identifiable {
     public let time: Double
     public let temperature: Double?
     public let icon: WeatherIcon?
+    // Temperatures are Celsius, wind m/s, pressure hPa, visibility metres, probabilities percent.
+    // Precipitation amounts (mm) retain their provider interval; intensity is a separate mm/h rate.
+    public var apparent: Double? = nil
+    public var humidity: Double? = nil
+    public var windSpeed: Double? = nil
+    public var windGust: Double? = nil
+    public var windDirection: Double? = nil
+    public var pressure: Double? = nil
+    public var cloudCover: Double? = nil
+    public var precipitationProbability: Double? = nil
+    public var rainProbability: Double? = nil
+    public var snowProbability: Double? = nil
+    public var precipitation: Double? = nil
+    public var precipitationHours: Int? = nil
+    public var precipitationTiming: WeatherPrecipitationTiming? = nil
+    public var precipitationIntensity: Double? = nil
+    public var intensityIsRainOnly: Bool? = nil
+    public var visibility: Double? = nil
+    public var uvIndex: Double? = nil
+    public var clearSkyUVIndex: Double? = nil
+    public var dewPoint: Double? = nil
+    public var detailCount: Int {
+        [apparent, humidity, windSpeed, windGust, windDirection, pressure, cloudCover, precipitationProbability,
+         rainProbability, snowProbability, precipitation, precipitationIntensity, visibility, uvIndex, clearSkyUVIndex, dewPoint].compactMap { $0 }.count
+    }
     public var id: Double { time }
+    enum CodingKeys: String, CodingKey {
+        case night, time, temperature, icon, apparent, humidity, pressure
+        case windSpeed = "wind-speed"
+    }
 }
+
+public enum WeatherPrecipitationTiming: String, Decodable, Sendable { case preceding, following }
 
 public struct WeatherDay: Decodable, Sendable, Identifiable {
     public let start: Double

@@ -20,7 +20,8 @@ public enum WeatherProviderClient {
         if source.isOpenMeteo {
             var parameters = [("latitude", lat), ("longitude", lon), ("timezone", location.timeZone), ("forecast_days", "7"), ("wind_speed_unit", "ms"),
                 ("current", "temperature_2m,apparent_temperature,relative_humidity_2m,surface_pressure,wind_speed_10m,weather_code,is_day"),
-                ("hourly", "temperature_2m,weather_code,is_day"), ("daily", "temperature_2m_min,temperature_2m_max,weather_code")]
+                ("hourly", "temperature_2m,apparent_temperature,relative_humidity_2m,dew_point_2m,precipitation_probability,precipitation,wind_speed_10m,wind_direction_10m,wind_gusts_10m,surface_pressure,cloud_cover,visibility,uv_index,weather_code,is_day"),
+                ("daily", "temperature_2m_min,temperature_2m_max,weather_code")]
             if let model = source.model { parameters.append(("models", model)) }
             return [request("https://api.open-meteo.com/v1/forecast", parameters)]
         }
@@ -28,7 +29,7 @@ public enum WeatherProviderClient {
         case .visualCrossing:
             return [request("https://weather.visualcrossing.com/VisualCrossingWebServices/rest/services/timeline/\(lat),\(lon)/today/next4days",
                 [("unitGroup", "metric"), ("include", "current,days,hours"), ("lang", language),
-                 ("elements", "datetime,datetimeEpoch,temp,tempmin,tempmax,feelslike,humidity,pressure,windspeed,conditions,icon")])]
+                 ("elements", "datetime,datetimeEpoch,temp,tempmin,tempmax,feelslike,humidity,pressure,windspeed,windgust,winddir,precip,precipprob,cloudcover,visibility,uvindex,dew,conditions,icon")])]
         case .metNorway:
             return [request("https://api.met.no/weatherapi/locationforecast/2.0/compact", [("lat", lat), ("lon", lon)])]
         case .weatherAPI:
@@ -140,20 +141,33 @@ private struct WeatherProviderDecoder {
         return icon(token, night: night)
     }
     private func description(_ icon: WeatherIcon?) -> String? {
-        guard let token = icon?.icon else { return nil }
-        if token.contains("thunder") { return String(localized: "Gök gürültülü") }
-        if token.contains("snow") { return String(localized: "Karlı") }
-        if token.contains("sleet") { return String(localized: "Karla karışık yağmurlu") }
-        if token.contains("rain") || token.contains("drizzle") { return String(localized: "Yağmurlu") }
-        if token.contains("fog") || token.contains("mist") { return String(localized: "Sisli") }
-        if token.contains("partly") { return String(localized: "Parçalı bulutlu") }
-        if token.contains("cloud") { return String(localized: "Bulutlu") }
-        if token.contains("clear") || token.contains("sun") { return String(localized: "Weather.condition.clear", defaultValue: "Açık") }
-        return nil
+        icon?.localizedDescription
     }
     private func current(_ temperature: Double?, apparent: Double? = nil, humidity: Double? = nil, pressure: Double? = nil,
                          wind: Double? = nil, icon: WeatherIcon? = nil) -> WeatherConditions {
         .init(temperature: temperature, apparent: apparent, humidity: humidity, pressure: pressure, windSpeed: wind, conditions: description(icon), icon: icon)
+    }
+    private func detailed(_ hour: WeatherHour, apparent: Double? = nil, humidity: Double? = nil, wind: Double? = nil,
+                          gust: Double? = nil, direction: Double? = nil, pressure: Double? = nil, cloud: Double? = nil,
+                          probability: Double? = nil, rainProbability: Double? = nil, snowProbability: Double? = nil,
+                          precipitation: Double? = nil, hours: Int? = nil, timing: WeatherPrecipitationTiming? = nil,
+                          intensity: Double? = nil, rainOnly: Bool? = nil, visibility: Double? = nil,
+                          uv: Double? = nil, clearSkyUV: Double? = nil, dew: Double? = nil) -> WeatherHour {
+        func valid(_ value: Double?, _ range: ClosedRange<Double>) -> Double? {
+            value.flatMap { $0.isFinite && range.contains($0) ? $0 : nil }
+        }
+        var result = hour
+        result.apparent = valid(apparent, -150...100); result.humidity = valid(humidity, 0...100)
+        result.windSpeed = valid(wind, 0...200); result.windGust = valid(gust, 0...250)
+        result.windDirection = valid(direction, 0...360); result.pressure = valid(pressure, 100...1_200)
+        result.cloudCover = valid(cloud, 0...100); result.precipitationProbability = valid(probability, 0...100)
+        result.rainProbability = valid(rainProbability, 0...100); result.snowProbability = valid(snowProbability, 0...100)
+        result.precipitation = valid(precipitation, 0...5_000)
+        if result.precipitation != nil { result.precipitationHours = hours; result.precipitationTiming = timing }
+        result.precipitationIntensity = valid(intensity, 0...5_000); result.intensityIsRainOnly = rainOnly
+        result.visibility = valid(visibility, 0...1_000_000); result.uvIndex = valid(uv, 0...50)
+        result.clearSkyUVIndex = valid(clearSkyUV, 0...50); result.dewPoint = valid(dew, -150...100)
+        return result
     }
     private func aggregate(_ hours: [WeatherHour]) -> [WeatherDay] {
         let calendar = calendar()
@@ -177,7 +191,12 @@ private struct WeatherProviderDecoder {
             }
             for (i, time) in (h["time"] as? [Any] ?? []).enumerated() {
                 guard let time = instant(time) else { continue }
-                hours.append(.init(night: number(item(h, "is_day", i)) == 0 ? 1 : 0, time: time, temperature: number(item(h, "temperature_2m", i)), icon: wmo(item(h, "weather_code", i))))
+                hours.append(detailed(.init(night: number(item(h, "is_day", i)) == 0 ? 1 : 0, time: time, temperature: number(item(h, "temperature_2m", i)), icon: wmo(item(h, "weather_code", i))),
+                    apparent: number(item(h, "apparent_temperature", i)), humidity: number(item(h, "relative_humidity_2m", i)),
+                    wind: number(item(h, "wind_speed_10m", i)), gust: number(item(h, "wind_gusts_10m", i)), direction: number(item(h, "wind_direction_10m", i)),
+                    pressure: number(item(h, "surface_pressure", i)), cloud: number(item(h, "cloud_cover", i)),
+                    probability: number(item(h, "precipitation_probability", i)), precipitation: number(item(h, "precipitation", i)), hours: 1, timing: .preceding,
+                    visibility: number(item(h, "visibility", i)), uv: number(item(h, "uv_index", i)), dew: number(item(h, "dew_point_2m", i))))
             }
             for (i, time) in (d["time"] as? [Any] ?? []).enumerated() {
                 guard let time = instant(time) else { continue }
@@ -198,7 +217,11 @@ private struct WeatherProviderDecoder {
                 for h in objects(d["hours"]) {
                     guard let time = instant(h["datetimeEpoch"]) else { continue }
                     let token = h["icon"] as? String
-                    hours.append(.init(night: token?.contains("night") == true ? 1 : 0, time: time, temperature: number(h["temp"]), icon: icon(token)))
+                    hours.append(detailed(.init(night: token?.contains("night") == true ? 1 : 0, time: time, temperature: number(h["temp"]), icon: icon(token)),
+                        apparent: number(h["feelslike"]), humidity: number(h["humidity"]), wind: number(h["windspeed"]).map { $0 / 3.6 },
+                        gust: number(h["windgust"]).map { $0 / 3.6 }, direction: number(h["winddir"]), pressure: number(h["pressure"]), cloud: number(h["cloudcover"]),
+                        probability: number(h["precipprob"]), precipitation: number(h["precip"]), hours: 1,
+                        visibility: number(h["visibility"]).map { $0 * 1_000 }, uv: number(h["uvindex"]), dew: number(h["dew"])))
                 }
             }
             attribution = ["https://www.visualcrossing.com/"]
@@ -213,8 +236,14 @@ private struct WeatherProviderDecoder {
             current = self.current(number(c["air_temperature"]), humidity: number(c["relative_humidity"]), pressure: number(c["air_pressure_at_sea_level"]), wind: number(c["wind_speed"]), icon: symbol(nearest.1))
             hours = valid.map { time, data in
                 let token = symbol(data)
-                return .init(night: token?.icon?.contains("night") == true ? 1 : 0, time: time,
-                             temperature: number(object(object(data["instant"])["details"])["air_temperature"]), icon: token)
+                let c = object(object(data["instant"])["details"])
+                let period = [("next_1_hours", 1), ("next_6_hours", 6), ("next_12_hours", 12)].first { data[$0.0] != nil }
+                let p = object(object(period.flatMap { data[$0.0] })["details"])
+                return detailed(.init(night: token?.icon?.contains("night") == true ? 1 : 0, time: time, temperature: number(c["air_temperature"]), icon: token),
+                    humidity: number(c["relative_humidity"]), wind: number(c["wind_speed"]), gust: number(c["wind_speed_of_gust"]),
+                    direction: number(c["wind_from_direction"]), pressure: number(c["air_pressure_at_sea_level"]), cloud: number(c["cloud_area_fraction"]),
+                    probability: number(p["probability_of_precipitation"]), precipitation: number(p["precipitation_amount"]), hours: period?.1, timing: .following,
+                    clearSkyUV: number(c["ultraviolet_index_clear_sky"]), dew: number(c["dew_point_temperature"]))
             }
             days = aggregate(hours); attribution = ["https://www.met.no/"]
         case .weatherAPI:
@@ -244,7 +273,11 @@ private struct WeatherProviderDecoder {
                 days.append(day(time, low: number(values["mintemp_c"]), high: number(values["maxtemp_c"]), icon: symbol(values), zone: zone))
                 for h in objects(d["hour"]) {
                     guard let time = instant(h["time_epoch"]) else { continue }
-                    hours.append(.init(night: number(h["is_day"]) == 0 ? 1 : 0, time: time, temperature: number(h["temp_c"]), icon: symbol(h)))
+                    hours.append(detailed(.init(night: number(h["is_day"]) == 0 ? 1 : 0, time: time, temperature: number(h["temp_c"]), icon: symbol(h)),
+                        apparent: number(h["feelslike_c"]), humidity: number(h["humidity"]), wind: number(h["wind_kph"]).map { $0 / 3.6 },
+                        gust: number(h["gust_kph"]).map { $0 / 3.6 }, direction: number(h["wind_degree"]), pressure: number(h["pressure_mb"]), cloud: number(h["cloud"]),
+                        rainProbability: number(h["chance_of_rain"]), snowProbability: number(h["chance_of_snow"]), precipitation: number(h["precip_mm"]), hours: 1,
+                        visibility: number(h["vis_km"]).map { $0 * 1_000 }, uv: number(h["uv"]), dew: number(h["dewpoint_c"])))
                 }
             }
             attribution = ["https://www.weatherapi.com/"]
@@ -255,7 +288,11 @@ private struct WeatherProviderDecoder {
             hours = objects(object(root["hourly"])["data"]).compactMap { h in
                 guard let time = instant(h["time"]) else { return nil }
                 let token = h["icon"] as? String
-                return .init(night: token?.contains("night") == true ? 1 : 0, time: time, temperature: number(h["temperature"]), icon: icon(token))
+                return detailed(.init(night: token?.contains("night") == true ? 1 : 0, time: time, temperature: number(h["temperature"]), icon: icon(token)),
+                    apparent: number(h["apparentTemperature"]), humidity: number(h["humidity"]).map { $0 * 100 }, wind: number(h["windSpeed"]),
+                    gust: number(h["windGust"]), direction: number(h["windBearing"]), pressure: number(h["pressure"]), cloud: number(h["cloudCover"]).map { $0 * 100 },
+                    probability: number(h["precipProbability"]).map { $0 * 100 }, intensity: number(h["precipIntensity"]),
+                    visibility: number(h["visibility"]).map { $0 * 1_000 }, uv: number(h["uvIndex"]), dew: number(h["dewPoint"]))
             }
             days = objects(object(root["daily"])["data"]).compactMap { d in
                 guard let time = instant(d["time"]) else { return nil }
@@ -274,8 +311,14 @@ private struct WeatherProviderDecoder {
             guard let extra, let forecast = (try? JSONSerialization.jsonObject(with: extra)) as? Object else { throw WeatherSourceError.invalidResponse }
             hours = objects(forecast["list"]).compactMap { h in
                 guard let time = instant(h["dt"]) else { return nil }
-                return .init(night: (objects(h["weather"]).first?["icon"] as? String)?.hasSuffix("n") == true ? 1 : 0,
-                             time: time, temperature: number(object(h["main"])["temp"]), icon: symbol(h))
+                let c = object(h["main"]), wind = object(h["wind"])
+                let rain = number(object(h["rain"])["3h"]), snow = number(object(h["snow"])["3h"])
+                let amount: Double? = rain == nil && snow == nil ? nil : (rain ?? 0) + (snow ?? 0)
+                return detailed(.init(night: (objects(h["weather"]).first?["icon"] as? String)?.hasSuffix("n") == true ? 1 : 0,
+                             time: time, temperature: number(c["temp"]), icon: symbol(h)),
+                    apparent: number(c["feels_like"]), humidity: number(c["humidity"]), wind: number(wind["speed"]), gust: number(wind["gust"]), direction: number(wind["deg"]),
+                    pressure: number(c["pressure"]), cloud: number(object(h["clouds"])["all"]), probability: number(h["pop"]).map { $0 * 100 },
+                    precipitation: amount, hours: 3, timing: .preceding, visibility: number(h["visibility"]))
             }
             days = aggregate(hours); attribution = ["https://openweathermap.org/"]
         case .tomorrow:
@@ -302,7 +345,11 @@ private struct WeatherProviderDecoder {
             hours = values.compactMap { h in
                 guard let time = instant(h["time"]) else { return nil }
                 let values = object(h["values"])
-                return .init(night: nil, time: time, temperature: number(values["temperature"]), icon: symbol(values))
+                return detailed(.init(night: nil, time: time, temperature: number(values["temperature"]), icon: symbol(values)),
+                    apparent: number(values["temperatureApparent"]), humidity: number(values["humidity"]), wind: number(values["windSpeed"]), gust: number(values["windGust"]),
+                    direction: number(values["windDirection"]), pressure: number(values["pressureSurfaceLevel"]), cloud: number(values["cloudCover"]),
+                    probability: number(values["precipitationProbability"]), intensity: number(values["rainIntensity"]), rainOnly: true,
+                    visibility: number(values["visibility"]).map { $0 * 1_000 }, uv: number(values["uvIndex"]), dew: number(values["dewPoint"]))
             }
             days = objects(series["daily"]).compactMap { d in
                 guard let time = instant(d["time"]) else { return nil }

@@ -136,6 +136,8 @@ import SwiftUI
                 checks["hourlyPreviousRestoresFirstHours"] = previous && originalX != nil && abs((WeatherUIProbe.targets[id]?.frame.minX ?? .infinity) - originalX!) < 2
                 checks["hourCardClickOpensActualDetails"] = await WeatherUIProbe.click(id, in: window) && WeatherUIProbe.contains("weather.hour-detail")
                 try await capture(window, at: directory.appendingPathComponent("hour-details.png"))
+                checks["hourDetailsShowSelectedProviderMeasurements"] = hour.detailCount > 0 &&
+                    ["probability", "precipitation", "humidity", "wind"].allSatisfy { WeatherUIProbe.contains("weather.hour-field." + $0) }
                 checks["hourDetailsCanBeClosed"] = await press(String(localized: "Saat Ayrıntısını Kapat"), in: window) && !WeatherUIProbe.contains("weather.hour-detail")
             } else { checks["hourlyNextActuallyScrolls"] = false }
             checks["nativeWeatherSettingsOpens"] = await press(String(localized: "Hava Durumu Ayarları"), in: window) && WeatherUIProbe.contains("weather.source-picker")
@@ -166,12 +168,17 @@ import SwiftUI
             try await capture(window, at: directory.appendingPathComponent("key-settings.png"))
             let nodes = ToolUIAudit.accessibilityNodes(window)
             if let data = try? JSONSerialization.data(withJSONObject: nodes, options: [.prettyPrinted, .sortedKeys]) { try data.write(to: directory.appendingPathComponent("accessibility.json")) }
-            for state in ["no-location", "loading", "unavailable", "current-only"] {
+            for state in ["no-location", "loading", "unavailable", "current-only", "hour-no-details"] {
                 let suite = namespace + "." + state
                 let defaults = UserDefaults(suiteName: suite)!
                 let fixture = WeatherService(defaults: defaults, credentials: keys, client: { _, location, _, _ in
                     if state == "loading" { try await Task.sleep(for: .seconds(60)) }
                     if state == "unavailable" { throw WeatherSourceError.unavailable }
+                    if state == "hour-no-details" {
+                        let data = try JSONSerialization.data(withJSONObject: ["currentConditions": ["temp": 10],
+                            "days": [["datetimeEpoch": Date().timeIntervalSince1970, "hours": [["datetimeEpoch": Date().addingTimeInterval(3600).timeIntervalSince1970, "temp": 8]]]]])
+                        return try WeatherProviderClient.decode([data], source: .visualCrossing, location: location)
+                    }
                     return try WeatherProviderClient.decode([Data(#"{"currentConditions":{"temp":10}}"#.utf8)], source: .visualCrossing, location: location)
                 })
                 defer { fixture.setEnabled(false); defaults.removePersistentDomain(forName: suite) }
@@ -180,6 +187,10 @@ import SwiftUI
                     if state != "loading" { _ = await wait { !fixture.loading } }
                 }
                 host(WeatherDetail(service: fixture).padding(PocketSpacing.m).buttonStyle(.pocketSecondary), in: window, size: NSSize(width: 368, height: 590))
+                if state == "hour-no-details", let hour = fixture.snapshot?.hourly.first {
+                    try await Task.sleep(for: .milliseconds(200))
+                    checks["sparseHourCardOpensDetails"] = await WeatherUIProbe.click("weather.hour." + String(hour.id), in: window)
+                }
                 try await capture(window, at: directory.appendingPathComponent(state + ".png"))
                 switch state {
                 case "no-location":
@@ -187,6 +198,8 @@ import SwiftUI
                     checks["emptyLocationActionOpensSettings"] = await press(String(localized: "Konum Seç"), in: window) && WeatherUIProbe.contains("weather.source-picker")
                 case "loading": checks["loadingStateVisible"] = WeatherUIProbe.contains("weather.loading") && fixture.loading
                 case "unavailable": checks["failedSourceHasRecoveryAction"] = WeatherUIProbe.contains("weather.unavailable") && fixture.snapshot == nil
+                case "hour-no-details":
+                    checks["missingHourlyMeasurementsNotInvented"] = WeatherUIProbe.contains("weather.hour-no-details") && !WeatherUIProbe.contains("weather.hour-field.precipitation")
                 default: checks["missingForecastNotInvented"] = WeatherUIProbe.contains("weather.current-only") && fixture.snapshot?.hourly.isEmpty == true
                 }
             }

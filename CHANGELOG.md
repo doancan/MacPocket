@@ -2,6 +2,8 @@
 
 ## Yayımlanmamış
 
+- **Saatlik hava ayrıntıları:** saat kartı ayrı bir ayrıntı sayfası açar. Kaynak sağlıyorsa yağış olasılığı/miktarı/şiddeti, hissedilen sıcaklık, nem, rüzgâr/hamle/yön, basınç, bulut örtüsü, görüş, UV ve çiy noktası gösterilir. Yağışın 1/3/6/12 saatlik dönemi korunur; eksik alanlar sıfırla doldurulmaz.
+
 - **Saatlik tahmin tıklamaları:** görsel ok yerine çalışan ileri/geri düğmeleri eklendi. Saat kartları tıklandığında kaynağın sunduğu tarih/saat ve Celsius sıcaklığı gösterilir; ayrıntı kapatılabilir. Kaydırma sınırlarında düğmeler devre dışı kalır; hareketi azalt tercihi korunur.
 
 - **Hava durumu paneli:** büyük sıcaklık/koşul görünümü, kompakt nem-rüzgâr-basınç satırı, kaydırılabilir saatlik tahmin ve ortak ölçekli günlük sıcaklık çubukları. Konum ve kaynak ayarları ayrı görünüme alındı; seçili kaynak ve yenileme altta kaldı. Boş konum, yükleme, hata, anahtar eksikliği ve ayrıntılı tahmin bulunmaması için ayrı durumlar eklendi.

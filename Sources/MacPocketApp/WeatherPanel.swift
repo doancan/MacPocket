@@ -10,6 +10,7 @@ struct WeatherDetail: View {
     @State private var hourViewport = WeatherHourViewport()
     @State private var selectedHourID: Double?
     @PocketReduceMotion private var reduceMotion
+    private var selectedHour: WeatherHour? { service.snapshot?.hourly.first { $0.id == selectedHourID } }
 
     var body: some View {
         VStack(alignment: .leading, spacing: PocketSpacing.m) {
@@ -23,6 +24,13 @@ struct WeatherDetail: View {
                         WeatherSourcePicker(service: service, initiallyExpanded: true)
                     }.padding(.vertical, PocketSpacing.xs)
                 }.frame(height: scrollHeight)
+            } else if let hour = selectedHour, let snapshot = service.snapshot {
+                ScrollView {
+                    WeatherHourDetailView(hour: hour, snapshot: snapshot) { settings = true }
+                        .padding(.vertical, PocketSpacing.xs)
+                }.frame(height: scrollHeight).weatherAuditTarget("weather.hour-detail")
+                Divider()
+                sourceFooter
             } else {
                 ScrollView {
                     forecastContent
@@ -35,7 +43,8 @@ struct WeatherDetail: View {
                 Divider()
                 sourceFooter
             }
-        }
+        }.onChange(of: service.activeSource) { selectedHourID = nil }
+            .onChange(of: service.location) { selectedHourID = nil }
     }
     private var scrollHeight: CGFloat { min(450, max(220, (NSScreen.main?.visibleFrame.height ?? 800) - 190)) }
     private var header: some View {
@@ -44,6 +53,10 @@ struct WeatherDetail: View {
                 Button { settings = false } label: { Image(systemName: "chevron.left").frame(width: 28, height: 28) }
                     .buttonStyle(.plain).help("Hava Durumuna Dön").accessibilityLabel("Hava Durumuna Dön").weatherAuditTarget("weather.back")
                 Text("Konum ve Kaynaklar").font(.headline).accessibilityAddTraits(.isHeader)
+            } else if selectedHour != nil {
+                Button { selectedHourID = nil } label: { Image(systemName: "chevron.left").frame(width: 28, height: 28) }
+                    .buttonStyle(.plain).help("Saat Ayrıntısını Kapat").accessibilityLabel("Saat Ayrıntısını Kapat").weatherAuditTarget("weather.hour-close")
+                Text("Saatlik Tahmin").font(.headline).accessibilityAddTraits(.isHeader)
             } else {
                 Image(systemName: "mappin").font(.caption).foregroundStyle(.secondary).accessibilityHidden(true)
                 if let location = service.location {
@@ -177,20 +190,6 @@ struct WeatherDetail: View {
                     if let first = hours.first { proxy.scrollTo(first.id, anchor: .leading) }
                 }
             }
-            if let hour = hours.first(where: { $0.id == selectedHourID }) {
-                HStack(spacing: PocketSpacing.m) {
-                    WeatherConditionSymbol(symbol: hour.symbol, size: 24)
-                    VStack(alignment: .leading, spacing: PocketSpacing.xs) {
-                        Text(date(hour.time, snapshot: snapshot, pattern: "EEE d MMM, HH:mm")).font(.caption).foregroundStyle(.secondary)
-                        Text(temperature(hour.temperature) + "C").font(.callout.weight(.semibold)).monospacedDigit()
-                    }
-                    Spacer()
-                    Button { selectedHourID = nil } label: { Image(systemName: "xmark").frame(width: 24, height: 24) }
-                        .buttonStyle(.plain).help("Saat Ayrıntısını Kapat").accessibilityLabel("Saat Ayrıntısını Kapat").weatherAuditTarget("weather.hour-close")
-                }.padding(PocketSpacing.s)
-                    .background(.primary.opacity(0.035), in: RoundedRectangle(cornerRadius: PocketRadius.small))
-                    .weatherAuditTarget("weather.hour-detail")
-            }
         }
     }
     private func moveHours(_ direction: Int, hours: [WeatherHour], proxy: ScrollViewProxy) {
@@ -281,7 +280,7 @@ private struct WeatherHourViewport: Equatable {
     var canGoForward: Bool { width > 0 && offset + width < contentWidth - 1 }
 }
 
-private struct WeatherConditionSymbol: View {
+struct WeatherConditionSymbol: View {
     let symbol: String
     let size: CGFloat
     private var accent: Color {

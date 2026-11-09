@@ -145,7 +145,11 @@ final class WeatherProviderTests: XCTestCase {
         for source in WeatherSource.catalog where !source.requiresAPIKey {
             do {
                 let value = try await WeatherProviderClient.fetch(source: source, location: location, language: "tr")
-                report.append(["source":source.rawValue,"passed":true,"hours":value.hourly.count,"days":value.forecast.count,"temperature":value.current.temperature ?? NSNull()])
+                let hour = try XCTUnwrap(value.hourly.first)
+                XCTAssertGreaterThan(hour.detailCount, 0, source.rawValue)
+                report.append(["source":source.rawValue,"passed":true,"hours":value.hourly.count,"days":value.forecast.count,"temperature":value.current.temperature ?? NSNull(),
+                    "hourlyDetailCount":hour.detailCount,"hourlyHumidity":hour.humidity ?? NSNull(),"hourlyWindMS":hour.windSpeed ?? NSNull(),
+                    "hourlyPrecipitationMM":hour.precipitation ?? NSNull(),"hourlyPrecipitationHours":hour.precipitationHours ?? NSNull()])
             } catch { report.append(["source":source.rawValue,"passed":false,"error":error.localizedDescription]) }
         }
         let destination = URL(fileURLWithPath: FileManager.default.currentDirectoryPath).appendingPathComponent(".build/weather-basket/live-report.json")
