@@ -37,7 +37,9 @@ final class PocketStatusItemController: NSObject {
         self.model = model
         super.init()
         popover.behavior = .transient
-        popover.animates = true
+        // Status items behave like menus: opening, closing and changing items must be immediate.
+        // The presenter still serializes close notifications, without two sequential animations.
+        popover.animates = false
         updateAppearance()
         refresh()
         model.$system.receive(on: RunLoop.main).sink { [weak self] snapshot in

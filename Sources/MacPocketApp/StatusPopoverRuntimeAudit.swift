@@ -84,8 +84,26 @@ import MacPocketCore
         checks["localMouseClickSwitchesToAI"] = aiClick && aiShown
         fixture.presenter.close()
         checks["finalCloseReleasesContent"] = await wait { fixture.closed }
+        var timings: [[String: Any]] = []
+        for animated in [true, false] {
+            fixture.popover.animates = animated
+            for (index, key) in ["weather", "ai", "weather", "ai", "weather", "ai", "weather", "ai", "weather", "ai"].enumerated() {
+                let previousShows = fixture.completedShows
+                let start = ProcessInfo.processInfo.systemUptime
+                fixture.click(key)
+                let finished = await wait { fixture.completedShows > previousShows && fixture.shows(key) }
+                checks["timed.\(animated).\(index)"] = finished
+                if finished {
+                    timings.append(["animated": animated, "operation": index == 0 ? "open" : "switch", "target": key,
+                        "clickToDidShowMS": (fixture.lastDidShowTime - start) * 1_000])
+                }
+            }
+            fixture.presenter.close()
+            _ = await wait { fixture.closed }
+        }
         let report: [String: Any] = ["passed": checks.values.allSatisfy { $0 }, "checks": checks,
             "statusButtonActions": fixture.actions, "userSettingsChanged": false, "realCredentialReads": false,
+            "timings": timings, "timingBoundary": "status-button action to NSPopover.didShowNotification; fixture content",
             "inputMode": "native-status-button-actions-and-own-window-mouse-events"]
         try? FileManager.default.createDirectory(at: destination.deletingLastPathComponent(), withIntermediateDirectories: true)
         if let data = try? JSONSerialization.data(withJSONObject: report, options: [.prettyPrinted, .sortedKeys]) { try? data.write(to: destination) }
@@ -96,6 +114,9 @@ import MacPocketCore
         let popover = NSPopover()
         var items: [String: NSStatusItem] = [:]
         var actions: [String] = []
+        var completedShows = 0
+        var lastDidShowTime: TimeInterval = 0
+        private var shownObserver: NSObjectProtocol?
         lazy var presenter = StatusItemPopoverPresenter(popover: popover, button: { [weak self] in self?.items[$0]?.button }, content: { key in
             let controller = NSViewController()
             controller.representedObject = key
@@ -108,6 +129,12 @@ import MacPocketCore
         override init() {
             super.init()
             popover.behavior = .transient
+            shownObserver = NotificationCenter.default.addObserver(forName: NSPopover.didShowNotification, object: popover, queue: .main) { [weak self] _ in
+                MainActor.assumeIsolated {
+                    self?.completedShows += 1
+                    self?.lastDidShowTime = ProcessInfo.processInfo.systemUptime
+                }
+            }
             for (key, symbol) in [("weather", "cloud.sun"), ("ai", "sparkle"), ("grouped", "chart.bar")] {
                 let item = NSStatusBar.system.statusItem(withLength: 28)
                 item.button?.image = NSImage(systemSymbolName: symbol, accessibilityDescription: nil)
@@ -140,6 +167,8 @@ import MacPocketCore
         func shows(_ key: String) -> Bool { popover.isShown && presenter.owner == key && popover.contentViewController?.representedObject as? String == key }
         var closed: Bool { !popover.isShown && presenter.owner == nil && popover.contentViewController == nil }
         func removeItems() {
+            if let shownObserver { NotificationCenter.default.removeObserver(shownObserver) }
+            shownObserver = nil
             presenter.close()
             for item in items.values { NSStatusBar.system.removeStatusItem(item) }
             items.removeAll()
