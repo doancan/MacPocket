@@ -2,6 +2,8 @@
 
 ## Yayımlanmamış
 
+- **Hava durumu kaynak sepeti:** 11 ücretsiz erişim seçeneğinden istenenler sepete eklenebilir; menü çubuğu yalnız seçili kaynağı sorgular. Visual Crossing, MET Norway ve Open-Meteo anahtarsız; ECMWF IFS/AIFS Single, GFS ve ICON ayrı model seçenekleridir. WeatherAPI.com, Pirate Weather, OpenWeather’ın ücretsiz mevcut hava/5 günlük tahmin uçları ve Tomorrow.io kişisel API anahtarıyla çalışır. Anahtarlar Anahtar Zinciri’nde tutulur. Sağlayıcıya özel önbellek, kalıcı seçim, kota/erişim hataları ve kapsam bağlantıları eklendi; mevcut kullanıcıların iStat bağlantısı ilk seçim değişikliğine kadar korunur.
+
 - **Kaldırma planı:** uygulama, önbellek/günlükler ve kullanıcı verileri ayrı gruplarda gösterilir. Grup seçimi, Finder’da gösterme ve sabit seçim özeti eklendi; kullanıcı verileri başlangıçta seçilmez.
 - **Çalışan uygulamalar:** kaldırma onayından sonra önce normal çıkış istenir. Uygulama ve paket içindeki yardımcı süreçler kapanmadan dosyalar taşınmaz. Kapanmayan süreçler için ayrı zorla kapatma onayı gerekir; hatada plan açık kalır. [Kapsam ve doğrulama](docs/APPLICATION_UNINSTALL.md).
 

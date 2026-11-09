@@ -97,3 +97,10 @@ Gerçek ekran/sistem sesi/mikrofon kaydı; izin reddi/onayı akışlarının tam
 ## Sonraki derleme doğrulaması
 
 Pratik Araçlar geliştirmesinde denetim yardımcısının `CGFloat` değerlerini metne dönüştürme hatası düzeltildi. Eski genel geometri kaydı için tam ölçüm doğrulanamadığından yatay taşma sonucu bu raporun kabul kanıtından çıkarıldı. Pratik Araçlar’ın kendi canlı raporunda ölçülen native öğe sayıları açıkça yer alır.
+
+
+## Hava durumu kaynak sepeti — 9 Kasım 2026
+
+Mevcut hava durumu paneline ve Menü Çubuğu ayarlarına etkin kaynak menüsü ve açılabilir Kaynak Sepeti eklendi. Anahtarsız kaynaklar, ayrı Open-Meteo modelleri ve ücretsiz hesap isteyen kaynaklar ayrıdır. Onay kutuları yalnız sepeti değiştirir; veri almak için etkin kaynağın seçilmesi gerekir. Koşul bağlantıları ve ücretsiz hesap kotaları görünürdür; API anahtarları SecureField ile girilir ve Anahtar Zinciri’nde tutulur.
+
+Türkçe/açık ve İngilizce/koyu görünümde 14’er yerel kontrol geçti. 368 px menü paneli ve 640 px sepet görünümü; canlı tahmin, anahtar eksikliği, kaynak ekleme/çıkarma, GFS ekleme ve grupları açma sınandı. Yerel NSHostingController denetim penceresinin boyut değiştirmesi, sabit denetim alanı ve genişlik kabul kontrolleriyle düzeltildi. Model grubu sola hizalandı; koşul bağlantıları satır içi sunulur. Erişilebilirlik ağacı/eylemleri kontrol edildi; VoiceOver kabulü yapılmadı. Görüntü ve raporlar `.build/weather-basket/ui-{tr,en}/` altındadır.

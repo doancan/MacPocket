@@ -33,23 +33,24 @@ public struct WeatherIcon: Decodable, Sendable {
     public var symbol: String { symbol(isNight: false) }
     public func symbol(isNight: Bool) -> String {
         let name = icon?.lowercased() ?? ""
+        let night = isNight || name.contains("night")
         if name.contains("thunder") || name.contains("storm") { return "cloud.bolt.rain.fill" }
         if name.contains("snow") { return "cloud.snow.fill" }
         if name.contains("sleet") || name.contains("hail") { return "cloud.sleet.fill" }
         if name.contains("rain") || name.contains("drizzle") { return "cloud.rain.fill" }
         if name.contains("fog") || name.contains("mist") || name.contains("haze") { return "cloud.fog.fill" }
-        if name.contains("partly") { return isNight ? "cloud.moon.fill" : "cloud.sun.fill" }
+        if name.contains("partly") { return night ? "cloud.moon.fill" : "cloud.sun.fill" }
         if name.contains("cloud") || name.contains("overcast") { return "cloud.fill" }
         if name.contains("wind") { return "wind" }
         if name.contains("night") { return "moon.stars.fill" }
-        if name.contains("clear") || name.contains("sun") { return isNight ? "moon.stars.fill" : "sun.max.fill" }
+        if name.contains("clear") || name.contains("sun") { return night ? "moon.stars.fill" : "sun.max.fill" }
         return "cloud.sun.fill"
     }
 }
 
 public struct WeatherHour: Decodable, Sendable, Identifiable {
     public let night: Int?
-    public var symbol: String { icon?.symbol(isNight: night == 1) ?? "cloud.sun.fill" }
+    public var symbol: String { icon?.symbol(isNight: night == 1) ?? "thermometer.medium" }
     public let time: Double
     public let temperature: Double?
     public let icon: WeatherIcon?
@@ -71,6 +72,13 @@ public struct WeatherAttribution: Decodable, Sendable {
     public var url: URL? { link.flatMap(URL.init(string:)).flatMap { $0.scheme == "https" ? $0 : nil } }
     public var title: String {
         if let host = url?.host, host == "apple.com" || host.hasSuffix(".apple.com") { return "Apple Weather" }
+        if let host = url?.host {
+            let sources: [(String, String)] = [("open-meteo.com", "Open-Meteo"), ("visualcrossing.com", "Visual Crossing"),
+                ("met.no", "MET Norway"), ("weatherapi.com", "WeatherAPI.com"), ("pirateweather.net", "Pirate Weather"),
+                ("openweathermap.org", "OpenWeather"), ("tomorrow.io", "Tomorrow.io"), ("ecmwf.int", "ECMWF"),
+                ("dwd.de", "DWD"), ("noaa.gov", "NOAA")]
+            if let match = sources.first(where: { host == $0.0 || host.hasSuffix("." + $0.0) }) { return match.1 }
+        }
         return String(localized: "Veri kaynağı")
     }
 }
@@ -83,8 +91,10 @@ public struct WeatherSnapshot: Sendable {
     public let attributions: [WeatherAttribution]
     public let fetchedAt: Date
     public let serverTimeZone: String?
+    public var source: WeatherSource? = nil
+    public var nextRefreshAt: Date? = nil
     public var timeZone: TimeZone { TimeZone(identifier: serverTimeZone ?? location.timeZone) ?? .current }
-    public var symbol: String { current.icon?.symbol ?? "cloud.sun.fill" }
+    public var symbol: String { current.icon?.symbol ?? "thermometer.medium" }
 
     public static func decode(_ data: Data, location: WeatherLocation, at date: Date = Date()) throws -> Self {
         struct Response: Decodable {

@@ -178,7 +178,7 @@ private struct ModuleSettingsEditor: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: PocketSpacing.s) {
-            if module == .weather { WeatherLocationPicker() }
+            if module == .weather { WeatherLocationPicker(); WeatherSourcePicker() }
             Picker("Değer", selection: $settings.value) {
                 ForEach(module.valueOptions) { Text($0.title).tag($0) }
             }

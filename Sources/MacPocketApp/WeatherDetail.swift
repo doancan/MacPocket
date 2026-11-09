@@ -5,7 +5,7 @@ import SwiftUI
 
 @MainActor
 struct WeatherLocationPicker: View {
-    @ObservedObject private var service = WeatherService.shared
+    @ObservedObject var service: WeatherService = .shared
     @State private var query = ""
     @State private var results: [WeatherLocation] = []
     @State private var searching = false
@@ -64,7 +64,7 @@ struct WeatherLocationPicker: View {
 }
 
 struct WeatherDetail: View {
-    @ObservedObject private var service = WeatherService.shared
+    @ObservedObject var service: WeatherService = .shared
     @State private var contentHeight: CGFloat = 160
 
     var body: some View {
@@ -79,7 +79,8 @@ struct WeatherDetail: View {
 
     private var content: some View {
         VStack(alignment: .leading, spacing: PocketSpacing.m) {
-            WeatherLocationPicker()
+            WeatherLocationPicker(service: service)
+            WeatherSourcePicker(service: service)
             if let snapshot = service.snapshot {
                 HStack(spacing: PocketSpacing.m) {
                     Image(systemName: snapshot.symbol).font(.system(size: 32)).foregroundStyle(.orange).accessibilityHidden(true)
@@ -111,20 +112,25 @@ struct WeatherDetail: View {
                     }
                 }
                 let days = Array(snapshot.forecast.filter { ($0.end ?? $0.start + 86400) > Date().timeIntervalSince1970 }.prefix(5))
+                if !days.isEmpty && [.metNorway, .openWeather].contains(service.activeSource) {
+                    Text("Günlük aralıklar, mevcut tahmin örneklerinden hesaplanır; kesin günlük en düşük/en yüksek değer değildir.")
+                        .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+                }
                 ForEach(days) { day in
                     HStack {
                         Text(date(day.start, snapshot: snapshot, pattern: "EEE")).frame(width: 56, alignment: .leading)
-                        Image(systemName: day.icon?.symbol ?? "cloud.sun.fill").frame(width: 22).accessibilityHidden(true)
+                        Image(systemName: day.icon?.symbol ?? "thermometer.medium").frame(width: 22).accessibilityHidden(true)
                         Spacer()
                         Text(temperature(day.low)).foregroundStyle(.secondary)
                         Text(temperature(day.high)).frame(width: 56, alignment: .trailing)
                     }.font(.callout).monospacedDigit()
                 }
-                HStack {
+                VStack(alignment: .leading, spacing: PocketSpacing.xs) {
                     Text("Güncelleme: \(snapshot.fetchedAt.formatted(date: .omitted, time: .shortened))").font(.caption).foregroundStyle(.secondary)
-                    Spacer()
-                    ForEach(Array(snapshot.attributions.enumerated()), id: \.offset) { _, attribution in
-                        if let url = attribution.url { Link(attribution.title, destination: url).font(.caption) }
+                    HStack(spacing: PocketSpacing.s) {
+                        ForEach(Array(snapshot.attributions.enumerated()), id: \.offset) { _, attribution in
+                            if let url = attribution.url { Link(attribution.title, destination: url).font(.caption) }
+                        }
                     }
                 }
             } else if service.loading {
@@ -136,11 +142,12 @@ struct WeatherDetail: View {
             if service.location != nil {
                 TimelineView(.periodic(from: .now, by: 1)) { _ in
                     HStack {
-                        Text("Saatte bir otomatik yenilenir.").font(.caption).foregroundStyle(.secondary)
+                        Text(service.activeSource == .metNorway ? String(localized: "Üç saatte bir otomatik yenilenir.") : String(localized: "Saatte bir otomatik yenilenir."))
+                            .font(.caption).foregroundStyle(.secondary)
                         Spacer()
                         Button { service.refresh(manual: true) } label: { Label("Yenile", systemImage: "arrow.clockwise") }
                             .controlSize(.small).disabled(!service.canRefresh)
-                            .help("Elle yenileme için istekler arasında en az bir dakika beklenir.")
+                            .help("Yenileme, kaynağın önbellek süresi dolduğunda açılır. Hata sonrası yeniden deneme için en az bir dakika beklenir.")
                     }
                 }
             }
