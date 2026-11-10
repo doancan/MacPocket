@@ -126,6 +126,7 @@ final class ScreenTimeService: ObservableObject {
         timer = Timer.scheduledTimer(withTimeInterval: 15, repeats: true) { _ in
             MainActor.assumeIsolated { ScreenTimeService.shared.tick() }
         }
+        timer?.tolerance = 1.5
         pausedReason = nil
         openSegment()
     }
@@ -244,7 +245,7 @@ struct ScreenTimeView: View {
     @State private var search = ""
     @State private var confirmDelete = false
     @State private var now = Date()
-    private let ticker = Timer.publish(every: 30, on: .main, in: .common).autoconnect()
+    private let ticker = Timer.publish(every: 30, tolerance: 5, on: .main, in: .common).autoconnect()
 
     var body: some View {
         VStack(alignment: .leading, spacing: PocketSpacing.l) {

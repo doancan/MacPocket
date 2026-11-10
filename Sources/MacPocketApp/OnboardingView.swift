@@ -914,7 +914,12 @@ private struct OnboardingHelperCard: View {
             .frame(minWidth: 112, alignment: .trailing)
         }
         .pocketCard(padding: PocketSpacing.m)
-        .onAppear { fans.refreshAvailability() }
-        .onReceive(Timer.publish(every: 1, on: .main, in: .common).autoconnect()) { _ in fans.refreshAvailability() }
+        // One polling loop for the card's lifetime; a Timer publisher built in `body` restarts on every update.
+        .task {
+            while !Task.isCancelled {
+                fans.refreshAvailability()
+                do { try await Task.sleep(for: .seconds(1), tolerance: .milliseconds(250)) } catch { return }
+            }
+        }
     }
 }

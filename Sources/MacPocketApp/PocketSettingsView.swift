@@ -4,7 +4,7 @@ import SwiftUI
 import UniformTypeIdentifiers
 
 struct PocketSettingsView: View {
-    @ObservedObject var model: PocketModel
+    var model: PocketModel
     @ObservedObject var loginItem: LoginItemController
     @ObservedObject private var navigation = PocketSettingsNavigation.shared
 
@@ -41,7 +41,7 @@ struct PocketSettingsView: View {
 // MARK: - General
 
 private struct PocketGeneralSettings: View {
-    @ObservedObject var model: PocketModel
+    var model: PocketModel
     @ObservedObject var loginItem: LoginItemController
     @State private var language = AppLanguage.stored
     @AppStorage(MenuBarPreferences.visibleKey) private var showMenuBar = true
@@ -217,7 +217,7 @@ LabeledContent("Kart yoğunluğu") {
 // MARK: - Monitoring
 
 private struct PocketMonitoringSettings: View {
-    @ObservedObject var model: PocketModel
+    @Bindable var model: PocketModel
     @AppStorage("manager.showUser") private var showUser = true
     @AppStorage("manager.showThreads") private var showThreads = true
     @AppStorage(ProcessCPUScale.key) private var cpuScale = ProcessCPUScale.defaultValue
@@ -332,7 +332,7 @@ private struct PocketMonitoringSettings: View {
 // MARK: - Advanced
 
 private struct PocketAdvancedSettings: View {
-    @ObservedObject var model: PocketModel
+    var model: PocketModel
     @State private var message: PocketSettingsMessage?
     @State private var confirmReset = false
     @State private var confirmClearHistory = false

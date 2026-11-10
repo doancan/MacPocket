@@ -3,6 +3,7 @@ import Combine
 import CoreGraphics
 import Darwin
 import SwiftUI
+import Synchronization
 import XCTest
 @testable import MacPocketCore
 @testable import MacPocketApp
@@ -293,19 +294,20 @@ import XCTest
             let idleMS = (ProcessInfo.processInfo.systemUptime-idleStart)*1000, idleCPU = cpuMS()-idleCPUStart
             let idle = PerformanceSurveyCounters.snapshot()
             PerformanceSurveyCounters.reset()
-            var notifications = 0
-            let subscription = model.objectWillChange.sink { notifications += 1 }
+            // PocketModel is @Observable: tracking is armed before each assignment and counted.
+            let notificationCount = Mutex(0)
             let updateStart = ProcessInfo.processInfo.systemUptime, updateCPUStart = cpuMS()
             for index in 1...20 {
+                withObservationTracking { _ = model.system } onChange: { notificationCount.withLock { $0 += 1 } }
                 model.system = snapshots[index]
                 try await Task.sleep(for:.milliseconds(80)); host.layoutSubtreeIfNeeded(); window.displayIfNeeded()
             }
             let updateMS = (ProcessInfo.processInfo.systemUptime-updateStart)*1000, updateCPU = cpuMS()-updateCPUStart
-            rows.append(["page":page,"systemAssignments":20,"objectWillChange":notifications,"idleBodyEvaluations":idle,
+            rows.append(["page":page,"systemAssignments":20,"systemChangeNotifications":notificationCount.withLock { $0 },"idleBodyEvaluations":idle,
                 "idleElapsedMS":idleMS,"idleProcessCPUMS":idleCPU,"updateElapsedMS":updateMS,"updateProcessCPUMS":updateCPU,
                 "estimatedExtraProcessCPUPerAssignmentMS":max(0,(updateCPU-idleCPU*updateMS/idleMS)/20),
                 "cpuUpdateBodyEvaluations":PerformanceSurveyCounters.snapshot(),"windowVisible":window.isVisible])
-            subscription.cancel(); window.close()
+            window.close()
             try await Task.sleep(for:.milliseconds(100))
         }
         report["ui"] = ["measurements":rows,"scope":"actual source views with body-entry counters in measurement-only checkout; 20 CPU-only assignments at 80ms; not normal 2s cadence"]

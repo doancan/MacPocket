@@ -1,4 +1,6 @@
 import Combine
+import Observation
+import Synchronization
 import XCTest
 import MacPocketCore
 @testable import MacPocketApp
@@ -43,10 +45,33 @@ private actor HistoryReader {
             historyStore: PowerHistoryStore(url: directory.appendingPathComponent("history.json")))
         for _ in 0..<PocketModel.sampleCapacity { await model.refresh(includeProcesses: false) }
         var counts: [Int] = []
-        let subscription = model.$samples.dropFirst().sink { counts.append($0.count) }; defer { subscription.cancel() }
-        for _ in 0..<20 { await model.refresh(includeProcesses: false) }
+        for _ in 0..<20 {
+            let changes = Mutex(0)
+            withObservationTracking { _ = model.samples } onChange: { changes.withLock { $0 += 1 } }
+            await model.refresh(includeProcesses: false)
+            XCTAssertEqual(changes.withLock { $0 }, 1)
+            counts.append(model.samples.count)
+        }
         XCTAssertEqual(counts, Array(repeating: PocketModel.sampleCapacity, count: 20))
         XCTAssertEqual(model.samples.first?.date, Date(timeIntervalSinceReferenceDate: 20))
         XCTAssertEqual(model.samples.last?.date, Date(timeIntervalSinceReferenceDate: 169))
+    }
+}
+
+/// With Observation, a monitoring sample must not invalidate views that never read live metrics.
+@MainActor final class PocketModelObservationTests: XCTestCase {
+    func testSystemRefreshDoesNotInvalidateUnrelatedReaders() async {
+        let reader = HistoryReader()
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent("MacPocket.Observation." + UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let model = PocketModel(startMonitoring: false, readSystemSnapshot: { try await reader.read() },
+            historyStore: PowerHistoryStore(url: directory.appendingPathComponent("history.json")))
+        await model.refresh(includeProcesses: false)
+        let unrelated = Mutex(0), live = Mutex(0)
+        withObservationTracking { _ = model.refreshSeconds; _ = model.paused; _ = model.awakeSession } onChange: { unrelated.withLock { $0 += 1 } }
+        withObservationTracking { _ = model.system } onChange: { live.withLock { $0 += 1 } }
+        await model.refresh(includeProcesses: false)
+        XCTAssertEqual(unrelated.withLock { $0 }, 0)
+        XCTAssertEqual(live.withLock { $0 }, 1)
     }
 }

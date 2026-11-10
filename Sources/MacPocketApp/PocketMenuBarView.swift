@@ -12,7 +12,7 @@ enum MenuBarPopoverContent: Equatable {
 /// Popover root. Created when the popover opens and released when it closes, so nothing here
 /// re-renders while the popover is hidden.
 struct PocketMenuBarView: View {
-    @ObservedObject var model: PocketModel
+    var model: PocketModel
     @ObservedObject var history: MenuBarHistory
     @ObservedObject private var store = MenuBarSettingsStore.shared
     let content: MenuBarPopoverContent

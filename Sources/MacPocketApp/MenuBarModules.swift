@@ -229,7 +229,7 @@ private struct ProcessIcon: View {
 /// the module's name with its own Temel / Gelişmiş switch, then the content for that level.
 struct MenuBarModuleDetail: View {
     let module: MenuBarModule
-    @ObservedObject var model: PocketModel
+    var model: PocketModel
     @ObservedObject var history: MenuBarHistory
     let binaryUnits: Bool
     @AppStorage private var level: PocketDetailLevel
@@ -269,7 +269,7 @@ private func percentText(_ value: Double?, decimals: Bool = false) -> String {
 }
 
 private struct CPUDetail: View {
-    @ObservedObject var model: PocketModel
+    var model: PocketModel
     @ObservedObject var history: MenuBarHistory
     let advanced: Bool
     private let module = MenuBarModule.cpu
@@ -335,7 +335,7 @@ private struct CPUDetail: View {
 }
 
 private struct GPUDetail: View {
-    @ObservedObject var model: PocketModel
+    var model: PocketModel
     @ObservedObject var history: MenuBarHistory
     let binary: Bool
     let advanced: Bool
@@ -381,7 +381,7 @@ private struct GPUDetail: View {
 }
 
 private struct MemoryDetail: View {
-    @ObservedObject var model: PocketModel
+    var model: PocketModel
     @ObservedObject var history: MenuBarHistory
     let binary: Bool
     let advanced: Bool
@@ -459,7 +459,7 @@ private struct MemoryDetail: View {
 }
 
 private struct DiskDetail: View {
-    @ObservedObject var model: PocketModel
+    var model: PocketModel
     @ObservedObject var history: MenuBarHistory
     let binary: Bool
     let advanced: Bool
@@ -525,7 +525,7 @@ private struct DiskDetail: View {
 }
 
 private struct NetworkDetail: View {
-    @ObservedObject var model: PocketModel
+    var model: PocketModel
     @ObservedObject var history: MenuBarHistory
     let binary: Bool
     let advanced: Bool
@@ -653,7 +653,7 @@ private struct FanSpin: ViewModifier {
 }
 
 private struct PowerDetail: View {
-    @ObservedObject var model: PocketModel
+    var model: PocketModel
     let advanced: Bool
     private let module = MenuBarModule.power
 

@@ -51,7 +51,7 @@ final class PortManagerModel: ObservableObject {
 
 /// Tools → Port Yöneticisi: who listens on which port, whether it is reachable from the network, and stop it.
 struct PortManagerView: View {
-    @ObservedObject var model: PocketModel
+    var model: PocketModel
     @StateObject private var ports = PortManagerModel()
     @State private var search = ""
     @State private var exposedOnly = false

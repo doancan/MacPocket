@@ -559,3 +559,24 @@ Normalleştirilmiş hızlı yol belirgin biçimde ucuzladı; Foundation karşıl
 1.000 uzun kayıttaki JSON 20.15 MB'dir. Kazanç ana aktörün yazıyı beklememesidir; toplam JSON/disk işi yaklaşık 40 ms sürer. Worker'a gönderme süresi, tüm `ClipboardService` veya SwiftUI güncellemesinin maliyeti olarak sunulmaz. Kapanış/silme/geçiş sınırlarının bekleme süresine bu iyileştirme uygulanmaz.
 
 **Son kontroller ve canlı sınır:** Tam kök grupta **1.575 test, 0 hata, 6 isteğe bağlı atlama**. Yerelleştirme **4.518 anahtar, 0 eksik İngilizce çeviri/biçim uyuşmazlığı**. İmzalı Release derlemesi ve sıkı kod imzası doğrulaması geçti. Ürün sürüm/build değiştirilmeden **0.1.6 / 9** olarak yeniden açıldı. Canlı kabul bu paketin normal açılışını kapsar; kullanıcının gerçek panosuna deneme verisi yazılmadı. Arama indeksi korunur; genel SwiftUI gözlem kapsamı, sensör talepleri ve görsel önbelleği bu turun dışındadır.
+
+### Observation geçişi, görsel önbellek bütçesi ve zamanlayıcı toleransı — 10 Kasım 2026
+
+Kaynak `ec81011` üzerine uygulanan değişiklik; ürün 0.1.6 / 9 korunur. Dayanak: Apple [ObservableObject'ten Observable makrosuna geçiş](https://developer.apple.com/documentation/swiftui/migrating-from-the-observable-object-protocol-to-the-observable-macro), [SwiftUI performansını anlama ve iyileştirme](https://developer.apple.com/documentation/xcode/understanding-and-improving-swiftui-performance), [NSCache](https://developer.apple.com/documentation/foundation/nscache) ve [Energy Efficiency Guide: zamanlayıcı toleransı](https://developer.apple.com/library/archive/documentation/Performance/Conceptual/EnergyGuide-iOS/MinimizeTimerUse.html).
+
+- **`PocketModel` → `@Observable`:** `@Published` kaldırıldı; iç durum (`historyStore`, görevler, aboneler, görünürlük bayrakları) `@ObservationIgnored`. 38 görünüm `@ObservedObject` yerine düz referans, bağlama gereken dört yer `@Bindable` kullanır. Menü çubuğu `model.$system`/`$paused` Combine aboneliklerinden Swift `Observations` dizisine geçti. Artık bir görünüm yalnız gövdesinde okuduğu özellik değişince güncellenir.
+- **Pano görsel önbelleği:** `countLimit` 48, `totalCostLimit` 96 MiB; maliyet çözülmüş piksel baytı (genişlik × yükseklik × 4). Çıkarılan görsel arşivden yeniden okunur.
+- **Zamanlayıcılar:** Ağ izleme (15 dk → 60 sn tolerans), Ekran Süresi tik'i (1,5 sn), Odak geri sayımı ve pencere geçişi yerel tuş denetimi (0,2 sn), iki 30 sn'lik SwiftUI saati (5 sn) toleranslı. Kurulum sihirbazındaki fan kartı `body` içinde her güncellemede yeniden kurulan `Timer.publish` yerine kart ömrü boyunca tek `.task` döngüsü kullanır.
+
+**Ölçüm (uygulanan kod):** Aynı `scripts/measure-performance-survey.sh` hedefi; çalışma ağacı değişiklikleri ayrı detached kopyada geçici commit'e alınıp Release ile ölçüldü (ana dal ve çalışan uygulama değişmedi).
+
+| Alan | Önce (9 Kasım) | Sonra |
+| --- | --- | --- |
+| 20 `system` ataması · Genel ayarlar | 40 gövde hesabı, ~12,97 ms ek CPU/atama | **0** gövde, ~0,01 ms |
+| · İzleme ayarları | 40 gövde, ~16,84 ms | **0** gövde, ~0,09 ms |
+| · Araçlar | 620 gövde (20 hub + 600 kart), ~13,25 ms | **0** gövde, ~0,08 ms |
+| 8 × 4K görsel önizleme sonrası RSS artışı | 253–256 MiB | **95–96 MiB** (`phys_footprint` artışı 0,3–0,7 MiB) |
+
+Değişiklik bildirimi her atamada 20/20 ulaştı; yani ölçüm gerçekten tetiklendi, yalnız ilgisiz görünümler yeniden hesaplanmadı. Yeni `PocketModelObservationTests`, örnekleme yenilemesinin `refreshSeconds`/`paused`/`awakeSession` okuyucularını geçersiz kılmadığını ve `system` okuyucusunu tam bir kez bildirdiğini sınar.
+
+**Sınırlar:** Gövde sayıları ölçüm kopyasındaki sayaçlara dayanır; GPU/WindowServer maliyeti kapsanmaz. Önbellek bütçesi bellek tavanını sınırlar, ama sınırı aşan geçmiş görselleri yeniden diskten çözülür (gezinirken ek I/O). Zamanlayıcı toleranslarının enerji etkisi ayrı ölçülmedi. Çalışan uygulamada canlı Instruments kaydı bu turda alınmadı. Tam kök grupta XCTest **1.026 test, 0 hata, 5 atlama** ve Swift Testing **355 test** geçti; yerelleştirme **4.524 anahtar, 0 eksik**.

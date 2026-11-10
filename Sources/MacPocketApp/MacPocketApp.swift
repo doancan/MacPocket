@@ -245,12 +245,13 @@ extension PocketApplicationState {
 }
 
 @MainActor
-final class PocketModel: ObservableObject {
-    @Published var system: SystemSnapshot?
-    @Published var processes: [ProcessEntry] = []
-    @Published var appPIDs: Set<Int32> = []
-    @Published var paused = false
-    @Published var refreshSeconds = 2.0 {
+@Observable
+final class PocketModel {
+    var system: SystemSnapshot?
+    var processes: [ProcessEntry] = []
+    var appPIDs: Set<Int32> = []
+    var paused = false
+    var refreshSeconds = 2.0 {
         didSet {
             if refreshSeconds != oldValue { UserDefaults.standard.set(refreshSeconds, forKey: "MacPocket.refreshSeconds") }
         }
@@ -259,27 +260,27 @@ final class PocketModel: ObservableObject {
     let storage = FileWorkspaceModel()
     let cleanup = FileWorkspaceModel(cleanup: true)
     let applications = ApplicationWorkspaceModel()
-    @Published var error: String?
-    @Published var lastUpdate: Date?
-    @Published var unreadableCount = 0
-    @Published private(set) var samples: [PocketSample] = []
-    @Published var signalStatus: String?
-    @Published var terminatingPID: Int32?
-    @Published var awakeSession: AwakeSession?
-    @Published var awakeError: String?
-    @Published var powerHistory: [PowerHistoryEntry] = []
-    @Published var powerHistoryError: String?
-    private(set) var mainWindowVisible = false
+    var error: String?
+    var lastUpdate: Date?
+    var unreadableCount = 0
+    private(set) var samples: [PocketSample] = []
+    var signalStatus: String?
+    var terminatingPID: Int32?
+    var awakeSession: AwakeSession?
+    var awakeError: String?
+    var powerHistory: [PowerHistoryEntry] = []
+    var powerHistoryError: String?
+    @ObservationIgnored private(set) var mainWindowVisible = false
     /// Set by the menu bar while a popover showing top processes is open; process sampling is
     /// otherwise limited to the visible Task Manager.
-    var menuBarProcessesWanted = false
-    var openMainWindow: (() -> Void)?
-    var openSettingsWindow: (() -> Void)?
+    @ObservationIgnored var menuBarProcessesWanted = false
+    @ObservationIgnored var openMainWindow: (() -> Void)?
+    @ObservationIgnored var openSettingsWindow: (() -> Void)?
     let processMonitor = ProcessMonitor()
     let systemMonitor = SystemMonitor()
     let sleepController: any SleepControlling
-    private var awakeOperationGeneration = 0
-    private var awakeAutomationInstance: AwakeAutomationService?
+    @ObservationIgnored private var awakeOperationGeneration = 0
+    @ObservationIgnored private var awakeAutomationInstance: AwakeAutomationService?
     var awakeAutomation: AwakeAutomationService {
         if let awakeAutomationInstance { return awakeAutomationInstance }
         let service = AwakeAutomationService(controller: sleepController, sessionChanged: { [weak self] session in
@@ -288,18 +289,18 @@ final class PocketModel: ObservableObject {
         awakeAutomationInstance = service; return service
     }
     var awakeIsAutomatic: Bool { awakeSession != nil && awakeAutomationInstance?.ownedSessionID == awakeSession?.id }
-    private var historyDays = PowerHistoryRetention.days(from: .standard)
+    @ObservationIgnored private var historyDays = PowerHistoryRetention.days(from: .standard)
     #if DEBUG
-    private lazy var historyStore = PowerHistoryStore(url: ModuleRuntimeAudit.dataURL("power-history.json"), maximumEntries: PowerHistoryRetention.maximumEntries(days: historyDays))
+    @ObservationIgnored private lazy var historyStore = PowerHistoryStore(url: ModuleRuntimeAudit.dataURL("power-history.json"), maximumEntries: PowerHistoryRetention.maximumEntries(days: historyDays))
     #else
-    private lazy var historyStore = PowerHistoryStore(maximumEntries: PowerHistoryRetention.maximumEntries(days: historyDays))
+    @ObservationIgnored private lazy var historyStore = PowerHistoryStore(maximumEntries: PowerHistoryRetention.maximumEntries(days: historyDays))
     #endif
-    private var historyLoaded = false
+    @ObservationIgnored private var historyLoaded = false
     private let alerts = PocketAlertNotifier()
-    private var subscriptions = Set<AnyCancellable>()
-    private var refreshing = false
-    private var pendingAutomaticProcessRefresh = false
-    private var pollingTask: Task<Void, Never>?
+    @ObservationIgnored private var subscriptions = Set<AnyCancellable>()
+    @ObservationIgnored private var refreshing = false
+    @ObservationIgnored private var pendingAutomaticProcessRefresh = false
+    @ObservationIgnored private var pollingTask: Task<Void, Never>?
     private let readSystemSnapshot: (@Sendable () async throws -> SystemSnapshot)?
     private let readProcessSnapshot: (@Sendable () async throws -> ProcessSnapshot)?
 
@@ -364,7 +365,7 @@ final class PocketModel: ObservableObject {
             do { powerHistory = try await historyStore.entries(); historyLoaded = true }
             catch { powerHistoryError = error.localizedDescription; historyLoaded = true }
         }
-        // Every @Published write notifies all observers, even with an equal value; publish only changes.
+        // Observation notifies readers on every write, even with an equal value; write only changes.
         let awakeGeneration = awakeOperationGeneration
         let session = await sleepController.status()
         if awakeGeneration == awakeOperationGeneration, session != awakeSession { awakeSession = session }
@@ -519,7 +520,7 @@ struct PocketSample: Identifiable, Sendable {
 }
 
 struct ResourceStrip: View {
-    @ObservedObject var model: PocketModel
+    var model: PocketModel
     var body: some View {
         let system = model.system
         let volume = system?.volumes.first

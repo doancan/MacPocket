@@ -82,7 +82,7 @@ extension MenuBarGroupedStyle {
 
 /// Settings → Menü Çubuğu: the live editor first, then the selected module's options, then layout and units.
 struct StatusBarPreferencesView: View {
-    @ObservedObject var model: PocketModel
+    @Bindable var model: PocketModel
     @ObservedObject private var store = MenuBarSettingsStore.shared
     @State private var selection: MenuBarModule?
 

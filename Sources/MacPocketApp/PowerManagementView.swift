@@ -4,7 +4,7 @@ import SwiftUI
 
 /// Güç Merkezi: live power monitoring, sleep blockers, per-app energy, every pmset setting and history.
 struct PowerManagementView: View {
-    @ObservedObject var model: PocketModel
+    var model: PocketModel
     @StateObject private var center = PowerCenterModel()
 
     var body: some View {
@@ -105,7 +105,7 @@ struct PowerFactRow: View {
 
 struct PowerHeroCard: View {
     @ObservedObject var center: PowerCenterModel
-    @ObservedObject var model: PocketModel
+    var model: PocketModel
     @Environment(\.pocketTint) private var tint
 
     var body: some View {
@@ -248,7 +248,7 @@ struct PowerHeroCard: View {
 /// Keeping awake, thermal limits, sensors, top energy users and schedules.
 struct PowerOverviewPanel: View {
     @ObservedObject var center: PowerCenterModel
-    @ObservedObject var model: PocketModel
+    var model: PocketModel
 
     var body: some View {
         VStack(alignment: .leading, spacing: PocketSpacing.l) {
@@ -391,7 +391,7 @@ struct PowerOverviewPanel: View {
 // MARK: - Keep awake
 
 struct PowerKeepAwakeCard: View {
-    @ObservedObject var model: PocketModel
+    var model: PocketModel
     @AppStorage("MacPocket.power.awakeMinutes") private var minutes = 30.0
     @AppStorage(PocketModel.awakeDisplayKey) private var displayAwake = PocketModel.awakeDisplayDefault
     @State private var changing = false
@@ -464,7 +464,7 @@ struct PowerKeepAwakeCard: View {
 
 struct PowerBatteryPanel: View {
     @ObservedObject var center: PowerCenterModel
-    @ObservedObject var model: PocketModel
+    var model: PocketModel
 
     var body: some View {
         VStack(alignment: .leading, spacing: PocketSpacing.l) {

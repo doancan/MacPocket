@@ -17,7 +17,7 @@ private enum ProcessScope: String, CaseIterable, Identifiable {
 }
 
 struct TaskManagerView: View {
-    @ObservedObject var model: PocketModel
+    var model: PocketModel
     @State private var search = ""
     @FocusState private var searchFocused: Bool
     @State private var scope = ProcessScope.all

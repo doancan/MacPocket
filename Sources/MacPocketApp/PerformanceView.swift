@@ -3,7 +3,7 @@ import MacPocketCore
 import SwiftUI
 
 struct PerformanceView: View {
-    @ObservedObject var model: PocketModel
+    var model: PocketModel
     @Environment(\.pocketTint) private var tint
 
     var body: some View {

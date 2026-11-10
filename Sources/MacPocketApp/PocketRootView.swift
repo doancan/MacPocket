@@ -255,7 +255,7 @@ private struct PocketSidebarSettingsButton: View {
 }
 
 private struct PocketRefreshButton: View {
-    @ObservedObject var model: PocketModel
+    var model: PocketModel
     @State private var refreshCount = 0
     @PocketReduceMotion private var reduceMotion
 
@@ -287,7 +287,7 @@ private struct PocketRefreshSpin: ViewModifier {
 }
 
 private struct PocketPauseButton: View {
-    @ObservedObject var model: PocketModel
+    var model: PocketModel
     var body: some View {
         Button { model.paused.toggle() } label: {
             Label(model.paused ? "İzlemeyi Sürdür" : "İzlemeyi Duraklat", systemImage: model.paused ? "play" : "pause")
@@ -296,7 +296,7 @@ private struct PocketPauseButton: View {
     }
 }
 private struct PocketIntervalMenu: View {
-    @ObservedObject var model: PocketModel
+    @Bindable var model: PocketModel
     var body: some View {
         Menu {
             Picker("Yenileme Aralığı", selection: $model.refreshSeconds) {
@@ -308,7 +308,7 @@ private struct PocketIntervalMenu: View {
 }
 
 struct PocketCommands: Commands {
-    @ObservedObject var model: PocketModel
+    @Bindable var model: PocketModel
     @ObservedObject private var navigation: PocketNavigation
     @Environment(\.openWindow) private var openWindow
     @AppStorage("MacPocket.showMenuBar") private var showMenuBar = true

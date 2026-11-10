@@ -7,7 +7,7 @@ import SystemConfiguration
 /// Twelve divides evenly into 2, 3 and 4 columns, so every row is full at any window width.
 struct OverviewView: View {
     @ObservedObject private var modules = PocketModuleRuntime.shared
-    @ObservedObject var model: PocketModel
+    var model: PocketModel
     @ObservedObject var files: FileWorkspaceModel
     @ObservedObject var applications: ApplicationWorkspaceModel
     let navigation: PocketNavigation
@@ -215,7 +215,7 @@ private struct TileBar: View {
 // MARK: - Monitoring tiles
 
 private struct CPUTile: View {
-    @ObservedObject var model: PocketModel
+    var model: PocketModel
     let open: () -> Void
 
     var body: some View {
@@ -232,7 +232,7 @@ private struct CPUTile: View {
 }
 
 private struct MemoryTile: View {
-    @ObservedObject var model: PocketModel
+    var model: PocketModel
     let open: () -> Void
 
     var body: some View {
@@ -250,7 +250,7 @@ private struct MemoryTile: View {
 }
 
 private struct DiskTile: View {
-    @ObservedObject var model: PocketModel
+    var model: PocketModel
     let open: () -> Void
 
     var body: some View {
@@ -270,7 +270,7 @@ private struct DiskTile: View {
 }
 
 private struct NetworkTile: View {
-    @ObservedObject var model: PocketModel
+    var model: PocketModel
     @ObservedObject private var history = MenuBarHistory.shared
     let open: () -> Void
 
@@ -293,7 +293,7 @@ private struct NetworkTile: View {
 }
 
 private struct PowerTile: View {
-    @ObservedObject var model: PocketModel
+    var model: PocketModel
     let open: () -> Void
 
     var body: some View {
@@ -319,7 +319,7 @@ private struct PowerTile: View {
 }
 
 private struct SystemTile: View {
-    @ObservedObject var model: PocketModel
+    var model: PocketModel
     let verdict: OverviewView.Verdict
     let open: () -> Void
 
@@ -346,7 +346,7 @@ private struct SystemTile: View {
 // MARK: - Control tiles
 
 private struct KeepAwakeTile: View {
-    @ObservedObject var model: PocketModel
+    var model: PocketModel
     let open: () -> Void
 
     var body: some View {

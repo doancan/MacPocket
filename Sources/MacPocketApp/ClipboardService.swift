@@ -59,7 +59,14 @@ final class ClipboardService: ObservableObject {
     private var lastChangeCount: Int
     private var ownChangeCount: Int?
     private var memoryImages: [String: Data] = [:]
-    private let imageCache = NSCache<NSString, NSImage>()
+    /// Bounded by decoded pixel bytes so a few 4K/5K pastes cannot pin hundreds of MiB; evicted
+    /// images are re-read from the archive on demand.
+    private let imageCache: NSCache<NSString, NSImage> = {
+        let cache = NSCache<NSString, NSImage>()
+        cache.totalCostLimit = 96 * 1024 * 1024
+        cache.countLimit = 48
+        return cache
+    }()
     private var observers: [NSObjectProtocol] = []
     private lazy var hotKey = PocketGlobalHotKey { [weak self] in self?.togglePanel() }
     private lazy var panel = ClipboardPanelController(service: self)
@@ -219,7 +226,8 @@ final class ClipboardService: ObservableObject {
         if let cached = imageCache.object(forKey: reference.fileName as NSString) { return cached }
         let data = memoryImages[reference.fileName] ?? (try? Data(contentsOf: archive.imageURL(reference.fileName)))
         guard let data, let image = NSImage(data: data) else { return nil }
-        imageCache.setObject(image, forKey: reference.fileName as NSString)
+        imageCache.setObject(image, forKey: reference.fileName as NSString,
+                             cost: max(1, reference.pixelWidth) * max(1, reference.pixelHeight) * 4)
         return image
     }
 

@@ -319,7 +319,7 @@ struct PowerHistoryPanel: View {
     }
 
     @ObservedObject var center: PowerCenterModel
-    @ObservedObject var model: PocketModel
+    var model: PocketModel
     @State private var filter = Filter.sleepWake
 
     var body: some View {

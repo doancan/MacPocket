@@ -206,6 +206,7 @@ final class LANScannerModel: ObservableObject {
         timer = Timer.scheduledTimer(withTimeInterval: 15 * 60, repeats: true) { _ in
             Task { @MainActor in await LANScannerModel.shared.scan(notify: true) }
         }
+        timer?.tolerance = 60
     }
 
     private func announce(_ devices: [LANDevice]) {

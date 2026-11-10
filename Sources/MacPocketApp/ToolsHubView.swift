@@ -3,7 +3,7 @@ import SwiftUI
 
 @MainActor
 struct ToolsHubView: View {
-    @ObservedObject var model: PocketModel
+    var model: PocketModel
     var openTool: (String) -> Void = { _ in }
     @AppStorage("MacPocket.tools.favorites") private var favorites = ""
     @State private var search = ""

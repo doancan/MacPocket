@@ -8,7 +8,7 @@ import UniformTypeIdentifiers
 /// Settings → Menü Çubuğu: a live mock of the menu bar. Items render exactly as they will in the real menu bar,
 /// reorder by dragging, open their options on click, and move to and from the shelf of switched-off modules.
 struct MenuBarEditor: View {
-    @ObservedObject var model: PocketModel
+    var model: PocketModel
     @Binding var selection: MenuBarModule?
     @ObservedObject private var store = MenuBarSettingsStore.shared
     @ObservedObject private var history = MenuBarHistory.shared
@@ -17,7 +17,7 @@ struct MenuBarEditor: View {
     @State private var appearance: PreviewAppearance = .system
     @State private var dragging: MenuBarModule?
     @State private var now = Date()
-    private let clock = Timer.publish(every: 30, on: .main, in: .common).autoconnect()
+    private let clock = Timer.publish(every: 30, tolerance: 5, on: .main, in: .common).autoconnect()
 
     enum PreviewAppearance: String, CaseIterable, Identifiable {
         case system, light, dark

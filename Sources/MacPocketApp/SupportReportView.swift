@@ -6,7 +6,7 @@ import UniformTypeIdentifiers
 
 /// Tools → Destek Raporu: a Markdown snapshot of this Mac to paste into a support request.
 struct SupportReportView: View {
-    @ObservedObject var model: PocketModel
+    var model: PocketModel
     @StateObject private var ports = PortManagerModel()
     @State private var options = SupportReport.Options()
     @State private var text = ""

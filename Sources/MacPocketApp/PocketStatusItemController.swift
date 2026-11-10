@@ -40,13 +40,11 @@ final class PocketStatusItemController: NSObject {
         popover.animates = true
         updateAppearance()
         refresh()
-        model.$system.receive(on: RunLoop.main).sink { [weak self] snapshot in
-            MainActor.assumeIsolated {
-                guard let self else { return }
-                if let snapshot { self.history.record(snapshot) }
-                self.refresh()
-            }
-        }.store(in: &subscriptions)
+        // Observation (not Combine) drives the menu bar: only `system` and `paused` writes reach here.
+        observe({ [model] in model.system }) { controller, snapshot in
+            if let snapshot { controller.history.record(snapshot) }
+            controller.refresh()
+        }
         store.$preferences.dropFirst().removeDuplicates().receive(on: RunLoop.main).sink { [weak self] _ in
             MainActor.assumeIsolated {
                 self?.refresh()
@@ -68,9 +66,7 @@ final class PocketStatusItemController: NSObject {
         WeatherService.shared.objectWillChange.receive(on: RunLoop.main).sink { [weak self] _ in
             MainActor.assumeIsolated { self?.refresh() }
         }.store(in: &subscriptions)
-        model.$paused.removeDuplicates().receive(on: RunLoop.main).sink { [weak self] _ in
-            MainActor.assumeIsolated { self?.updateTooltips() }
-        }.store(in: &subscriptions)
+        observe({ [model] in model.paused }) { controller, _ in controller.updateTooltips() }
         NotificationCenter.default.publisher(for: UserDefaults.didChangeNotification)
             .receive(on: RunLoop.main).sink { [weak self] _ in
                 MainActor.assumeIsolated { self?.updateAppearance() }
@@ -83,6 +79,19 @@ final class PocketStatusItemController: NSObject {
             .receive(on: RunLoop.main).sink { [weak self] _ in
                 MainActor.assumeIsolated { self?.showPopover(for: nil) }
             }.store(in: &subscriptions)
+    }
+
+    /// Runs `apply` on the main actor for the current value and every later transaction that
+    /// changes what `value` reads. The loop ends with the controller or its subscriptions.
+    private func observe<Value: Sendable>(_ value: @escaping @MainActor @Sendable () -> Value,
+                                          apply: @escaping @MainActor (PocketStatusItemController, Value) -> Void) {
+        let task = Task { @MainActor [weak self] in
+            for await current in Observations(value) {
+                guard let self else { return }
+                apply(self, current)
+            }
+        }
+        subscriptions.insert(AnyCancellable { task.cancel() })
     }
 
     /// The ping leaves the Mac, so it runs only while the network module shows latency in the menu bar.

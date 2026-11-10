@@ -158,6 +158,7 @@ final class FocusSessionService: ObservableObject {
                 Task { await self.finish(completed: true) }
             }
         }
+        timer.tolerance = 0.2
         RunLoop.main.add(timer, forMode: .common)
         self.timer = timer
     }
