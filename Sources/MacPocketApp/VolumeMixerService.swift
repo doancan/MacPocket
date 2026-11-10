@@ -10,7 +10,9 @@ struct MixerPathConfiguration: Equatable, Sendable {
 }
 
 @MainActor
-final class VolumeMixerService: ObservableObject {
+@Observable
+
+final class VolumeMixerService {
     typealias PathBuilder = @Sendable (MixerPathConfiguration, AudioRenderGain, MixerBuildCancellation) throws -> any MixerAudioPath
     static let shared = VolumeMixerService()
     #if DEBUG
@@ -37,20 +39,20 @@ final class VolumeMixerService: ObservableObject {
         let message: String
     }
 
-    @Published var settings: VolumeMixerSettings {
+    var settings: VolumeMixerSettings {
         didSet {
             guard settings != oldValue else { return }
             settings.save(to: defaults)
             apply(); updatePolling()
         }
     }
-    @Published private(set) var apps: [AudioApp] = []
-    @Published private(set) var devices: [AudioOutputDevice] = []
-    @Published private(set) var defaultUID: String?
-    @Published private(set) var states: [String: RowState] = [:]
-    @Published private(set) var failure: String?
-    @Published private(set) var refreshing = false
-    private(set) var moduleRunning = false
+    private(set) var apps: [AudioApp] = []
+    private(set) var devices: [AudioOutputDevice] = []
+    private(set) var defaultUID: String?
+    private(set) var states: [String: RowState] = [:]
+    private(set) var failure: String?
+    private(set) var refreshing = false
+    @ObservationIgnored private(set) var moduleRunning = false
     private let defaults: UserDefaults
     private let readInventory: @Sendable ([MixerRunningApp]) throws -> MixerInventory
     private let buildPath: PathBuilder
@@ -61,20 +63,20 @@ final class VolumeMixerService: ObservableObject {
     private let scanQueue = DispatchQueue(label: "MacPocket.mixer.inventory", qos: .utility)
     private let observers = AudioPropertyObservers()
     private let deviceObservers = AudioPropertyObservers()
-    private var inventory: MixerInventory?
-    private var observedDevices: [AudioObjectID] = []
-    private var taps: [String: Active] = [:]
-    private var builds: [String: Build] = [:]
-    private var retiringBuilds: [String: Set<UInt64>] = [:]
-    private var registry = MixerBuildRegistry()
-    private var releasing: Set<String> = []
-    private var failures: [String: Failed] = [:]
-    private var recoveries: [String: Int] = [:]
-    private var timer: Timer?
-    private var viewVisible = false
-    private var scanInFlight = false
-    private var scanAgain = false
-    private var generation: UInt64 = 0
+    @ObservationIgnored private var inventory: MixerInventory?
+    @ObservationIgnored private var observedDevices: [AudioObjectID] = []
+    @ObservationIgnored private var taps: [String: Active] = [:]
+    @ObservationIgnored private var builds: [String: Build] = [:]
+    @ObservationIgnored private var retiringBuilds: [String: Set<UInt64>] = [:]
+    @ObservationIgnored private var registry = MixerBuildRegistry()
+    @ObservationIgnored private var releasing: Set<String> = []
+    @ObservationIgnored private var failures: [String: Failed] = [:]
+    @ObservationIgnored private var recoveries: [String: Int] = [:]
+    @ObservationIgnored private var timer: Timer?
+    @ObservationIgnored private var viewVisible = false
+    @ObservationIgnored private var scanInFlight = false
+    @ObservationIgnored private var scanAgain = false
+    @ObservationIgnored private var generation: UInt64 = 0
 
     init(defaults: UserDefaults = .standard, observesHardware: Bool = true,
          readInventory: @escaping @Sendable ([MixerRunningApp]) throws -> MixerInventory = { try MixerInventory.read(running: $0) },

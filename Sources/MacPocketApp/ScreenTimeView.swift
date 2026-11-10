@@ -12,26 +12,27 @@ import SwiftUI
 /// input; an app that keeps the display awake (video, presentations) counts as in use even without input.
 /// Opt-in, and the ledger never leaves this Mac.
 @MainActor
-final class ScreenTimeService: ObservableObject {
+@Observable
+final class ScreenTimeService {
     static let shared = ScreenTimeService()
     #if DEBUG
     private let moduleProbe = ModuleServiceProbe("ScreenTimeService")
     #endif
-    private(set) var moduleRunning = false
+    @ObservationIgnored private(set) var moduleRunning = false
     static let enabledKey = "MacPocket.screenTime.enabled"
     static let idleKey = "MacPocket.screenTime.idleSeconds"
 
-    @Published private(set) var ledger = UsageLedger()
-    @Published private(set) var enabled = UserDefaults.standard.bool(forKey: ScreenTimeService.enabledKey)
-    @Published var idleSeconds: Double = {
+    private(set) var ledger = UsageLedger()
+    private(set) var enabled = UserDefaults.standard.bool(forKey: ScreenTimeService.enabledKey)
+    var idleSeconds: Double = {
         let stored = UserDefaults.standard.double(forKey: ScreenTimeService.idleKey)
         return [120.0, 300, 600].contains(stored) ? stored : 300
     }() {
         didSet { UserDefaults.standard.set(idleSeconds, forKey: Self.idleKey) }
     }
     /// The app being counted right now, for the live row on the page.
-    @Published private(set) var current: (app: String, name: String, since: Date)?
-    @Published private(set) var pausedReason: PauseReason?
+    private(set) var current: (app: String, name: String, since: Date)?
+    private(set) var pausedReason: PauseReason?
 
     enum PauseReason { case idle, locked, asleep }
 
@@ -40,14 +41,14 @@ final class ScreenTimeService: ObservableObject {
     #else
     private let store = UsageStore()
     #endif
-    private var observers: [NSObjectProtocol] = []
-    private var timer: Timer?
-    private var loaded = false
-    private var loading = false
-    private var dirty = false
-    private var lastSave = Date.distantPast
-    private var locked = false
-    private var asleep = false
+    @ObservationIgnored private var observers: [NSObjectProtocol] = []
+    @ObservationIgnored private var timer: Timer?
+    @ObservationIgnored private var loaded = false
+    @ObservationIgnored private var loading = false
+    @ObservationIgnored private var dirty = false
+    @ObservationIgnored private var lastSave = Date.distantPast
+    @ObservationIgnored private var locked = false
+    @ObservationIgnored private var asleep = false
 
     func stopForModule() {
         moduleRunning = false
@@ -184,7 +185,7 @@ final class ScreenTimeService: ObservableObject {
         save(force: false)
     }
 
-    private var currentPID: pid_t?
+    @ObservationIgnored private var currentPID: pid_t?
 
     private func openSegment() {
         guard enabled, current == nil, let app = NSWorkspace.shared.frontmostApplication,
@@ -240,7 +241,7 @@ private enum ScreenTimeRange: String, CaseIterable, Identifiable {
 
 /// Tools → Ekran Süresi.
 struct ScreenTimeView: View {
-    @ObservedObject private var service = ScreenTimeService.shared
+    @Bindable private var service = ScreenTimeService.shared
     @State private var range = ScreenTimeRange.today
     @State private var search = ""
     @State private var confirmDelete = false

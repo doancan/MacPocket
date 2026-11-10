@@ -249,29 +249,31 @@ struct CleanupSummary: Equatable {
 }
 
 @MainActor
-final class CleanupModel: ObservableObject {
-    @Published private(set) var report: CleanupReport?
-    @Published private(set) var scanning = false
-    @Published private(set) var working = false
-    @Published private(set) var progress: StorageScanControl.Snapshot?
-    @Published var selection = Set<String>() { didSet { refreshSelection() } }
-    @Published var expanded = Set<CleanupTargetID>()
-    @Published var failure: String?
-    @Published private(set) var summary: CleanupSummary?
-    @Published var downloadsAgeDays = 90
-    @Published private(set) var protection = CleanupProtection.load(from: .standard)
-    private(set) var selectedBytes: Int64 = 0
-    private(set) var selectedItems: [CleanupItem] = []
-    private(set) var targets: [CleanupTarget] = CleanupCatalog.targets(home: URL(fileURLWithPath: NSHomeDirectory()))
+@Observable
+
+final class CleanupModel {
+    private(set) var report: CleanupReport?
+    private(set) var scanning = false
+    private(set) var working = false
+    private(set) var progress: StorageScanControl.Snapshot?
+    var selection = Set<String>() { didSet { refreshSelection() } }
+    var expanded = Set<CleanupTargetID>()
+    var failure: String?
+    private(set) var summary: CleanupSummary?
+    var downloadsAgeDays = 90
+    private(set) var protection = CleanupProtection.load(from: .standard)
+    @ObservationIgnored private(set) var selectedBytes: Int64 = 0
+    @ObservationIgnored private(set) var selectedItems: [CleanupItem] = []
+    @ObservationIgnored private(set) var targets: [CleanupTarget] = CleanupCatalog.targets(home: URL(fileURLWithPath: NSHomeDirectory()))
     /// What the next scan covers; remembered between launches.
-    @Published var scanSelection: CleanupScanSelection {
+    var scanSelection: CleanupScanSelection {
         didSet { if scanSelection != oldValue { scanSelection.save(to: .standard) } }
     }
     /// Per-location sizes from earlier scans, shown on the category tiles.
-    @Published private(set) var lastSizes = CleanupLastScanSizes.load(from: .standard)
-    private var itemsByID: [String: CleanupItem] = [:]
-    private var control: StorageScanControl?
-    private var task: Task<Void, Never>?
+    private(set) var lastSizes = CleanupLastScanSizes.load(from: .standard)
+    @ObservationIgnored private var itemsByID: [String: CleanupItem] = [:]
+    @ObservationIgnored private var control: StorageScanControl?
+    @ObservationIgnored private var task: Task<Void, Never>?
     private let service = CleanupService()
     private let emptier = TrashEmptier()
 
@@ -291,9 +293,9 @@ final class CleanupModel: ObservableObject {
     }
 
     /// No new entries for a few seconds: usually a macOS privacy prompt (Downloads, Mail) awaiting an answer.
-    @Published private(set) var stalled = false
-    private var lastVisited = -1
-    private var unchangedPolls = 0
+    private(set) var stalled = false
+    @ObservationIgnored private var lastVisited = -1
+    @ObservationIgnored private var unchangedPolls = 0
 
     private func noteProgress(_ snapshot: StorageScanControl.Snapshot) {
         progress = snapshot

@@ -72,7 +72,6 @@ final class FileWorkspaceModel: ObservableObject {
     let overview = StorageOverviewModel()
     let lens = SpaceLensModel()
     let junk = CleanupModel()
-    private var junkChanges: AnyCancellable?
     @Published var selection = Set<String>() { didSet { refreshSelection() } }
     @Published var search = "" { didSet { if search != oldValue { applyFilters() } } }
     @Published var busy = false
@@ -104,8 +103,6 @@ final class FileWorkspaceModel: ObservableObject {
         self.cleanup = cleanup
         if cleanup { root = FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Library/Caches"); scope = .folders }
         storageTab = .overview
-        // Overview observes this model and summarizes the System Junk result.
-        junkChanges = junk.objectWillChange.sink { [weak self] in self?.objectWillChange.send() }
     }
 
     /// True when the visible results changed since the last scan (items were moved to Trash).
@@ -279,40 +276,42 @@ final class FileWorkspaceModel: ObservableObject {
 }
 
 @MainActor
-final class ApplicationWorkspaceModel: ObservableObject {
-    @Published var applications: [InstalledApplication] = []
-    @Published var casks: [HomebrewCask] = []
-    @Published var updates: [HomebrewCask] = []
-    @Published var updateSettings = ApplicationUpdateSettings.load(from: .standard) {
+@Observable
+
+final class ApplicationWorkspaceModel {
+    var applications: [InstalledApplication] = []
+    var casks: [HomebrewCask] = []
+    var updates: [HomebrewCask] = []
+    var updateSettings = ApplicationUpdateSettings.load(from: .standard) {
         didSet {
             guard updateSettings != oldValue else { return }
             updateSettings.save(to: .standard)
             updatesCheckedAt = nil; updateSourceResults = [:]; remoteUpdates = []; updates = []; updateCheckCancelled = false
         }
     }
-    @Published private(set) var remoteUpdates: [ApplicationUpdateFinding] = []
-    @Published private(set) var updateSourceResults: [ApplicationUpdateSource: ApplicationUpdateSourceResult] = [:]
-    @Published private(set) var currentUpdateSource: ApplicationUpdateSource?
-    @Published private(set) var updateProgress: String?
-    @Published private(set) var updateCheckCancelled = false
-    @Published var loaded = false
-    @Published var busy = false
-    @Published var checkingUpdates = false
-    @Published var updatingToken: String?
-    @Published var packageAction = String(localized: "güncelleniyor")
-    @Published var updatesCheckedAt: Date?
-    @Published var failure: String?
-    @Published var resultMessage: String?
-    @Published var showUpdates = false
-    @Published var selection: String?
-    @Published var search = ""
-    private var additionalRoots: [URL] = []
+    private(set) var remoteUpdates: [ApplicationUpdateFinding] = []
+    private(set) var updateSourceResults: [ApplicationUpdateSource: ApplicationUpdateSourceResult] = [:]
+    private(set) var currentUpdateSource: ApplicationUpdateSource?
+    private(set) var updateProgress: String?
+    private(set) var updateCheckCancelled = false
+    var loaded = false
+    var busy = false
+    var checkingUpdates = false
+    var updatingToken: String?
+    var packageAction = String(localized: "güncelleniyor")
+    var updatesCheckedAt: Date?
+    var failure: String?
+    var resultMessage: String?
+    var showUpdates = false
+    var selection: String?
+    var search = ""
+    @ObservationIgnored private var additionalRoots: [URL] = []
     private let inventory = ApplicationInventory()
     private let homebrew = HomebrewApplications()
     private let updateScanner: ApplicationUpdateScanner
     private let uninstallProcesses: any UninstallProcessManaging
     private let uninstallTrash: @Sendable ([FileTrashRequest]) async -> [FileTrashResult]
-    private var updateTask: Task<Void, Never>?
+    @ObservationIgnored private var updateTask: Task<Void, Never>?
 
     init(updateScanner: ApplicationUpdateScanner = ApplicationUpdateScanner(),
          uninstallProcesses: any UninstallProcessManaging = ApplicationUninstallProcesses(),

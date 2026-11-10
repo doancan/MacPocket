@@ -5,7 +5,7 @@ import SwiftUI
 /// Tools → Ses Mikseri.
 struct VolumeMixerView: View {
     @ObservedObject private var modules = PocketModuleRuntime.shared
-    @ObservedObject private var service: VolumeMixerService
+    private var service: VolumeMixerService
     private let showsMonitor: Bool
 
     init(service: VolumeMixerService = .shared, showsMonitor: Bool = true) {
@@ -56,7 +56,7 @@ struct VolumeMixerView: View {
 
 private struct MixerRow: View {
     let app: AudioApp
-    @ObservedObject var service: VolumeMixerService
+    var service: VolumeMixerService
 
     var body: some View {
         let entry = service.settings.entry(for: app.id)

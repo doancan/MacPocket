@@ -30,7 +30,7 @@ extension CleanupGroup {
 }
 
 struct CleanupView: View {
-    @ObservedObject var model: CleanupModel
+    var model: CleanupModel
     @Environment(\.pocketTint) private var tint
     @State private var confirmClean = false
     @State private var confirmEmptyTrash = false
@@ -309,7 +309,7 @@ struct CleanupSafetyBadge: View {
 // MARK: - Target card
 
 private struct CleanupTargetCard: View {
-    @ObservedObject var model: CleanupModel
+    var model: CleanupModel
     let target: CleanupTargetReport
     @Environment(\.pocketTint) private var tint
     @PocketReduceMotion private var reduceMotion

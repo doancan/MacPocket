@@ -2,7 +2,7 @@ import MacPocketCore
 import SwiftUI
 
 struct ApplicationUpdateSourcesView: View {
-    @ObservedObject var model: ApplicationWorkspaceModel
+    @Bindable var model: ApplicationWorkspaceModel
     let working: Bool
     var body: some View {
         VStack(alignment: .leading, spacing: PocketSpacing.m) {

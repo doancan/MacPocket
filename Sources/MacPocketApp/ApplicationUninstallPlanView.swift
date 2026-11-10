@@ -4,7 +4,7 @@ import SwiftUI
 
 struct UninstallPlanView: View {
     let plan: UninstallPlan
-    @ObservedObject var model: ApplicationWorkspaceModel
+    var model: ApplicationWorkspaceModel
     @Environment(\.dismiss) private var dismiss
     @State private var selected: Set<String>
     @StateObject private var preparation: UninstallPreparationModel

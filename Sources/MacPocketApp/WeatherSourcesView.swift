@@ -2,7 +2,7 @@ import MacPocketCore
 import SwiftUI
 
 struct WeatherSourcePicker: View {
-    @ObservedObject var service: WeatherService = .shared
+    var service: WeatherService = .shared
     @State private var expanded: Bool
     init(service: WeatherService = .shared, initiallyExpanded: Bool = false) {
         self.service = service; _expanded = State(initialValue: initiallyExpanded)
@@ -25,7 +25,7 @@ struct WeatherSourcePicker: View {
 }
 
 struct WeatherSourcesView: View {
-    @ObservedObject var service: WeatherService
+    var service: WeatherService
     @State private var accountsExpanded = false
     var body: some View {
         VStack(alignment: .leading, spacing: PocketSpacing.m) {
@@ -69,7 +69,7 @@ struct WeatherSourcesView: View {
 
 private struct WeatherSourceRow: View {
     let source: WeatherSource
-    @ObservedObject var service: WeatherService
+    var service: WeatherService
     @State private var key = ""
     var body: some View {
         VStack(alignment: .leading, spacing: PocketSpacing.s) {

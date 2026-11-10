@@ -4,7 +4,7 @@ import SwiftUI
 
 /// Forecast first; location and provider configuration live on a separate page inside the popover.
 struct WeatherDetail: View {
-    @ObservedObject var service: WeatherService = .shared
+    var service: WeatherService = .shared
     @State private var settings = false
     @State private var contentHeight: CGFloat = 360
     @State private var hourViewport = WeatherHourViewport()

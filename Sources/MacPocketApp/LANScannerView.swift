@@ -9,7 +9,8 @@ import UserNotifications
 /// Scans the local network on demand, remembers devices by MAC address, and (opt-in) rescans every 15 minutes to
 /// notify about devices that join for the first time.
 @MainActor
-final class LANScannerModel: ObservableObject {
+@Observable
+final class LANScannerModel {
     static let shared = LANScannerModel()
     private static let knownKey = "MacPocket.lan.known"
     private static let watchKey = "MacPocket.lan.watch"
@@ -21,28 +22,28 @@ final class LANScannerModel: ObservableObject {
         var name: String
     }
 
-    @Published private(set) var results: [LANScanResult] = []
+    private(set) var results: [LANScanResult] = []
     /// Attached networks found on this Mac, plus the ranges the user added.
-    @Published private(set) var networks: [LANNetworkInfo] = []
-    @Published private(set) var custom: [CustomRange] = []
+    private(set) var networks: [LANNetworkInfo] = []
+    private(set) var custom: [CustomRange] = []
     /// Network ids chosen for scanning; empty means "the primary network".
-    @Published private(set) var selected: Set<String> = []
-    @Published private(set) var scanning = false
-    @Published private(set) var progress = 0.0
-    @Published private(set) var error: String?
-    @Published private(set) var known: LANKnownDevices
+    private(set) var selected: Set<String> = []
+    private(set) var scanning = false
+    private(set) var progress = 0.0
+    private(set) var error: String?
+    private(set) var known: LANKnownDevices
     /// MAC addresses that appeared for the first time in the latest scan.
-    @Published private(set) var fresh: Set<String> = []
-    @Published private(set) var oui: OUIDatabase?
-    @Published var watch: Bool {
+    private(set) var fresh: Set<String> = []
+    private(set) var oui: OUIDatabase?
+    var watch: Bool {
         didSet {
             UserDefaults.standard.set(watch, forKey: Self.watchKey)
             scheduleWatch()
             if watch { Task { _ = await PocketAlertNotifier.requestAuthorization() } }
         }
     }
-    private var timer: Timer?
-    private var retried = false
+    @ObservationIgnored private var timer: Timer?
+    @ObservationIgnored private var retried = false
 
     private init() {
         if let data = UserDefaults.standard.data(forKey: Self.knownKey),
@@ -286,7 +287,7 @@ private enum LANLayout: String, CaseIterable, Identifiable {
 
 /// Tools → Yerel Ağ.
 struct LANScannerView: View {
-    @ObservedObject private var model = LANScannerModel.shared
+    @Bindable private var model = LANScannerModel.shared
     @State private var filter = LANFilter.all
     @State private var layout = LANLayout.list
     @State private var search = ""
@@ -666,7 +667,7 @@ private struct LANDeviceRow: View {
 private struct LANMapView: View {
     @PocketReduceMotion private var reduceMotion
     let result: LANScanResult
-    @ObservedObject var model: LANScannerModel
+    var model: LANScannerModel
     @Binding var selection: LANDevice.ID?
     @State private var hovered: LANDevice.ID?
 
@@ -792,7 +793,7 @@ private final class LANDeviceProbe: ObservableObject {
 private struct LANDeviceInspector: View {
     let device: LANDevice
     let network: LANNetworkInfo
-    @ObservedObject var model: LANScannerModel
+    var model: LANScannerModel
     let rename: () -> Void
     let close: () -> Void
     @StateObject private var probe = LANDeviceProbe()

@@ -3,18 +3,20 @@ import MacPocketCore
 import MapKit
 
 @MainActor
-final class WeatherService: ObservableObject {
+@Observable
+
+final class WeatherService {
     static let shared = WeatherService()
     private static let locationKey = "MacPocket.weather.location"
     private static let basketKey = "MacPocket.weather.sources"
-    @Published private(set) var location: WeatherLocation?
-    @Published private(set) var snapshot: WeatherSnapshot?
-    @Published private(set) var loading = false
-    @Published private(set) var error: String?
-    @Published private(set) var basket: WeatherBasket
-    @Published private(set) var configuredKeys: Set<WeatherSource>
-    @Published private(set) var credentialError: String?
-    @Published private(set) var nextRefreshAt: Date?
+    private(set) var location: WeatherLocation?
+    private(set) var snapshot: WeatherSnapshot?
+    private(set) var loading = false
+    private(set) var error: String?
+    private(set) var basket: WeatherBasket
+    private(set) var configuredKeys: Set<WeatherSource>
+    private(set) var credentialError: String?
+    private(set) var nextRefreshAt: Date?
     private let defaults: UserDefaults
     private let credentials: any WeatherCredentialStoring
     private let client: @Sendable (WeatherSource, WeatherLocation, String, String?) async throws -> WeatherSnapshot
@@ -22,12 +24,12 @@ final class WeatherService: ObservableObject {
     private struct CacheKey: Hashable {
         let source: WeatherSource, locationID: String, zone: String, name: String
     }
-    private var cache: [CacheKey: WeatherSnapshot] = [:]
-    private var attempts: [CacheKey: Date] = [:]
-    private var enabled = false
-    private var refreshTimer: Task<Void, Never>?
-    private var fetch: Task<Void, Never>?
-    private var generation = UUID()
+    @ObservationIgnored private var cache: [CacheKey: WeatherSnapshot] = [:]
+    @ObservationIgnored private var attempts: [CacheKey: Date] = [:]
+    @ObservationIgnored private var enabled = false
+    @ObservationIgnored private var refreshTimer: Task<Void, Never>?
+    @ObservationIgnored private var fetch: Task<Void, Never>?
+    @ObservationIgnored private var generation = UUID()
     init(defaults: UserDefaults = .standard, credentials: any WeatherCredentialStoring = WeatherKeychainStore(),
          now: @escaping () -> Date = Date.init,
          client: @escaping @Sendable (WeatherSource, WeatherLocation, String, String?) async throws -> WeatherSnapshot = {

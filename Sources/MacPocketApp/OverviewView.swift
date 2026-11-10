@@ -9,7 +9,7 @@ struct OverviewView: View {
     @ObservedObject private var modules = PocketModuleRuntime.shared
     var model: PocketModel
     @ObservedObject var files: FileWorkspaceModel
-    @ObservedObject var applications: ApplicationWorkspaceModel
+    var applications: ApplicationWorkspaceModel
     let navigation: PocketNavigation
     @State private var width: CGFloat = 0
 
@@ -444,7 +444,7 @@ private struct SpeedTestTile: View {
 }
 
 private struct CleanupTile: View {
-    @ObservedObject var cleanup: CleanupModel
+    var cleanup: CleanupModel
     let open: () -> Void
 
     var body: some View {
@@ -469,7 +469,7 @@ private struct CleanupTile: View {
 }
 
 private struct ApplicationsTile: View {
-    @ObservedObject var applications: ApplicationWorkspaceModel
+    var applications: ApplicationWorkspaceModel
     let open: () -> Void
     let openUpdates: () -> Void
 

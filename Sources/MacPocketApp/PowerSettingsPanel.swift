@@ -3,7 +3,7 @@ import SwiftUI
 
 /// Every pmset setting per power source, with a confirm-then-authenticate edit flow.
 struct PowerSettingsPanel: View {
-    @ObservedObject var center: PowerCenterModel
+    var center: PowerCenterModel
     @State private var selectedProfile: PMPowerProfile?
 
     var body: some View {
@@ -88,7 +88,7 @@ struct PowerSettingRow: View {
     let value: PMSettingValue
     let live: PMSettingValue?
     let profile: PMPowerProfile
-    @ObservedObject var center: PowerCenterModel
+    var center: PowerCenterModel
 
     var body: some View {
         HStack(alignment: .center, spacing: PocketSpacing.m) {
@@ -189,7 +189,7 @@ enum PowerSettingPresets {
 
 /// Shows the exact command before anything privileged runs.
 struct PowerChangeConfirmation: View {
-    @ObservedObject var center: PowerCenterModel
+    var center: PowerCenterModel
     @State var change: PowerSettingChange
     @Environment(\.dismiss) private var dismiss
 

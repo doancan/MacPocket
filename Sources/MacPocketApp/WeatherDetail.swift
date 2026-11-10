@@ -5,7 +5,7 @@ import SwiftUI
 
 @MainActor
 struct WeatherLocationPicker: View {
-    @ObservedObject var service: WeatherService = .shared
+    var service: WeatherService = .shared
     @State private var query = ""
     @State private var results: [WeatherLocation] = []
     @State private var searching = false

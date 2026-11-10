@@ -580,3 +580,13 @@ Kaynak `ec81011` üzerine uygulanan değişiklik; ürün 0.1.6 / 9 korunur. Daya
 Değişiklik bildirimi her atamada 20/20 ulaştı; yani ölçüm gerçekten tetiklendi, yalnız ilgisiz görünümler yeniden hesaplanmadı. Yeni `PocketModelObservationTests`, örnekleme yenilemesinin `refreshSeconds`/`paused`/`awakeSession` okuyucularını geçersiz kılmadığını ve `system` okuyucusunu tam bir kez bildirdiğini sınar.
 
 **Sınırlar:** Gövde sayıları ölçüm kopyasındaki sayaçlara dayanır; GPU/WindowServer maliyeti kapsanmaz. Önbellek bütçesi bellek tavanını sınırlar, ama sınırı aşan geçmiş görselleri yeniden diskten çözülür (gezinirken ek I/O). Zamanlayıcı toleranslarının enerji etkisi ayrı ölçülmedi. Çalışan uygulamada canlı Instruments kaydı bu turda alınmadı. Tam kök grupta XCTest **1.026 test, 0 hata, 5 atlama** ve Swift Testing **355 test** geçti; yerelleştirme **4.524 anahtar, 0 eksik**.
+
+### Observation geçişinin ikinci grubu — 10 Kasım 2026
+
+Kaynak `ca7b794`. Aynı kural yedi modele uygulandı: `PowerCenterModel` (20 alan, 2 sn döngü), `ApplicationWorkspaceModel` (20), `CleanupModel` (13), `LANScannerModel` (11), `WeatherService` (8), `ScreenTimeService` ve `VolumeMixerService` (1 sn). `@Published` kaldırıldı. Önceden yayın yapmayan saklı alanlar `@ObservationIgnored` oldu, böylece bildirim davranışı korunur. Tüketicilerde `@ObservedObject` yerine düz referans ya da `@Bindable` (6 yer), `@StateObject` yerine `@State` kullanılır.
+
+- `FileWorkspaceModel`'in `junk.objectWillChange` aktarımı kaldırıldı; Genel Bakış'taki temizlik kutusu `CleanupModel`'i doğrudan izler.
+- Menü çubuğu hava durumunu `objectWillChange` yerine `Observations` ile yalnız `snapshot`/`location` değişince yeniden çizer; yükleme ve sonraki yenileme zamanı gibi iç alanlar çizim tetiklemez.
+- Kapsam dışı: `WindowSwitcherModel` (elle `objectWillChange.send()`, Alt+Tab ana deneyimi), `FileWorkspaceModel` (elle bildirim), `DisplayBrightnessService` (Gece Modu Combine `$settings`/`$displays` hatları) ve tek alanlı `MenuBarHistory` (Observation kazanç sağlamaz).
+
+**Doğrulama:** Statik inceleme ve derleme; bu grup için ayrı gövde sayacı ölçümü alınmadı, kazanç ilk gruptaki ölçülen mekanizmaya dayanır (bir sekmenin okumadığı alan değişince o sekme yeniden hesaplanmaz). Gövdesinde `Date()` okuyan görünümler (Güç zaman çizelgesi, hava durumu saat/gün süzgeci) artık ilgisiz yayınlarla değil, okudukları model alanı değişince tazelenir. Tam kök grupta XCTest **1.026 test, 0 hata, 5 atlama**, Swift Testing **355 test** geçti. Çalışan uygulamada canlı doğrulama yapılmadı.

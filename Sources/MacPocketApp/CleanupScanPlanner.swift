@@ -3,7 +3,7 @@ import SwiftUI
 
 /// Before scanning: a profile picker, one tile per category and an expandable list of its locations.
 struct CleanupScanPlanner: View {
-    @ObservedObject var model: CleanupModel
+    var model: CleanupModel
     @Environment(\.pocketTint) private var tint
     @PocketReduceMotion private var reduceMotion
     @State private var openGroup: CleanupGroup?
@@ -69,7 +69,7 @@ struct CleanupScanPlanner: View {
 // MARK: - Category tile
 
 private struct CleanupCategoryTile: View {
-    @ObservedObject var model: CleanupModel
+    var model: CleanupModel
     let group: CleanupGroup
     let open: Bool
     let toggleOpen: () -> Void
@@ -162,7 +162,7 @@ private struct CleanupCategoryTile: View {
 // MARK: - Location list
 
 private struct CleanupLocationList: View {
-    @ObservedObject var model: CleanupModel
+    @Bindable var model: CleanupModel
     let group: CleanupGroup
     let close: () -> Void
     @Environment(\.pocketTint) private var tint

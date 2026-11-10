@@ -49,37 +49,38 @@ struct PowerWattSample: Identifiable, Equatable {
 
 /// Page-scoped state of the Güç Merkezi. Created by the view; all polling stops when `run()` is cancelled.
 @MainActor
-final class PowerCenterModel: ObservableObject {
-    @Published var tab: PowerTab = .overview
-    @Published private(set) var overview: PowerOverview?
-    @Published private(set) var wattHistory: [PowerWattSample] = []
+@Observable
+final class PowerCenterModel {
+    var tab: PowerTab = .overview
+    private(set) var overview: PowerOverview?
+    private(set) var wattHistory: [PowerWattSample] = []
 
-    @Published private(set) var assertions: PMAssertionReport?
-    @Published private(set) var assertionsError: String?
-    @Published private(set) var thermal: PMThermalReport?
+    private(set) var assertions: PMAssertionReport?
+    private(set) var assertionsError: String?
+    private(set) var thermal: PMThermalReport?
 
-    @Published private(set) var profiles: [PMSettingsProfile] = []
-    @Published private(set) var live: PMLiveSettings?
-    @Published private(set) var settingsError: String?
-    @Published private(set) var settingsLoading = false
+    private(set) var profiles: [PMSettingsProfile] = []
+    private(set) var live: PMLiveSettings?
+    private(set) var settingsError: String?
+    private(set) var settingsLoading = false
 
-    @Published private(set) var schedule: [PMScheduledEvent]?
-    @Published private(set) var scheduleError: String?
+    private(set) var schedule: [PMScheduledEvent]?
+    private(set) var scheduleError: String?
 
-    @Published private(set) var energy: ProcessEnergySample?
-    @Published private(set) var energyError: String?
+    private(set) var energy: ProcessEnergySample?
+    private(set) var energyError: String?
 
-    @Published private(set) var logEvents: [PMLogEvent]?
-    @Published private(set) var logLoading = false
-    @Published private(set) var logError: String?
+    private(set) var logEvents: [PMLogEvent]?
+    private(set) var logLoading = false
+    private(set) var logError: String?
 
-    @Published var pendingChange: PowerSettingChange?
-    @Published private(set) var applying = false
-    @Published var applyMessage: (text: String, success: Bool)?
+    var pendingChange: PowerSettingChange?
+    private(set) var applying = false
+    var applyMessage: (text: String, success: Bool)?
 
     private let runner: any PMSetPrivilegedRunning
-    private var sampler = ProcessEnergySampler()
-    private var logTask: Task<Void, Never>?
+    @ObservationIgnored private var sampler = ProcessEnergySampler()
+    @ObservationIgnored private var logTask: Task<Void, Never>?
     static let wattCapacity = 150
 
     init(runner: any PMSetPrivilegedRunning = AppleScriptPMSetRunner()) {

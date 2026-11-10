@@ -63,9 +63,8 @@ final class PocketStatusItemController: NSObject {
             }
         }.store(in: &subscriptions)
         AIUsageIntegration.shared.configure(preferences: store.preferences)
-        WeatherService.shared.objectWillChange.receive(on: RunLoop.main).sink { [weak self] _ in
-            MainActor.assumeIsolated { self?.refresh() }
-        }.store(in: &subscriptions)
+        // The menu bar shows only the forecast and its place; loading/refresh bookkeeping does not redraw it.
+        observe({ (WeatherService.shared.snapshot, WeatherService.shared.location) }) { controller, _ in controller.refresh() }
         observe({ [model] in model.paused }) { controller, _ in controller.updateTooltips() }
         NotificationCenter.default.publisher(for: UserDefaults.didChangeNotification)
             .receive(on: RunLoop.main).sink { [weak self] _ in

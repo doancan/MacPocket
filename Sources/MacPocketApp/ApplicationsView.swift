@@ -3,7 +3,7 @@ import MacPocketCore
 import SwiftUI
 
 struct ApplicationsView: View {
-    @ObservedObject var model: ApplicationWorkspaceModel
+    @Bindable var model: ApplicationWorkspaceModel
     @State private var uninstallPlan: UninstallPlan?
     @State private var pendingUpdate: HomebrewCask?
     @State private var confirmUpdate = false
@@ -227,7 +227,7 @@ struct ApplicationsView: View {
 
 private struct ApplicationInspector: View {
     let app: InstalledApplication
-    @ObservedObject var model: ApplicationWorkspaceModel
+    var model: ApplicationWorkspaceModel
     let reviewUninstall: (UninstallPlan) -> Void
 
     private var channel: String { model.cask(for: app) != nil ? ApplicationUpdateSource.homebrew.localizedTitle : app.channel.localizedTitle }
@@ -303,7 +303,7 @@ private struct ApplicationInspector: View {
 }
 
 private struct InstalledApplicationsTable: View {
-    @ObservedObject var model: ApplicationWorkspaceModel
+    @Bindable var model: ApplicationWorkspaceModel
     var body: some View {
         Table(model.filtered, selection: $model.selection) {
             TableColumn("Uygulama") { app in

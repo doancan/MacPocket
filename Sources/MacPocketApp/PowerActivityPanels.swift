@@ -5,7 +5,7 @@ import SwiftUI
 // MARK: - Sleep blockers
 
 struct PowerBlockersPanel: View {
-    @ObservedObject var center: PowerCenterModel
+    var center: PowerCenterModel
     @State private var onlyBlockers = true
 
     var body: some View {
@@ -177,7 +177,7 @@ struct PowerEnergyRow: View {
 }
 
 struct PowerEnergyPanel: View {
-    @ObservedObject var center: PowerCenterModel
+    var center: PowerCenterModel
     @State private var totals: [PowerWattSample] = []
     @State private var showMinor = false
     @State private var visibleCount = Self.pageSize
@@ -318,7 +318,7 @@ struct PowerHistoryPanel: View {
         }
     }
 
-    @ObservedObject var center: PowerCenterModel
+    var center: PowerCenterModel
     var model: PocketModel
     @State private var filter = Filter.sleepWake
 
