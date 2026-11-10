@@ -502,3 +502,33 @@ Bu inceleme ürün davranışını değiştirmez. Kaynak sürüm `f17c12b`, ür�
 **Öncelik:** En güçlü ilk hedef tam metin araması, ardından büyük geçmişin ana iş parçacığında kaydı ve ilgisiz görünüm güncellemeleridir. Sensörün duvar süresi büyük ölçüde I/O beklemesidir; CPU süresiyle eş tutulmaz ve okunmayan sensörlerin maliyetini azaltmak için önce gösterge/uyarı/koruma talepleri doğrulanmalıdır. Üretimde sistem özeti actor üzerinde okunur; bileşen okuma süresi doğrudan ana arayüz donma süresi değildir. Görsel tarafında küçük önizleme ve tam çözünürlük temsilinin bellek davranışı ayrı ele alınmalıdır.
 
 **Tekrarlama ve kanıt:** `scripts/measure-performance-survey.sh [yeni-çıktı-dizini]` ayrı çalışma kopyası oluşturur, yalnız ölçüm hedefini derler, sonuçları doğrular ve kopyayı temizler. İlk ölçümler `.build/performance-survey/report.json` içindedir: disk ve arama ilk çalışmadan; görsel ve arayüz ayrıntıları aynı kaynakla yapılan takip çalışmasından gelir. Günlükler `run.log` ve `final-detail-run.log`, gövde/konum eşlemesi `body-map.json` dosyasındadır. Nihai ölçüm çalışmaları hatasız geçti. Normal uygulama yeniden derlenmedi veya yeniden başlatılmadı. [Apple SwiftUI ölçüm rehberi](https://developer.apple.com/documentation/xcode/understanding-and-improving-swiftui-performance), [yanıt verebilirlik](https://developer.apple.com/documentation/xcode/improving-app-responsiveness).
+
+### Pano aramasının ortak bellek indeksi — 10 Kasım 2026
+
+**İnceleme ve uygulama:** Hızlı panelde `items`, seçim ve ok tuşları; araç sayfasında ise görünüm gövdesi eşzamanlı `ClipboardHistory.search` çağırıyordu. İki görünüm artık `ClipboardSearchModel` kullanır. `ClipboardService`, geçmiş değiştiğinde ortak `ClipboardSearchIndex` actor'üne yeni revizyonu hazırlar; metin dönüşümü ve eşleştirme MainActor dışında çalışır. Değişmeyen içerik/kaynak adı yeniden dönüştürülmez; sabitleme ve kullanım tarihi değişikliklerinde güncel öğe bilgileri döner. Silinen belgeler indeksten çıkarılır. İndeks RAM'de ek bir normalize metin temsili tutar; disk arşiv biçimi değişmez.
+
+Yazma 120 ms beklemeyle birleştirilir. Yeni sorgu önceki sonucu hemen kaldırır; sonuç beklenirken Enter, rakam kısayolları ve satır seçimi eski öğeyi yapıştıramaz. Geçmiş veya filtre değişikliği beklemeden yeni sorgu başlatır. Boş sorgu doğrudan mevcut listeyi gösterir. Panel kapanınca/görünüm ayrılınca gözlem ve UI isteği iptal edilir; ortak hazırlık diğer görünüm için kullanılabilir. Hem actor revizyonu hem UI istek kimliği eski yanıtların uygulanmasını engeller.
+
+**Eşleştirme sınırı:** Türkçe İ/I/ı dönüşümü ve Foundation büyük/küçük harf/aksan katlama seçenekleri korunur. Normalize sonucu tamamen ASCII olan belgelerde tek bir `Data` temsiliyle alt dizi aranır; diğer alfabelerde kanonik `String` karşılaştırması sürer. ASCII dışı sorguların önbellek kaçırmalarında Foundation'ın önceki karşılaştırması da uygulanır: örneğin `ß`/`ﬁ` gibi genişleyen karakterler yalnız katlanmış sorgunun alt dizi testiyle aynı sonucu vermeyebilir. Bu özel sorguların maliyeti normal hızlı yolun süresi olarak sunulmaz. Kaynak uygulama adı aranır; paket kimliği aramaya eklenmez.
+
+**Doğruluk:** Beş Core ve üç App testi; eski API ile Türkçe/aksan/Unicode/emoji/bağlantı/dosya/görsel eşleşmelerini, alanlar arasındaki satır sonlarını, NUL içeren metni, tüm tür filtrelerini ve sabitlenenlerin sırasını karşılaştırır. Metadata değişikliklerinde hazırlanan belge sayısı artmaz; içerik/kaynak değişiminde yalnız ilgili belge yenilenir. Eşzamanlı tüketiciler hazırlığı paylaşır; iptal edilen tüketici indeksi bozmaz. Hazırlık sürerken yeni revizyon silinmiş kayıtları geri getiremez. UI testleri hızlı yazmada tek son sorguyu, iptali dikkate almayan geç yanıtı, silme/sabitleme/filtre değişimini ve kapanıp yeniden bağlanmayı sınar. Kullanıcı arşivi veya genel pano kullanılmaz.
+
+**Tekrarlama:** `swift test --filter 'ClipboardSearch(Index|Model)Tests'`; ölçüm için `scripts/measure-clipboard-search.sh [çıktı-dizini]`. Ölçüm üretimdeki Core kaynaklarını `swiftc -O -whole-module-optimization` ile derler. Geçmiş/sorgu başına aynı süreçte üç önce/sonra çifti alınır ve sonuçlar tam öğe eşitliğiyle karşılaştırılır. İlk hazırlık, sonraki sorgular ve tek kayıt ekleme ayrı ölçülür. Bu arama çekirdeği mikrotestidir; 120 ms yazma beklemesi, SwiftUI çizimi ve uçtan uca panel gecikmesi dahil değildir. Kaynak özetleri `source-sha256.json`, ham süreler `search-report.json` içindedir; `.build/clipboard-search-performance/` altında tutulur.
+
+**Apple kaynakları:** [Foundation folding](https://developer.apple.com/documentation/foundation/nsstring/folding(options:locale:)) karşılaştırma için karakter ayrımlarını kaldırır; `nil` locale sistem yerelini kullanır. [Task.cancel()](https://developer.apple.com/documentation/swift/task/cancel()) işbirlikçi iptal uygular; bu nedenle döngülerde açık iptal kontrolleri ve sonuç uygulanmadan önce istek/revizyon kontrolü vardır.
+
+**Son kontrollü ölçüm:** 1.000 × yaklaşık 20.000 karakter, üç çiftin ortancası; derleme işleri bittikten sonra alındı.
+
+| Sorgu | Önce | İndeks hazırken |
+| --- | --- | --- |
+| `fixture` | 207,38 ms | 0,63 ms |
+| `ıstanbul` | 3984,34 ms | 0,64 ms |
+| `missing-token` | 3113,01 ms | 2,01 ms |
+| `ß` | 207,23 ms | 215,59 ms |
+| `olmayan-öğe` | 3121,39 ms | 1764,67 ms |
+
+Büyük geçmişin ilk hazırlığı **1248,84 ms**; bu sırada 5 ms aralıklı MainActor probunun en büyük ek gecikmesi **2,62 ms** oldu. Bu prob kare süresi ölçümü değildir. Hazır indekse bir kayıt eklenmesi **0,73 ms** sürdü. Varsayılan kapasiteye yakın 200 kısa kayıtta ilk hazırlık **8,95 ms**, `ıstanbul` sorgusu **0,19 ms** oldu.
+
+Normalleştirilmiş hızlı yol belirgin biçimde ucuzladı; Foundation karşılaştırması gereken özel sorgular hâlâ pahalı olabilir. `ß` örneğinde küçük ek maliyet, `olmayan-öğe` örneğinde yaklaşık 1,76 saniyelik arka plan işi kaldı. Bunlar gizlenmez ve bütün Unicode sorguları için milisaniye düzeyinde sonuç iddia edilmez. İlk hazırlığın RAM maliyeti bu turda ayrı ölçülmedi.
+
+**Son kontroller ve canlı sınır:** Tam kök test grubunda **1.568 test, 0 hata, 6 isteğe bağlı atlama**. Yerelleştirme **4.518 anahtar, 0 eksik İngilizce çeviri/biçim uyuşmazlığı**. İmzalı Release derlemesi ve sıkı kod imzası doğrulaması geçti; ürün mevcut **0.1.6 / 9** olarak yeniden açıldı. Canlı doğrulama uygulamanın açılışıdır; fiziksel klavyeyle panelde uçtan uca arama kabulü yapılmış sayılmaz. Disk yazımı, görsel önbelleği, sensör talepleri ve genel gözlem kapsamı bu değişikliğin dışındadır.

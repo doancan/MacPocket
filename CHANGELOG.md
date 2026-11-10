@@ -2,6 +2,8 @@
 
 ## Yayımlanmamış
 
+- **Pano araması:** araç sayfası ve hızlı panel, geçmiş değiştikçe hazırlanan ortak bellek indeksini arayüz dışında sorgular. Yazma sırasında 120 ms bekleme ve eski isteği iptal etme eklendi; bekleyen aramada önceki sonuç Enter/kısayolla yapıştırılmaz. Türkçe harf dönüşümü, kaynak uygulama, tür filtresi ve sabitlenenlerin önceliği korunur. Yeni kayıt yalnız değişen arama belgesini hazırlar; boş arama beklemeden listeyi gösterir.
+
 - **Ekran Süresi hesaplamaları:** kartlar ve grafikler aynı gün/saat özetini paylaşır. Gün toplamları, aktif gün sayısı, ortalama ve ölçek için aynı uygulama süreleri tekrar tekrar toplanmaz. Düne göre karşılaştırma da aynı canlı kayıt anlık görüntüsünü kullanır.
 
 - **Pano listesindeki uzun metinler:** başlık için metnin tamamını satırlara ayırmak yerine ilk dolu satıra kadar ilerlenir. Başta boş satırlar, Unicode satır sonları, boşluk temizleme ve 200 karakterlik önizleme korunur. Uzun günlük metinlerinin görünmeyen devamı başlık hazırlanırken yeniden parçalanmaz.

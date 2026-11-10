@@ -2,31 +2,6 @@ import AppKit
 import MacPocketCore
 import SwiftUI
 
-/// Search, filter and selection of the floating clipboard panel. Owned by the controller so the key monitor
-/// can drive it while the search field has focus.
-@MainActor
-final class ClipboardPanelState: ObservableObject {
-    @Published var query = "" { didSet { selectedIndex = 0 } }
-    @Published var kind: ClipboardContent.Kind? { didSet { selectedIndex = 0 } }
-    @Published var selectedIndex = 0
-    let service: ClipboardService
-
-    init(service: ClipboardService) { self.service = service }
-
-    var items: [ClipboardItem] { service.history.search(query, kind: kind) }
-
-    var selectedItem: ClipboardItem? {
-        let items = items
-        return items.indices.contains(selectedIndex) ? items[selectedIndex] : items.first
-    }
-
-    func move(by offset: Int) {
-        let count = items.count
-        guard count > 0 else { return }
-        selectedIndex = min(max(0, selectedIndex + offset), count - 1)
-    }
-}
-
 /// A key panel that doesn't activate MacPocket, so the app in front keeps focus and receives the paste.
 private final class ClipboardPanelWindow: NSPanel {
     var onResign: (() -> Void)?
@@ -42,7 +17,7 @@ private final class ClipboardPanelWindow: NSPanel {
 final class ClipboardPanelController {
     private unowned let service: ClipboardService
     private var window: ClipboardPanelWindow?
-    private var state: ClipboardPanelState?
+    private var state: ClipboardSearchModel?
     private var keyMonitor: Any?
 
     static let size = NSSize(width: 580, height: 460)
@@ -56,7 +31,7 @@ final class ClipboardPanelController {
     func show() {
         let window = self.window ?? makeWindow()
         self.window = window
-        let state = ClipboardPanelState(service: service)
+        let state = ClipboardSearchModel(service: service)
         self.state = state
         window.contentView = NSHostingView(rootView: ClipboardPanelView(state: state, choose: { [weak self] item, plain in
             self?.choose(item, plain: plain)
@@ -67,6 +42,7 @@ final class ClipboardPanelController {
     }
 
     func close() {
+        state?.stop()
         if let keyMonitor { NSEvent.removeMonitor(keyMonitor) }
         keyMonitor = nil
         window?.onResign = nil
@@ -158,13 +134,13 @@ final class ClipboardPanelController {
 // MARK: - Panel view
 
 struct ClipboardPanelView: View {
-    @ObservedObject var state: ClipboardPanelState
+    @ObservedObject var state: ClipboardSearchModel
     @ObservedObject private var service: ClipboardService
     let choose: (ClipboardItem, Bool) -> Void
     @FocusState private var searchFocused: Bool
     @PocketReduceMotion private var reduceMotion
 
-    init(state: ClipboardPanelState, choose: @escaping (ClipboardItem, Bool) -> Void) {
+    init(state: ClipboardSearchModel, choose: @escaping (ClipboardItem, Bool) -> Void) {
         self.state = state
         service = state.service
         self.choose = choose
@@ -177,7 +153,9 @@ struct ClipboardPanelView: View {
         VStack(spacing: 0) {
             searchBar
             Divider().opacity(0.5)
-            if items.isEmpty {
+            if state.isSearching {
+                ProgressView("Aranıyor…").frame(maxWidth: .infinity, maxHeight: .infinity)
+            } else if items.isEmpty {
                 emptyState
             } else {
                 list(items)

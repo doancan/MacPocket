@@ -63,16 +63,20 @@ struct ClipboardHistoryView: View {
 
 private struct ClipboardHistoryBrowser: View {
     @ObservedObject var service: ClipboardService
-    @State private var query = ""
-    @State private var kind: ClipboardContent.Kind?
+    @StateObject private var search: ClipboardSearchModel
     @State private var confirmClear = false
 
+    init(service: ClipboardService) {
+        self.service = service
+        _search = StateObject(wrappedValue: ClipboardSearchModel(service: service))
+    }
+
     var body: some View {
-        let items = service.history.search(query, kind: kind)
+        let items = search.items
         VStack(alignment: .leading, spacing: PocketSpacing.m) {
             HStack(spacing: PocketSpacing.m) {
-                PocketSearchField("Geçmişte ara…", text: $query).frame(maxWidth: 280)
-                Picker(selection: $kind) {
+                PocketSearchField("Geçmişte ara…", text: $search.query).frame(maxWidth: 280)
+                Picker(selection: $search.kind) {
                     Text("Tüm türler").tag(ClipboardContent.Kind?.none)
                     ForEach(ClipboardContent.Kind.allCases, id: \.self) { kind in
                         Label(kind.title, systemImage: kind.symbol).tag(Optional(kind))
@@ -91,9 +95,11 @@ private struct ClipboardHistoryBrowser: View {
                         Text("Silinen öğeler geri alınamaz. Sistem panosundaki içerik değişmez.")
                     }
             }
-            if items.isEmpty {
-                ContentUnavailableView(query.isEmpty ? "Geçmiş boş" : "Eşleşen öğe yok",
-                                       systemImage: query.isEmpty ? "clipboard" : "magnifyingglass",
+            if search.isSearching {
+                PocketProgressRow(message: "Aranıyor…")
+            } else if items.isEmpty {
+                ContentUnavailableView(search.query.isEmpty ? "Geçmiş boş" : "Eşleşen öğe yok",
+                                       systemImage: search.query.isEmpty ? "clipboard" : "magnifyingglass",
                                        description: Text(service.settings.enabled ? "Bir şey kopyaladığında burada görünür."
                                                                                    : "Pano geçmişini başlıktaki anahtarla aç."))
                     .frame(maxWidth: .infinity, minHeight: 220)
@@ -113,6 +119,8 @@ private struct ClipboardHistoryBrowser: View {
                 .pocketCard(padding: 0)
             }
         }
+        .onAppear { search.start() }
+        .onDisappear { search.stop() }
     }
 
     @ViewBuilder private func menu(for item: ClipboardItem) -> some View {

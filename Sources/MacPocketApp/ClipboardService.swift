@@ -25,7 +25,15 @@ final class ClipboardService: ObservableObject {
         }
     }
     @Published private(set) var history = ClipboardHistory() {
-        didSet { if history != oldValue { historyNeedsSave = true } }
+        didSet {
+            if history != oldValue {
+                historyNeedsSave = true
+                searchRevision &+= 1
+                let snapshot = history, revision = searchRevision, index = searchIndex
+                searchPreparation?.cancel()
+                searchPreparation = Task { try? await index.prepare(snapshot, revision: revision) }
+            }
+        }
     }
     @Published private(set) var lastError: String?
     /// Set while a settings view records a new shortcut, so pressing it doesn't open the panel.
@@ -36,6 +44,9 @@ final class ClipboardService: ObservableObject {
     private let archive: ClipboardArchive
     private let pasteboard: NSPasteboard
     private var historyNeedsSave = false
+    private let searchIndex = ClipboardSearchIndex()
+    private var searchRevision: UInt64 = 0
+    private var searchPreparation: Task<Void, Never>?
     private var pollTimer: Timer?
     private var clearTimer: Timer?
     private var saveTask: Task<Void, Never>?
@@ -205,6 +216,14 @@ final class ClipboardService: ObservableObject {
     }
 
     // MARK: Using items
+
+    func search(_ query: String, kind: ClipboardContent.Kind?) async throws -> [ClipboardItem] {
+        let revision = searchRevision, snapshot = history
+        let items = try await searchIndex.search(query, kind: kind, in: snapshot, revision: revision)
+        try Task.checkCancellation()
+        guard searchRevision == revision else { throw CancellationError() }
+        return items
+    }
 
     /// Puts the item back on the pasteboard. `plain` drops formatting (and turns files into their paths).
     @discardableResult
