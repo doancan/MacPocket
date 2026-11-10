@@ -9,7 +9,7 @@ struct AIUsageDetailView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
             HStack {
-                Text(service.settings.mode.localizedTitle).font(.caption).foregroundStyle(.secondary)
+                Text(service.settings.mode.localizedTitle).font(.caption).foregroundStyle(AIUsagePalette.secondaryText)
                 Spacer()
                 Button { Task { await service.refresh(manual: true) } } label: { Label("Yenile", systemImage: "arrow.clockwise") }
                     .labelStyle(.iconOnly).disabled(!service.active || !service.refreshing.isEmpty)
@@ -60,7 +60,7 @@ struct AIUsageDashboardView: View {
                     ForEach(service.enabledAccounts) { account in
                         AIUsageAccountQuotaView(account: account, snapshot: service.snapshot(for: account), settings: service.settings,
                             refreshing: service.refreshing.contains(account.id))
-                            .padding(16).background(.background.opacity(0.65), in: RoundedRectangle(cornerRadius: 12))
+                            .padding(14).background(.background.opacity(0.65), in: RoundedRectangle(cornerRadius: 12))
                             .overlay { RoundedRectangle(cornerRadius: 12).strokeBorder(.primary.opacity(0.06)) }
                     }
                 }.padding(.horizontal, 22).padding(.vertical, 14)
@@ -90,58 +90,85 @@ struct AIUsageAccountQuotaView: View {
     let settings: AIUsageSettings
     var refreshing = false
     var dense = false
+
+    private var warning: (title: LocalizedStringKey, symbol: String, color: Color)? {
+        guard snapshot?.status == .ok, let used = snapshot?.headlineLimit?.percentUsed, used.isFinite else { return nil }
+        if used >= 100 { return ("Kota doldu", "exclamationmark.circle.fill", .red) }
+        if used >= settings.critical { return ("Az kota kaldı", "exclamationmark.circle.fill", .red) }
+        if used >= settings.warning { return ("Kota azalıyor", "exclamationmark.triangle.fill", .orange) }
+        return nil
+    }
+
     var body: some View {
-        VStack(alignment: .leading, spacing: dense ? 8 : 14) {
-            HStack(spacing: 9) {
-                AIUsageProviderIcon(provider: account.provider, size: dense ? 16 : 24)
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(account.name).font(dense ? .system(size: 12, weight: .semibold) : .headline).lineLimit(1)
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(alignment: .center, spacing: 10) {
+                AIUsageProviderIcon(provider: account.provider, size: dense ? 20 : 26)
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(account.name).font(.system(size: dense ? 13 : 15, weight: .semibold))
+                        .lineLimit(1).truncationMode(.middle).help(account.name)
                     HStack(spacing: 5) {
                         Text(account.provider.localizedTitle)
                         if let date = snapshot?.fetchedAt {
-                            Text("·")
+                            Text("·").accessibilityHidden(true)
                             TimelineView(.periodic(from: .now, by: 30)) { _ in Text(date, style: .relative) }
                                 .help(String(localized: "Son veri: \(date.formatted(date: .abbreviated, time: .shortened))"))
                         }
-                    }.font(.system(size: 10)).foregroundStyle(.secondary)
-                }
-                Spacer()
-                if refreshing { ProgressView().controlSize(.mini) }
-                if let headline = snapshot?.headlineLimit {
-                    VStack(alignment: .trailing, spacing: 0) {
-                        Text(AIUsageService.percent(settings.mode.percent(headline.percentUsed)))
-                            .font(.system(size: dense ? 20 : 30, weight: .semibold, design: .rounded).monospacedDigit())
-                        if !dense { Text(settings.mode.localizedTitle).font(.system(size: 10)).foregroundStyle(.secondary) }
+                    }.font(.system(size: 11)).foregroundStyle(AIUsagePalette.secondaryText)
+                }.layoutPriority(1)
+                Spacer(minLength: 4)
+                if refreshing {
+                    ProgressView().controlSize(.small).accessibilityLabel("Kotalar yenileniyor")
+                } else if let warning {
+                    ViewThatFits(in: .horizontal) {
+                        HStack(spacing: 5) {
+                            Image(systemName: warning.symbol).foregroundStyle(warning.color).accessibilityHidden(true)
+                            Text(warning.title).foregroundStyle(.primary)
+                        }.fixedSize()
+                        Image(systemName: warning.symbol).foregroundStyle(warning.color).accessibilityLabel(Text(warning.title))
                     }
+                    .font(.system(size: 11, weight: .medium))
+                    .help(Text(warning.title))
                 }
             }
             if let snapshot, !snapshot.limits.isEmpty {
-                if dense {
-                    ForEach(snapshot.limits) { limit in lane(limit) }
-                } else {
-                    LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], alignment: .leading, spacing: 12) {
-                        ForEach(snapshot.limits) { limit in lane(limit) }
-                    }
+                let shared = snapshot.limits.filter { !$0.id.hasPrefix("weekly_scoped") }
+                let scoped = snapshot.limits.filter { $0.id.hasPrefix("weekly_scoped") }
+                LazyVGrid(columns: shared.count == 1 ? [GridItem(.flexible())] :
+                          [GridItem(.flexible(), spacing: dense ? 20 : 28, alignment: .topLeading), GridItem(.flexible(), alignment: .topLeading)],
+                          alignment: .leading, spacing: dense ? 14 : 18) {
+                    ForEach(shared) { limit in lane(limit) }
                 }
+                ForEach(scoped) { limit in lane(limit) }
             }
             if snapshot?.status != .ok || snapshot?.limits.isEmpty == true {
                 Label(AIUsageText.status(snapshot), systemImage: AIUsagePalette.symbol(snapshot))
-                    .font(.system(size: 11)).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+                    .font(.system(size: 12)).foregroundStyle(AIUsagePalette.secondaryText)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .frame(maxWidth: .infinity, alignment: .leading)
             }
         }
     }
+
     private func lane(_ limit: UsageLimit) -> some View {
-        VStack(alignment: .leading, spacing: 4) {
-            HStack {
-                Text(AIUsageText.limitTitle(limit)).font(.system(size: 11))
-                Spacer(minLength: 8)
-                Text(AIUsageService.percent(settings.mode.percent(limit.percentUsed))).font(.system(size: 11, weight: .medium).monospacedDigit())
+        let tint = AIUsagePalette.color(limit, warning: settings.warning, critical: settings.critical)
+        return VStack(alignment: .leading, spacing: 5) {
+            HStack(alignment: .firstTextBaseline, spacing: 6) {
+                Text(AIUsageText.limitTitle(limit)).font(.system(size: 12, weight: .medium))
+                    .foregroundStyle(AIUsagePalette.secondaryText).fixedSize(horizontal: false, vertical: true)
+                Spacer(minLength: 0)
+                Text(AIUsageService.percent(settings.mode.percent(limit.percentUsed)))
+                    .font(.system(size: dense ? 23 : 27, weight: .semibold, design: .rounded).monospacedDigit())
+                    .foregroundStyle(.primary)
+                    .fixedSize()
             }
-            AIUsageBar(percent: settings.mode.percent(limit.percentUsed), color: AIUsagePalette.color(limit, warning: settings.warning, critical: settings.critical))
-                .opacity(snapshot?.status == .ok ? 1 : 0.55)
+            AIUsageBar(percent: settings.mode.percent(limit.percentUsed), color: tint)
+                .opacity(snapshot?.status == .ok ? 1 : 0.45)
             if let reset = limit.resetsAt { AIUsageResetLabel(date: reset) }
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
         .accessibilityElement(children: .combine)
+        .accessibilityLabel(Text("\(AIUsageText.limitTitle(limit)): \(AIUsageService.percent(settings.mode.percent(limit.percentUsed))) · \(settings.mode.localizedTitle)"))
+        .accessibilityValue(limit.resetsAt.map { String(localized: "Sıfırlanma: \($0.formatted(date: .abbreviated, time: .shortened))") } ?? "")
     }
 }
 

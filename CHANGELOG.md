@@ -2,6 +2,8 @@
 
 ## Yayımlanmamış
 
+- **AI kota görünümü:** oturum ve haftalık yüzdeler daha büyük ve yan yana; modele özel limitler tam genişlikte gösterilir. Tekrarlanan hesap yüzdesi kaldırıldı, düşük/dolu kota uyarıları ve açık yenilenme süreleri eklendi. Menü paneli daha çok hesabı aynı anda gösterir; açık temada metin ve çubuk kontrastı güçlendirildi.
+
 - **Pano geçmişinin otomatik kaydı:** JSON üretimi ve atomik disk yazısı sıralı arka plan kuyruğuna taşındı. Yazı sürerken gelen değişiklikler son durumda birleştirilir; eski yazının tamamlanması yeni değişiklikleri kaydedilmiş saymaz. Kapanışta son kayıt korunur; silme veya diskte saklamayı kapatma, bekleyen yazının ardından tamamlanır. Geç gelen hata yanıtı başarılı yeniden denemeyi geçersiz kılamaz. Pano yakalama kapalıyken de diskte saklama tercihi uygulanır.
 
 - **Pano araması:** araç sayfası ve hızlı panel, geçmiş değiştikçe hazırlanan ortak bellek indeksini arayüz dışında sorgular. Yazma sırasında 120 ms bekleme ve eski isteği iptal etme eklendi; bekleyen aramada önceki sonuç Enter/kısayolla yapıştırılmaz. Türkçe harf dönüşümü, kaynak uygulama, tür filtresi ve sabitlenenlerin önceliği korunur. Yeni kayıt yalnız değişen arama belgesini hazırlar; boş arama beklemeden listeyi gösterir.

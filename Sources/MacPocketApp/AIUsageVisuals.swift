@@ -28,6 +28,7 @@ struct AIUsageProviderIcon: View {
 }
 
 enum AIUsagePalette {
+    static let secondaryText = Color.primary.opacity(0.8)
     static func color(_ limit: UsageLimit, warning: Double, critical: Double) -> Color {
         if limit.percentUsed >= critical { return .red }
         if limit.percentUsed >= warning { return .orange }
@@ -57,16 +58,17 @@ struct AIUsageBar: View {
     let percent: Double
     let color: Color
     var vertical = false
+    @Environment(\.colorScheme) private var colorScheme
     var body: some View {
         GeometryReader { geometry in
             ZStack(alignment: vertical ? .bottom : .leading) {
-                Capsule().fill(.secondary.opacity(0.16))
-                Capsule().fill(color.gradient)
+                Capsule().fill(.primary.opacity(0.09))
+                Capsule().fill(colorScheme == .light ? color.mix(with: .black, by: 0.3) : color)
                     .frame(width: vertical ? nil : geometry.size.width * fraction,
                            height: vertical ? geometry.size.height * fraction : nil)
             }
         }
-        .frame(width: vertical ? 8 : nil, height: vertical ? nil : 5)
+        .frame(width: vertical ? 8 : nil, height: vertical ? nil : 6)
         .accessibilityHidden(true)
     }
     private var fraction: Double { min(100, max(0, percent.isFinite ? percent : 0)) / 100 }
@@ -74,13 +76,26 @@ struct AIUsageBar: View {
 
 struct AIUsageResetLabel: View {
     let date: Date
+    @Environment(\.locale) private var locale
     var body: some View {
         TimelineView(.periodic(from: .now, by: 30)) { context in
             if date <= context.date { Text("Sıfırlanma bekleniyor") }
-            else { HStack(spacing: 3) { Image(systemName: "clock").imageScale(.small); Text(date, style: .relative) } }
+            else { Text("Yenilenme: \(remaining(from: context.date))") }
         }
-        .font(.system(size: 10)).foregroundStyle(.secondary).lineLimit(1)
+        .font(.system(size: 11)).foregroundStyle(AIUsagePalette.secondaryText)
+        .fixedSize(horizontal: false, vertical: true)
         .help(String(localized: "Sıfırlanma: \(date.formatted(date: .abbreviated, time: .shortened))"))
+    }
+
+    private func remaining(from now: Date) -> String {
+        let formatter = DateComponentsFormatter()
+        var calendar = Calendar(identifier: .gregorian); calendar.locale = locale
+        formatter.calendar = calendar
+        formatter.unitsStyle = .short
+        formatter.maximumUnitCount = 2
+        formatter.allowedUnits = date.timeIntervalSince(now) < 60 ? [.second] : [.day, .hour, .minute]
+        formatter.zeroFormattingBehavior = .dropAll
+        return formatter.string(from: now, to: date) ?? date.formatted(date: .omitted, time: .shortened)
     }
 }
 

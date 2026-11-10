@@ -1,10 +1,12 @@
 #if DEBUG
 import AppKit
+import ApplicationServices
 import ObjectiveC
 import MacPocketAIUsage
 import MacPocketCore
 import ScreenCaptureKit
 import SwiftUI
+import UsageCore
 
 /// Native fixture acceptance, isolated by bundle ID. No real accounts, CLI login or notifications.
 @MainActor
@@ -20,6 +22,7 @@ enum AIUsageRuntimeAudit {
 
     static func run(destination: URL) async {
         guard AIUsageFixtures.requested else { return }
+        let accessibility = AXUIElementSetAttributeValue(AXUIElementCreateApplication(getpid()), "AXManualAccessibility" as CFString, kCFBooleanTrue)
         let profileHome = AIUsageFixtures.profileSearchHome
         defer { try? FileManager.default.removeItem(at: profileHome) }
         for name in [".claude", ".claude-work"] {
@@ -92,7 +95,14 @@ enum AIUsageRuntimeAudit {
             record("claudeFolderSearchAction", content.contains(String(localized: "Claude Klasörlerini Bul")))
             record("claudeProfileFolderDiscovered", content.contains(where: { $0.contains(".claude-work") }))
             record("claudeDefaultSessionWithoutFolder", content.contains(where: { $0.contains(String(localized: "Varsayılan Claude Code oturumu")) }))
-            record("claudeFoundProfileSelectable", press(".claude-work", in: sheet))
+            // Discovery and SwiftUI's accessibility children become ready asynchronously.
+            // The path field's placeholder also contains '.claude-work'; it isn't readiness evidence.
+            var selectedProfile = false
+            for _ in 0..<10 {
+                if press(".claude-work", in: sheet) { selectedProfile = true; break }
+                try? await Task.sleep(for: .milliseconds(100))
+            }
+            record("claudeFoundProfileSelectable", selectedProfile)
             try? await Task.sleep(for: .milliseconds(200))
             record("claudeSelectionFillsPath", nodes(sheet).contains(profileHome.appending(path: ".claude-work").path))
             record("claudeFolderRescan", press(String(localized: "Claude Klasörlerini Bul"), in: sheet))
@@ -122,9 +132,32 @@ enum AIUsageRuntimeAudit {
         var bar = MenuBarSettingsStore.shared.preferences; bar.enabled = []; MenuBarSettingsStore.shared.preferences = bar
         AIUsageIntegration.shared.configure(preferences: bar)
         record("disableStopsPolling", !service.active && service.refreshing.isEmpty)
+        // Direct quota surfaces exercise real layout without credentials or accessibility automation.
+        var longAccount = originalSettings.accounts[0]
+        longAccount.name = "Design & Engineering · International Production Account"
+        let session = UsageLimit(id: "session", label: "Session", percentUsed: 98, resetsAt: .now.addingTimeInterval(3_600), severity: .critical)
+        let weekly = UsageLimit(id: "weekly_all", label: "Weekly", percentUsed: 45, resetsAt: .now.addingTimeInterval(172_800), severity: .normal)
+        let scoped = UsageLimit(id: "weekly_scoped#Claude Sonnet · Extended model context", label: "Scoped", percentUsed: 75, resetsAt: nil, severity: .warning)
+        for scenario in ["critical", "exhausted-used", "stale", "sign-in", "loading", "long-model"] {
+            var settings = originalSettings
+            if scenario == "exhausted-used" { settings.mode = .used }
+            let limits: [UsageLimit] = scenario == "sign-in" ? [] : scenario == "long-model" ? [session, weekly, scoped] :
+                scenario == "exhausted-used" ? [UsageLimit(id: "session", label: "Session", percentUsed: 100, resetsAt: .now.addingTimeInterval(-60), severity: .critical)] : [session, weekly]
+            let fetchStatus: FetchStatus = scenario == "stale" ? .stale(reason: "network") : scenario == "sign-in" ? .needsSignIn : .ok
+            let snapshot: UsageSnapshot? = scenario == "loading" ? nil : .init(provider: .claude, fetchedAt: .now.addingTimeInterval(-900), limits: limits, status: fetchStatus)
+            let surface = VStack(alignment: .leading, spacing: 14) {
+                Text(settings.mode.localizedTitle).font(.caption).foregroundStyle(.secondary)
+                AIUsageAccountQuotaView(account: longAccount, snapshot: snapshot, settings: settings, refreshing: scenario == "loading", dense: true)
+                Spacer(minLength: 0)
+            }.padding(16).frame(width: 320, height: 360, alignment: .topLeading).background(Color(nsColor: .windowBackgroundColor))
+            let window = makeWindow(surface, size: NSSize(width: 320, height: 360))
+            try? await Task.sleep(for: .milliseconds(150))
+            record("quotaState-\(scenario)", await self.snapshot(window, to: URL(fileURLWithPath: prefix + "-quota-\(scenario).png")))
+            window.orderOut(nil)
+        }
         let report: [String: Any] = ["checks": checks, "passed": !checks.isEmpty && checks.values.allSatisfy { $0 }, "rows": rows,
             "language": Bundle.main.preferredLocalizations.first ?? "unknown", "realCredentialReads": false,
-            "realQuotaRequests": false, "realCLILogins": false]
+            "realQuotaRequests": false, "realCLILogins": false, "selfAccessibilityEnableResult": accessibility.rawValue]
         if let data = try? JSONSerialization.data(withJSONObject: report, options: [.prettyPrinted, .sortedKeys]) {
             try? data.write(to: destination, options: .atomic)
         }

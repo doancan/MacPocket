@@ -4730,3 +4730,9 @@
 "Çiy Noktası" = "Dew Point";
 "Önceki %lld saat" = "Previous %lld h";
 "Aranıyor…" = "Searching…";
+"Kota doldu" = "Quota exhausted";
+"Az kota kaldı" = "Low quota";
+"Kota azalıyor" = "Quota running low";
+"Kotalar yenileniyor" = "Refreshing quotas";
+"Yenilenme: %@" = "Resets in %@";
+"%@: %@ · %@" = "%@: %@ · %@";
