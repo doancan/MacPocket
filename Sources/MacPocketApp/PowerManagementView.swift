@@ -253,120 +253,23 @@ struct PowerOverviewPanel: View {
     var body: some View {
         VStack(alignment: .leading, spacing: PocketSpacing.l) {
             ViewThatFits(in: .horizontal) {
-                HStack(alignment: .top, spacing: PocketSpacing.l) { PowerKeepAwakeCard(model: model); statusCard }
+                HStack(alignment: .top, spacing: PocketSpacing.l) { PowerKeepAwakeCard(model: model); PowerStatusCard(center: center) }
                     .fixedSize(horizontal: false, vertical: true)
-                VStack(spacing: PocketSpacing.l) { PowerKeepAwakeCard(model: model); statusCard }
+                VStack(spacing: PocketSpacing.l) { PowerKeepAwakeCard(model: model); PowerStatusCard(center: center) }
             }
-            PocketSensorsCard(system: model.system)
-            if model.system?.fans?.isEmpty == false { FanControlCard() }
+            // Live samples arrive every 2 s; only this child reads them.
+            PowerLiveSensors(model: model)
             ViewThatFits(in: .horizontal) {
-                HStack(alignment: .top, spacing: PocketSpacing.l) { topEnergy; scheduleCard }
+                HStack(alignment: .top, spacing: PocketSpacing.l) { PowerTopEnergyCard(center: center); PowerScheduleCard(center: center) }
                     .fixedSize(horizontal: false, vertical: true)
-                VStack(spacing: PocketSpacing.l) { topEnergy; scheduleCard }
+                VStack(spacing: PocketSpacing.l) { PowerTopEnergyCard(center: center); PowerScheduleCard(center: center) }
             }
             if let ups = center.overview?.upsSources, !ups.isEmpty { upsCard(ups) }
         }
     }
 
-    private var statusCard: some View {
-        VStack(alignment: .leading, spacing: PocketSpacing.m) {
-            PocketSectionHeader("Sistem durumu", icon: "waveform.path.ecg")
-            if let overview = center.overview {
-                PowerFactRow(title: "Termal durum", value: "\(pocketThermalTitle(overview.thermalState))",
-                             tone: pocketThermalTone(overview.thermalState))
-                if let thermal = center.thermal {
-                    PowerFactRow(title: "CPU hız sınırı", value: thermal.cpuSpeedLimit.map { "\(pocketPercent(Double($0)))" } ?? "Sınır yok",
-                                 tone: thermal.isThrottled ? .warning : .success,
-                                 help: "pmset -g therm: işlemci hızının termal nedenle kısıldığı oran")
-                    if let scheduler = thermal.schedulerLimit {
-                        PowerFactRow(title: "Zamanlayıcı sınırı", value: "\(pocketPercent(Double(scheduler)))")
-                    }
-                    if let cpus = thermal.availableCPUs {
-                        PowerFactRow(title: "Kullanılabilir çekirdek", value: "\(cpus)")
-                    }
-                } else {
-                    PowerFactRow(title: "CPU hız sınırı", value: "Okunuyor…")
-                }
-                PowerFactRow(title: "Düşük Güç Modu", value: overview.lowPowerMode ? "Açık" : "Kapalı")
-                if let live = center.live {
-                    PowerFactRow(title: "Sistem uykusu", value: "\(live.value(.sleep)?.displayValue ?? "—")")
-                    PowerFactRow(title: "Ekranı kapat", value: "\(live.value(.displaysleep)?.displayValue ?? "—")")
-                }
-                if let report = center.assertions {
-                    PowerFactRow(title: "Boşta uyku", value: report.preventsIdleSystemSleep ? "Engelleniyor" : "Serbest",
-                                 tone: report.preventsIdleSystemSleep ? .warning : .success)
-                    Button("Uyku engelleyicileri göster") { center.tab = .blockers }
-                        .buttonStyle(.link)
-                } else if let error = center.assertionsError {
-                    PocketMessage(error, error: true)
-                }
-            } else {
-                ProgressView().frame(maxWidth: .infinity)
-            }
-        }
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-        .pocketCard()
-    }
 
-    private var topEnergy: some View {
-        VStack(alignment: .leading, spacing: PocketSpacing.m) {
-            PocketSectionHeader("En çok enerji kullananlar", icon: "bolt.fill") {
-                Button("Tümü") { center.tab = .energy }.buttonStyle(.link)
-            }
-            if let sample = center.energy {
-                if sample.processes.isEmpty {
-                    Text("Ölçüm aralığında enerji kullanan süreç yok.").font(.callout).foregroundStyle(.secondary)
-                } else {
-                    ForEach(sample.processes.prefix(5)) { process in
-                        PowerEnergyRow(process: process, maximum: sample.processes.first?.milliwatts ?? 1, compact: true)
-                    }
-                }
-            } else {
-                HStack(spacing: PocketSpacing.s) {
-                    ProgressView().controlSize(.small)
-                    Text("İlk ölçüm alınıyor…").font(.callout).foregroundStyle(.secondary)
-                }
-            }
-        }
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-        .pocketCard()
-    }
 
-    private var scheduleCard: some View {
-        VStack(alignment: .leading, spacing: PocketSpacing.m) {
-            PocketSectionHeader("Zamanlanmış güç olayları", icon: "calendar.badge.clock")
-            if let error = center.scheduleError {
-                PocketMessage(error, error: true)
-            } else if let events = center.schedule {
-                if events.isEmpty {
-                    Text("Zamanlanmış uyanma, uyku veya kapanma yok.").font(.callout).foregroundStyle(.secondary)
-                } else {
-                    ForEach(events) { event in
-                        HStack(alignment: .firstTextBaseline, spacing: PocketSpacing.s) {
-                            Image(systemName: event.repeating ? "repeat" : "clock")
-                                .foregroundStyle(.secondary).frame(width: 18).accessibilityHidden(true)
-                            VStack(alignment: .leading, spacing: PocketSpacing.xxs) {
-                                Text(event.typeTitle).font(.callout.weight(.medium))
-                                if let owner = event.owner {
-                                    Text(owner).font(.subheadline).foregroundStyle(.secondary).lineLimit(1)
-                                }
-                            }
-                            Spacer()
-                            Text(event.date.map { $0.formatted(.dateTime.locale(pocketLocale).day().month().hour().minute()) } ?? event.when)
-                                .font(.callout).monospacedDigit().foregroundStyle(.secondary)
-                        }
-                        .accessibilityElement(children: .combine)
-                    }
-                }
-            } else {
-                ProgressView().controlSize(.small)
-            }
-            Text("Olaylar Sistem Ayarları veya `pmset schedule` ile eklenir.")
-                .font(.subheadline).foregroundStyle(.secondary)
-        }
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-        .pocketCard()
-    }
 
     private func upsCard(_ sources: [PowerSourceInfo]) -> some View {
         VStack(alignment: .leading, spacing: PocketSpacing.m) {
@@ -457,6 +360,131 @@ struct PowerKeepAwakeCard: View {
         guard !changing else { return }
         changing = true
         Task { await action(); changing = false }
+    }
+}
+
+/// Own view so only changes to what it reads re-evaluate it, not the whole overview panel.
+private struct PowerStatusCard: View {
+    var center: PowerCenterModel
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: PocketSpacing.m) {
+            PocketSectionHeader("Sistem durumu", icon: "waveform.path.ecg")
+            if let overview = center.overview {
+                PowerFactRow(title: "Termal durum", value: "\(pocketThermalTitle(overview.thermalState))",
+                             tone: pocketThermalTone(overview.thermalState))
+                if let thermal = center.thermal {
+                    PowerFactRow(title: "CPU hız sınırı", value: thermal.cpuSpeedLimit.map { "\(pocketPercent(Double($0)))" } ?? "Sınır yok",
+                                 tone: thermal.isThrottled ? .warning : .success,
+                                 help: "pmset -g therm: işlemci hızının termal nedenle kısıldığı oran")
+                    if let scheduler = thermal.schedulerLimit {
+                        PowerFactRow(title: "Zamanlayıcı sınırı", value: "\(pocketPercent(Double(scheduler)))")
+                    }
+                    if let cpus = thermal.availableCPUs {
+                        PowerFactRow(title: "Kullanılabilir çekirdek", value: "\(cpus)")
+                    }
+                } else {
+                    PowerFactRow(title: "CPU hız sınırı", value: "Okunuyor…")
+                }
+                PowerFactRow(title: "Düşük Güç Modu", value: overview.lowPowerMode ? "Açık" : "Kapalı")
+                if let live = center.live {
+                    PowerFactRow(title: "Sistem uykusu", value: "\(live.value(.sleep)?.displayValue ?? "—")")
+                    PowerFactRow(title: "Ekranı kapat", value: "\(live.value(.displaysleep)?.displayValue ?? "—")")
+                }
+                if let report = center.assertions {
+                    PowerFactRow(title: "Boşta uyku", value: report.preventsIdleSystemSleep ? "Engelleniyor" : "Serbest",
+                                 tone: report.preventsIdleSystemSleep ? .warning : .success)
+                    Button("Uyku engelleyicileri göster") { center.tab = .blockers }
+                        .buttonStyle(.link)
+                } else if let error = center.assertionsError {
+                    PocketMessage(error, error: true)
+                }
+            } else {
+                ProgressView().frame(maxWidth: .infinity)
+            }
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        .pocketCard()
+        }
+}
+
+/// Own view so only changes to what it reads re-evaluate it, not the whole overview panel.
+private struct PowerTopEnergyCard: View {
+    var center: PowerCenterModel
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: PocketSpacing.m) {
+            PocketSectionHeader("En çok enerji kullananlar", icon: "bolt.fill") {
+                Button("Tümü") { center.tab = .energy }.buttonStyle(.link)
+            }
+            if let sample = center.energy {
+                if sample.processes.isEmpty {
+                    Text("Ölçüm aralığında enerji kullanan süreç yok.").font(.callout).foregroundStyle(.secondary)
+                } else {
+                    ForEach(sample.processes.prefix(5)) { process in
+                        PowerEnergyRow(process: process, maximum: sample.processes.first?.milliwatts ?? 1, compact: true)
+                    }
+                }
+            } else {
+                HStack(spacing: PocketSpacing.s) {
+                    ProgressView().controlSize(.small)
+                    Text("İlk ölçüm alınıyor…").font(.callout).foregroundStyle(.secondary)
+                }
+            }
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        .pocketCard()
+        }
+}
+
+/// Own view so only changes to what it reads re-evaluate it, not the whole overview panel.
+private struct PowerScheduleCard: View {
+    var center: PowerCenterModel
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: PocketSpacing.m) {
+            PocketSectionHeader("Zamanlanmış güç olayları", icon: "calendar.badge.clock")
+            if let error = center.scheduleError {
+                PocketMessage(error, error: true)
+            } else if let events = center.schedule {
+                if events.isEmpty {
+                    Text("Zamanlanmış uyanma, uyku veya kapanma yok.").font(.callout).foregroundStyle(.secondary)
+                } else {
+                    ForEach(events) { event in
+                        HStack(alignment: .firstTextBaseline, spacing: PocketSpacing.s) {
+                            Image(systemName: event.repeating ? "repeat" : "clock")
+                                .foregroundStyle(.secondary).frame(width: 18).accessibilityHidden(true)
+                            VStack(alignment: .leading, spacing: PocketSpacing.xxs) {
+                                Text(event.typeTitle).font(.callout.weight(.medium))
+                                if let owner = event.owner {
+                                    Text(owner).font(.subheadline).foregroundStyle(.secondary).lineLimit(1)
+                                }
+                            }
+                            Spacer()
+                            Text(event.date.map { $0.formatted(.dateTime.locale(pocketLocale).day().month().hour().minute()) } ?? event.when)
+                                .font(.callout).monospacedDigit().foregroundStyle(.secondary)
+                        }
+                        .accessibilityElement(children: .combine)
+                    }
+                }
+            } else {
+                ProgressView().controlSize(.small)
+            }
+            Text("Olaylar Sistem Ayarları veya `pmset schedule` ile eklenir.")
+                .font(.subheadline).foregroundStyle(.secondary)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        .pocketCard()
+        }
+}
+
+/// Sensors and fan control: the only part of the overview panel that follows every system sample.
+private struct PowerLiveSensors: View {
+    var model: PocketModel
+
+    var body: some View {
+        PocketSensorsCard(system: model.system)
+        if model.system?.fans?.isEmpty == false { FanControlCard() }
     }
 }
 

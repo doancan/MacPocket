@@ -203,6 +203,12 @@ public struct PowerOverview: Equatable, Sendable {
     public var upsSources: [PowerSourceInfo] { sources.filter(\.isUPS) }
     /// A battery exists if IOPS lists one or the registry says it is installed.
     public var hasBattery: Bool { internalBattery != nil || battery?.installed == true }
+
+    /// Equal apart from `capturedAt`: the reading has nothing new to show.
+    public func hasSameReading(as other: PowerOverview) -> Bool {
+        providingSource == other.providingSource && sources == other.sources && adapter == other.adapter
+            && battery == other.battery && lowPowerMode == other.lowPowerMode && thermalState == other.thermalState
+    }
 }
 
 // MARK: - Live readers

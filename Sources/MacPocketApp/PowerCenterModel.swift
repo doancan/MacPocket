@@ -81,6 +81,8 @@ final class PowerCenterModel {
     private let runner: any PMSetPrivilegedRunning
     @ObservationIgnored private var sampler = ProcessEnergySampler()
     @ObservationIgnored private var logTask: Task<Void, Never>?
+    /// Most recent raw overview, including readings not published because only the timestamp changed.
+    @ObservationIgnored private var lastOverviewReading: PowerOverview?
     static let wattCapacity = 150
 
     init(runner: any PMSetPrivilegedRunning = AppleScriptPMSetRunner()) {
@@ -112,8 +114,11 @@ final class PowerCenterModel {
 
     func refreshOverview() {
         let next = PowerInspector.overview()
-        let previous = overview
-        overview = next
+        let previous = lastOverviewReading
+        lastOverviewReading = next
+        // `capturedAt` is not shown; republishing an otherwise identical reading would redraw every card that
+        // reads the overview every 2 s. Watt averaging below still uses the latest raw reading.
+        if overview.map({ !$0.hasSameReading(as: next) }) ?? true { overview = next }
         if let watts = Self.currentWatts(next, previous: previous) {
             wattHistory.append(PowerWattSample(date: next.capturedAt, watts: watts))
             if wattHistory.count > Self.wattCapacity { wattHistory.removeFirst(wattHistory.count - Self.wattCapacity) }
