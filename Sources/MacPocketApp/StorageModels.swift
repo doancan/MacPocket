@@ -250,7 +250,6 @@ struct CleanupSummary: Equatable {
 
 @MainActor
 @Observable
-
 final class CleanupModel {
     private(set) var report: CleanupReport?
     private(set) var scanning = false

@@ -590,3 +590,19 @@ Kaynak `ca7b794`. Aynı kural yedi modele uygulandı: `PowerCenterModel` (20 ala
 - Kapsam dışı: `WindowSwitcherModel` (elle `objectWillChange.send()`, Alt+Tab ana deneyimi), `FileWorkspaceModel` (elle bildirim), `DisplayBrightnessService` (Gece Modu Combine `$settings`/`$displays` hatları) ve tek alanlı `MenuBarHistory` (Observation kazanç sağlamaz).
 
 **Doğrulama:** Statik inceleme ve derleme; bu grup için ayrı gövde sayacı ölçümü alınmadı, kazanç ilk gruptaki ölçülen mekanizmaya dayanır (bir sekmenin okumadığı alan değişince o sekme yeniden hesaplanmaz). Gövdesinde `Date()` okuyan görünümler (Güç zaman çizelgesi, hava durumu saat/gün süzgeci) artık ilgisiz yayınlarla değil, okudukları model alanı değişince tazelenir. Tam kök grupta XCTest **1.026 test, 0 hata, 5 atlama**, Swift Testing **355 test** geçti. Çalışan uygulamada canlı doğrulama yapılmadı.
+
+### Canlı Instruments ölçümü — 10 Kasım 2026
+
+**Yöntem:** `ec81011` (önce) ve `14dd3f3` (sonra) ayrı detached kopyalarda `scripts/build-app.sh release` ile derlendi ve imzalandı. İki kopyaya da yalnız ölçüm için aynı `--profile-page <sayfa>` başlatma yaması eklendi. Bu yama ana dala girmez. Her çalıştırmada uygulama kapatıldı, sayfa açık başlatıldı, 20 sn beklendi, ardından 45 sn ölçüldü. Ölçüm türleri: bir tur `xctrace` SwiftUI şablonu (Time Profiler dahil), iki tur yalnız `ps` süreç CPU süresi. Sürüm sırası turlar arasında ters çevrildi. Makine: pilsiz Mac Studio, gerçek kullanıcı oturumu ve gerçek donanım. Kayıtlar oturum çalışma alanındadır ve depoya eklenmedi.
+
+| Sayfa | 45 sn'de SwiftUI güncellemesi (önce → sonra) | Düğme gövdesi yeniden hesabı | Süreç CPU, 3 eşleşmiş tur (önce → sonra, s) |
+| --- | --- | --- | --- |
+| Araçlar | 83.455 → **14.106** | 7.054 → **14** | 2,66→2,02 · 0,96→0,66 · 2,19→1,40 |
+| Güç Merkezi | 272.327 → **207.454** | 4.209 → 1.270 | 9,41→7,60 · 3,66→2,93 · 12,96→8,81 |
+| Genel Bakış | 58.830 → **24.331** | 3.962 → **0** | 2,45→2,78 · 1,47→1,18 · 2,30→1,76 |
+
+Dokuz eşleşmiş CPU ölçümünün sekizinde yeni sürüm daha düşük çıktı. Oranlar: Araçlar 0,64–0,76, Güç 0,68–0,81, Genel Bakış 0,77–1,13. Mutlak saniyeler turlar arasında 3–4 kat değişiyor (arka plan yükü; iki CPU turu sırasında depoda `swift build` da çalıştı). Bu yüzden yalnız aynı turdaki önce/sonra oranı yorumlanır. Kayıt sırasında örneklerin ~%18'i Instruments'ın SwiftUI izleme desteğine düşer, yani izlemeli tur CPU'yu şişirir.
+
+**Kalan sıcak nokta — Güç Merkezi:** 45 sn'de 207 bin güncelleme; ana kalemler `Text Content` ~0,4–0,53 sn ve `DynamicContainerInfo<DynamicLayoutViewAdaptor>` ~0,5 sn. Sayfadaki dört `ViewThatFits` her iki düzen seçeneğini de kurup ölçüyor. Zaman damgası değişen `overview` her 2 sn'de bütün kartları yenilediği için bu maliyet her turda tekrarlanıyor. Time Profiler örneklerinin büyük kısmı SwiftUI'nin kendi kodunda; tek başına öne çıkan bir uygulama fonksiyonu yok.
+
+**Eşit değer yazımı kontrolü:** `PowerCenterModel` (onaylar, termal, enerji, ayarlar, zamanlama) ve `VolumeMixerService` (uygulamalar, aygıtlar, varsayılan çıkış, satır durumları) artık yalnız değer değişince yazıyor. Güç sayfasında dört eşleşmiş turda CPU farkı ±%6 içinde iki yöne de değişti; SwiftUI güncellemesi 207.218 / 207.854. **Ölçülebilir kazanç yok.** Değişiklik `PocketModel`'deki kuralla tutarlılık için tutuldu. Mikser etkisi ayrıca ölçülmedi.

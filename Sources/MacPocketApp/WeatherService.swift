@@ -4,7 +4,6 @@ import MapKit
 
 @MainActor
 @Observable
-
 final class WeatherService {
     static let shared = WeatherService()
     private static let locationKey = "MacPocket.weather.location"

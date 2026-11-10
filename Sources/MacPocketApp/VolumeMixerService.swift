@@ -11,7 +11,6 @@ struct MixerPathConfiguration: Equatable, Sendable {
 
 @MainActor
 @Observable
-
 final class VolumeMixerService {
     typealias PathBuilder = @Sendable (MixerPathConfiguration, AudioRenderGain, MixerBuildCancellation) throws -> any MixerAudioPath
     static let shared = VolumeMixerService()
@@ -171,8 +170,14 @@ final class VolumeMixerService {
         if scannedGeneration == generation {
             switch result {
             case .success(let fresh):
-                inventory = fresh; apps = fresh.apps; devices = fresh.devices.map(\.device); defaultUID = fresh.defaultUID
-                failure = nil; observeDevices(fresh.devices.map { $0.device.objectID })
+                // Polled every second: write only changes so unchanged rows are not re-evaluated.
+                inventory = fresh
+                if apps != fresh.apps { apps = fresh.apps }
+                let freshDevices = fresh.devices.map(\.device)
+                if devices != freshDevices { devices = freshDevices }
+                if defaultUID != fresh.defaultUID { defaultUID = fresh.defaultUID }
+                if failure != nil { failure = nil }
+                observeDevices(fresh.devices.map { $0.device.objectID })
                 apply(); checkHealth()
             case .failure(let error):
                 // An unreadable inventory is not evidence that devices/apps still exist. Restore native audio.
@@ -246,7 +251,7 @@ final class VolumeMixerService {
                 }
             }
         }
-        states = nextStates
+        if states != nextStates { states = nextStates }
     }
 
     private func cancelBuild(_ id: String) {

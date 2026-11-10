@@ -130,23 +130,28 @@ final class PowerCenterModel {
         return nil
     }
 
+    /// Observation notifies readers on every write, even an equal one; the polling loop writes only changes.
+    private func assign<Value: Equatable>(_ keyPath: ReferenceWritableKeyPath<PowerCenterModel, Value>, _ value: Value) {
+        if self[keyPath: keyPath] != value { self[keyPath: keyPath] = value }
+    }
+
     func refreshAssertionsAndThermal() async {
         do {
-            assertions = try await PowerCommandReader.assertions()
-            assertionsError = nil
+            assign(\.assertions, try await PowerCommandReader.assertions())
+            assign(\.assertionsError, nil)
         } catch is CancellationError {
             return
         } catch {
-            assertionsError = error.localizedDescription
+            assign(\.assertionsError, error.localizedDescription)
         }
-        thermal = try? await PowerCommandReader.thermal()
+        assign(\.thermal, try? await PowerCommandReader.thermal())
     }
 
     func refreshEnergy() async {
         let sample = await sampler.sample(limit: 60)
         // The first call only primes the counters.
-        if sample.interval > 0 { energy = sample }
-        energyError = sample.readableCount == 0 ? String(localized: "Süreç enerji sayaçları okunamadı.") : nil
+        if sample.interval > 0 { assign(\.energy, sample) }
+        assign(\.energyError, sample.readableCount == 0 ? String(localized: "Süreç enerji sayaçları okunamadı.") : nil)
     }
 
     func loadSettings() async {
@@ -154,9 +159,9 @@ final class PowerCenterModel {
         defer { settingsLoading = false }
         do {
             let result = try await PowerCommandReader.settings()
-            profiles = result.profiles
-            live = result.live
-            settingsError = nil
+            assign(\.profiles, result.profiles)
+            assign(\.live, result.live)
+            assign(\.settingsError, nil)
         } catch is CancellationError {
         } catch {
             settingsError = error.localizedDescription
@@ -165,8 +170,8 @@ final class PowerCenterModel {
 
     func loadSchedule() async {
         do {
-            schedule = try await PowerCommandReader.schedule()
-            scheduleError = nil
+            assign(\.schedule, try await PowerCommandReader.schedule())
+            assign(\.scheduleError, nil)
         } catch is CancellationError {
         } catch {
             scheduleError = error.localizedDescription

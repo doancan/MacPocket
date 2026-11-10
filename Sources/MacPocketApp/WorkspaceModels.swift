@@ -277,7 +277,6 @@ final class FileWorkspaceModel: ObservableObject {
 
 @MainActor
 @Observable
-
 final class ApplicationWorkspaceModel {
     var applications: [InstalledApplication] = []
     var casks: [HomebrewCask] = []
