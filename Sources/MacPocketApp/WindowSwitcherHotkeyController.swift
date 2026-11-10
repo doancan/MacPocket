@@ -177,19 +177,28 @@ final class WindowSwitcherHotkeyController: NSObject, ObservableObject {
 
     private func observeModelChanges() {
         // Card count changes (search, refresh) resize the panel around its center.
-        model.$windows.combineLatest(model.$sessionSearch)
-            .receive(on: RunLoop.main)
-            .sink { [weak self] _, _ in MainActor.assumeIsolated { self?.listChanged() } }
-            .store(in: &subscriptions)
-        model.$exceptionRules.dropFirst().receive(on: RunLoop.main)
-            .sink { [weak self] _ in MainActor.assumeIsolated { self?.listChanged() } }
-            .store(in: &subscriptions)
-        model.$selection
-            .removeDuplicates()
-            .receive(on: RunLoop.main)
-            .sink { [weak self] _ in MainActor.assumeIsolated { self?.selectionChanged() } }
-            .store(in: &subscriptions)
+        observeModel({ [model] in (model.windows, model.sessionSearch) }) { controller, _, _ in controller.listChanged() }
+        observeModel({ [model] in model.exceptionRules }) { controller, previous, _ in
+            if previous != nil { controller.listChanged() }
+        }
+        observeModel({ [model] in model.selection }) { controller, previous, current in
+            if previous.map({ $0 != current }) ?? true { controller.selectionChanged() }
+        }
+    }
 
+    /// Runs `apply` on the main actor after each change of `value`, starting with its current value.
+    /// `previous` is nil for that first delivery. The task ends with `subscriptions`.
+    private func observeModel<Value: Sendable>(_ value: @escaping @MainActor @Sendable () -> Value,
+                                               apply: @escaping @MainActor (WindowSwitcherHotkeyController, Value?, Value) -> Void) {
+        let task = Task { @MainActor [weak self] in
+            var previous: Value?
+            for await current in Observations(value) {
+                guard let self else { return }
+                apply(self, previous, current)
+                previous = current
+            }
+        }
+        subscriptions.insert(AnyCancellable { task.cancel() })
     }
 
     private func observeEnvironmentChanges() {

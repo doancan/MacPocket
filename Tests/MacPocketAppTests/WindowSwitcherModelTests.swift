@@ -1,4 +1,5 @@
 import AppKit
+import Synchronization
 import XCTest
 @testable import MacPocketCore
 @testable import MacPocketApp
@@ -164,6 +165,31 @@ final class WindowSwitcherModelTests: XCTestCase {
         let requested = await capture.requests
         XCTAssertEqual(requested.filter { $0 == "w0" }.count, 1)
         XCTAssertTrue(requested.contains("w79"))
+    }
+
+    /// A capture must redraw only its own card: the grid's inputs and other cards' slots stay untouched.
+    @MainActor func testCaptureNotifiesOnlyItsOwnCardSlot() async throws {
+        let capture = try CaptureFixture()
+        await capture.fail("w1")
+        let model = WindowSwitcherModel(windows: (0..<3).map(window), previews: capture, permitsCapture: { true })
+        model.sessionFilter = .init()
+        model.selection = "w0"
+        let slots = (0..<3).map { model.thumbnailSlot(for: "w\($0)") }
+        let notified = Mutex<Set<String>>([])
+        func track(_ name: String, _ read: @escaping @MainActor () -> Void) {
+            withObservationTracking { read() } onChange: { notified.withLock { _ = $0.insert(name) } }
+        }
+        track("grid") { _ = model.filtered; _ = model.selection; _ = model.actionBusy; _ = model.applicationBadges }
+        for (index, slot) in slots.enumerated() { track("w\(index)") { _ = slot.image; _ = slot.unavailable } }
+        for index in 0..<2 { model.thumbnailVisibilityChanged("w\(index)", visible: true) }
+        let worker = Task { await model.runThumbnails(maxPixels: size, live: false) }
+        let done = await eventually { slots[0].image != nil && slots[1].unavailable }
+        XCTAssertTrue(done)
+        model.clearThumbnails()
+        await worker.value
+        XCTAssertTrue(slots[0].image === model.thumbnails["w0"])
+        XCTAssertEqual(notified.withLock { $0 }.intersection(["grid", "w2"]), [], "capture must not invalidate the grid or other cards")
+        XCTAssertEqual(notified.withLock { $0 }.intersection(["w0", "w1"]), ["w0", "w1"])
     }
 
     func testCancelledFocusCannotClearOrReplaceNewSessionFailure() async {

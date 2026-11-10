@@ -6,7 +6,7 @@ import SwiftUI
 /// each with only its app icon and window title, and a selection frame that glides between items.
 /// Configuration and the detail table live in Tools.
 struct WindowSwitcherOverlayView: View {
-    @ObservedObject var model: WindowSwitcherModel
+    var model: WindowSwitcherModel
     @ObservedObject var controller: WindowSwitcherHotkeyController
     let choose: (String) -> Void
     let thumbnailSessionID: UUID
@@ -43,20 +43,24 @@ struct WindowSwitcherOverlayView: View {
     private func panel(_ layout: SwitcherLayout) -> some View {
         let windows = model.filtered
         let style = controller.style
+        // Read here, not inside the lazy closures below: one selection change then updates the grid,
+        // its animation value and both cards in a single transaction. Reading it only inside the
+        // closures splits that update and the selection animation renders measurably more frames.
+        let selection = model.selection
         return VStack(spacing: PocketSpacing.s) {
             if windows.isEmpty {
                 emptyState
             } else {
                 ScrollViewReader { reader in
                     ScrollView(.vertical) {
-                        grid(windows, layout: layout, style: style).padding(4)
+                        grid(windows, layout: layout, style: style, selection: selection).padding(4)
                     }
                     .scrollIndicators(layout.rows > 1 ? .automatic : .never)
-                    .onChange(of: model.selection) { _, id in
+                    .onChange(of: selection) { _, id in
                         guard let id else { return }
                         reader.scrollTo(id)
                     }
-                    .onAppear { if let id = model.selection { reader.scrollTo(id) } }
+                    .onAppear { if let selection { reader.scrollTo(selection) } }
                 }
             }
             statusLine
@@ -110,36 +114,37 @@ struct WindowSwitcherOverlayView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
-    private func grid(_ windows: [SwitchableWindow], layout: SwitcherLayout, style: SwitcherStyle) -> some View {
+    private func grid(_ windows: [SwitchableWindow], layout: SwitcherLayout, style: SwitcherStyle, selection: String?) -> some View {
         let columns = Array(repeating: GridItem(.fixed(layout.itemSize.width), spacing: SwitcherLayout.spacing), count: layout.columns)
         return LazyVGrid(columns: columns, spacing: style == .titles ? 4 : SwitcherLayout.spacing) {
             ForEach(windows) { window in
                 SwitcherItem(window: window, style: style, size: layout.itemSize,
                              badge: controller.presentation.showBadges ? model.applicationBadge(for: window) : nil,
-                             selected: model.selection == window.id, thumbnail: model.thumbnails[window.id],
-                             thumbnailUnavailable: model.unavailableThumbnails.contains(window.id) || !window.canCapturePreview,
+                             selected: selection == window.id, thumbnail: model.thumbnailSlot(for: window.id),
                              actionBusy: model.actionBusy, presentation: controller.presentation,
                              reduceMotion: reduceMotion, reduceTransparency: reduceTransparency, selectionAnimation: selectionAnimation,
                              choose: { choose(window.id) },
                              hover: { controller.hover(window.id) },
                              act: { controller.act($0, on: window.id) })
+                    // Only cards whose inputs changed re-run: a Tab press redraws the old and new selection.
+                    .equatable()
                     .id(window.id)
                     .onAppear { model.thumbnailVisibilityChanged(window.id, visible: true, sessionID: thumbnailSessionID) }
                     .onDisappear { model.thumbnailVisibilityChanged(window.id, visible: false, sessionID: thumbnailSessionID) }
             }
         }
-        .animation(reduceMotion || !controller.presentation.animateSelection ? nil : .easeOut(duration: 0.16), value: model.selection)
+        .animation(reduceMotion || !controller.presentation.animateSelection ? nil : .easeOut(duration: 0.16), value: selection)
     }
 }
 
-private struct SwitcherItem: View {
+private struct SwitcherItem: View, Equatable {
     let window: SwitchableWindow
     let style: SwitcherStyle
     let size: CGSize
     let badge: DockApplicationBadge?
     let selected: Bool
-    let thumbnail: NSImage?
-    let thumbnailUnavailable: Bool
+    /// Observed here, not in the grid, so a new capture redraws this card alone.
+    let thumbnailSlot: SwitcherThumbnailSlot
     let actionBusy: Bool
     let presentation: SwitcherPresentation
     let reduceMotion: Bool
@@ -149,6 +154,27 @@ private struct SwitcherItem: View {
     let hover: () -> Void
     let act: (WindowAction) -> Void
     @State private var hovering = false
+
+    init(window: SwitchableWindow, style: SwitcherStyle, size: CGSize, badge: DockApplicationBadge?, selected: Bool,
+         thumbnail: SwitcherThumbnailSlot, actionBusy: Bool, presentation: SwitcherPresentation, reduceMotion: Bool,
+         reduceTransparency: Bool, selectionAnimation: Namespace.ID, choose: @escaping () -> Void,
+         hover: @escaping () -> Void, act: @escaping (WindowAction) -> Void) {
+        self.window = window; self.style = style; self.size = size; self.badge = badge; self.selected = selected
+        self.thumbnailSlot = thumbnail; self.actionBusy = actionBusy; self.presentation = presentation
+        self.reduceMotion = reduceMotion; self.reduceTransparency = reduceTransparency
+        self.selectionAnimation = selectionAnimation; self.choose = choose; self.hover = hover; self.act = act
+    }
+
+    /// The closures only forward this card's window id (part of `window`) to the long-lived controller.
+    nonisolated static func == (lhs: SwitcherItem, rhs: SwitcherItem) -> Bool {
+        lhs.window == rhs.window && lhs.style == rhs.style && lhs.size == rhs.size && lhs.badge == rhs.badge
+            && lhs.selected == rhs.selected && lhs.thumbnailSlot === rhs.thumbnailSlot && lhs.actionBusy == rhs.actionBusy
+            && lhs.presentation == rhs.presentation && lhs.reduceMotion == rhs.reduceMotion
+            && lhs.reduceTransparency == rhs.reduceTransparency && lhs.selectionAnimation == rhs.selectionAnimation
+    }
+
+    private var thumbnail: NSImage? { thumbnailSlot.image }
+    private var thumbnailUnavailable: Bool { thumbnailSlot.unavailable || !window.canCapturePreview }
 
     private var radius: CGFloat { style == .titles ? 8 : 12 }
     private var showsActions: Bool { presentation.showActions && hovering && (window.canClose || window.canMinimize || window.canFullScreen) }

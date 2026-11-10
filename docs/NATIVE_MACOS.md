@@ -634,3 +634,24 @@ Dokuz eşleşmiş CPU ölçümünün sekizinde yeni sürüm daha düşük çıkt
 Mikro ölçüm (paketlenmiş uygulama): `localization: nil` 0,11–0,19 µs; açık `tr` 24–32 µs; açık `en` 312–315 µs. İngilizce senaryo kullanıcının kalıcı ayarı değiştirilmeden komut satırı argümanlarıyla canlandırıldı; ekrandaki metinlerin gerçekten İngilizce çıktığı görsel olarak doğrulanmadı, yalnız arama yolu ve dili doğrulandı.
 
 **Etkisi:** Ölçüm sürümü bu makinede uygulama alanına kalıcı olarak `AppleLocale=tr_TR` yazdı. Bu, tasarımın normal davranışı. Önceki derlemeler bu anahtarı okumaz ama `Locale.current` üzerinden AppKit biçimlendirmesi Türkçeleşir. Tam kök grupta XCTest **1.030 testte 1 hata** var: `PowerLiveSystemTests.testStreamingLogReaderFindsEventsWithBoundedOutput`, önceki commit'te de aynı nedenle başarısız. Swift Testing **355 test** geçti; yerelleştirme 0 eksik.
+
+### Pencere geçişi HUD'u: Observation ve kart kapsamı — 10 Kasım 2026
+
+**Değişiklik:** `WindowSwitcherModel` `@Observable` oldu; iç kayıtlar (önbellek, yakalama zamanları, görevler, `filteredCache`) `@ObservationIgnored`. Denetleyicideki üç Combine aboneliği (`$windows`+`$sessionSearch`, `$exceptionRules`, `$selection`) `Observations` görevine taşındı. Denetleyici `ObservableObject` olarak kaldı. Ayrıca:
+- **Kart başına görsel:** Her kart görselini kendi `SwitcherThumbnailSlot`'undan okur; `thumbnails`/`unavailableThumbnails` gözlenmez, değişiklikleri yalnız etkilenen slota yansıtılır.
+- **Atlanan kartlar:** `SwitcherItem` `Equatable`; kapanışlar yalnız kendi pencere kimliğini uzun ömürlü denetleyiciye iletir. Girdisi değişmeyen kart yeniden hesaplanmaz.
+- **Tek işlem:** Seçim panel gövdesinde okunur ve ızgaraya parametre olarak geçer. Yalnız tembel kapanışlar içinde okunduğunda seçim güncellemesi bölünüyor, seçim animasyonu ölçülebilir biçimde daha fazla çiziliyordu: 200 adımda 7,3 → 8,4 s süreç CPU'su (+%16, `.equatable()` olmadan da aynı).
+- **Eşit değer yazımları:** Açık HUD'un okuduğu bayrak yazımları (`trusted`, `partial`, alan bilgisi, arama durumu) yalnız değişince yapılır. 1 yeni test.
+
+**Ölçüm** (`8fdebdb` ile karşılaştırma; release, sahte 24 pencere, 640×400 sahte görsel, 12 ms yakalama gecikmesi, gerçek `NSPanel` + `NSHostingView`, `beginHeldAudit`; üç eşleşmiş tur, değerler turlar arasında ±%2):
+
+| Aşama | Kart gövdesi | Panel gövdesi | CPU (ms) |
+| --- | --- | --- | --- |
+| Canlı önizleme, 12 s (~255 yakalama) | 1.488 → **264** | 62 → **0** | 630–644 → 630–640 (fark yok) |
+| 50 Tab adımı, 120 ms arayla | 2.016–2.136 → **243** | 84–89 → **50** | 1.667–1.678 → **1.565–1.581** (-%6) |
+| İlgisiz 200 `UserDefaults` yazımı, panel açık | ~4.900 → **44** | ~204 → 200 | 739–757 → **327–339** (-%55) |
+| Yalnız gezinme, 200 adım, süreç user+sys (s) | — | — | 7,26–7,37 → **6,87–6,96** (-%6) |
+
+**Kalan maliyet:** Tab başına CPU'nun çoğu seçim animasyonunun çizimidir (Core Animation, metin glifi doldurma, `RBInterpolatedDisplayListContents`). Seçim animasyonu kapalıyken 200 adım iki sürümde de 2,5 s user'dır; açıkken ~6 s. Canlı önizlemede maliyet görüntü çizimidir, gövde hesaplaması değildir. Panel gövdesi her `UserDefaults` yazımında yeniden hesaplanır (`@PocketReduceMotion` içindeki `@AppStorage`). Kartlar artık atlandığı için bu ucuzdur.
+
+**Doğrulama sınırı:** Ölçüm ve ekran görüntüsü sahte pencerelerle yapıldı. Ekran görüntüsü seçim çerçevesini iki kart arasında kayarken ve görselleri yerinde gösteriyor. Gerçek pencerelerle fiziksel Alt+Tab basışı ve animasyon akıcılığı bu turda gözle doğrulanmadı. XCTest 1.030 testte yalnız bilinen `pmset` canlı testi başarısız; Swift Testing 355 test geçti; yerelleştirme 0 eksik.

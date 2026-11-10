@@ -1,7 +1,7 @@
 import CoreGraphics
 import Foundation
 
-public struct WindowTabInfo: Sendable {
+public struct WindowTabInfo: Sendable, Equatable {
     public let groupID: String
     public let controlID: String
     public let ordinal: Int

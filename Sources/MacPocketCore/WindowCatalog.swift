@@ -4,7 +4,7 @@ import CoreGraphics
 import Darwin
 import Foundation
 
-public struct SwitchableWindow: Identifiable, Sendable {
+public struct SwitchableWindow: Identifiable, Equatable, Sendable {
     public let id: String
     public let processID: Int32
     public let application: String

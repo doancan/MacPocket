@@ -3,38 +3,59 @@ import Combine
 import MacPocketCore
 import SwiftUI
 
+/// One card's image state. Cards observe their own slot, so a capture redraws that card only
+/// instead of invalidating the grid and every other card.
+@MainActor
+@Observable
+final class SwitcherThumbnailSlot {
+    fileprivate(set) var image: NSImage?
+    fileprivate(set) var unavailable = false
+}
+
 /// Shared window list for the keyboard switcher and the Tools detail table.
 @MainActor
-final class WindowSwitcherModel: ObservableObject {
-    @Published private(set) var windows: [SwitchableWindow] = [] { didSet { filteredCache = nil } }
-    @Published private(set) var trusted = AXIsProcessTrusted()
-    @Published private(set) var partial = false
-    @Published private(set) var otherSpacesVisible = false
-    @Published private(set) var spaceMetadataAvailable = false
-    @Published private(set) var spaceMetadataPartial = false
-    @Published private(set) var busy = false
-    @Published private(set) var actionBusy = false
-    @Published var failure: String?
-    @Published var selection: String?
+@Observable
+final class WindowSwitcherModel {
+    private(set) var windows: [SwitchableWindow] = [] { didSet { filteredCache = nil } }
+    private(set) var trusted = AXIsProcessTrusted()
+    private(set) var partial = false
+    private(set) var otherSpacesVisible = false
+    private(set) var spaceMetadataAvailable = false
+    private(set) var spaceMetadataPartial = false
+    private(set) var busy = false
+    private(set) var actionBusy = false
+    var failure: String?
+    var selection: String?
     /// Table search in Tools.
-    @Published var search = "" { didSet { filteredCache = nil } }
+    var search = "" { didSet { filteredCache = nil } }
     /// Type-to-search inside the switcher panel.
-    @Published var sessionSearch = "" { didSet { filteredCache = nil } }
-    @Published private(set) var isSearching = false
-    /// Live thumbnails keyed by window id; only populated while the switcher is open.
-    @Published private(set) var thumbnails: [String: NSImage] = [:]
-    @Published private(set) var unavailableThumbnails = Set<String>()
+    var sessionSearch = "" { didSet { filteredCache = nil } }
+    private(set) var isSearching = false
+    /// Live thumbnails keyed by window id; only populated while the switcher is open. Views read
+    /// `thumbnailSlot(for:)` instead, so these two are not observed directly.
+    @ObservationIgnored private(set) var thumbnails: [String: NSImage] = [:] {
+        didSet { for (id, slot) in thumbnailSlots where slot.image !== thumbnails[id] { slot.image = thumbnails[id] } }
+    }
+    @ObservationIgnored private(set) var unavailableThumbnails = Set<String>() {
+        didSet {
+            for (id, slot) in thumbnailSlots {
+                let unavailable = unavailableThumbnails.contains(id)
+                if slot.unavailable != unavailable { slot.unavailable = unavailable }
+            }
+        }
+    }
+    @ObservationIgnored private var thumbnailSlots: [String: SwitcherThumbnailSlot] = [:]
     /// Application-owned Dock values, populated only while the HUD is visible.
-    @Published private(set) var applicationBadges: [DockBadgeTarget: DockApplicationBadge] = [:]
+    private(set) var applicationBadges: [DockBadgeTarget: DockApplicationBadge] = [:]
     /// Large image of the selected window for the in-place preview.
-    @Published private(set) var selectedPreview: (id: String, image: NSImage)?
-    @Published var preview: NSImage?
-    @Published var previewBusy = false
-    @Published var previewMessage: String?
-    @Published private(set) var lastRefresh: Date?
+    private(set) var selectedPreview: (id: String, image: NSImage)?
+    var preview: NSImage?
+    var previewBusy = false
+    var previewMessage: String?
+    private(set) var lastRefresh: Date?
 
-    @Published private(set) var lifecycleRevision: UInt64 = 0
-    private var appliedLifecycle: WindowLifecycleSnapshot = .unavailable
+    private(set) var lifecycleRevision: UInt64 = 0
+    @ObservationIgnored private var appliedLifecycle: WindowLifecycleSnapshot = .unavailable
 
     var foregroundPID: Int32? { didSet { filteredCache = nil } }
     /// Non-nil while a switcher session runs; it replaces the table filters.
@@ -43,39 +64,39 @@ final class WindowSwitcherModel: ObservableObject {
     var sessionOrder: WindowSortOrder? { didSet { filteredCache = nil } }
     private(set) var sessionPointerLocation: CGPoint? { didSet { filteredCache = nil } }
     private(set) var sessionPointerApplicationPID: Int32? { didSet { filteredCache = nil } }
-    @Published private(set) var exceptionRules: [SwitcherExceptionRule] { didSet { filteredCache = nil } }
+    private(set) var exceptionRules: [SwitcherExceptionRule] { didSet { filteredCache = nil } }
     /// Selection, image and badge updates reuse the same projection. Its inputs invalidate the
     /// cache above; effective defaults ordering and locale are checked on read as they can change
     /// outside this object. One bounded value array is retained, never AX handles or images.
-    private var filteredCache: (order: WindowSortOrder,locale: String,windows: [SwitchableWindow])?
-    private let defaults: UserDefaults
-    private let badgeReader: any DockApplicationBadgeReading
-    private var badgeSessionID: UUID?
-    private var badgeWorkerID: UUID?
-    private let cursorFollower: any WindowCursorFollowing
-    private var focusGeneration = UUID()
-    private var exceptionObserver: AnyCancellable?
-    private let catalog: any WindowCatalogServing
-    private let focusObservation: any WindowFocusObserving
-    private let lifecycleObservation: any WindowLifecycleObserving
-    private let previews: any WindowPreviewCapturing
-    private let permitsCapture: @MainActor () -> Bool
-    private var activationObserver: AnyCancellable?
-    private var lifecycleObserver: AnyCancellable?
-    private var refreshTask: Task<WindowCatalogReport, Never>?
-    private var refreshID = UUID()
-    private var appliedRefreshID: UUID?
-    private var thumbnailGeneration = UUID()
-    private var visibleThumbnailIDs = Set<String>()
-    private var thumbnailCapturedAt: [String: Date] = [:]
-    private var thumbnailAccessedAt: [String: Date] = [:]
-    private var thumbnailCosts: [String: Int] = [:]
-    private let thumbnailCacheBudget: Int
-    private var thumbnailRequests: AsyncStream<Void>.Continuation?
-    private var thumbnailWorkerID: UUID?
-    private var actionReconciliationTask: Task<Void, Never>?
-    private var actionReconciliationID = UUID()
-    private var thumbnailAttemptedIDs = Set<String>()
+    @ObservationIgnored private var filteredCache: (order: WindowSortOrder,locale: String,windows: [SwitchableWindow])?
+    @ObservationIgnored private let defaults: UserDefaults
+    @ObservationIgnored private let badgeReader: any DockApplicationBadgeReading
+    @ObservationIgnored private var badgeSessionID: UUID?
+    @ObservationIgnored private var badgeWorkerID: UUID?
+    @ObservationIgnored private let cursorFollower: any WindowCursorFollowing
+    @ObservationIgnored private var focusGeneration = UUID()
+    @ObservationIgnored private var exceptionObserver: AnyCancellable?
+    @ObservationIgnored private let catalog: any WindowCatalogServing
+    @ObservationIgnored private let focusObservation: any WindowFocusObserving
+    @ObservationIgnored private let lifecycleObservation: any WindowLifecycleObserving
+    @ObservationIgnored private let previews: any WindowPreviewCapturing
+    @ObservationIgnored private let permitsCapture: @MainActor () -> Bool
+    @ObservationIgnored private var activationObserver: AnyCancellable?
+    @ObservationIgnored private var lifecycleObserver: AnyCancellable?
+    @ObservationIgnored private var refreshTask: Task<WindowCatalogReport, Never>?
+    @ObservationIgnored private var refreshID = UUID()
+    @ObservationIgnored private var appliedRefreshID: UUID?
+    @ObservationIgnored private var thumbnailGeneration = UUID()
+    @ObservationIgnored private var visibleThumbnailIDs = Set<String>()
+    @ObservationIgnored private var thumbnailCapturedAt: [String: Date] = [:]
+    @ObservationIgnored private var thumbnailAccessedAt: [String: Date] = [:]
+    @ObservationIgnored private var thumbnailCosts: [String: Int] = [:]
+    @ObservationIgnored private let thumbnailCacheBudget: Int
+    @ObservationIgnored private var thumbnailRequests: AsyncStream<Void>.Continuation?
+    @ObservationIgnored private var thumbnailWorkerID: UUID?
+    @ObservationIgnored private var actionReconciliationTask: Task<Void, Never>?
+    @ObservationIgnored private var actionReconciliationID = UUID()
+    @ObservationIgnored private var thumbnailAttemptedIDs = Set<String>()
     var thumbnailSessionID: UUID { thumbnailGeneration }
 
     init(windows: [SwitchableWindow] = [], catalog: any WindowCatalogServing = WindowCatalog(),
@@ -163,6 +184,16 @@ final class WindowSwitcherModel: ObservableObject {
         thumbnailAccessedAt = thumbnailAccessedAt.filter { present.contains($0.key) }
         thumbnailCosts = thumbnailCosts.filter { present.contains($0.key) }
         unavailableThumbnails.formIntersection(present)
+        if thumbnailSlots.keys.contains(where: { !present.contains($0) }) { thumbnailSlots = thumbnailSlots.filter { present.contains($0.key) } }
+    }
+
+    /// Stable per-window image state for a card; created on first use with the current values.
+    func thumbnailSlot(for id: String) -> SwitcherThumbnailSlot {
+        if let slot = thumbnailSlots[id] { return slot }
+        let slot = SwitcherThumbnailSlot()
+        slot.image = thumbnails[id]; slot.unavailable = unavailableThumbnails.contains(id)
+        thumbnailSlots[id] = slot
+        return slot
     }
 
     func reloadExceptions() {
@@ -191,8 +222,11 @@ final class WindowSwitcherModel: ObservableObject {
 
     var selected: SwitchableWindow? { filtered.first { $0.id == selection } }
 
-    func beginSearch() { isSearching = true }
-    func resetSessionSearch() { sessionSearch = ""; isSearching = false }
+    func beginSearch() { if !isSearching { isSearching = true } }
+    func resetSessionSearch() {
+        if !sessionSearch.isEmpty { sessionSearch = "" }
+        if isSearching { isSearching = false }
+    }
 
     func captureSessionPointer(at point: CGPoint?) {
         sessionPointerLocation = point
@@ -229,10 +263,12 @@ final class WindowSwitcherModel: ObservableObject {
         let present = Set(report.windows.map(\.id))
         retainThumbnails(present)
         appliedLifecycle = report.lifecycle
-        trusted = report.accessibilityGranted
-        partial = report.partial
-        otherSpacesVisible = report.otherSpacesVisible
-        spaceMetadataAvailable = report.spaceMetadataAvailable; spaceMetadataPartial = report.spaceMetadataPartial
+        // Observation notifies on every write, even of an equal value; the open HUD reads these flags.
+        if trusted != report.accessibilityGranted { trusted = report.accessibilityGranted }
+        if partial != report.partial { partial = report.partial }
+        if otherSpacesVisible != report.otherSpacesVisible { otherSpacesVisible = report.otherSpacesVisible }
+        if spaceMetadataAvailable != report.spaceMetadataAvailable { spaceMetadataAvailable = report.spaceMetadataAvailable }
+        if spaceMetadataPartial != report.spaceMetadataPartial { spaceMetadataPartial = report.spaceMetadataPartial }
         lastRefresh = Date()
         if sessionFilter == nil, foregroundPID == ProcessInfo.processInfo.processIdentifier || foregroundPID == nil {
             foregroundPID = windows.first?.processID
@@ -455,7 +491,7 @@ final class WindowSwitcherModel: ObservableObject {
                         thumbnailAttemptedIDs.insert(id)
                         if let image {
                             cacheThumbnail(image, id: id)
-                            unavailableThumbnails.remove(id)
+                            if unavailableThumbnails.contains(id) { unavailableThumbnails.remove(id) }
                         } else {
                             unavailableThumbnails.insert(id)
                         }
@@ -535,6 +571,5 @@ final class WindowSwitcherModel: ObservableObject {
         }
         reloadExceptions()
         selection = nil
-        objectWillChange.send()
     }
 }

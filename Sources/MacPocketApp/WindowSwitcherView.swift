@@ -6,7 +6,8 @@ import SwiftUI
 /// Tools → Pencere Geçişi: switcher settings and the detailed window table.
 struct WindowSwitcherView: View {
     @ObservedObject private var controller = WindowSwitcherHotkeyController.shared
-    @StateObject private var model = WindowSwitcherModel()
+    /// Created on first appearance: `@State` would otherwise build a model (catalog, observers) on every view init.
+    @State private var model: WindowSwitcherModel?
     @State private var section = Section.settings
     @State private var accessibility = AXIsProcessTrusted()
     @State private var screenRecording = WindowPreviewProvider.permitted
@@ -32,12 +33,16 @@ struct WindowSwitcherView: View {
                 .frame(maxWidth: 320)
             switch section {
             case .settings: SwitcherSettingsForm(controller: controller)
-            case .windows: SwitcherWindowTable(model: model)
+            case .windows: if let model { SwitcherWindowTable(model: model) }
             }
         }
         .pocketPage()
-        .onAppear { model.startObserving() }
-        .onDisappear { model.stopObserving() }
+        .onAppear {
+            let model = model ?? WindowSwitcherModel()
+            self.model = model
+            model.startObserving()
+        }
+        .onDisappear { model?.stopObserving() }
         .task {
             while !Task.isCancelled {
                 secureInput = SecureKeyboardInputStatus.read()
@@ -118,7 +123,7 @@ struct WindowSwitcherView: View {
 // MARK: - Window table
 
 private struct SwitcherWindowTable: View {
-    @ObservedObject var model: WindowSwitcherModel
+    @Bindable var model: WindowSwitcherModel
     @State private var confirmClose = false
     @State private var pendingClose: SwitchableWindow?
     @FocusState private var searchFocused: Bool
