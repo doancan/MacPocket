@@ -617,3 +617,20 @@ Dokuz eşleşmiş CPU ölçümünün sekizinde yeni sürüm daha düşük çıkt
 **Asıl CPU kaynağı (Time Profiler, kapsayıcı):** Ana iş parçacığı örneklerinin ~5.500'ü, yani 45 sn'de ~0,55 sn, SwiftUI'nin `Text(LocalizedStringKey)` çözümlemesinden `-[NSBundle localizedAttributedStringForKey:value:table:localization:]` çağrısına gider. Bu yol metin tablosunu her çağrıda diskten yeniden okur (`open`/`statfs`/`_CFDataCreateFromURL`). Mikro ölçüm (paketlenmiş uygulama, 2.000 çağrı): `localization: nil` **0,11–0,19 µs**; açık `tr` **24–32 µs**; açık `en` (359 KB tablo) **312–315 µs**. SwiftUI, environment `locale` kimliği `Locale.current` ile aynı olduğunda `nil`, değilse açık dili geçirir. `pocketLocale` bölgesiz olduğu için (`"tr"`/`"en"`) her kullanıcı açık yola düşer. Heceleme sözlüğü `stat` çağrıları (~1.900 örnek) ve izleme desteğinin SHA256'sı (~1.350 örnek, Instruments kaynaklı) ayrıca görüldü.
 
 **Not:** `PowerLiveSystemTests.testStreamingLogReaderFindsEventsWithBoundedOutput` bu makinede şu an commit'lenmiş kodda da başarısız; canlı `pmset -g log` içeriğine bağlı, değişiklikle ilgisiz. Diğer 1.027 XCTest ve 355 Swift Testing testi geçti; yerelleştirme 0 eksik.
+
+### Metin literal'leri için önbellekli yerelleştirme yolu — 10 Kasım 2026
+
+**Sorun:** SwiftUI, environment `locale` kimliği `Locale.current` ile aynı değilse her `Text` literal'ini `-[NSBundle localizedAttributedStringForKey:value:table:localization:]` ile belirli bir dilde çözer. Bu yol metin tablosunu her çağrıda diskten yeniden okur. Ayrı bir SwiftUI sondası çağrıları saydı: environment'ta yerel ayar yoksa, `.current`, `.autoupdatingCurrent` ya da `Locale(identifier: Locale.current.identifier)` verildiğinde `localization: nil`; `tr`, `en` gibi farklı bir kimlik verildiğinde açık dil geçiyor. Uygulama alanındaki `AppleLanguages` `Locale.current`'ı değiştirmez; `AppleLocale` değiştirir (`en_TR` → `tr_TR`, Türkçe tarih ve ondalık virgülle). Eski `pocketLocale` bölgesiz olduğundan (`"tr"`/`"en"`) bütün kullanıcılar yavaş yoldaydı.
+
+**Değişiklik:** `AppLanguage` Türkçe/İngilizce kaydedilince uygulama alanına sistem yerel ayarından türetilmiş `AppleLocale` yazar. Yalnız dil değişir; bölge, takvim ve diğer anahtar sözcükler korunur (`en_TR` → `tr_TR`, `de_DE@calendar=buddhist` → `en_DE@calendar=buddhist`). "Sistem" seçilince kayıt kaldırılır. Açılışta `applyLanguageDefault` aynı değeri yeniden hesaplar, böylece sistem bölgesi değişikliği de izlenir. `pocketLocale`, dili uygulama diliyle eşleşiyorsa `Locale.current`'tır; eşleşmiyorsa, ör. hizalamadan önceki ilk açılışta, bölgesi korunmuş doğru dilde bir yerel ayar kullanılır (doğru ama yavaş yol). Biçimlendirme artık seçilen dil ve kullanıcının bölgesiyle yapılır (`tr` → `tr_TR`, `en` → `en_TR`/`en_GB`). `AppleLocale` ayar aktarımına girmez. 2 yeni test.
+
+**Canlı ölçüm** (Güç sayfası, `165fdb8` ile karşılaştırma, 45 sn, aynı yöntem):
+
+| Arayüz dili | Tablo yükleme örnekleri | Süreç CPU, eşleşmiş turlar (önce → sonra, s) |
+| --- | --- | --- |
+| Türkçe (kalıcı tercih, ısınma açılışından sonra `AppleLocale=tr_TR`) | 1.632 → **34** | 6,88→6,13 · 3,16→3,04 · 3,23→2,97 · 3,02→3,04 |
+| İngilizce (`-AppleLanguages (en)`; yeni sürümde hizalanmış `-AppleLocale en_TR`, argüman alanıyla) | 15.005 → **26** | 8,81→6,12 · 4,35→3,03 · 4,41→2,92 (**-%30–34**) |
+
+Mikro ölçüm (paketlenmiş uygulama): `localization: nil` 0,11–0,19 µs; açık `tr` 24–32 µs; açık `en` 312–315 µs. İngilizce senaryo kullanıcının kalıcı ayarı değiştirilmeden komut satırı argümanlarıyla canlandırıldı; ekrandaki metinlerin gerçekten İngilizce çıktığı görsel olarak doğrulanmadı, yalnız arama yolu ve dili doğrulandı.
+
+**Etkisi:** Ölçüm sürümü bu makinede uygulama alanına kalıcı olarak `AppleLocale=tr_TR` yazdı. Bu, tasarımın normal davranışı. Önceki derlemeler bu anahtarı okumaz ama `Locale.current` üzerinden AppKit biçimlendirmesi Türkçeleşir. Tam kök grupta XCTest **1.030 testte 1 hata** var: `PowerLiveSystemTests.testStreamingLogReaderFindsEventsWithBoundedOutput`, önceki commit'te de aynı nedenle başarısız. Swift Testing **355 test** geçti; yerelleştirme 0 eksik.

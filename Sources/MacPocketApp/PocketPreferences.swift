@@ -44,6 +44,7 @@ enum PocketDefaults {
     /// MacPocket was Turkish-only before English was added. Until the user picks a language, keep Turkish
     /// instead of silently following an English system; an explicit "Sistem" choice is respected afterwards.
     static func applyLanguageDefault(_ defaults: UserDefaults = .standard) {
+        defer { AppLanguage.load(from: defaults, domain: domain).alignLocale(in: defaults) }
         guard defaults.object(forKey: languageConfiguredKey) == nil else { return }
         if AppLanguage.load(from: defaults, domain: domain) == .system { AppLanguage.turkish.save(to: defaults) }
         defaults.set(true, forKey: languageConfiguredKey)

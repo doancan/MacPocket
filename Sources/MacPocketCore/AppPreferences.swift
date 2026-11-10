@@ -33,9 +33,39 @@ public enum AppLanguage: String, CaseIterable, Identifiable, Sendable {
         AppLanguage(appleLanguages: defaults.persistentDomain(forName: domain)?[defaultsKey] as? [String])
     }
 
-    public func save(to defaults: UserDefaults) {
+    /// App-domain `AppleLocale`, kept in step with the pinned language so `Locale.current` speaks it.
+    /// SwiftUI resolves `Text` literals through the bundle's cached string table only when the environment
+    /// locale is `Locale.current`; any other locale reloads the table from disk for every literal.
+    public static let localeKey = "AppleLocale"
+
+    /// The system-wide locale identifier (for example `en_TR`), ignoring this app's own override.
+    public static var systemLocaleIdentifier: String? {
+        UserDefaults.standard.persistentDomain(forName: UserDefaults.globalDomain)?[localeKey] as? String
+    }
+
+    /// `systemLocale` with only its language replaced (region, calendar and other keywords are kept);
+    /// nil for `.system` or when there is no system locale to adapt.
+    public func appleLocale(systemLocale: String?) -> String? {
+        guard let language = appleLanguages?.first, let systemLocale, !systemLocale.isEmpty else { return nil }
+        var components = Locale.Components(identifier: systemLocale)
+        components.languageComponents.languageCode = Locale.LanguageCode(language)
+        return Locale(components: components).identifier
+    }
+
+    public func save(to defaults: UserDefaults, systemLocale: String? = AppLanguage.systemLocaleIdentifier) {
         if let appleLanguages { defaults.set(appleLanguages, forKey: Self.defaultsKey) }
         else { defaults.removeObject(forKey: Self.defaultsKey) }
+        alignLocale(in: defaults, systemLocale: systemLocale)
+    }
+
+    /// Writes or removes the app-domain `AppleLocale` to match this choice; also run at launch so a changed
+    /// system region is picked up. Takes effect for `Locale.current` from the next launch at the latest.
+    public func alignLocale(in defaults: UserDefaults, systemLocale: String? = AppLanguage.systemLocaleIdentifier) {
+        if let locale = appleLocale(systemLocale: systemLocale) {
+            if defaults.string(forKey: Self.localeKey) != locale { defaults.set(locale, forKey: Self.localeKey) }
+        } else {
+            defaults.removeObject(forKey: Self.localeKey)
+        }
     }
 }
 

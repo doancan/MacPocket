@@ -485,7 +485,18 @@ struct PocketAppIcon: View {
 
 /// Formatters follow the language the app is running in (Settings → General → Language),
 /// not the system region, so numbers and units match the surrounding copy.
-let pocketLocale = Locale(identifier: Bundle.main.preferredLocalizations.first ?? "tr")
+/// The app language with the user's region. When it is `Locale.current` (the app-domain `AppleLocale` is kept
+/// aligned, see `AppLanguage.alignLocale`), SwiftUI resolves `Text` literals from the cached string table:
+/// ~0.2 µs per literal instead of ~30 µs (Turkish) or ~300 µs (English) for any other environment locale.
+let pocketLocale: Locale = {
+    let language = Bundle.main.preferredLocalizations.first ?? "tr"
+    let current = Locale.current
+    if current.language.languageCode?.identifier == language { return current }
+    // Not aligned yet (first launch after a change): correct language and region, slower literal lookups.
+    var components = Locale.Components(locale: current)
+    components.languageComponents.languageCode = Locale.LanguageCode(language)
+    return Locale(components: components)
+}()
 
 @MainActor private let pocketByteFormatter: ByteCountFormatter = {
     let formatter = ByteCountFormatter()

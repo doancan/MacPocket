@@ -35,6 +35,31 @@ final class AppPreferencesTests: XCTestCase {
         XCTAssertEqual(AppLanguage.load(from: defaults, domain: domain), .system)
     }
 
+    func testPinnedLanguageAlignsLocaleKeepingRegionAndKeywords() {
+        XCTAssertEqual(AppLanguage.turkish.appleLocale(systemLocale: "en_TR"), "tr_TR")
+        XCTAssertEqual(AppLanguage.english.appleLocale(systemLocale: "tr_TR"), "en_TR")
+        XCTAssertEqual(AppLanguage.english.appleLocale(systemLocale: "de_DE@calendar=buddhist"), "en_DE@calendar=buddhist")
+        XCTAssertNil(AppLanguage.system.appleLocale(systemLocale: "en_TR"))
+        XCTAssertNil(AppLanguage.turkish.appleLocale(systemLocale: nil))
+        // The aligned identifier is what makes the app's current locale speak the pinned language.
+        XCTAssertEqual(Locale(identifier: AppLanguage.turkish.appleLocale(systemLocale: "en_TR")!).language.languageCode, "tr")
+    }
+
+    func testLocaleOverrideFollowsLanguageChoice() {
+        let (defaults, domain) = defaults()
+        AppLanguage.turkish.save(to: defaults, systemLocale: "en_TR")
+        XCTAssertEqual(defaults.string(forKey: AppLanguage.localeKey), "tr_TR")
+        AppLanguage.english.save(to: defaults, systemLocale: "en_TR")
+        XCTAssertEqual(defaults.string(forKey: AppLanguage.localeKey), "en_TR")
+        // A changed system region is picked up by the launch-time alignment.
+        AppLanguage.english.alignLocale(in: defaults, systemLocale: "en_GB")
+        XCTAssertEqual(defaults.string(forKey: AppLanguage.localeKey), "en_GB")
+        AppLanguage.system.save(to: defaults, systemLocale: "en_TR")
+        // Read the suite's own domain: `object(forKey:)` would fall through to the global AppleLocale.
+        XCTAssertNil(defaults.persistentDomain(forName: domain)?[AppLanguage.localeKey])
+        XCTAssertNil(defaults.persistentDomain(forName: domain)?[AppLanguage.defaultsKey])
+    }
+
     // MARK: Settings transfer
 
     func testTransferableKeys() {
