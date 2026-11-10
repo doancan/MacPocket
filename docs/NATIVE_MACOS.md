@@ -532,3 +532,30 @@ Büyük geçmişin ilk hazırlığı **1248,84 ms**; bu sırada 5 ms aralıklı 
 Normalleştirilmiş hızlı yol belirgin biçimde ucuzladı; Foundation karşılaştırması gereken özel sorgular hâlâ pahalı olabilir. `ß` örneğinde küçük ek maliyet, `olmayan-öğe` örneğinde yaklaşık 1,76 saniyelik arka plan işi kaldı. Bunlar gizlenmez ve bütün Unicode sorguları için milisaniye düzeyinde sonuç iddia edilmez. İlk hazırlığın RAM maliyeti bu turda ayrı ölçülmedi.
 
 **Son kontroller ve canlı sınır:** Tam kök test grubunda **1.568 test, 0 hata, 6 isteğe bağlı atlama**. Yerelleştirme **4.518 anahtar, 0 eksik İngilizce çeviri/biçim uyuşmazlığı**. İmzalı Release derlemesi ve sıkı kod imzası doğrulaması geçti; ürün mevcut **0.1.6 / 9** olarak yeniden açıldı. Canlı doğrulama uygulamanın açılışıdır; fiziksel klavyeyle panelde uçtan uca arama kabulü yapılmış sayılmaz. Disk yazımı, görsel önbelleği, sensör talepleri ve genel gözlem kapsamı bu değişikliğin dışındadır.
+
+### Pano geçmişinin otomatik kaydını arka plana taşıma — 10 Kasım 2026
+
+**İnceleme:** Bir saniyelik birleştirme gecikmesi bittikten sonra `ClipboardService.flushSave()` ana aktörde `ClipboardArchive.save()` çağırıyordu. JSON kodlama, atomik değiştirme ve dosya izinleri aynı çağrıyı bekletiyordu. Değişikliksiz kayıtların atlanması önceki turda yapılmıştı; burada gerçek değişikliklerin otomatik kaydı hedeflendi.
+
+**Uygulama:** Otomatik kayıt artık `ClipboardArchiveWriter` içindeki utility öncelikli seri Dispatch kuyruğuna sabit bir geçmiş anlık görüntüsü gönderir. Mevcut JSON/ISO8601 biçimi, atomik değiştirme ve owner-only izinler korunur. Ana aktör en fazla bir otomatik yazıyı takip eder; bu sırada gelen hazır kayıt istekleri bir bayrakta birleştirilir ve sonraki yazı güncel geçmişi alır. Ara anlık görüntüler kuyrukta birikmez. Başarılı yazı yalnız kendi revizyonu hâlâ güncelse dirty durumunu temizler; hata yeniden deneme için değişiklikleri dirty bırakır. İstek kimliği, eski tamamlanma/hata yanıtlarının yeni duruma uygulanmasını engeller.
+
+**Bilinçli sınır:** Normal otomatik kayıt arayüzü bekletmez. Açık `flushSave()` çağrıları (modül/özellik kapanışı ve uygulama çıkışı), arşivi yükleme, tamamen silme ve disk/bellek saklama geçişleri aynı kuyruğu senkron bekleyen dayanıklılık sınırlarıdır. Bu işlemler önceki yazının üzerine son durumun yazılmasını veya silmenin en son gerçekleşmesini sağlar; aynı başarılı revizyon ikinci kez yazılmaz. Bu tur, bütün dosya erişimlerini veya çıkış akışını asenkron yaptığını iddia etmez. Görsel dosyalarının okuma/yazımı da kapsam dışıdır. Disk tercihinin yakalama kapalıyken atlanması giderildi; kapatma tercihi artık bu durumda da arşivi siler.
+
+**Doğruluk:** `ClipboardPersistenceTests` grubundaki 13 testin yedisi yeni akışı sınar. Kontrol edilebilir yavaş/yazma hatalı disk testlerinde; yazı beklerken arayüz tarafının ilerleyebilmesi ve worker'ın ana iş parçacığında olmaması, 20 ara isteğin yalnız son durumla birleştirilmesi, başarısız yazının yeniden denenmesi, silme/saklama geçişlerinin eski yazıdan sonra tamamlanması, aynı revizyondaki kapanış flush'ının ikinci disk yazısı üretmemesi, kapalı yakalamada disk tercihi ve geç hata yanıtının başarılı açık yeniden denemeyi ezmemesi doğrulandı. Önceki değişikliksiz yazı/izin/bellek görseli testleri de geçti. Genel pano ve kullanıcı arşivi kullanılmadı.
+
+**Ölçüm yöntemi:** `scripts/measure-clipboard-writes.sh [çıktı-dizini]`, üretimdeki `ClipboardArchive` ve `ClipboardArchiveWriter` kaynaklarını `swiftc -O -whole-module-optimization` ile derler. 200/1.000 kayıt ve yaklaşık 200/20.000 karakterlik gövdelerde bir ısınma sonrası 10 eşleştirilmiş yazı alınır. Önceki ana aktör çağrısı ile yeni worker'ın kuyruğa verme/tamamlama süresi ayrı tutulur. Her çağrıdan önce sıraya bırakılan MainActor probunun beklemesi kaydedilir. Her yazıdan sonra iki arşiv de okunup tam geçmiş eşitliği ve 0600 dosya izni doğrulanır. Bir saniyelik birleştirme gecikmesi ve SwiftUI çizimi bu mikroteste dahil değildir; bu, uçtan uca uygulama kare süresi ölçümü değildir. Ham veriler `.build/clipboard-write-performance/write-report.json`, kaynak özetleri `source-sha256.json` içindedir.
+
+**Apple kaynakları:** [Yanıt verebilirlik rehberi](https://developer.apple.com/documentation/xcode/improving-app-responsiveness), normal arka plan işinin ana iş parçacığına asenkron sonuç bildirmesini önerir. [Dispatch kuyrukları](https://developer.apple.com/documentation/dispatch/dispatch-queue) seri FIFO çalışmayı ve `sync` ile `async` arasındaki bekleme farkını tanımlar. Üründe normal otomatik kayıt `async` kullanır; yukarıdaki açık dayanıklılık sınırları hâlâ bekler.
+
+**Son kontrollü ölçüm:** Derleme işleri bittikten sonra aynı kaynakla alınan 10 çiftin ortancaları:
+
+| Geçmiş | Önce MainActor probu | Worker kuyruğuna verme | Sonra MainActor probu | Arka plan kaydının tamamlanması |
+| --- | --- | --- | --- | --- |
+| 200 × 200 karakter | 0,9488 ms | 0,0040 ms | 0,0075 ms | 0,9274 ms |
+| 1000 × 200 karakter | 3,4380 ms | 0,0055 ms | 0,0101 ms | 3,3040 ms |
+| 200 × 20000 karakter | 8,5306 ms | 0,0073 ms | 0,0118 ms | 8,6748 ms |
+| 1000 × 20000 karakter | 40,1884 ms | 0,0082 ms | 0,0144 ms | 40,0552 ms |
+
+1.000 uzun kayıttaki JSON 20.15 MB'dir. Kazanç ana aktörün yazıyı beklememesidir; toplam JSON/disk işi yaklaşık 40 ms sürer. Worker'a gönderme süresi, tüm `ClipboardService` veya SwiftUI güncellemesinin maliyeti olarak sunulmaz. Kapanış/silme/geçiş sınırlarının bekleme süresine bu iyileştirme uygulanmaz.
+
+**Son kontroller ve canlı sınır:** Tam kök grupta **1.575 test, 0 hata, 6 isteğe bağlı atlama**. Yerelleştirme **4.518 anahtar, 0 eksik İngilizce çeviri/biçim uyuşmazlığı**. İmzalı Release derlemesi ve sıkı kod imzası doğrulaması geçti. Ürün sürüm/build değiştirilmeden **0.1.6 / 9** olarak yeniden açıldı. Canlı kabul bu paketin normal açılışını kapsar; kullanıcının gerçek panosuna deneme verisi yazılmadı. Arama indeksi korunur; genel SwiftUI gözlem kapsamı, sensör talepleri ve görsel önbelleği bu turun dışındadır.

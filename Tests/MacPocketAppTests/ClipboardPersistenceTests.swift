@@ -1,10 +1,11 @@
 import AppKit
 import XCTest
-import MacPocketCore
+@testable import MacPocketCore
 @testable import MacPocketApp
 
 @MainActor final class ClipboardPersistenceTests: XCTestCase {
-    private func fixture(history: ClipboardHistory = ClipboardHistory()) throws -> (ClipboardService, ClipboardArchive) {
+    private func fixture(history: ClipboardHistory = ClipboardHistory(),
+                         onWrite: (@Sendable (ClipboardHistory) throws -> Void)? = nil) throws -> (ClipboardService, ClipboardArchive) {
         let suite = "MacPocket.ClipboardPersistence." + UUID().uuidString
         let directory = FileManager.default.temporaryDirectory.appendingPathComponent(suite)
         let archive = ClipboardArchive(directory: directory)
@@ -18,7 +19,10 @@ import MacPocketCore
             UserDefaults(suiteName: suite)?.removePersistentDomain(forName: suite)
             try? FileManager.default.removeItem(at: directory)
         }
-        return (ClipboardService(defaults: defaults, archive: archive, pasteboard: pasteboard), archive)
+        let writer = onWrite.map { hook in
+            ClipboardArchiveWriter(archive: archive, write: { history in try hook(history); try archive.save(history) })
+        }
+        return (ClipboardService(defaults: defaults, archive: archive, pasteboard: pasteboard, archiveWriter: writer), archive)
     }
 
     private func item(_ content: ClipboardContent = .text("fixture"), pinned: Bool = false) -> ClipboardItem {
@@ -126,4 +130,141 @@ import MacPocketCore
         XCTAssertTrue(service.history.items.isEmpty)
         XCTAssertFalse(FileManager.default.fileExists(atPath: archive.directory.path))
     }
+
+    private func waitUntil(_ condition: @MainActor () throws -> Bool) async throws {
+        let deadline = ContinuousClock.now + .seconds(3)
+        while try !condition(), ContinuousClock.now < deadline { try await Task.sleep(for: .milliseconds(5)) }
+        XCTAssertTrue(try condition())
+    }
+
+    func testAutomaticSaveRunsOffMainAndCoalescesChangesDuringAnInFlightWrite() async throws {
+        let probe = ClipboardWriteProbe(pauseFirst: true)
+        defer { probe.release() }
+        let entry = item(.link(URL(string: "https://example.com/?utm_source=fixture&keep=1")!))
+        let (service, archive) = try fixture(history: ClipboardHistory(items: [entry]), onWrite: probe.write)
+        service.loadStoredHistory(); service.setPinned(true, entry); service.saveInBackground()
+        try await waitUntil { probe.snapshots.count == 1 }
+        XCTAssertFalse(probe.wroteOnMain)
+        for _ in 0..<20 { service.setPinned(false, entry); service.saveInBackground() }
+        service.cleanLink(entry); service.saveInBackground()
+        XCTAssertEqual(probe.snapshots.count, 1, "UI remains usable while the writer is blocked")
+        probe.release()
+        try await waitUntil { try archive.load() == service.history }
+        service.flushSave()
+        XCTAssertEqual(probe.snapshots.count, 2, "only the running snapshot and latest state are written")
+        XCTAssertTrue(probe.snapshots[0].items[0].pinned)
+        XCTAssertEqual(probe.snapshots[1], service.history)
+        let saved = try FileIdentity.read(archive.historyFile)
+        service.flushSave()
+        XCTAssertEqual(try FileIdentity.read(archive.historyFile), saved)
+    }
+
+    func testAutomaticFailureKeepsChangesDirtyAndCanRetry() async throws {
+        let probe = ClipboardWriteProbe(failFirst: true), entry = item()
+        let (service, archive) = try fixture(history: ClipboardHistory(items: [entry]), onWrite: probe.write)
+        service.loadStoredHistory(); service.setPinned(true, entry)
+        let original = try FileIdentity.read(archive.historyFile)
+        service.saveInBackground()
+        try await waitUntil { service.lastError != nil }
+        XCTAssertEqual(try FileIdentity.read(archive.historyFile), original)
+        service.saveInBackground()
+        try await waitUntil { try archive.load().items[0].pinned }
+        service.flushSave()
+        XCTAssertEqual(probe.snapshots.count, 2)
+        XCTAssertEqual(try archive.load(), service.history)
+    }
+
+    func testEraseWaitsForRunningWriteAndItsLateCallbackCannotRecreateArchive() async throws {
+        let probe = ClipboardWriteProbe(pauseFirst: true), entry = item()
+        defer { probe.release() }
+        let (service, archive) = try fixture(history: ClipboardHistory(items: [entry]), onWrite: probe.write)
+        service.loadStoredHistory(); service.setPinned(true, entry); service.saveInBackground()
+        try await waitUntil { probe.snapshots.count == 1 }
+        DispatchQueue.global().asyncAfter(deadline: .now() + 0.02) { probe.release() }
+        service.eraseEverything()
+        try await Task.sleep(for: .milliseconds(20))
+        service.flushSave()
+        XCTAssertEqual(probe.snapshots.count, 1)
+        XCTAssertTrue(service.history.items.isEmpty)
+        XCTAssertFalse(FileManager.default.fileExists(atPath: archive.directory.path))
+    }
+
+    func testMemoryOnlyTransitionDrainsRunningWriteAndNewDiskStateWins() async throws {
+        let probe = ClipboardWriteProbe(pauseFirst: true), entry = item()
+        defer { probe.release() }
+        let (service, archive) = try fixture(history: ClipboardHistory(items: [entry]), onWrite: probe.write)
+        service.loadStoredHistory(); service.setPinned(true, entry); service.saveInBackground()
+        try await waitUntil { probe.snapshots.count == 1 }
+        DispatchQueue.global().asyncAfter(deadline: .now() + 0.02) { probe.release() }
+        service.settings.saveToDisk = false
+        service.setPinned(false, entry)
+        try await Task.sleep(for: .milliseconds(20))
+        XCTAssertFalse(FileManager.default.fileExists(atPath: archive.directory.path))
+        service.settings.saveToDisk = true
+        try await Task.sleep(for: .milliseconds(20))
+        XCTAssertEqual(try archive.load(), service.history)
+        XCTAssertFalse(try archive.load().items[0].pinned)
+        XCTAssertEqual(probe.snapshots.count, 2)
+    }
+
+    func testExplicitFlushWaitsForRunningIdenticalSnapshotWithoutDuplicateWrite() async throws {
+        let probe = ClipboardWriteProbe(pauseFirst: true), entry = item()
+        defer { probe.release() }
+        let (service, archive) = try fixture(history: ClipboardHistory(items: [entry]), onWrite: probe.write)
+        service.loadStoredHistory(); service.setPinned(true, entry); service.saveInBackground()
+        try await waitUntil { probe.snapshots.count == 1 }
+        DispatchQueue.global().asyncAfter(deadline: .now() + 0.02) { probe.release() }
+        service.flushSave()
+        XCTAssertTrue(try archive.load().items[0].pinned)
+        try await Task.sleep(for: .milliseconds(20))
+        service.flushSave()
+        XCTAssertEqual(probe.snapshots.count, 1)
+    }
+
+    func testDiskStorageCanBeDisabledWhileCaptureIsDisabled() throws {
+        let (service, archive) = try fixture(history: ClipboardHistory(items: [item()]))
+        service.loadStoredHistory()
+        service.settings.enabled = false
+        service.settings.saveToDisk = false
+        XCTAssertFalse(FileManager.default.fileExists(atPath: archive.directory.path))
+        service.settings.saveToDisk = true
+        XCTAssertEqual(try archive.load(), service.history)
+    }
+
+    func testLateFailureCallbackCannotOverrideSuccessfulExplicitRetry() async throws {
+        let probe = ClipboardWriteProbe(failFirst: true), entry = item()
+        let (service, archive) = try fixture(history: ClipboardHistory(items: [entry]), onWrite: probe.write)
+        service.loadStoredHistory(); service.setPinned(true, entry)
+        service.saveInBackground()
+        service.flushSave() // Waits behind the first failing write and retries before its UI callback runs.
+        try await Task.sleep(for: .milliseconds(20))
+        XCTAssertNil(service.lastError)
+        XCTAssertTrue(try archive.load().items[0].pinned)
+        XCTAssertEqual(probe.snapshots.count, 2)
+    }
+}
+
+/// A deterministic slow/failing disk; mutable observations are protected by `lock`.
+private final class ClipboardWriteProbe: @unchecked Sendable {
+    private let lock = NSLock()
+    private let gate = DispatchSemaphore(value: 0)
+    private let pauseFirst: Bool
+    private let failFirst: Bool
+    private var recorded: [ClipboardHistory] = []
+    private var mainThread = false
+    init(pauseFirst: Bool = false, failFirst: Bool = false) {
+        self.pauseFirst = pauseFirst; self.failFirst = failFirst
+    }
+    var snapshots: [ClipboardHistory] { lock.withLock { recorded } }
+    var wroteOnMain: Bool { lock.withLock { mainThread } }
+    func release() { gate.signal() }
+    func write(_ history: ClipboardHistory) throws {
+        let count = lock.withLock {
+            recorded.append(history); mainThread = mainThread || Thread.isMainThread
+            return recorded.count
+        }
+        if count == 1, pauseFirst, gate.wait(timeout: .now() + 5) != .success { throw Failure.timedOut }
+        if count == 1, failFirst { throw Failure.disk }
+    }
+    private enum Failure: Error { case disk, timedOut }
 }
