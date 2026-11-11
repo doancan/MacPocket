@@ -206,6 +206,7 @@ struct AppFreezerView: View {
                         ForEach(AppFreezeRule.delayChoices, id: \.self) { Text("\($0) dk sonra").tag($0) }
                     }
                     .labelsHidden().fixedSize()
+                        .pocketMenuPicker()
                     Button { service.settings.rules.removeAll { $0.bundleID == rule.bundleID } } label: { Image(systemName: "minus.circle") }
                         .buttonStyle(.borderless)
                         .accessibilityLabel("\(Self.name(rule.bundleID)) kuralını kaldır")

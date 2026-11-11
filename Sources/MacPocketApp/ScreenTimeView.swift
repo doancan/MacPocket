@@ -458,6 +458,7 @@ struct ScreenTimeView: View {
                 Text("10 dakika").tag(600.0)
             }
             .fixedSize()
+                .pocketMenuPicker()
             Spacer()
             Button("Tüm Verileri Sil…", role: .destructive) { confirmDelete = true }
                 .buttonStyle(.bordered).tint(.red)

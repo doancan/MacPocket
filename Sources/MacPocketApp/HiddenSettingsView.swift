@@ -241,6 +241,7 @@ private struct HiddenSettingRow: View {
             }
             .labelsHidden()
             .fixedSize()
+                .pocketMenuPicker()
         }
     }
 

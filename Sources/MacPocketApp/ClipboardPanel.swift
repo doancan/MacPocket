@@ -187,6 +187,7 @@ struct ClipboardPanelView: View {
             }
             .labelsHidden()
             .fixedSize()
+                .pocketMenuPicker()
         }
         .padding(.horizontal, PocketSpacing.l)
         .frame(height: 54)

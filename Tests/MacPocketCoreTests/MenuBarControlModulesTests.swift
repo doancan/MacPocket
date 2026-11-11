@@ -23,7 +23,7 @@ final class MenuBarControlModulesTests: XCTestCase {
         defaults.set(MenuBarPreferences.schemaVersion, forKey: MenuBarPreferences.schemaKey)
         defaults.set("network,cpu,gpu,memory,disk,power,weather,aiUsage", forKey: MenuBarPreferences.orderKey)
         let loaded = MenuBarPreferences.load(from: defaults)
-        XCTAssertEqual(loaded.order.suffix(4), [.awake, .focus, .bluetooth, .display])
+        XCTAssertEqual(loaded.order.suffix(5), [.awake, .focus, .bluetooth, .display, .clock])
         XCTAssertFalse(loaded.enabled.contains(.awake))
     }
 

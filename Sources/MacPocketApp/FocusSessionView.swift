@@ -304,11 +304,13 @@ struct FocusSessionView: View {
                 ForEach(availableMacros) { Text($0.name).tag(Optional($0.id)) }
             }
             .frame(maxWidth: 420)
+                .pocketMenuPicker()
             Picker("Biterken çalışacak makro", selection: $service.settings.endMacro) {
                 Text("Yok").tag(UUID?.none)
                 ForEach(availableMacros) { Text($0.name).tag(Optional($0.id)) }
             }
             .frame(maxWidth: 420)
+                .pocketMenuPicker()
             Text("İpucu: macOS Odak modunu açan bir Kestirme’yi bir makroya koyup burada seçebilirsin. Oturum yalnız kendi değiştirdiklerini geri alır.")
                 .font(.subheadline).foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)

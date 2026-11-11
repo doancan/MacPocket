@@ -411,6 +411,7 @@ struct WiFiView: View {
                     ForEach(WiFiSort.allCases) { Text(verbatim: $0.title).tag($0) }
                 }
                 .fixedSize()
+                    .pocketMenuPicker()
                 Spacer(minLength: 0)
                 Toggle(String(localized: "\(Int(WiFiModel.autoScanInterval)) sn’de bir tara"), isOn: $model.autoScan)
                     .toggleStyle(.checkbox)

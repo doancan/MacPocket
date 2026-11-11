@@ -9,6 +9,19 @@ public struct WeatherLocation: Codable, Equatable, Sendable, Identifiable {
     public init(name: String, latitude: Double, longitude: Double, timeZone: String = "Europe/Istanbul") {
         self.name = name; self.latitude = latitude; self.longitude = longitude; self.timeZone = timeZone
     }
+    /// MapKit addresses can repeat the place ("Ankara Ankara, Türkiye"); shown with the repeat dropped.
+    public var displayName: String { Self.collapsingRepeatedPrefix(name) }
+
+    static func collapsingRepeatedPrefix(_ text: String) -> String {
+        let words = text.split(separator: " ", omittingEmptySubsequences: true).map(String.init)
+        func bare(_ word: String) -> String { word.trimmingCharacters(in: CharacterSet(charactersIn: ",")).lowercased() }
+        for length in stride(from: words.count / 2, through: 1, by: -1) {
+            let head = words[0..<length].map(bare), next = words[length..<(2 * length)].map(bare)
+            if head == next { return words[length...].joined(separator: " ") }
+        }
+        return text
+    }
+
     public var isValid: Bool { !name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
         && latitude.isFinite && longitude.isFinite && (-90...90).contains(latitude) && (-180...180).contains(longitude) }
 }

@@ -10,7 +10,9 @@ struct SwitcherGlobalCardOptions: View {
     @AppStorage("switcher.showThumbnails") private var showThumbnails = true
     var body: some View {
         Picker("Başlık", selection: $titleMode) { ForEach(SwitcherTitleMode.allCases, id: \.self) { Text($0.localizedTitle).tag($0.rawValue) } }
+            .pocketMenuPicker()
         Picker("Başlığı kısalt", selection: $truncation) { ForEach(SwitcherTitleTruncation.allCases, id: \.self) { Text($0.localizedTitle).tag($0.rawValue) } }
+            .pocketMenuPicker()
         Toggle("Durum simgeleri", isOn: $showStatus)
         Toggle("Masaüstü numaraları", isOn: $showSpaces)
         SwitcherBadgeSettings()
@@ -25,6 +27,7 @@ struct SwitcherGlobalPlacementOptions: View {
     @AppStorage("switcher.openingDelayMilliseconds") private var delay = 110
     var body: some View {
         Picker("Paneli göster", selection: $screen) { ForEach(SwitcherScreenPolicy.allCases, id: \.self) { Text($0.localizedTitle).tag($0.rawValue) } }
+            .pocketMenuPicker()
         let bounded = SwitcherPresentation.boundedDelay(Double(delay))
         Stepper("Açılma gecikmesi: \(bounded) ms", value: Binding(get: { SwitcherPresentation.boundedDelay(Double(delay)) },
             set: { delay = SwitcherPresentation.boundedDelay(Double($0)) }), in: 0...900, step: 10)

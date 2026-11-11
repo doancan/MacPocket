@@ -33,6 +33,7 @@ struct ScreenCleaningView: View {
                         }
                         .frame(maxWidth: 240)
                         .disabled(controller.phase != .idle)
+                            .pocketMenuPicker()
                         Spacer(minLength: PocketSpacing.m)
                         action
                     }

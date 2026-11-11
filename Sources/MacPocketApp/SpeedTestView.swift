@@ -136,12 +136,14 @@ struct SpeedTestView: View {
                     ForEach(interfaces, id: \.name) { interface in Text(interface.title).tag(Optional(interface.name)) }
                 }
                 .frame(maxWidth: 300)
+                    .pocketMenuPicker()
                 Picker("Süre sınırı", selection: $model.options.maximumSeconds) {
                     ForEach(SpeedTestOptions.durationChoices, id: \.self) { seconds in
                         Text(seconds.map { "\($0) sn" as LocalizedStringKey } ?? "Otomatik").tag(seconds)
                     }
                 }
                 .frame(maxWidth: 220)
+                    .pocketMenuPicker()
             }
             .disabled(model.running)
             Toggle("iCloud Özel Geçiş üzerinden ölç", isOn: $model.options.usePrivateRelay)

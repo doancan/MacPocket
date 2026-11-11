@@ -122,6 +122,7 @@ struct CommandBarView: View {
                 }
                 .labelsHidden().frame(maxWidth: 170)
                 .accessibilityLabel("Sonuç türü")
+                    .pocketMenuPicker()
             }
             .padding(.horizontal, PocketSpacing.l).padding(.vertical, PocketSpacing.s)
             if let message = service.message {

@@ -48,7 +48,7 @@ struct CableImpactView: View {
             Picker("Bağlantı / aygıt", selection: Binding(get: { model.selectedID }, set: model.select)) {
                 Text("Bağlantı seç…").tag(nil as String?)
                 ForEach(inventory.connections) { connection in Text(connection.name).tag(Optional(connection.id)) }
-            }.pickerStyle(.menu).disabled(model.loading)
+            }.pocketMenuPicker().disabled(model.loading)
             if model.selection?.groupedByContainer == true {
                 Text("Bu aygıtın ortak donanım kimliği bildiren USB işlevleri birlikte değerlendiriliyor.")
                     .font(.caption).foregroundStyle(.secondary)

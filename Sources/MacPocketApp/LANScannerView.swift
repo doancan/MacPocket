@@ -511,6 +511,7 @@ struct LANScannerView: View {
                         }
                     }
                     .fixedSize()
+                        .pocketMenuPicker()
                 }
                 Spacer()
                 Text("Bir cihaza tıklayarak ayrıntılarını aç.").font(.callout).foregroundStyle(.secondary)

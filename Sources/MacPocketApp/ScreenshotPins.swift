@@ -144,6 +144,7 @@ private struct PinnedScreenshotView: View {
                     Text("Sığdır").tag(0.0)
                     Text(verbatim: "50%").tag(0.5); Text(verbatim: "100%").tag(1.0); Text(verbatim: "200%").tag(2.0)
                 }.labelsHidden().frame(width: 105)
+                    .pocketMenuPicker()
             }
             .labelStyle(.iconOnly).disabled(model.working)
             HStack {

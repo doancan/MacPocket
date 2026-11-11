@@ -17,7 +17,6 @@ struct PocketMenuBarView: View {
     @ObservedObject private var store = MenuBarSettingsStore.shared
     let content: MenuBarPopoverContent
 
-    @AppStorage("MacPocket.appearance") private var appearance = PocketAppearance.defaultValue
     @AppStorage("MacPocket.menubar.selectedTab") private var storedTab = MenuBarModule.cpu.rawValue
     @State private var selection: MenuBarModule
     @State private var showsSSH = false
@@ -39,8 +38,14 @@ struct PocketMenuBarView: View {
         return selection
     }
 
+    /// The enabled modules, in menu bar order; with none enabled the popover still offers every module.
+    private var tabModules: [MenuBarModule] {
+        let enabled = store.preferences.enabledModules
+        return enabled.isEmpty ? store.preferences.order : enabled
+    }
+
     private var tabs: [GlassTab<MenuBarModule>] {
-        store.preferences.order.map { GlassTab(id: $0, title: $0.title, symbol: $0.symbol, tint: $0.tint) }
+        tabModules.map { GlassTab(id: $0, title: $0.title, symbol: $0.symbol, tint: $0.tint) }
     }
 
     var body: some View {
@@ -56,13 +61,25 @@ struct PocketMenuBarView: View {
         }
         .padding(PocketSpacing.m)
         .frame(width: Self.width)
-        .preferredColorScheme(appearance.colorScheme)
-        .onAppear { updateProcessSampling() }
+        .background { PocketPopoverBackdrop() }
+        .tint(PocketTheme.accent)
+        .environment(\.pocketTint, PocketTheme.brand)
+        .onAppear {
+            keepSelectionOnAVisibleTab()
+            updateProcessSampling()
+        }
+        .onChange(of: tabModules) { keepSelectionOnAVisibleTab() }
         .onChange(of: selection) { _, value in
             storedTab = value.rawValue
             updateProcessSampling()
         }
         .onDisappear { model.menuBarProcessesWanted = false }
+    }
+
+    /// A module switched off since the popover last opened has no tab; fall back to the first one.
+    private func keepSelectionOnAVisibleTab() {
+        guard !tabModules.contains(selection), let first = tabModules.first else { return }
+        selection = first
     }
 
     /// Process sampling is costly; it runs only while a process list is on screen.
@@ -104,6 +121,19 @@ struct PocketMenuBarView: View {
         .buttonStyle(MenuBarFooterButtonStyle())
         .help(title)
         .accessibilityLabel(title)
+    }
+}
+
+/// The chosen app theme behind the popover: its opaque canvas tone with a soft wash of the brand colors, so the Stats Bar
+/// dropdown matches the main window and stays readable over any window behind it (no translucency).
+private struct PocketPopoverBackdrop: View {
+    var body: some View {
+        ZStack {
+            PocketTheme.background
+            RadialGradient(colors: [PocketTheme.brand.opacity(0.20), .clear], center: .topLeading, startRadius: 0, endRadius: 360)
+            RadialGradient(colors: [PocketTheme.brandSecondary.opacity(0.12), .clear], center: .topTrailing, startRadius: 0, endRadius: 280)
+        }
+        .accessibilityHidden(true)
     }
 }
 

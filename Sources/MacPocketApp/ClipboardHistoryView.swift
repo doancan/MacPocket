@@ -84,6 +84,7 @@ private struct ClipboardHistoryBrowser: View {
                 } label: { Text("Tür") }
                 .labelsHidden()
                 .fixedSize()
+                    .pocketMenuPicker()
                 Spacer(minLength: PocketSpacing.s)
                 Text("\(service.history.items.count) öğe").font(.callout).foregroundStyle(.secondary).monospacedDigit()
                 Button(role: .destructive) { confirmClear = true } label: { Label("Temizle", systemImage: "trash") }
@@ -173,11 +174,13 @@ private struct ClipboardSettingsForm: View {
                 Picker("En fazla", selection: $service.settings.capacity) {
                     ForEach(ClipboardSettings.capacityChoices, id: \.self) { Text("\($0) öğe").tag($0) }
                 }
+                    .pocketMenuPicker()
                 Picker("Saklama süresi", selection: $service.settings.retentionDays) {
                     ForEach(ClipboardSettings.retentionChoices, id: \.self) { days in
                         Text(days.map { "\($0) gün" as LocalizedStringKey } ?? "Süresiz").tag(days)
                     }
                 }
+                    .pocketMenuPicker()
                 Toggle("Görselleri de sakla", isOn: $service.settings.keepImages)
                 Toggle("Geçmişi diske kaydet", isOn: $service.settings.saveToDisk)
                 Text(service.settings.saveToDisk
@@ -213,6 +216,7 @@ private struct ClipboardSettingsForm: View {
                         Text(minutes.map { "\($0) dk sonra" as LocalizedStringKey } ?? "Hiçbir zaman").tag(minutes)
                     }
                 }
+                    .pocketMenuPicker()
                 Toggle("Uykuya geçince ve ekran kilitlenince boşalt", isOn: $service.settings.clearClipboardOnSleepOrLock)
                 Text("Yalnız sistem panosu boşaltılır; geçmişteki kopya kalır. Kopyaladığın parolanın panoda unutulmasını önler.")
                     .font(.subheadline).foregroundStyle(.secondary)

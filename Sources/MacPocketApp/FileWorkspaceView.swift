@@ -184,6 +184,7 @@ struct FileWorkspaceView: View {
                     Text("1 GB+").tag(1024.0)
                 }
                 .fixedSize()
+                    .pocketMenuPicker()
                 if model.scope == .old {
                     Picker("Değiştirilme", selection: $model.olderDays) {
                         Text("30 günden eski").tag(30.0)
@@ -191,6 +192,7 @@ struct FileWorkspaceView: View {
                         Text("1 yıldan eski").tag(365.0)
                     }
                     .fixedSize()
+                        .pocketMenuPicker()
                 }
                 if model.scope == .duplicates {
                     Button("İçerikleri Karşılaştır") { model.findDuplicates() }

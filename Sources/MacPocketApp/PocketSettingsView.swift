@@ -14,8 +14,6 @@ struct PocketSettingsView: View {
                 .tabItem { Label("Genel", systemImage: "gearshape") }.tag(PocketSettingsNavigation.Section.general)
             PocketAppearanceSettings()
                 .tabItem { Label("Görünüm", systemImage: "paintbrush") }.tag(PocketSettingsNavigation.Section.appearance)
-            StatusBarPreferencesView(model: model)
-                .tabItem { Label("Menü Çubuğu", systemImage: "menubar.rectangle") }.tag(PocketSettingsNavigation.Section.menuBar)
             PocketMonitoringSettings(model: model)
                 .tabItem { Label("İzleme", systemImage: "waveform.path.ecg") }.tag(PocketSettingsNavigation.Section.monitoring)
             PocketModuleSettings()
@@ -33,11 +31,9 @@ struct PocketSettingsView: View {
 
 /// Shared navigation is transient UI state; it is never included in an exported preference file.
 @MainActor final class PocketSettingsNavigation: ObservableObject {
-    enum Section: Int { case general,appearance,menuBar,monitoring,modules,advanced }
+    enum Section: Int { case general,appearance,monitoring,modules,advanced }
     static let shared = PocketSettingsNavigation()
     @Published var section = Section.general
-    /// Selected in Settings › Menü Çubuğu when it next appears (e.g. from a tool page's "Menü Çubuğu Ayarları…").
-    @Published var menuBarModule: MenuBarModule?
 }
 
 // MARK: - General
@@ -61,6 +57,7 @@ private struct PocketGeneralSettings: View {
                     ForEach(AppLanguage.allCases) { Text($0.localizedTitle).tag($0) }
                 }
                 .onChange(of: language) { _, value in value.save(to: .standard) }
+                    .pocketMenuPicker()
                 if language != PocketRelaunch.languageAtLaunch {
                     HStack {
                         Text("Yeni dil MacPocket yeniden başlatılınca uygulanır.")
@@ -95,6 +92,7 @@ private struct PocketGeneralSettings: View {
                 Picker("Açılışta açılacak sayfa", selection: $launchPage) {
                     ForEach(PocketPage.allCases) { Text($0.localizedTitle).tag($0) }
                 }
+                    .pocketMenuPicker()
             } header: { Text(String(localized: "Settings.startupSection", defaultValue: "Başlangıç")) }
 
             Section {
@@ -105,6 +103,12 @@ private struct PocketGeneralSettings: View {
                     .onChange(of: showMenuBar) { PocketDock.apply() }
                 Toggle("Menü çubuğunda CPU yüzdesini göster", isOn: $menuBarCPU)
                     .disabled(!showMenuBar)
+                LabeledContent("Menü çubuğu öğeleri") {
+                    Button("İstatistik Çubuğunu Aç…") {
+                        model.navigation.openMenuBar()
+                        model.openMainWindow?()
+                    }
+                }
                 Text(showMenuBar
                      ? "Pencereyi kapattığında izleme menü çubuğunda sürer. Dock simgesi gizliyken MacPocket’a menü çubuğundan ulaşırsın."
                      : "Menü çubuğu öğesi gizliyken Dock simgesi her zaman gösterilir; böylece MacPocket’a ulaşabilirsin.")
@@ -159,6 +163,7 @@ private struct PocketGeneralSettings: View {
 private struct PocketAppearanceSettings: View {
     @AppStorage("MacPocket.appearance") private var appearance = PocketAppearance.defaultValue
     @AppStorage(PocketPreferenceKey.accentStyle) private var accent = PocketAccentStyle.brand
+    @AppStorage(PocketPreferenceKey.theme) private var theme = PocketAppTheme.defaultValue
     @AppStorage(PocketPreferenceKey.sidebarIcons) private var sidebarIcons = PocketSidebarIconStyle.colorful
     @AppStorage(PocketPreferenceKey.density) private var density = PocketDensity.comfortable
     @AppStorage(PocketPreferenceKey.reduceMotion) private var reduceMotion = false
@@ -171,15 +176,26 @@ LabeledContent("Görünüm") {
                     GlassTabBar(tabs: PocketAppearance.allCases.map { GlassTab(id: $0, title: $0.localizedTitle) }, selection: $appearance)
                         .frame(maxWidth: 300)
                 }
+                Picker("Renk teması", selection: $theme) {
+                    ForEach(PocketAppTheme.allCases) { theme in
+                        Label { Text(theme.localizedTitle) } icon: {
+                            Image(systemName: "circle.fill").foregroundStyle(theme.brand)
+                        }
+                        .tag(theme)
+                    }
+                }
+                    .pocketMenuPicker()
+                LabeledContent("Önizleme") { ThemeSwatches(theme: theme) }
                 Picker("Vurgu rengi", selection: $accent) {
                     ForEach(PocketAccentStyle.allCases) { style in
                         Label { Text(style.localizedTitle) } icon: {
                             Image(systemName: "circle.fill")
-                                .foregroundStyle(style == .brand ? PocketTheme.cobalt : Color.accentColor)
+                                .foregroundStyle(style == .brand ? theme.brand : Color.accentColor)
                         }
                         .tag(style)
                     }
                 }
+                    .pocketMenuPicker()
                 Text("Sistem vurgu rengi, macOS Sistem Ayarları > Görünüm’deki rengi kullanır.")
                     .font(.callout).foregroundStyle(.secondary)
             } header: { Text("Tema") }
@@ -244,6 +260,7 @@ private struct PocketMonitoringSettings: View {
                     Text("5 saniye").tag(5.0)
                     Text("10 saniye").tag(10.0)
                 }
+                    .pocketMenuPicker()
                 Text("Daha uzun aralıklar izleme yükünü azaltır. Pencere kapalıyken menü çubuğu için yalnız sistem özeti güncellenir.")
                     .font(.callout).foregroundStyle(.secondary)
             } header: { Text("Örnekleme") }
@@ -254,6 +271,7 @@ private struct PocketMonitoringSettings: View {
                         Text("\(days) gün").tag(days)
                     }
                 }
+                    .pocketMenuPicker()
                 Text("Pil ve güç olayları dakikada en çok bir kez kaydedilir. Süreyi kısaltmak eski kayıtları siler.")
                     .font(.callout).foregroundStyle(.secondary)
             } header: { Text("Geçmiş") }
@@ -266,6 +284,7 @@ private struct PocketMonitoringSettings: View {
                     }
                 }
                 .disabled(!alertDisk)
+                    .pocketMenuPicker()
                 alertToggle(.thermal, isOn: $alertThermal)
                 alertToggle(.memoryPressure, isOn: $alertMemory)
                 alertToggle(.sustainedCPU, isOn: $alertCPU)
@@ -273,9 +292,11 @@ private struct PocketMonitoringSettings: View {
                     Picker("Eşik", selection: $cpuThreshold) {
                         ForEach(ResourceAlertSettings.cpuThresholdChoices, id: \.self) { Text(verbatim: pocketPercent($0)).tag($0) }
                     }
+                        .pocketMenuPicker()
                     Picker("Süre", selection: $cpuMinutes) {
                         ForEach(ResourceAlertSettings.cpuMinuteChoices, id: \.self) { Text("\($0) dk").tag($0) }
                     }
+                        .pocketMenuPicker()
                 }
                 .disabled(!alertCPU)
                 alertToggle(.lowBattery, isOn: $alertBattery)
@@ -283,6 +304,7 @@ private struct PocketMonitoringSettings: View {
                     ForEach(ResourceAlertSettings.batteryThresholdChoices, id: \.self) { Text(verbatim: pocketPercent($0)).tag($0) }
                 }
                 .disabled(!alertBattery)
+                    .pocketMenuPicker()
                 if notificationsDenied {
                     HStack {
                         Label("MacPocket’ın bildirim izni kapalı.", systemImage: "bell.slash")
@@ -308,6 +330,7 @@ private struct PocketMonitoringSettings: View {
                 Picker("Süreç CPU yüzdesi", selection: $cpuScale) {
                     ForEach(ProcessCPUScale.allCases) { Text($0.title).tag($0) }
                 }
+                    .pocketMenuPicker()
                 Text("Tüm Mac: her süreç %0–100 arasında, tüm çekirdeklere oranla gösterilir. Çekirdek başına: Unix/Linux ve Etkinlik Monitörü gibi; birden çok çekirdeği kullanan süreç %100’ü aşabilir.")
                     .font(.callout).foregroundStyle(.secondary)
             } header: { Text("Görev Yöneticisi") }
@@ -509,5 +532,33 @@ private struct PocketSettingsMessage {
 
     init(verbatim: String, tone: PocketTone) {
         text = verbatim; self.tone = tone
+    }
+}
+
+/// The surfaces and brand colors of a theme, drawn as a miniature card on its canvas, in the current appearance.
+private struct ThemeSwatches: View {
+    let theme: PocketAppTheme
+
+    var body: some View {
+        HStack(spacing: PocketSpacing.s) {
+            RoundedRectangle(cornerRadius: PocketRadius.small, style: .continuous)
+                .fill(theme.background)
+                .frame(width: 96, height: 44)
+                .overlay {
+                    RoundedRectangle(cornerRadius: 5, style: .continuous)
+                        .fill(theme.panel)
+                        .padding(6)
+                        .overlay(alignment: .leading) {
+                            HStack(spacing: 5) {
+                                Circle().fill(theme.brand).frame(width: 12, height: 12)
+                                Capsule().fill(theme.brandSecondary).frame(width: 26, height: 5)
+                            }
+                            .padding(.leading, 12)
+                        }
+                }
+                .overlay { RoundedRectangle(cornerRadius: PocketRadius.small, style: .continuous).strokeBorder(PocketTheme.line) }
+            Capsule().fill(theme.brandGradient).frame(width: 60, height: 12)
+        }
+        .accessibilityHidden(true)
     }
 }

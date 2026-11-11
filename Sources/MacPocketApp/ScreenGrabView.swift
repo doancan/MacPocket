@@ -271,6 +271,7 @@ struct ScreenGrabView: View {
                     Text("SwiftUI").tag(PickedColor.Format.swiftUI)
                 }
                 .labelsHidden().fixedSize()
+                    .pocketMenuPicker()
             }
             if service.colors.isEmpty {
                 Text("Henüz renk alınmadı.").foregroundStyle(.secondary)

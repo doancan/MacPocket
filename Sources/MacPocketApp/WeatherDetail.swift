@@ -17,7 +17,7 @@ struct WeatherLocationPicker: View {
         VStack(alignment: .leading, spacing: PocketSpacing.s) {
             if let location = service.location {
                 HStack(alignment: .top) {
-                    Label { Text(verbatim: location.name).lineLimit(2) } icon: { Image(systemName: "mappin.circle") }
+                    Label { Text(verbatim: location.displayName).lineLimit(2) } icon: { Image(systemName: "mappin.circle") }
                     Spacer(minLength: 4)
                     Button("Konumu Değiştir") { editing.toggle() }.controlSize(.small)
                 }
@@ -35,7 +35,7 @@ struct WeatherLocationPicker: View {
                     } label: {
                         HStack {
                             Image(systemName: "mappin")
-                            Text(verbatim: location.name).multilineTextAlignment(.leading).lineLimit(3)
+                            Text(verbatim: location.displayName).multilineTextAlignment(.leading).lineLimit(3)
                             Spacer(minLength: 4)
                             Image(systemName: "plus.circle")
                         }.frame(maxWidth: .infinity, alignment: .leading).contentShape(Rectangle())

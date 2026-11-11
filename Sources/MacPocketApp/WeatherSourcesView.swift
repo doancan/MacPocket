@@ -11,7 +11,7 @@ struct WeatherSourcePicker: View {
         VStack(alignment: .leading, spacing: PocketSpacing.s) {
             Picker("Veri Kaynağı", selection: Binding(get: { service.activeSource }, set: service.selectSource)) {
                 ForEach(service.basket.orderedSources) { source in Text(source.localizedTitle).tag(source) }
-            }.pickerStyle(.menu).weatherAuditTarget("weather.source-picker")
+            }.pocketMenuPicker().weatherAuditTarget("weather.source-picker")
             if service.activeSource.requiresAPIKey && !service.configuredKeys.contains(service.activeSource) {
                 Label("API anahtarı gerekiyor; Kaynak Sepeti’nden ekleyebilirsin.", systemImage: "key")
                     .font(.caption).foregroundStyle(.secondary)

@@ -8,6 +8,7 @@ enum PocketPage: String, CaseIterable, Identifiable, Hashable {
     case cleanup = "Temizlik", storage = "Disk Analizi", applications = "Uygulamalar", tools = "Araçlar"
     case practical = "Pratik Araçlar"
     case ssh = "SSH Yöneticisi"
+    case menuBar = "İstatistik Çubuğu"
     var id: String { rawValue }
     var icon: String {
         switch self {
@@ -20,6 +21,7 @@ enum PocketPage: String, CaseIterable, Identifiable, Hashable {
         case .tools: "wrench.and.screwdriver.fill"
         case .practical: "square.grid.3x3"
         case .ssh: "terminal.fill"
+        case .menuBar: "menubar.rectangle"
         }
     }
 }
@@ -55,12 +57,18 @@ final class PocketNavigation: ObservableObject {
     /// Starts on the page chosen in Settings → General.
     @Published private(set) var page = PocketPage.launchPage
     @Published var tool: PocketTool?
+    /// The module the Menü Çubuğu page selects when it next appears (e.g. from a tool page's "Menü Çubuğu Ayarları…").
+    @Published var menuBarModule: MenuBarModule?
     @Published var utility = MacUtility.timeMachine
     var title: String { page == .tools ? tool?.localizedTitle ?? page.localizedTitle : page.localizedTitle }
     func select(_ page: PocketPage) {
         guard self.page != page || tool != nil else { return }
         tool = nil
         self.page = page
+    }
+    func openMenuBar(module: MenuBarModule? = nil) {
+        menuBarModule = module
+        select(.menuBar)
     }
     func open(_ tool: PocketTool) {
         page = .tools

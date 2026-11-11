@@ -106,6 +106,7 @@ struct SwitcherExceptionRuleForm: View {
                 Picker("Uygulama eşleştirmesi", selection: $rule.target) {
                     ForEach(SwitcherExceptionTarget.allCases, id: \.self) { Text($0.localizedTitle).tag($0) }
                 }
+                    .pocketMenuPicker()
                 TextField("Uygulama hedefi", text: $rule.value).textFieldStyle(.roundedBorder)
                     .accessibilityIdentifier("switcher-exception-target")
                 Menu("Uygulamadan Doldur") {
@@ -124,6 +125,7 @@ struct SwitcherExceptionRuleForm: View {
                 Picker("Pencere görünürlüğü", selection: $rule.visibility) {
                     ForEach(SwitcherExceptionVisibility.allCases, id: \.self) { Text($0.localizedTitle).tag($0) }
                 }
+                    .pocketMenuPicker()
                 if rule.visibility == .titleContains {
                     VStack(alignment: .leading, spacing: PocketSpacing.s) {
                         Text("Başlık metinleri (satır başına bir tane)").font(.subheadline)
@@ -137,6 +139,7 @@ struct SwitcherExceptionRuleForm: View {
                 Picker("Global kısayollar", selection: $rule.shortcuts) {
                     ForEach(SwitcherExceptionShortcuts.allCases, id: \.self) { Text($0.localizedTitle).tag($0) }
                 }
+                    .pocketMenuPicker()
                 if rule.shortcuts == .fullscreen {
                     Text("Yalnız öndeki pencerenin gerçek tam ekran durumu kullanılır. Erişilebilirlik izni yoksa veya durum okunamazsa kısayollar etkin kalır.")
                         .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)

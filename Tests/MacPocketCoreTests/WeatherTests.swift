@@ -92,4 +92,13 @@ final class WeatherTests: XCTestCase {
         settings.style = .pie
         XCTAssertEqual(settings.normalized(for: .weather).style, .value)
     }
+
+    func testLocationDisplayNameDropsARepeatedPlace() {
+        func name(_ value: String) -> String { WeatherLocation(name: value, latitude: 1, longitude: 1).displayName }
+        XCTAssertEqual(name("Ankara Ankara, Türkiye"), "Ankara, Türkiye")
+        XCTAssertEqual(name("İzmir İzmir, Türkiye"), "İzmir, Türkiye")
+        XCTAssertEqual(name("New York New York, ABD"), "New York, ABD")
+        XCTAssertEqual(name("Kadıköy İstanbul, Türkiye"), "Kadıköy İstanbul, Türkiye")
+        XCTAssertEqual(name("Paris"), "Paris")
+    }
 }
