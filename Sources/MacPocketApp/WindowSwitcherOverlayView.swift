@@ -4,6 +4,8 @@ import SwiftUI
 
 /// The transient keyboard switcher, modelled on Windows 11 Alt+Tab: a row of large live thumbnails,
 /// each with only its app icon and window title, and a selection frame that glides between items.
+/// Only that frame animates: card contents change without animation, so a Tab press interpolates one
+/// shape's position instead of cross-fading the display lists of two cards.
 /// Configuration and the detail table live in Tools.
 struct WindowSwitcherOverlayView: View {
     var model: WindowSwitcherModel
@@ -13,7 +15,6 @@ struct WindowSwitcherOverlayView: View {
     var reduceTransparencyOverride: Bool? = nil
     @PocketReduceMotion private var reduceMotion
     @Environment(\.accessibilityReduceTransparency) private var systemReduceTransparency
-    @Namespace private var selectionAnimation
     private var reduceTransparency: Bool { reduceTransparencyOverride ?? systemReduceTransparency }
 
     private static let radius: CGFloat = 20
@@ -44,8 +45,7 @@ struct WindowSwitcherOverlayView: View {
         let windows = model.filtered
         let style = controller.style
         // Read here, not inside the lazy closures below: one selection change then updates the grid,
-        // its animation value and both cards in a single transaction. Reading it only inside the
-        // closures splits that update and the selection animation renders measurably more frames.
+        // the selection frame and both cards in a single transaction.
         let selection = model.selection
         return VStack(spacing: PocketSpacing.s) {
             if windows.isEmpty {
@@ -122,7 +122,7 @@ struct WindowSwitcherOverlayView: View {
                              badge: controller.presentation.showBadges ? model.applicationBadge(for: window) : nil,
                              selected: selection == window.id, thumbnail: model.thumbnailSlot(for: window.id),
                              actionBusy: model.actionBusy, presentation: controller.presentation,
-                             reduceMotion: reduceMotion, reduceTransparency: reduceTransparency, selectionAnimation: selectionAnimation,
+                             reduceMotion: reduceMotion, reduceTransparency: reduceTransparency,
                              choose: { choose(window.id) },
                              hover: { controller.hover(window.id) },
                              act: { controller.act($0, on: window.id) })
@@ -133,7 +133,39 @@ struct WindowSwitcherOverlayView: View {
                     .onDisappear { model.thumbnailVisibilityChanged(window.id, visible: false, sessionID: thumbnailSessionID) }
             }
         }
-        .animation(reduceMotion || !controller.presentation.animateSelection ? nil : .easeOut(duration: 0.16), value: selection)
+        .backgroundPreferenceValue(SwitcherSelectionAnchor.self) { anchor in
+            GeometryReader { proxy in
+                if let anchor {
+                    let rect = proxy[anchor]
+                    SwitcherSelectionFrame(style: style)
+                        .frame(width: rect.width, height: rect.height)
+                        .offset(x: rect.minX, y: rect.minY)
+                }
+            }
+            // Scoped to the frame: card contents (title weight, captions) switch instantly.
+            .animation(selectionMotion, value: selection)
+        }
+    }
+
+    private var selectionMotion: Animation? {
+        let duration = SwitcherMotionPlan(presentation: controller.presentation, reduceMotion: reduceMotion).selection
+        return duration > 0 ? .easeOut(duration: duration) : nil
+    }
+}
+
+/// Bounds of the selected card, published by that card for the grid's single selection frame.
+private struct SwitcherSelectionAnchor: PreferenceKey {
+    static let defaultValue: Anchor<CGRect>? = nil
+    static func reduce(value: inout Anchor<CGRect>?, nextValue: () -> Anchor<CGRect>?) { value = value ?? nextValue() }
+}
+
+private struct SwitcherSelectionFrame: View {
+    let style: SwitcherStyle
+    var body: some View {
+        let shape = RoundedRectangle(cornerRadius: style == .titles ? 8 : 12, style: .continuous)
+        shape.fill(Color.primary.opacity(0.10))
+            .overlay { shape.strokeBorder(Color.accentColor, lineWidth: style == .titles ? 2 : 2.5) }
+            .allowsHitTesting(false)
     }
 }
 
@@ -149,7 +181,6 @@ private struct SwitcherItem: View, Equatable {
     let presentation: SwitcherPresentation
     let reduceMotion: Bool
     let reduceTransparency: Bool
-    let selectionAnimation: Namespace.ID
     let choose: () -> Void
     let hover: () -> Void
     let act: (WindowAction) -> Void
@@ -157,12 +188,12 @@ private struct SwitcherItem: View, Equatable {
 
     init(window: SwitchableWindow, style: SwitcherStyle, size: CGSize, badge: DockApplicationBadge?, selected: Bool,
          thumbnail: SwitcherThumbnailSlot, actionBusy: Bool, presentation: SwitcherPresentation, reduceMotion: Bool,
-         reduceTransparency: Bool, selectionAnimation: Namespace.ID, choose: @escaping () -> Void,
+         reduceTransparency: Bool, choose: @escaping () -> Void,
          hover: @escaping () -> Void, act: @escaping (WindowAction) -> Void) {
         self.window = window; self.style = style; self.size = size; self.badge = badge; self.selected = selected
         self.thumbnailSlot = thumbnail; self.actionBusy = actionBusy; self.presentation = presentation
         self.reduceMotion = reduceMotion; self.reduceTransparency = reduceTransparency
-        self.selectionAnimation = selectionAnimation; self.choose = choose; self.hover = hover; self.act = act
+        self.choose = choose; self.hover = hover; self.act = act
     }
 
     /// The closures only forward this card's window id (part of `window`) to the long-lived controller.
@@ -170,7 +201,7 @@ private struct SwitcherItem: View, Equatable {
         lhs.window == rhs.window && lhs.style == rhs.style && lhs.size == rhs.size && lhs.badge == rhs.badge
             && lhs.selected == rhs.selected && lhs.thumbnailSlot === rhs.thumbnailSlot && lhs.actionBusy == rhs.actionBusy
             && lhs.presentation == rhs.presentation && lhs.reduceMotion == rhs.reduceMotion
-            && lhs.reduceTransparency == rhs.reduceTransparency && lhs.selectionAnimation == rhs.selectionAnimation
+            && lhs.reduceTransparency == rhs.reduceTransparency
     }
 
     private var thumbnail: NSImage? { thumbnailSlot.image }
@@ -187,21 +218,12 @@ private struct SwitcherItem: View, Equatable {
         }
         .buttonStyle(.plain)
         .background {
-            ZStack {
-                if hovering && !selected {
-                    RoundedRectangle(cornerRadius: radius, style: .continuous).fill(.primary.opacity(0.06))
-                }
-                if selected {
-                    RoundedRectangle(cornerRadius: radius, style: .continuous)
-                        .fill(Color.primary.opacity(0.10))
-                        .overlay {
-                            RoundedRectangle(cornerRadius: radius, style: .continuous)
-                                .strokeBorder(Color.accentColor, lineWidth: style == .titles ? 2 : 2.5)
-                        }
-                        .matchedGeometryEffect(id: "switcher-selection", in: selectionAnimation)
-                }
+            if hovering && !selected {
+                RoundedRectangle(cornerRadius: radius, style: .continuous).fill(.primary.opacity(0.06))
             }
         }
+        // The grid draws one selection frame behind the cards at these bounds.
+        .anchorPreference(key: SwitcherSelectionAnchor.self, value: .bounds) { selected ? $0 : nil }
         .overlay(alignment: .topTrailing) { if style != .thumbnails { actionControls } }
         .onHover { inside in
             withAnimation(reduceMotion || !presentation.animateSelection ? nil : .easeOut(duration: 0.12)) { hovering = inside }

@@ -85,8 +85,8 @@ final class WindowSwitcherHotkeyController: NSObject, ObservableObject {
     private var blockedGestureID: UUID?
     private var gestureFeedbackSelection: String?
     private var showTask: Task<Void, Never>?
-    private var dismissalTask: Task<Void, Never>?
-    private var closingSnapshot: NSPanel?
+    /// Reused across sessions; each session replaces only the root view (new `.id`, fresh state).
+    private var hostingView: NSHostingView<WindowSwitcherPanelRoot>?
     private var focusTask: Task<Void, Never>?
     private var focusID: UUID?
     private var thumbnailsWanted = false
@@ -277,7 +277,6 @@ final class WindowSwitcherHotkeyController: NSObject, ObservableObject {
 
     func stopForModule() {
         cancelFocus()
-        cancelDismissal()
         moduleRunning = false
         cancelConditionalExceptions()
         suspendedForApplication = nil
@@ -842,7 +841,6 @@ final class WindowSwitcherHotkeyController: NSObject, ObservableObject {
             dismiss()
         }
         cancelFocus()
-        cancelDismissal()
         let id = UUID()
         sessionID = id; preparing = true; commitWhenReady = false
         preparationOrigin = .opening
@@ -899,10 +897,10 @@ final class WindowSwitcherHotkeyController: NSObject, ObservableObject {
             panel.level = .popUpMenu; panel.isReleasedWhenClosed = false; panel.hidesOnDeactivate = false
             panel.becomesKeyOnlyIfNeeded = false
             panel.collectionBehavior = [.moveToActiveSpace, .fullScreenAuxiliary, .transient]
-            panel.animationBehavior = .none
             self.panel = panel
         }
-        cancelDismissal()
+        // Closing may have left the window-server fade behaviour set; ordering in uses our own fade.
+        panel?.animationBehavior = .none
         panel?.ignoresMouseEvents = false
         relayout(force: true)
         switch presentation.theme {
@@ -910,9 +908,9 @@ final class WindowSwitcherHotkeyController: NSObject, ObservableObject {
         case .light: panel?.appearance = NSAppearance(named: .aqua)
         case .dark: panel?.appearance = NSAppearance(named: .darkAqua)
         }
-        panel?.contentView = NSHostingView(rootView: WindowSwitcherOverlayView(model: model, controller: self, choose: { [weak self] target in
+        installRoot(WindowSwitcherOverlayView(model: model, controller: self, choose: { [weak self] target in
             self?.model.selection = target; self?.requestCommit()
-        }, thumbnailSessionID: model.thumbnailSessionID, reduceTransparencyOverride: transparencyOverride).preferredColorScheme(colorScheme).id(id))
+        }, thumbnailSessionID: model.thumbnailSessionID, reduceTransparencyOverride: transparencyOverride), session: id)
         let duration = SwitcherMotionPlan(presentation: presentation, reduceMotion: PocketReduceMotion.isEnabled).opening
         NSAnimationContext.runAnimationGroup { context in context.duration = 0; panel?.animator().alphaValue = duration > 0 ? 0 : 1 }
         panel?.makeKeyAndOrderFront(nil)
@@ -1083,10 +1081,23 @@ final class WindowSwitcherHotkeyController: NSObject, ObservableObject {
         perform(action)
     }
 
+    /// One hosting view per panel, as AppKit/SwiftUI guidance recommends for reused content: a session swaps
+    /// the root view instead of rebuilding the hosting view, renderer and layer tree. The panel frame is set
+    /// explicitly by `relayout`, so the hosting view needs no size constraints (`sizingOptions = []`).
+    private func installRoot(_ overlay: WindowSwitcherOverlayView, session: UUID) {
+        let root = WindowSwitcherPanelRoot(overlay: overlay, colorScheme: colorScheme, session: session)
+        if let hostingView, panel?.contentView === hostingView {
+            hostingView.rootView = root
+        } else {
+            let view = NSHostingView(rootView: root)
+            view.sizingOptions = []
+            hostingView = view
+            panel?.contentView = view
+        }
+    }
+
     private func dismiss(restorePrevious: Bool = false, animated: Bool = true) {
-        let closingDuration = animated ? SwitcherMotionPlan(presentation: presentation, reduceMotion: PocketReduceMotion.isEnabled).closing : 0
-        cancelDismissal()
-        let snapshot = closingDuration > 0 ? panel.flatMap(makeClosingSnapshot) : nil
+        let fadesOut = animated && SwitcherMotionPlan(presentation: presentation, reduceMotion: PocketReduceMotion.isEnabled).closing > 0
         let previous = restorePrevious ? previousApplication : nil
         if let owner = gestureOwner { blockedGestureID = owner.id }
         gestureOwner = nil;gestureFeedbackSelection = nil
@@ -1113,43 +1124,13 @@ final class WindowSwitcherHotkeyController: NSObject, ObservableObject {
         model.resetSessionSearch()
         model.clearThumbnails()
         previewPanel?.orderOut(nil)
+        // AppKit orders the panel out (and releases key status) synchronously; with `.utilityWindow` the window
+        // server then fades its last frame on the GPU. The previous owned snapshot re-rendered the whole panel
+        // on the CPU (`cacheDisplay`, blurring every card shadow): ~390 ms on the main thread with 24 windows.
+        panel?.animationBehavior = fadesOut ? .utilityWindow : .none
         panel?.orderOut(nil)
-        if let snapshot {
-            closingSnapshot = snapshot
-            snapshot.orderFront(nil)
-            NSAnimationContext.runAnimationGroup { $0.duration = closingDuration; snapshot.animator().alphaValue = 0 }
-            dismissalTask = Task { [weak self, weak snapshot] in
-                try? await Task.sleep(for: .seconds(closingDuration))
-                guard !Task.isCancelled, let self, sessionID == nil, let snapshot, closingSnapshot === snapshot else { return }
-                snapshot.orderOut(nil); closingSnapshot = nil; dismissalTask = nil
-            }
-        }
         if let previous, !previous.isTerminated, !previous.isActive,
            previous.processIdentifier != ProcessInfo.processInfo.processIdentifier { previous.activate(options: []) }
-    }
-
-    private func cancelDismissal() {
-        dismissalTask?.cancel(); dismissalTask = nil
-        closingSnapshot?.orderOut(nil); closingSnapshot = nil
-    }
-
-    /// The live panel relinquishes AppKit key-window ownership immediately. Fade only an owned,
-    /// click-through image; calling resignKey() directly leaves AppKit's key-window bookkeeping stale.
-    private func makeClosingSnapshot(_ panel: NSPanel) -> NSPanel? {
-        guard panel.isVisible, let view = panel.contentView,
-              let bitmap = view.bitmapImageRepForCachingDisplay(in: view.bounds) else { return nil }
-        view.cacheDisplay(in: view.bounds, to: bitmap)
-        let image = NSImage(size: view.bounds.size); image.addRepresentation(bitmap)
-        let snapshot = SwitcherClosingPanel(contentRect: panel.frame, styleMask: [.borderless, .nonactivatingPanel], backing: .buffered, defer: false)
-        snapshot.isReleasedWhenClosed = false; snapshot.backgroundColor = .clear; snapshot.isOpaque = false
-        snapshot.hasShadow = panel.hasShadow; snapshot.level = panel.level; snapshot.ignoresMouseEvents = true
-        snapshot.collectionBehavior = panel.collectionBehavior; snapshot.animationBehavior = .none
-        snapshot.setAccessibilityElement(false)
-        let imageView = NSImageView(frame: NSRect(origin: .zero, size: view.bounds.size))
-        imageView.image = image; imageView.imageScaling = .scaleAxesIndependently
-        imageView.setAccessibilityElement(false)
-        snapshot.contentView = imageView
-        return snapshot
     }
 
     private static func eventFlags(_ modifiers: SwitcherModifiers) -> NSEvent.ModifierFlags {
@@ -1175,14 +1156,17 @@ final class WindowSwitcherHotkeyController: NSObject, ObservableObject {
     }
 }
 
+/// The panel's root: a new `session` id gives each opening fresh view state inside the reused hosting view.
+struct WindowSwitcherPanelRoot: View {
+    let overlay: WindowSwitcherOverlayView
+    let colorScheme: ColorScheme?
+    let session: UUID
+    var body: some View { overlay.preferredColorScheme(colorScheme).id(session) }
+}
+
 @MainActor
 private final class SwitcherCardPanel: NSPanel {
     override var canBecomeKey: Bool { true }
-    override var canBecomeMain: Bool { false }
-}
-
-@MainActor private final class SwitcherClosingPanel: NSPanel {
-    override var canBecomeKey: Bool { false }
     override var canBecomeMain: Bool { false }
 }
 
@@ -1232,7 +1216,7 @@ extension WindowSwitcherHotkeyController {
     func refreshRegistrationForAudit() { configure() }
     func checkNativeKeysForAudit() { checkNativeKeys() }
     func loseNativeKeysForAudit() { guard syntheticAuditInput else { return };auditNativeKeysLost = true }
-    var moduleDiagnosticResources: [String: Int] { ["nativeKeyLease": nativeKeyLease?.isRunning == true ? 1 : 0, "nativeKeyTimer": nativeKeyTimer == nil ? 0 : 1, "hotKeys": keyRefs.count, "handler": handler == nil ? 0 : 1, "monitor": monitor == nil ? 0 : 1, "subscriptions": subscriptions.count, "prewarmTask": prewarmTask == nil ? 0 : 1, "focusTask": focusTask == nil ? 0 : 1, "dismissalTask": dismissalTask == nil ? 0 : 1, "conditionalExceptionTask": conditionalExceptionTask == nil ? 0 : 1, "gestureMonitor": configuredGestureOptions?.enabled == true && gestureMonitor.isRunning ? 1 : 0, "badgeTask": badgeTask == nil ? 0 : 1] }
+    var moduleDiagnosticResources: [String: Int] { ["nativeKeyLease": nativeKeyLease?.isRunning == true ? 1 : 0, "nativeKeyTimer": nativeKeyTimer == nil ? 0 : 1, "hotKeys": keyRefs.count, "handler": handler == nil ? 0 : 1, "monitor": monitor == nil ? 0 : 1, "subscriptions": subscriptions.count, "prewarmTask": prewarmTask == nil ? 0 : 1, "focusTask": focusTask == nil ? 0 : 1, "conditionalExceptionTask": conditionalExceptionTask == nil ? 0 : 1, "gestureMonitor": configuredGestureOptions?.enabled == true && gestureMonitor.isRunning ? 1 : 0, "badgeTask": badgeTask == nil ? 0 : 1] }
     func beginGestureAudit() {
         syntheticAuditInput = true;auditReduceTransparency = true;moduleRunning = true
         if subscriptions.isEmpty { observeModelChanges();observeEnvironmentChanges() }
@@ -1257,7 +1241,6 @@ extension WindowSwitcherHotkeyController {
         syntheticAuditInput = true
         auditReduceTransparency = reduceTransparency
         cancelFocus()
-        cancelDismissal()
         moduleRunning = true
         if subscriptions.isEmpty { observeModelChanges(); observeEnvironmentChanges() }
         if monitor == nil { installLocalMonitor() }
@@ -1275,10 +1258,9 @@ extension WindowSwitcherHotkeyController {
         model.sessionFilter = shortcut.filter
         model.sessionOrder = presentation.order
         presentPanel(sessionID: id)
-        panel?.contentView = NSHostingView(rootView: WindowSwitcherOverlayView(model: model, controller: self, choose: { _ in },
-                                                                            thumbnailSessionID: model.thumbnailSessionID,
-                                                                            reduceTransparencyOverride: reduceTransparency)
-            .preferredColorScheme(colorScheme))
+        installRoot(WindowSwitcherOverlayView(model: model, controller: self, choose: { _ in },
+                                              thumbnailSessionID: model.thumbnailSessionID,
+                                              reduceTransparencyOverride: reduceTransparency), session: UUID())
         return panel
     }
 
@@ -1292,7 +1274,7 @@ extension WindowSwitcherHotkeyController {
     func dismissForAudit() { dismiss() }
     func commitForAudit() { requestCommit() }
     var previewVisibleForAudit: Bool { previewPanel?.isVisible == true }
-    var closingSnapshotVisibleForAudit: Bool { closingSnapshot?.isVisible == true }
+    var closingFadeRequestedForAudit: Bool { panel?.animationBehavior == .utilityWindow }
     var preparingForAudit: Bool { preparing }
     func releaseModifiersForAudit() {
         guard let activeShortcut else { return }

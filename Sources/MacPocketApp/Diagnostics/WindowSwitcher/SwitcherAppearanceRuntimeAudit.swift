@@ -79,7 +79,7 @@ import SwiftUI
         try? await Task.sleep(for: .milliseconds(70))
         let subscriptions = controller.moduleDiagnosticResources["subscriptions"]
         controller.dismissForAudit()
-        checks["appearanceClosingReleasesInputImmediately"] = !panel.isKeyWindow && !panel.isVisible && (PocketReduceMotion.isEnabled || controller.closingSnapshotVisibleForAudit)
+        checks["appearanceClosingReleasesInputImmediately"] = !panel.isKeyWindow && !panel.isVisible && (PocketReduceMotion.isEnabled || controller.closingFadeRequestedForAudit)
         _ = controller.beginVisualAudit(reduceTransparency: true, shortcut: shortcut)
         try? await Task.sleep(for: .milliseconds(170))
         checks["appearanceOldClosingTaskCannotHideReopenedPanel"] = panel.isVisible && panel.alphaValue > 0.99

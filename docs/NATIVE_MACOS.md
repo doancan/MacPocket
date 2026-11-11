@@ -655,3 +655,26 @@ Mikro ölçüm (paketlenmiş uygulama): `localization: nil` 0,11–0,19 µs; aç
 **Kalan maliyet:** Tab başına CPU'nun çoğu seçim animasyonunun çizimidir (Core Animation, metin glifi doldurma, `RBInterpolatedDisplayListContents`). Seçim animasyonu kapalıyken 200 adım iki sürümde de 2,5 s user'dır; açıkken ~6 s. Canlı önizlemede maliyet görüntü çizimidir, gövde hesaplaması değildir. Panel gövdesi her `UserDefaults` yazımında yeniden hesaplanır (`@PocketReduceMotion` içindeki `@AppStorage`). Kartlar artık atlandığı için bu ucuzdur.
 
 **Doğrulama sınırı:** Ölçüm ve ekran görüntüsü sahte pencerelerle yapıldı. Ekran görüntüsü seçim çerçevesini iki kart arasında kayarken ve görselleri yerinde gösteriyor. Gerçek pencerelerle fiziksel Alt+Tab basışı ve animasyon akıcılığı bu turda gözle doğrulanmadı. XCTest 1.030 testte yalnız bilinen `pmset` canlı testi başarısız; Swift Testing 355 test geçti; yerelleştirme 0 eksik.
+
+### Pencere geçişi HUD'u: kapanış solması, kapsamlı seçim animasyonu, tek barındırma görünümü — 11 Kasım 2026
+
+**Kaynaklar:** WWDC23 “Explore SwiftUI animation” (animasyonu yalnız gereken özelliğe daraltma), WWDC22 “Use SwiftUI with AppKit” (`NSHostingView` yeniden kullanımı, `sizingOptions`), WWDC25 “Optimize SwiftUI performance with Instruments”.
+
+**Değişiklik:**
+- **Kapanış solması pencere sunucusunda:** Eski yol kapanışta paneli `cacheDisplay` ile CPU'da yeniden çizip (her kart gölgesi vImage bulanıklığı) sahip olunan bir anlık görüntü panelini soldururdu. Artık `orderOut` öncesi `animationBehavior = .utilityWindow`: AppKit paneli eşzamanlı olarak kapatır ve anahtar pencere durumunu hemen bırakır, son kareyi WindowServer GPU'da soldurur (~150 ms, süre sistemin). Açılışta davranış `.none`'a döner. Anlık görüntü paneli, görevi ve sınıfı kaldırıldı.
+- **Seçim animasyonu yalnız çerçevede:** Izgaranın tamamına bağlı `.animation(value: selection)` ve kartlar arası `matchedGeometryEffect` kaldırıldı. Seçili kart sınırlarını `anchorPreference` ile yayınlar; ızgara arkada tek, kalıcı bir çerçeve çizer ve animasyon yalnız ona bağlıdır. Kart içeriği (başlık kalınlığı, alt yazılar) animasyonsuz değişir; iki kartın görüntü listesi artık ara-değerlenmez. Süre `SwitcherMotionPlan.selection`'dan okunur.
+- **Tek `NSHostingView`:** Her açılış yeni barındırma görünümü kurmak yerine `rootView`'u (`.id(session)` ile taze durum) değiştirir. Panel çerçevesini `relayout` belirlediği için `sizingOptions = []`.
+
+**Ölçüm** (`a62d49d` ile karşılaştırma; release + DEBUG kancaları, sahte 24 pencere, 640×400 sahte görsel, gerçek `NSPanel`, `beginHeldAudit`; temel ve yeni sürüm aynı oturumda üç tur dönüşümlü):
+
+| Senaryo | Önce | Sonra |
+| --- | --- | --- |
+| `dismiss()` süresi, kapanış animasyonu açık (medyan) | 383–443 ms | **5–7 ms** |
+| 30 aç/kapa döngüsü, süreç CPU'su | 33,1–34,9 s | **2,5–2,7 s** (−%92) |
+| Paneli görünür yapma (medyan) | 78–86 ms | 80–85 ms (fark yok) |
+| 200 Tab adımı, animasyon açık, süreç CPU'su | 27,9–30,7 s | 22,7–23,3 s (−%17–25) |
+| 200 Tab adımı, animasyon kapalı | 1,9–2,3 s | 1,8–1,9 s |
+
+**Ölçüm sınırı:** Ölçüm sırasında ekran kilitliydi. Geçici bir `GeometryEffect` sondası 24 s'de 157.718 animasyon karesi saydı: kilitli ekranda ekran yenileme saati SwiftUI animasyonunu kısıtlamıyor. Bu yüzden Tab satırındaki mutlak CPU değerleri yapaydır; yalnız kare başına maliyetin ~%20 düştüğünü gösterir. Kalan kare maliyeti `DisplayList.ViewUpdater` ağaç güncellemesidir. Çerçeveyi kaydırma görünümünün dışına taşımak, çerçeveye ya da her karta `drawingGroup()` eklemek bu koşulda ölçülebilir fark yaratmadı ve uygulanmadı. Kapanış ölçümü bundan etkilenmez, çünkü o maliyet eşzamanlı ana iş parçacığı işidir.
+
+**Doğrulama:** Gerçek panelle: kapanışta `isVisible`/`isKeyWindow` anında `false`, WindowServer alfası 40 ms aralıklarla 1 → 0,60 → 0,27 → 0. Solma sırasında yeniden açılan panel tam görünür. Ayar kapalıyken solma yok. Seçim çerçevesinin kayması ekran kilitli olduğu için gözle doğrulanmadı; animasyon açık/kapalı CPU farkı çerçevenin animasyonla hareket ettiğini dolaylı olarak gösteriyor. Gerçek pencerelerle fiziksel Alt+Tab ve ekran açıkken akıcılık bu turda doğrulanmadı.

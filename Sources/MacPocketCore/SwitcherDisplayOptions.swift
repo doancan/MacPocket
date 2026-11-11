@@ -68,6 +68,7 @@ public enum SwitcherSpaceBadge {
 
 public struct SwitcherMotionPlan: Equatable, Sendable {
     public let opening: TimeInterval
+    /// Non-zero enables the closing fade. The app hands that fade to the window server, which sets its duration.
     public let closing: TimeInterval
     public let selection: TimeInterval
     public let preview: TimeInterval
