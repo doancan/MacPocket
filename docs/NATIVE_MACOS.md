@@ -678,3 +678,16 @@ Mikro ölçüm (paketlenmiş uygulama): `localization: nil` 0,11–0,19 µs; aç
 **Ölçüm sınırı:** Ölçüm sırasında ekran kilitliydi. Geçici bir `GeometryEffect` sondası 24 s'de 157.718 animasyon karesi saydı: kilitli ekranda ekran yenileme saati SwiftUI animasyonunu kısıtlamıyor. Bu yüzden Tab satırındaki mutlak CPU değerleri yapaydır; yalnız kare başına maliyetin ~%20 düştüğünü gösterir. Kalan kare maliyeti `DisplayList.ViewUpdater` ağaç güncellemesidir. Çerçeveyi kaydırma görünümünün dışına taşımak, çerçeveye ya da her karta `drawingGroup()` eklemek bu koşulda ölçülebilir fark yaratmadı ve uygulanmadı. Kapanış ölçümü bundan etkilenmez, çünkü o maliyet eşzamanlı ana iş parçacığı işidir.
 
 **Doğrulama:** Gerçek panelle: kapanışta `isVisible`/`isKeyWindow` anında `false`, WindowServer alfası 40 ms aralıklarla 1 → 0,60 → 0,27 → 0. Solma sırasında yeniden açılan panel tam görünür. Ayar kapalıyken solma yok. Seçim çerçevesinin kayması ekran kilitli olduğu için gözle doğrulanmadı; animasyon açık/kapalı CPU farkı çerçevenin animasyonla hareket ettiğini dolaylı olarak gösteriyor. Gerçek pencerelerle fiziksel Alt+Tab ve ekran açıkken akıcılık bu turda doğrulanmadı.
+
+### Menü çubuğu paneli animasyon incelemesi — 11 Kasım 2026
+
+**Kapsam:** Gerçek `NSPopover` + `NSHostingController(sizingOptions: .preferredContentSize)` içinde `PocketMenuBarView(.grouped)`, gerçek sistem verisi (`PocketModel(startMonitoring: false)` + elle `refresh`), release + DEBUG kancaları. Sekmeler ⌘1…⌘6 tuş olaylarıyla değiştirildi. Kod değişikliği yok; bu bölüm ölçüm ve olumsuz sonucun kaydıdır.
+
+**Bulgular:**
+- **Panel açık, boşta:** 10 s'de saniyede bir örnekle 375–397 ms süreç CPU'su; yalnız gösterilen sekmenin gövdeleri saniyede bir yeniden hesaplanıyor.
+- **Boyut değişimi:** 36 sekme geçişinde panel penceresi 35 kez boyut değiştirdi (`popover.animates` açık ya da kapalı aynı). NSPopover boyutu SwiftUI'ye kare kare yeniden yerleştirtmiyor. Ayrıntı görünümleri geçiş sırasında üst üste binip yüksekliği şişirmiyor; küçük bir deneyde `preferredContentSize` doğrudan yeni yüksekliğe geçti.
+- **Sekme geçişi:** Kare başına iş `NSHostingView.layout`/`updateConstraints` ve canlandırılabilir çerçeve güncellemeleridir, çünkü `GlassTabBar` seçimi yay animasyonuyla değiştirir ve bu işlem panelin tamamına uygulanır.
+- **Denenen ve geri alınan:** Ayrıntı geçişine kendi animasyonunu (`AnyTransition.animation`) verip yay işlemini `transaction(value: module)` ile ayrıntı ve alt düğmelerde temizlemek. Küçük deneyde geçiş 69 yerine 23 karede bitti, ancak gerçek panelde 36 geçişin CPU'su 20,8–21,1 s → 24,4–24,8 s oldu (üç tur, +%17). Uygulanmadı.
+- **Uygulama boşta:** Çalışan release uygulaması (panel kapalı) 20 s'de 0,75 s CPU, örneklerin neredeyse tamamı beklemede.
+
+**Ölçüm sınırı:** Ekran kilitliydi; kilitli ekranda SwiftUI animasyon kareleri ekran yenilemesiyle kısıtlanmıyor (pencere geçişi bölümündeki sonda). Sekme geçişi CPU değerleri bu yüzden yapaydır; yalnız aynı koşuldaki karşılaştırma için kullanıldı. Ekran açıkken ve fiziksel tıklamayla tekrar ölçülmedi.
