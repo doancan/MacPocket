@@ -248,7 +248,7 @@ struct MenuBarModuleDetail: View {
             HStack {
                 Text(module.title).font(.headline).accessibilityAddTraits(.isHeader)
                 Spacer(minLength: PocketSpacing.s)
-                if module != .weather && module != .aiUsage { PocketDetailLevelSwitch(level: $level).controlSize(.small) }
+                if module.isSystemMetric { PocketDetailLevelSwitch(level: $level).controlSize(.small) }
             }
             switch module {
             case .cpu: CPUDetail(model: model, history: history, advanced: advanced)
@@ -259,6 +259,9 @@ struct MenuBarModuleDetail: View {
             case .power: PowerDetail(model: model, advanced: advanced)
             case .weather: WeatherDetail()
             case .aiUsage: AIUsageDetailView()
+            case .awake: AwakeMenuDetail(model: model)
+            case .focus: FocusMenuDetail(model: model)
+            case .bluetooth: BluetoothMenuDetail(model: model)
             }
         }
     }
@@ -715,8 +718,6 @@ private struct PowerDetail: View {
                 }
                 .menuBarSection()
             }
-
-            keepAwake.menuBarSection()
         }
     }
 
@@ -733,49 +734,6 @@ private struct PowerDetail: View {
             }
             .font(.callout)
         }
-    }
-
-    @ViewBuilder private var keepAwake: some View {
-        VStack(alignment: .leading, spacing: PocketSpacing.s) {
-            SectionTitle(title: "Uyanık tut")
-            if let session = model.awakeSession, session.active {
-                HStack(spacing: PocketSpacing.s) {
-                    Image(systemName: "cup.and.saucer.fill").foregroundStyle(module.tint)
-                    VStack(alignment: .leading, spacing: 0) {
-                        Text("Mac uyanık tutuluyor").font(.callout.weight(.medium))
-                        if let end = session.endsAt {
-                            Text(timerInterval: Date()...max(Date(), end), countsDown: true)
-                                .font(.caption).monospacedDigit().foregroundStyle(.secondary)
-                        } else {
-                            Text("Süresiz").font(.caption).foregroundStyle(.secondary)
-                        }
-                    }
-                    Spacer()
-                    Button("Durdur", role: .destructive) { Task { await model.stopAwake() } }
-                        .controlSize(.small)
-                }
-            } else {
-                HStack(spacing: PocketSpacing.xs + 2) {
-                    awakeButton("30 dk", spoken: "30 dk uyanık tut", seconds: 1800)
-                    awakeButton("1 sa", spoken: "1 sa uyanık tut", seconds: 3600)
-                    awakeButton("2 sa", spoken: "2 sa uyanık tut", seconds: 7200)
-                    awakeButton("Süresiz", spoken: "Süresiz uyanık tut", seconds: nil)
-                }
-            }
-            if let error = model.awakeError {
-                Text(error).font(.caption).foregroundStyle(.orange).fixedSize(horizontal: false, vertical: true)
-            }
-        }
-    }
-
-    private func awakeButton(_ title: LocalizedStringKey, spoken: LocalizedStringKey, seconds: Double?) -> some View {
-        Button { Task { await model.startAwake(duration: seconds) } } label: {
-            Text(title).frame(maxWidth: .infinity)
-        }
-        // The popover is already glass on macOS 26; a glass button here would be glass on glass.
-        .buttonStyle(.bordered)
-        .controlSize(.small)
-        .accessibilityLabel(spoken)
     }
 
     private func batteryColor(_ power: PowerSnapshot) -> Color {
@@ -797,5 +755,348 @@ private struct PowerDetail: View {
         let remaining = pocketDuration(Double(minutes) * 60)
         return power.isCharging == true ? String(localized: "\(state) · dolmasına \(remaining)")
                                         : String(localized: "\(state) · \(remaining) kaldı")
+    }
+}
+
+// MARK: - Keep awake, focus and Bluetooth batteries
+
+/// Opens a main-window page or a settings tab from a menu bar panel.
+@MainActor private enum MenuBarNavigation {
+    static func openTool(_ id: String, model: PocketModel) {
+        model.openMainWindow?()
+        NotificationCenter.default.post(name: .pocketOpenTool, object: id)
+    }
+    static func openModuleSettings(model: PocketModel) {
+        PocketSettingsNavigation.shared.section = .modules
+        model.openSettingsWindow?()
+    }
+}
+
+/// Shown instead of a panel whose app module is switched off in Settings › Modules.
+private struct MenuBarModuleOff: View {
+    let module: MenuBarModule
+    let explanation: LocalizedStringKey
+    var model: PocketModel
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: PocketSpacing.s) {
+            HStack(spacing: PocketSpacing.s) {
+                PocketIconTile(symbol: module.symbol, tint: module.tint, size: 30)
+                Text(explanation).font(.callout).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+            }
+            Button("Modülleri Aç…") { MenuBarNavigation.openModuleSettings(model: model) }.controlSize(.small)
+        }
+        .menuBarSection()
+    }
+}
+
+private struct AwakeMenuDetail: View {
+    var model: PocketModel
+    @AppStorage(PocketModel.awakeDisplayKey) private var keepsDisplayAwake = PocketModel.awakeDisplayDefault
+    private let module = MenuBarModule.awake
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: PocketSpacing.s + 2) {
+            if let session = model.awakeSession, session.active { active(session) } else { idle }
+            VStack(alignment: .leading, spacing: PocketSpacing.xs + 2) {
+                Toggle(isOn: $keepsDisplayAwake) {
+                    VStack(alignment: .leading, spacing: 1) {
+                        Text("Ekranı da açık tut")
+                        Text(model.awakeSession?.active == true ? "Sonraki oturumda uygulanır." : "Kapalıyken yalnız sistem uyumaz; ekran kararabilir.")
+                            .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+                    }
+                }
+                .toggleStyle(.switch).controlSize(.small)
+                Divider()
+                AwakeAutomationLine(model: model)
+            }
+            .menuBarSection()
+            if let error = model.awakeError {
+                Text(error).font(.caption).foregroundStyle(.orange).fixedSize(horizontal: false, vertical: true)
+            }
+        }
+    }
+
+    private func active(_ session: AwakeSession) -> some View {
+        HStack(spacing: PocketSpacing.m) {
+            ZStack {
+                if let end = session.endsAt {
+                    TimelineView(.periodic(from: .now, by: 30)) { context in
+                        let total = max(1, end.timeIntervalSince(session.startedAt))
+                        PocketRing(fraction: min(1, max(0, end.timeIntervalSince(context.date) / total)), color: module.tint, lineWidth: 6)
+                    }
+                } else {
+                    PocketRing(fraction: 1, color: module.tint, lineWidth: 6)
+                }
+                Image(systemName: "cup.and.saucer.fill").font(.system(size: 15, weight: .semibold)).foregroundStyle(module.tint)
+            }
+            .frame(width: 52, height: 52)
+            .accessibilityHidden(true)
+            VStack(alignment: .leading, spacing: 1) {
+                Text(model.awakeIsAutomatic ? "Otomasyon uyanık tutuyor" : "Mac uyanık tutuluyor")
+                    .font(.caption.weight(.semibold)).foregroundStyle(.secondary)
+                if let end = session.endsAt {
+                    Text(timerInterval: Date()...max(Date(), end), countsDown: true)
+                        .font(.system(size: 22, weight: .semibold, design: .rounded)).monospacedDigit()
+                    Text("Bitiş \(end.formatted(date: .omitted, time: .shortened))").font(.caption).foregroundStyle(.secondary)
+                } else {
+                    Text("Süresiz").font(.system(size: 22, weight: .semibold, design: .rounded))
+                    Text("Durdurana kadar").font(.caption).foregroundStyle(.secondary)
+                }
+                Text(session.keepDisplayAwake ? "Ekran da açık" : "Yalnız sistem").font(.caption2).foregroundStyle(.tertiary)
+            }
+            Spacer(minLength: 0)
+            Button("Durdur", role: .destructive) { Task { await model.stopAwake() } }.controlSize(.small)
+        }
+        .menuBarSection()
+        .accessibilityElement(children: .combine)
+    }
+
+    private var idle: some View {
+        VStack(alignment: .leading, spacing: PocketSpacing.s) {
+            HStack(spacing: PocketSpacing.s + 2) {
+                PocketIconTile(symbol: "cup.and.saucer", tint: module.tint, size: 30)
+                VStack(alignment: .leading, spacing: 1) {
+                    Text("Kapalı").font(.system(size: 22, weight: .semibold, design: .rounded))
+                    Text("Mac normal enerji ayarlarına göre uyur.").font(.caption).foregroundStyle(.secondary)
+                }
+            }
+            .accessibilityElement(children: .combine)
+            HStack(spacing: PocketSpacing.xs + 2) {
+                awakeButton("30 dk", spoken: "30 dk uyanık tut", seconds: 1800)
+                awakeButton("1 sa", spoken: "1 sa uyanık tut", seconds: 3600)
+                awakeButton("2 sa", spoken: "2 sa uyanık tut", seconds: 7200)
+                awakeButton("Süresiz", spoken: "Süresiz uyanık tut", seconds: nil)
+            }
+        }
+        .menuBarSection()
+    }
+
+    private func awakeButton(_ title: LocalizedStringKey, spoken: LocalizedStringKey, seconds: Double?) -> some View {
+        Button { Task { await model.startAwake(duration: seconds) } } label: {
+            Text(title).frame(maxWidth: .infinity)
+        }
+        // The popover is already glass on macOS 26; a glass button here would be glass on glass.
+        .buttonStyle(.bordered)
+        .controlSize(.small)
+        .accessibilityLabel(spoken)
+    }
+}
+
+/// Automation state without creating the automation service: it exists only once the user configured it.
+private struct AwakeAutomationLine: View {
+    var model: PocketModel
+
+    var body: some View {
+        HStack(spacing: PocketSpacing.s) {
+            if AwakeAutomationSettings.load(from: .standard).enabled {
+                AwakeAutomationStatusText(service: model.awakeAutomation)
+            } else {
+                Text("Otomasyon kapalı").font(.callout).foregroundStyle(.secondary)
+            }
+            Spacer(minLength: PocketSpacing.s)
+            Button("Otomasyon…") { MenuBarNavigation.openTool("keep-awake", model: model) }.controlSize(.small)
+        }
+    }
+}
+
+private struct AwakeAutomationStatusText: View {
+    @ObservedObject var service: AwakeAutomationService
+    var body: some View {
+        Label(service.status.localizedTitle, systemImage: "wand.and.stars")
+            .font(.callout).lineLimit(2).fixedSize(horizontal: false, vertical: true)
+    }
+}
+
+private struct FocusMenuDetail: View {
+    var model: PocketModel
+    @ObservedObject private var service = FocusSessionService.shared
+    @ObservedObject private var modules = PocketModuleRuntime.shared
+    private let module = MenuBarModule.focus
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: PocketSpacing.s + 2) {
+            if !modules.available.contains(.focus) {
+                MenuBarModuleOff(module: module, explanation: "Odak Oturumu modülü kapalı. Ayarlar › Modüller’den açabilirsin.", model: model)
+            } else {
+                if let message = service.message {
+                    Text(message).font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+                }
+                if let start = service.startedAt, let end = service.endsAt { running(start: start, end: end) } else { idle }
+                statistics
+            }
+        }
+    }
+
+    private func running(start: Date, end: Date) -> some View {
+        HStack(spacing: PocketSpacing.m) {
+            ZStack {
+                TimelineView(.periodic(from: .now, by: 15)) { context in
+                    let total = max(1, end.timeIntervalSince(start))
+                    PocketRing(fraction: min(1, max(0, context.date.timeIntervalSince(start) / total)), color: module.tint, lineWidth: 6)
+                }
+                Image(systemName: "scope").font(.system(size: 15, weight: .semibold)).foregroundStyle(module.tint)
+            }
+            .frame(width: 52, height: 52)
+            .accessibilityHidden(true)
+            VStack(alignment: .leading, spacing: 1) {
+                Text("Odaklanıyorsun").font(.caption.weight(.semibold)).foregroundStyle(.secondary)
+                Text(timerInterval: Date()...max(Date(), end), countsDown: true)
+                    .font(.system(size: 22, weight: .semibold, design: .rounded)).monospacedDigit()
+                Text("Bitiş \(end.formatted(date: .omitted, time: .shortened))").font(.caption).foregroundStyle(.secondary)
+                if !service.applied.isEmpty {
+                    Text("\(service.applied.count) değişiklik bitince geri alınır").font(.caption2).foregroundStyle(.tertiary)
+                }
+            }
+            Spacer(minLength: 0)
+            Button("Bitir", role: .destructive) { Task { await service.finish(completed: false) } }.controlSize(.small)
+        }
+        .menuBarSection()
+        .accessibilityElement(children: .combine)
+    }
+
+    private var idle: some View {
+        VStack(alignment: .leading, spacing: PocketSpacing.s) {
+            Picker("Süre", selection: $service.settings.minutes) {
+                ForEach(FocusSettings.minuteChoices, id: \.self) { minutes in Text("\(minutes) dk").tag(minutes) }
+            }
+            .pickerStyle(.segmented)
+            .labelsHidden()
+            .frame(maxWidth: .infinity)
+            .accessibilityLabel("Oturum süresi")
+            HStack(spacing: PocketSpacing.xs) {
+                option("cup.and.saucer.fill", "Uyanık tut", service.settings.keepAwake)
+                option("eye.slash", "Masaüstü simgelerini gizle", service.settings.hideDesktopIcons)
+                option("sun.min", "Diğer ekranları karart", service.settings.dimOtherDisplays != nil)
+                option("command", "⌘Q koruması", service.settings.guardQuit)
+                Spacer(minLength: PocketSpacing.s)
+                Button("Seçenekler…") { MenuBarNavigation.openTool("focus", model: model) }.controlSize(.small)
+            }
+            Button { Task { await service.start() } } label: {
+                Label("Odaklan", systemImage: "play.fill").frame(maxWidth: .infinity)
+            }
+            .buttonStyle(.borderedProminent)
+            .controlSize(.regular)
+        }
+        .menuBarSection()
+    }
+
+    /// A glyph per session option: bright when on, dimmed when off; the name is the tooltip and VoiceOver label.
+    private func option(_ symbol: String, _ title: LocalizedStringKey, _ on: Bool) -> some View {
+        Image(systemName: symbol)
+            .font(.system(size: 11, weight: .semibold))
+            .frame(width: 24, height: 22)
+            .foregroundStyle(on ? module.tint : Color.secondary.opacity(0.45))
+            .background(Color.primary.opacity(on ? 0.08 : 0.03), in: RoundedRectangle(cornerRadius: PocketRadius.small, style: .continuous))
+            .help(title)
+            .accessibilityLabel(title)
+            .accessibilityValue(on ? Text("Açık") : Text("Kapalı"))
+    }
+
+    private var statistics: some View {
+        let now = Date()
+        let history = service.history
+        return VStack(spacing: PocketSpacing.xs + 1) {
+            InfoRow(title: "Bugün", value: MenuBarFormatter.duration(minutes: history.minutes(on: now)))
+            InfoRow(title: "Seri", value: String(localized: "\(history.streak(until: now)) gün"))
+            if let last = history.records.first {
+                InfoRow(title: "Son oturum", value: String(localized: "\(last.minutes) / \(last.plannedMinutes) dk · \(last.start.formatted(.relative(presentation: .named)))"))
+            }
+        }
+        .font(.callout)
+        .menuBarSection()
+    }
+}
+
+private struct BluetoothMenuDetail: View {
+    var model: PocketModel
+    @ObservedObject private var service = BluetoothBatteryService.shared
+    @ObservedObject private var modules = PocketModuleRuntime.shared
+    private let module = MenuBarModule.bluetooth
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: PocketSpacing.s + 2) {
+            if !modules.available.contains(.bluetoothBattery) {
+                MenuBarModuleOff(module: module, explanation: "Bluetooth Pilleri modülü kapalı. Ayarlar › Modüller’den açabilirsin.", model: model)
+            } else {
+                if service.logitechNeedsPermission {
+                    HStack(spacing: PocketSpacing.s) {
+                        Text("Logitech pilleri için Giriş İzleme izni gerekir.").font(.caption).foregroundStyle(.orange)
+                            .fixedSize(horizontal: false, vertical: true)
+                        Spacer(minLength: PocketSpacing.s)
+                        Button("İzin ver…") { service.requestLogitechAccess() }.controlSize(.small)
+                    }
+                }
+                devices
+                HStack(spacing: PocketSpacing.s) {
+                    if let updated = service.updatedAt {
+                        Text("Son okuma \(updated.formatted(date: .omitted, time: .shortened))").font(.caption).foregroundStyle(.secondary)
+                    }
+                    Spacer(minLength: PocketSpacing.s)
+                    Button { Task { await service.refresh(forceProfile: true) } } label: { Label("Yenile", systemImage: "arrow.clockwise") }
+                        .controlSize(.small).disabled(service.loading)
+                    Button("Bluetooth Pilleri…") { MenuBarNavigation.openTool("bluetooth-battery", model: model) }.controlSize(.small)
+                }
+            }
+        }
+    }
+
+    @ViewBuilder private var devices: some View {
+        if service.devices.isEmpty {
+            HStack(spacing: PocketSpacing.s + 2) {
+                PocketIconTile(symbol: "dot.radiowaves.left.and.right", tint: module.tint, size: 30)
+                Text(service.loading ? "Bluetooth aygıtları okunuyor…" : "Bağlı Bluetooth aygıtı yok")
+                    .font(.callout).foregroundStyle(.secondary)
+            }
+            .menuBarSection()
+        } else {
+            VStack(alignment: .leading, spacing: PocketSpacing.s + 2) {
+                ForEach(service.devices) { device in BluetoothMenuRow(device: device, threshold: service.settings.threshold) }
+            }
+            .menuBarSection()
+        }
+    }
+}
+
+private struct BluetoothMenuRow: View {
+    let device: BluetoothBatteryDevice
+    let threshold: Int
+
+    private func color(_ level: Int) -> Color { level <= threshold ? .red : level <= threshold + 15 ? .orange : .green }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: PocketSpacing.xs) {
+            HStack(spacing: PocketSpacing.xs + 2) {
+                Image(systemName: device.kind.symbol).frame(width: 18).foregroundStyle(.secondary)
+                Text(verbatim: device.name).lineLimit(1)
+                Spacer(minLength: PocketSpacing.s)
+                if device.charging { Image(systemName: "bolt.fill").font(.caption).foregroundStyle(.green).help("Şarj oluyor") }
+                if device.levelUnavailable {
+                    Text("Bilinmiyor").foregroundStyle(.secondary)
+                } else if device.levels.left != nil || device.levels.right != nil {
+                    HStack(spacing: PocketSpacing.xs + 2) {
+                        part("Sol", device.levels.left)
+                        part("Sağ", device.levels.right)
+                        part("Kutu", device.levels.batteryCase)
+                    }
+                } else if let level = device.levels.lowest {
+                    Text(percentText(Double(level))).monospacedDigit().foregroundStyle(color(level))
+                }
+            }
+            .font(.callout)
+            if let level = device.levels.lowest { CapacityBar(fraction: Double(level) / 100, tint: color(level), height: 4) }
+        }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(Text(verbatim: device.name))
+        .accessibilityValue(device.levels.lowest.map { Text(percentText(Double($0))) } ?? Text("Pil bilgisi alınamıyor"))
+    }
+
+    @ViewBuilder private func part(_ title: LocalizedStringKey, _ level: Int?) -> some View {
+        if let level {
+            HStack(spacing: 2) {
+                Text(title).font(.caption2.weight(.semibold)).foregroundStyle(.secondary)
+                Text(percentText(Double(level))).monospacedDigit().foregroundStyle(color(level))
+            }
+        }
     }
 }

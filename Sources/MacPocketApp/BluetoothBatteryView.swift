@@ -1,21 +1,11 @@
 import MacPocketCore
 import SwiftUI
 
-extension BluetoothBatteryDevice.Kind {
-    var symbol: String {
-        switch self {
-        case .keyboard: "keyboard"
-        case .trackpad: "rectangle.and.hand.point.up.left"
-        case .mouse: "computermouse"
-        case .headphones: "airpodspro"
-        case .other: "dot.radiowaves.left.and.right"
-        }
-    }
-}
-
 /// Tools → Bluetooth Pilleri: battery rings for connected accessories and the low-battery alert.
 struct BluetoothBatteryView: View {
     @ObservedObject private var service = BluetoothBatteryService.shared
+    @ObservedObject private var menuBar = MenuBarSettingsStore.shared
+    @Environment(\.openSettings) private var openSettings
 
     var body: some View {
         VStack(alignment: .leading, spacing: PocketSpacing.l) {
@@ -75,13 +65,21 @@ struct BluetoothBatteryView: View {
             .fixedSize()
             .disabled(!service.settings.lowBatteryAlerts)
             Divider().padding(.vertical, PocketSpacing.xs)
-            Toggle(isOn: $service.settings.showInMenuBar) {
+            HStack(spacing: PocketSpacing.m) {
                 VStack(alignment: .leading, spacing: 2) {
-                    Text("Menü çubuğunda göster").font(.headline)
-                    Text("En düşük pil ve aygıtın simgesi; tıklayınca tüm aygıtlar listelenir.").font(.subheadline).foregroundStyle(.secondary)
+                    Text("Menü çubuğu").font(.headline)
+                    Text(menuBar.preferences.visible && menuBar.preferences.enabled.contains(.bluetooth)
+                         ? "Bluetooth pilleri modülü menü çubuğunda en düşük pili gösteriyor."
+                         : "Menü çubuğunda göstermek için Menü Çubuğu ayarlarında Bluetooth pilleri modülünü aç.")
+                        .font(.subheadline).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+                }
+                Spacer(minLength: PocketSpacing.s)
+                Button("Menü Çubuğu Ayarları…") {
+                    PocketSettingsNavigation.shared.section = .menuBar
+                    PocketSettingsNavigation.shared.menuBarModule = .bluetooth
+                    openSettings()
                 }
             }
-            .toggleStyle(.switch)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .pocketCard()

@@ -68,7 +68,7 @@ final class MenuBarHistory: ObservableObject {
             return values.map { min(1, $0 / ceiling) }
         }
         switch module {
-        case .weather, .aiUsage: return []
+        case .weather, .aiUsage, .awake, .focus, .bluetooth: return []
         case .cpu:
             return recent.map { sample in
                 switch settings.value {
@@ -341,7 +341,7 @@ enum MenuBarRenderer {
                 levels += history.graph(for: module, settings: settings, count: graphSamples).map { Int($0 * 40) }
             }
         }
-        return Key(parts: [module.rawValue, String(describing: settings), symbol(for: module, value: settings.value, snapshot: snapshot),
+        return Key(parts: [module.rawValue, String(describing: settings), reading.symbol ?? symbol(for: module, value: settings.value, snapshot: snapshot),
                            showsVPN(module, settings: settings, snapshot: snapshot) ? "vpn" : "",
                            "\(MenuBarThresholds.level(reading, settings: settings).rawValue)"]
                    + reading.lines + reading.reserve, levels: levels)
@@ -355,7 +355,7 @@ enum MenuBarRenderer {
 
     private static func moduleTemplate(_ module: MenuBarModule, settings: MenuBarModuleSettings, reading: MenuBarReading,
                                        snapshot: SystemSnapshot?, history: MenuBarHistory) -> NSImage {
-        let symbolName = symbol(for: module, value: settings.value, snapshot: snapshot)
+        let symbolName = reading.symbol ?? symbol(for: module, value: settings.value, snapshot: snapshot)
         let shortLabel = module.shortLabel(for: settings.value)
         if settings.style == .icon {
             return template(width: 18) { drawSymbol(symbolName, in: NSRect(x: 0, y: 2, width: 18, height: 18), pointSize: 14) }

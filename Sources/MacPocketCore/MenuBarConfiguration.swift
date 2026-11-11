@@ -4,7 +4,7 @@ import Foundation
 
 /// One monitoring module shown in the menu bar (a status item, or a tab of the grouped popover).
 public enum MenuBarModule: String, CaseIterable, Codable, Sendable, Identifiable {
-    case cpu, gpu, memory, disk, network, power, weather, aiUsage
+    case cpu, gpu, memory, disk, network, power, weather, aiUsage, awake, focus, bluetooth
 
     public var id: String { rawValue }
 
@@ -18,6 +18,18 @@ public enum MenuBarModule: String, CaseIterable, Codable, Sendable, Identifiable
         case .power: String(localized: "Güç ve Fan")
         case .weather: String(localized: "Hava durumu")
         case .aiUsage: String(localized: "AI Kotaları")
+        case .awake: String(localized: "Uyanık tut")
+        case .focus: String(localized: "Odak")
+        case .bluetooth: String(localized: "Bluetooth pilleri")
+        }
+    }
+
+    /// System metrics read from the monitor's snapshot. The others (weather, AI quotas, keep awake, focus,
+    /// Bluetooth batteries) have their own item in every layout and can't drive the grouped icon.
+    public var isSystemMetric: Bool {
+        switch self {
+        case .cpu, .gpu, .memory, .disk, .network, .power: true
+        case .weather, .aiUsage, .awake, .focus, .bluetooth: false
         }
     }
 
@@ -32,6 +44,9 @@ public enum MenuBarModule: String, CaseIterable, Codable, Sendable, Identifiable
         case .power: String(localized: "MenuBar.shortLabel.power", defaultValue: "GÜÇ")
         case .weather: String(localized: "MenuBar.shortLabel.weather", defaultValue: "HAVA")
         case .aiUsage: String(localized: "AI")
+        case .awake: String(localized: "MenuBar.shortLabel.awake", defaultValue: "UYANIK")
+        case .focus: String(localized: "MenuBar.shortLabel.focus", defaultValue: "ODAK")
+        case .bluetooth: "BT"
         }
     }
 
@@ -57,6 +72,9 @@ public enum MenuBarModule: String, CaseIterable, Codable, Sendable, Identifiable
         case .power: "bolt.fill"
         case .weather: "cloud.sun.fill"
         case .aiUsage: "gauge.with.dots.needle.50percent"
+        case .awake: "cup.and.saucer.fill"
+        case .focus: "scope"
+        case .bluetooth: "battery.75percent"
         }
     }
 
@@ -71,6 +89,9 @@ public enum MenuBarModule: String, CaseIterable, Codable, Sendable, Identifiable
         case .power: [.powerBattery, .powerTimeRemaining, .powerSource, .powerFanSpeed, .powerFanPercent, .powerThermal, .powerTemperature]
         case .weather: [.weatherTemperature, .weatherApparent]
         case .aiUsage: [.aiQuota]
+        case .awake: [.awakeRemaining]
+        case .focus: [.focusRemaining]
+        case .bluetooth: [.bluetoothLowest]
         }
     }
 
@@ -83,7 +104,12 @@ public enum MenuBarModule: String, CaseIterable, Codable, Sendable, Identifiable
 
     /// Display styles that make sense for this module; per-core bars exist only for the CPU.
     public var styleOptions: [MenuBarDisplayStyle] {
-        if self == .weather || self == .aiUsage { return [.value, .icon] }
+        switch self {
+        case .weather, .aiUsage: return [.value, .icon]
+        case .awake, .focus: return [.value, .pie, .icon]
+        case .bluetooth: return [.value, .gauge, .pie, .icon]
+        default: break
+        }
         return self == .cpu ? MenuBarDisplayStyle.allCases : MenuBarDisplayStyle.allCases.filter { $0 != .cores }
     }
 }
@@ -99,6 +125,7 @@ public enum MenuBarValue: String, Codable, Sendable, CaseIterable, Identifiable 
     case powerFanSpeed, powerFanPercent, powerThermal, powerTemperature
     case weatherTemperature, weatherApparent
     case aiQuota
+    case awakeRemaining, focusRemaining, bluetoothLowest
 
     public var id: String { rawValue }
 
@@ -147,6 +174,8 @@ public enum MenuBarValue: String, Codable, Sendable, CaseIterable, Identifiable 
         case .weatherTemperature: String(localized: "Hava sıcaklığı (°C)")
         case .weatherApparent: String(localized: "Hissedilen sıcaklık (°C)")
         case .aiQuota: String(localized: "Hesap kotaları")
+        case .awakeRemaining, .focusRemaining: String(localized: "Kalan süre")
+        case .bluetoothLowest: String(localized: "En düşük pil (%)")
         }
     }
 }
@@ -257,18 +286,19 @@ extension MenuBarValue {
         case .cpuTotal, .cpuUser, .cpuSystem, .gpuUtilization, .gpuRenderer, .gpuMemory,
              .memoryUsedPercent, .memoryUsedBytes, .memoryFreeBytes, .memoryPressure,
              .diskFreeBytes, .diskUsedPercent, .diskFreePercent, .powerBattery, .powerTimeRemaining,
-             .powerFanSpeed, .powerFanPercent, .powerThermal, .aiQuota: .percent
+             .powerFanSpeed, .powerFanPercent, .powerThermal, .aiQuota, .bluetoothLowest: .percent
         case .powerTemperature: .celsius
         case .networkPing: .milliseconds
         case .networkWifiSignal: .dBm
-        case .diskActivity, .diskReadWrite, .networkUpDown, .networkCombined, .networkDownload, .networkUpload, .powerSource, .weatherTemperature, .weatherApparent: nil
+        case .diskActivity, .diskReadWrite, .networkUpDown, .networkCombined, .networkDownload, .networkUpload, .powerSource, .weatherTemperature, .weatherApparent,
+             .awakeRemaining, .focusRemaining: nil
         }
     }
 
     /// Battery charge and Wi-Fi signal get worse as they fall; everything else as it rises.
     public var lowerIsWorse: Bool {
         switch self {
-        case .powerBattery, .powerTimeRemaining, .networkWifiSignal: true
+        case .powerBattery, .powerTimeRemaining, .networkWifiSignal, .bluetoothLowest: true
         default: false
         }
     }
@@ -281,7 +311,7 @@ extension MenuBarValue {
         case .memoryUsedPercent, .memoryUsedBytes, .memoryFreeBytes: (80, 92)
         case .memoryPressure: (50, 80)
         case .diskFreeBytes, .diskUsedPercent, .diskFreePercent: (85, 95)
-        case .powerBattery, .powerTimeRemaining: (20, 10)
+        case .powerBattery, .powerTimeRemaining, .bluetoothLowest: (20, 10)
         case .powerFanSpeed, .powerFanPercent: (70, 90)
         case .powerThermal: (50, 75)
         case .aiQuota: (65, 85)
@@ -354,6 +384,10 @@ public struct MenuBarModuleSettings: Codable, Equatable, Sendable {
         case .power: Self(showLabel: false, showIcon: true, value: .powerBattery)
         case .weather: Self(showLabel: false, showIcon: true, value: .weatherTemperature)
         case .aiUsage: Self(showLabel: false, showIcon: true, value: .aiQuota)
+        case .awake: Self(showLabel: false, showIcon: true, value: .awakeRemaining)
+        case .focus: Self(showLabel: false, showIcon: true, value: .focusRemaining)
+        // Colored by default, like the standalone item it replaces turned red at the alert level.
+        case .bluetooth: Self(showLabel: false, showIcon: true, value: .bluetoothLowest, colorMode: .thresholds)
         default: Self(value: module.valueOptions[0])
         }
     }
@@ -549,7 +583,7 @@ public struct MenuBarPreferences: Equatable, Sendable {
                 settings.volumePath = defaults.string(forKey: "MacPocket.bar.volume") ?? ""
             case .power:
                 settings.value = battery ? .powerBattery : .powerSource
-            case .network, .weather, .aiUsage:
+            case .network, .weather, .aiUsage, .awake, .focus, .bluetooth:
                 settings = .defaults(for: module)
             case .cpu, .gpu:
                 break
@@ -575,11 +609,13 @@ public struct MenuBarReading: Equatable, Sendable {
     public let accessibility: String
     /// The value in its threshold unit (see `MenuBarValue.thresholdUnit`), nil when it has none.
     public var thresholdValue: Double? = nil
+    /// Replaces the module's symbol for this state (a filled cup while awake, the weakest accessory's kind).
+    public var symbol: String? = nil
 
     public init(lines: [String], reserve: [String], fraction: Double?, magnitude: Double?, accessibility: String,
-                thresholdValue: Double? = nil) {
+                thresholdValue: Double? = nil, symbol: String? = nil) {
         self.lines = lines; self.reserve = reserve; self.fraction = fraction; self.magnitude = magnitude
-        self.accessibility = accessibility; self.thresholdValue = thresholdValue
+        self.accessibility = accessibility; self.thresholdValue = thresholdValue; self.symbol = symbol
     }
 }
 
@@ -652,7 +688,12 @@ public enum MenuBarFormatter {
 
     public static func reading(_ module: MenuBarModule, settings raw: MenuBarModuleSettings,
                                snapshot: SystemSnapshot?, binaryUnits: Bool = true, weather: WeatherSnapshot? = nil,
-                               aiUsage: MenuBarReading? = nil) -> MenuBarReading {
+                               aiUsage: MenuBarReading? = nil, external: MenuBarReading? = nil) -> MenuBarReading {
+        // Keep awake, focus and Bluetooth state live outside the snapshot; the app builds their readings
+        // with `awakeReading`, `focusReading` and `bluetoothReading`.
+        if module == .awake || module == .focus || module == .bluetooth {
+            return external ?? MenuBarReading(lines: [""], reserve: [""], fraction: nil, magnitude: nil, accessibility: module.title)
+        }
         if module == .aiUsage {
             return aiUsage ?? MenuBarReading(lines: ["AI —"], reserve: ["AI 100%"], fraction: nil, magnitude: nil,
                                             accessibility: String(localized: "AI kotaları: hesap ekle"))
@@ -699,7 +740,7 @@ public enum MenuBarFormatter {
                                   accessibility: String(localized: "Ağ: internet bağlantısı yok"))
         }
         switch settings.value {
-        case .weatherTemperature, .weatherApparent, .aiQuota: return pending()
+        case .weatherTemperature, .weatherApparent, .aiQuota, .awakeRemaining, .focusRemaining, .bluetoothLowest: return pending()
         case .gpuUtilization, .gpuRenderer:
             guard let gpu = s.gpu else { return pending() }
             let value = settings.value == .gpuRenderer ? (gpu.rendererPercent ?? gpu.utilizationPercent) : gpu.utilizationPercent
@@ -881,6 +922,75 @@ public enum MenuBarFormatter {
             let text = percent(charge, decimals: decimals)
             return MenuBarReading(lines: [text], reserve: [percentReserve], fraction: charge / 100, magnitude: charge,
                                   accessibility: batterySpoken(text))
+        }
+    }
+}
+
+// MARK: - Timers and accessories
+
+extension MenuBarFormatter {
+    /// Whole minutes left, rounded up so the item never reads "0 dk" while time remains.
+    static func minutesLeft(until end: Date, now: Date) -> Int { max(0, Int((end.timeIntervalSince(now) / 60).rounded(.up))) }
+
+    /// Off: only the outlined cup. Timed: minutes left and the share of the session still to run. Until stopped: "∞".
+    public static func awakeReading(_ session: AwakeSession?, now: Date = Date()) -> MenuBarReading {
+        guard let session, session.active else {
+            return MenuBarReading(lines: [""], reserve: [""], fraction: nil, magnitude: nil,
+                                  accessibility: String(localized: "Uyanık tut: kapalı"), symbol: "cup.and.saucer")
+        }
+        guard let end = session.endsAt else {
+            return MenuBarReading(lines: ["∞"], reserve: ["∞"], fraction: 1, magnitude: nil,
+                                  accessibility: String(localized: "Mac süresiz uyanık tutuluyor"), symbol: "cup.and.saucer.fill")
+        }
+        let minutes = minutesLeft(until: end, now: now)
+        let text = duration(minutes: minutes)
+        let total = end.timeIntervalSince(session.startedAt)
+        let fraction = total > 0 ? min(1, max(0, end.timeIntervalSince(now) / total)) : 0
+        return MenuBarReading(lines: [text], reserve: [minutes >= 60 ? "99:59" : duration(minutes: 59)], fraction: fraction,
+                              magnitude: Double(minutes), accessibility: String(localized: "Mac uyanık tutuluyor, \(text) kaldı"),
+                              symbol: "cup.and.saucer.fill")
+    }
+
+    /// Idle: only the symbol. Running: minutes left; the pie fills as the session progresses.
+    public static func focusReading(startedAt: Date?, endsAt: Date?, now: Date = Date()) -> MenuBarReading {
+        guard let start = startedAt, let end = endsAt else {
+            return MenuBarReading(lines: [""], reserve: [""], fraction: nil, magnitude: nil,
+                                  accessibility: String(localized: "Odak: oturum yok"))
+        }
+        let minutes = minutesLeft(until: end, now: now)
+        let text = duration(minutes: minutes)
+        let total = end.timeIntervalSince(start)
+        let progress = total > 0 ? min(1, max(0, now.timeIntervalSince(start) / total)) : 1
+        return MenuBarReading(lines: [text], reserve: [minutes >= 60 ? "99:59" : duration(minutes: 59)], fraction: progress,
+                              magnitude: Double(minutes), accessibility: String(localized: "Odak oturumu, \(text) kaldı"),
+                              symbol: "scope")
+    }
+
+    /// The accessory that runs out first, with its kind's symbol.
+    public static func bluetoothReading(_ devices: [BluetoothBatteryDevice], decimals: Bool = false) -> MenuBarReading {
+        let reserve = percent(100, decimals: decimals)
+        let known = devices.compactMap { device in device.levels.lowest.map { (device, $0) } }
+        guard let (device, level) = known.min(by: { $0.1 < $1.1 }) else {
+            let spoken = devices.isEmpty ? String(localized: "Bağlı Bluetooth aygıtı yok") : String(localized: "Bluetooth pil bilgisi alınamıyor")
+            return MenuBarReading(lines: ["—"], reserve: [reserve], fraction: nil, magnitude: nil, accessibility: spoken,
+                                  symbol: "dot.radiowaves.left.and.right")
+        }
+        let text = percent(Double(level), decimals: decimals)
+        let others = known.count > 1 ? String(localized: ", \(known.count) aygıt") : ""
+        return MenuBarReading(lines: [text], reserve: [reserve], fraction: Double(level) / 100, magnitude: Double(level),
+                              accessibility: String(localized: "En düşük Bluetooth pili: \(device.name) \(text)") + others,
+                              thresholdValue: Double(level), symbol: device.kind.symbol)
+    }
+}
+
+extension BluetoothBatteryDevice.Kind {
+    public var symbol: String {
+        switch self {
+        case .keyboard: "keyboard"
+        case .trackpad: "rectangle.and.hand.point.up.left"
+        case .mouse: "computermouse"
+        case .headphones: "airpodspro"
+        case .other: "dot.radiowaves.left.and.right"
         }
     }
 }

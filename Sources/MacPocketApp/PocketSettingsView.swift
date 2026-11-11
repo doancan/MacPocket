@@ -36,6 +36,8 @@ struct PocketSettingsView: View {
     enum Section: Int { case general,appearance,menuBar,monitoring,modules,advanced }
     static let shared = PocketSettingsNavigation()
     @Published var section = Section.general
+    /// Selected in Settings › Menü Çubuğu when it next appears (e.g. from a tool page's "Menü Çubuğu Ayarları…").
+    @Published var menuBarModule: MenuBarModule?
 }
 
 // MARK: - General

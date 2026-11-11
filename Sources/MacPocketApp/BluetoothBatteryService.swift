@@ -17,11 +17,10 @@ final class BluetoothBatteryService: NSObject, ObservableObject {
     struct Settings: Codable, Equatable {
         var lowBatteryAlerts = true
         var threshold = 20
-        var showInMenuBar = false
         static let storageKey = "MacPocket.bluetoothBattery.settings"
     }
 
-    @Published private(set) var devices: [BluetoothBatteryDevice] = [] { didSet { updateStatusItem() } }
+    @Published private(set) var devices: [BluetoothBatteryDevice] = []
     @Published private(set) var loading = false
     @Published private(set) var updatedAt: Date?
     /// A Logitech device is connected but its battery needs Input Monitoring.
@@ -32,7 +31,6 @@ final class BluetoothBatteryService: NSObject, ObservableObject {
             if let data = try? JSONEncoder().encode(settings) { UserDefaults.standard.set(data, forKey: Settings.storageKey) }
             alerts = LowBatteryAlerts(threshold: settings.threshold, rearm: settings.threshold + 10)
             if settings.lowBatteryAlerts && !oldValue.lowBatteryAlerts { Task { _ = await PocketAlertNotifier.requestAuthorization() } }
-            updateStatusItem()
         }
     }
 
@@ -44,7 +42,6 @@ final class BluetoothBatteryService: NSObject, ObservableObject {
     private var logitechAt: Date?
     private var refreshGeneration = UUID()
     private var timer: Timer?
-    private var statusItem: NSStatusItem?
 
     private override init() {
         let loaded = UserDefaults.standard.data(forKey: Settings.storageKey).flatMap { try? JSONDecoder().decode(Settings.self, from: $0) } ?? Settings()
@@ -58,25 +55,17 @@ final class BluetoothBatteryService: NSObject, ObservableObject {
         timer?.invalidate()
         timer = nil
         refreshGeneration = UUID()
-        if let statusItem { NSStatusBar.system.removeStatusItem(statusItem) }
-        statusItem = nil
     }
 
     func start() {
         guard !moduleRunning, PocketModule.bluetoothBattery.isAvailable() else { return }
         moduleRunning = true
         guard timer == nil else { return }
-        updateStatusItem()
         Task { await refresh() }
         let timer = Timer(timeInterval: 60, repeats: true) { [weak self] _ in Task { @MainActor in await self?.refresh() } }
         timer.tolerance = 15
         RunLoop.main.add(timer, forMode: .common)
         self.timer = timer
-    }
-
-    /// Lowest known level among connected accessories, for the menu bar.
-    var lowest: (device: BluetoothBatteryDevice, level: Int)? {
-        devices.compactMap { device in device.levels.lowest.map { (device, $0) } }.min { $0.1 < $1.1 }
     }
 
     func refresh(forceProfile: Bool = false) async {
@@ -121,53 +110,12 @@ final class BluetoothBatteryService: NSObject, ObservableObject {
 
     // MARK: Menu bar
 
-    /// The lowest level with its device's symbol in the menu bar; the menu lists every accessory.
-    private func updateStatusItem() {
-        guard moduleRunning, settings.showInMenuBar else {
-            if let statusItem { NSStatusBar.system.removeStatusItem(statusItem) }
-            statusItem = nil
-            return
-        }
-        let item = statusItem ?? {
-            let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
-            item.autosaveName = "MacPocketBluetoothBattery"
-            return item
-        }()
-        statusItem = item
-        guard let button = item.button else { return }
-        if let lowest {
-            let image = NSImage(systemSymbolName: lowest.device.kind.symbol, accessibilityDescription: lowest.device.name)
-            image?.isTemplate = true
-            button.image = image
-            button.imagePosition = .imageLeading
-            button.title = " \(lowest.level)%"
-            button.contentTintColor = lowest.level <= settings.threshold ? .systemRed : nil
-            button.toolTip = String(localized: "\(lowest.device.name): %\(lowest.level)")
-        } else {
-            let image = NSImage(systemSymbolName: "battery.75percent", accessibilityDescription: String(localized: "Bluetooth Pilleri"))
-            image?.isTemplate = true
-            button.image = image
-            button.title = ""
-            button.contentTintColor = nil
-        }
-        let menu = NSMenu()
-        for device in devices {
-            let level = device.levels.lowest.map { "%\($0)" } ?? "—"
-            let entry = NSMenuItem(title: "\(device.name)  \(level)", action: nil, keyEquivalent: "")
-            entry.image = NSImage(systemSymbolName: device.kind.symbol, accessibilityDescription: nil)
-            menu.addItem(entry)
-        }
-        if devices.isEmpty { menu.addItem(withTitle: String(localized: "Bağlı Bluetooth aygıtı yok"), action: nil, keyEquivalent: "") }
-        menu.addItem(.separator())
-        let open = NSMenuItem(title: String(localized: "Bluetooth Pilleri…"), action: #selector(openPage), keyEquivalent: "")
-        open.target = self
-        menu.addItem(open)
-        item.menu = menu
-    }
-
-    @objc private func openPage() {
-        NSApp.activate(ignoringOtherApps: true)
-        NotificationCenter.default.post(name: .pocketOpenTool, object: "bluetooth-battery")
+    /// Whether the settings saved by earlier versions asked for the standalone menu bar item, which the
+    /// Bluetooth module of the menu bar configuration replaces.
+    static func legacyMenuBarItemRequested(_ defaults: UserDefaults = .standard) -> Bool {
+        guard let data = defaults.data(forKey: Settings.storageKey),
+              let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else { return false }
+        return object["showInMenuBar"] as? Bool == true
     }
 
     private func notify(_ due: [BluetoothBatteryDevice]) {
@@ -216,6 +164,6 @@ extension Notification.Name {
 
 #if DEBUG
 extension BluetoothBatteryService {
-    var moduleDiagnosticResources: [String: Int] { ["timer": timer?.isValid == true ? 1 : 0, "statusItem": statusItem == nil ? 0 : 1] }
+    var moduleDiagnosticResources: [String: Int] { ["timer": timer?.isValid == true ? 1 : 0] }
 }
 #endif

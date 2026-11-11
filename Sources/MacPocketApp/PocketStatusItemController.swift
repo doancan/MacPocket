@@ -32,6 +32,8 @@ final class PocketStatusItemController: NSObject {
         }, didClose: { [weak self] in self?.model.menuBarProcessesWanted = false })
     private var appearanceName: String?
     private var subscriptions = Set<AnyCancellable>()
+    /// Advances keep-awake and focus countdowns while monitoring is paused (samples drive `refresh` otherwise).
+    private var clock: Timer?
 
     init(model: PocketModel) {
         self.model = model
@@ -66,6 +68,13 @@ final class PocketStatusItemController: NSObject {
         // The menu bar shows only the forecast and its place; loading/refresh bookkeeping does not redraw it.
         observe({ (WeatherService.shared.snapshot, WeatherService.shared.location) }) { controller, _ in controller.refresh() }
         observe({ [model] in model.paused }) { controller, _ in controller.updateTooltips() }
+        observe({ [model] in model.awakeSession }) { controller, _ in controller.refresh() }
+        FocusSessionService.shared.objectWillChange.receive(on: RunLoop.main).sink { [weak self] _ in
+            MainActor.assumeIsolated { self?.refresh() }
+        }.store(in: &subscriptions)
+        BluetoothBatteryService.shared.$devices.dropFirst().removeDuplicates().receive(on: RunLoop.main).sink { [weak self] _ in
+            MainActor.assumeIsolated { self?.refresh() }
+        }.store(in: &subscriptions)
         NotificationCenter.default.publisher(for: UserDefaults.didChangeNotification)
             .receive(on: RunLoop.main).sink { [weak self] _ in
                 MainActor.assumeIsolated { self?.updateAppearance() }
@@ -125,9 +134,8 @@ final class PocketStatusItemController: NSObject {
         let enabled = preferences.enabledModules
         // With nothing enabled the grouped glyph stays, so MacPocket is always reachable.
         if preferences.layout == .separate && !enabled.isEmpty { return enabled.map(\.rawValue) }
-        return [Self.groupedKey]
-            + (preferences.enabled.contains(.weather) ? [MenuBarModule.weather.rawValue] : [])
-            + (preferences.enabled.contains(.aiUsage) ? [MenuBarModule.aiUsage.rawValue] : [])
+        // Weather, AI quotas, keep awake, focus and Bluetooth batteries keep their own item beside the grouped one.
+        return [Self.groupedKey] + enabled.filter { !$0.isSystemMetric }.map(\.rawValue)
     }
 
     private func refresh() {
@@ -147,7 +155,8 @@ final class PocketStatusItemController: NSObject {
                     settings.criticalThreshold = AIUsageService.shared.settings.critical
                 }
                 let reading = MenuBarFormatter.reading(module, settings: settings, snapshot: snapshot,
-                                                       binaryUnits: preferences.binaryUnits, weather: WeatherService.shared.snapshot, aiUsage: AIUsageService.shared.menuBarReading)
+                                                       binaryUnits: preferences.binaryUnits, weather: WeatherService.shared.snapshot, aiUsage: AIUsageService.shared.menuBarReading,
+                                                       external: MenuBarExternalReadings.reading(for: module, model: model, settings: settings))
                 let dark = button.effectiveAppearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua
                 var moduleKey = MenuBarRenderer.moduleKey(module, settings: settings, reading: reading, snapshot: snapshot, history: history)
                 if module == .aiUsage { moduleKey.parts.append(dark ? "ai-dark" : "ai-light") }
@@ -158,7 +167,7 @@ final class PocketStatusItemController: NSObject {
                 }
                 spoken = reading.accessibility
             } else {
-                let readings = preferences.enabledModules.map {
+                let readings = preferences.enabledModules.filter(\.isSystemMetric).map {
                     ($0, MenuBarFormatter.reading($0, settings: preferences.settings(for: $0), snapshot: snapshot,
                                                   binaryUnits: preferences.binaryUnits, weather: WeatherService.shared.snapshot, aiUsage: AIUsageService.shared.menuBarReading))
                 }
@@ -179,6 +188,21 @@ final class PocketStatusItemController: NSObject {
                 button.setAccessibilityLabel(String(localized: "MacPocket, \(spoken)"))
                 updateTooltip(button, spoken: spoken)
             }
+        }
+        updateClock(keys)
+    }
+
+    private func updateClock(_ keys: [String]) {
+        let awake = keys.contains(MenuBarModule.awake.rawValue) && model.awakeSession?.active == true && model.awakeSession?.endsAt != nil
+        let focus = keys.contains(MenuBarModule.focus.rawValue) && FocusSessionService.shared.isRunning
+        if awake || focus {
+            guard clock == nil else { return }
+            let timer = Timer(timeInterval: 20, repeats: true) { [weak self] _ in MainActor.assumeIsolated { self?.refresh() } }
+            timer.tolerance = 5
+            RunLoop.main.add(timer, forMode: .common)
+            clock = timer
+        } else {
+            clock?.invalidate(); clock = nil
         }
     }
 
@@ -304,6 +328,27 @@ final class PocketStatusItemController: NSObject {
 
     @objc private func quit() { NSApp.terminate(nil) }
 
+}
+
+/// Readings for the modules whose state lives outside the system snapshot.
+@MainActor enum MenuBarExternalReadings {
+    static func reading(for module: MenuBarModule, model: PocketModel, settings: MenuBarModuleSettings, now: Date = Date()) -> MenuBarReading? {
+        switch module {
+        case .awake:
+            return MenuBarFormatter.awakeReading(model.awakeSession, now: now)
+        case .focus:
+            let focus = FocusSessionService.shared
+            return MenuBarFormatter.focusReading(startedAt: focus.startedAt, endsAt: focus.endsAt, now: now)
+        case .bluetooth:
+            guard PocketModule.bluetoothBattery.isAvailable() else {
+                return MenuBarReading(lines: ["—"], reserve: ["—"], fraction: nil, magnitude: nil,
+                                      accessibility: String(localized: "Bluetooth Pilleri modülü kapalı"), symbol: "dot.radiowaves.left.and.right")
+            }
+            return MenuBarFormatter.bluetoothReading(BluetoothBatteryService.shared.devices, decimals: settings.decimals)
+        default:
+            return nil
+        }
+    }
 }
 
 @MainActor

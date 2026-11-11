@@ -691,3 +691,15 @@ Mikro ölçüm (paketlenmiş uygulama): `localization: nil` 0,11–0,19 µs; aç
 - **Uygulama boşta:** Çalışan release uygulaması (panel kapalı) 20 s'de 0,75 s CPU, örneklerin neredeyse tamamı beklemede.
 
 **Ölçüm sınırı:** Ekran kilitliydi; kilitli ekranda SwiftUI animasyon kareleri ekran yenilemesiyle kısıtlanmıyor (pencere geçişi bölümündeki sonda). Sekme geçişi CPU değerleri bu yüzden yapaydır; yalnız aynı koşuldaki karşılaştırma için kullanıldı. Ekran açıkken ve fiziksel tıklamayla tekrar ölçülmedi.
+
+### Menü çubuğu: Uyanık tut, Odak ve Bluetooth pilleri modülleri — 11 Kasım 2026
+
+**Uygulanan:**
+- **Üç yeni modül:** `awake`, `focus`, `bluetooth`. Hava durumu ve AI kotaları gibi `isSystemMetric == false`: her düzende kendi menü çubuğu öğesinde görünürler, gruplu simgeyi besleyemezler. Gruplu paneldeki sekmelere de eklenirler. Varsayılan olarak kapalıdırlar; kayıtlı sıralamaya sona eklenirler.
+- **Okumalar Core'da saf fonksiyonlar:** `awakeReading`, `focusReading`, `bluetoothReading`. Kalan süre yukarı yuvarlanır, hiç negatif olmaz; süresiz uyanık tutmada "∞" gösterilir. `MenuBarReading.symbol` duruma göre simgeyi değiştirir: kapalıyken boş fincan, açıkken dolu fincan, Bluetooth'ta en düşük pilli aygıtın türü. Görünüm seçenekleri: uyanık tut ve odak için değer, pasta (kalan pay ya da ilerleme) ve simge; Bluetooth için değer, çubuk, pasta ve simge.
+- **Tek yer:** Uyanık tut düğmeleri Güç ve Fan panelinden kaldırılıp Uyanık tut paneline taşındı. Bu panelde şunlar var: kalan süre halkası, bitiş saati, otomasyon durumu (otomasyon yapılandırılmadıysa servis oluşturulmaz) ve "Ekranı da açık tut".
+- **Bluetooth:** Servisin kendi `NSStatusItem`'ı ve "Menü çubuğunda göster" ayarı kaldırıldı. Eski ayar açıksa ve yeni modülün kaydı yoksa modül bir kez etkinleştirilir. Bluetooth sayfası "Menü Çubuğu Ayarları…" düğmesiyle Ayarlar › Menü Çubuğu'nu Bluetooth modülü seçili açar. Varsayılan renk eşiğe göre (%20 uyarı, %10 kritik). Bildirim eşiği Bluetooth sayfasında kalır.
+- **Odak paneli:** Süre seçimi, oturum seçeneklerinin açık/kapalı simgeleri, Odaklan/Bitir, kalan süre halkası, bugünkü süre, seri ve son oturum. Uygulama modülü kapalıysa panel Ayarlar › Modüller'e yönlendirir.
+- **Güncelleme:** Uyanık tut oturumu (Observation), odak servisi ve Bluetooth aygıt listesi değişince öğe yeniden çizilir. Süreli oturum varken izleme duraklatılmış olsa da 20 s'lik bir saat geri sayımı ilerletir; oturum yokken saat çalışmaz.
+
+**Doğrulama:** 7 yeni test: okumalar, eşik rengi, sıralama, genel okuma geçişi, eski Bluetooth ayarının okunması. XCTest 1.036 testte yalnız bilinen `pmset` canlı testi başarısız; Swift Testing 355 test geçti; yerelleştirme 0 eksik. Paneller ve menü çubuğu simgeleri ekran dışında PNG'ye çizilip gözle incelendi. Ekran kilitli olduğu için gerçek menü çubuğunda tıklama, oturum başlatma ve gerçek Bluetooth aygıtlarıyla kabul yapılmadı.

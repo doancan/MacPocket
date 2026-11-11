@@ -96,7 +96,7 @@ struct MenuBarEditor: View {
                     }
                 } else {
                     groupedItem(foreground)
-                    ForEach([MenuBarModule.weather, .aiUsage].filter { preferences.enabled.contains($0) }) { module in
+                    ForEach(preferences.enabledModules.filter { !$0.isSystemMetric }) { module in
                         barItem(module, image: moduleImage(module), foreground: foreground)
                     }
                 }
@@ -224,7 +224,8 @@ struct MenuBarEditor: View {
             settings.warningThreshold = aiUsage.settings.warning; settings.criticalThreshold = aiUsage.settings.critical
             if let image = AIUsageMenuBarImage.make(service: aiUsage, settings: settings, dark: dark) { return image }
         }
-        let reading = MenuBarFormatter.reading(module, settings: settings, snapshot: model.system, binaryUnits: preferences.binaryUnits, weather: WeatherService.shared.snapshot, aiUsage: aiUsage.menuBarReading)
+        let reading = MenuBarFormatter.reading(module, settings: settings, snapshot: model.system, binaryUnits: preferences.binaryUnits, weather: WeatherService.shared.snapshot, aiUsage: aiUsage.menuBarReading,
+                                               external: MenuBarExternalReadings.reading(for: module, model: model, settings: settings))
         return MenuBarRenderer.module(module, settings: settings, reading: reading, snapshot: model.system, history: history)
     }
 }

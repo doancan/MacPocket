@@ -15,6 +15,9 @@ extension MenuBarModule {
         case .power: PocketTheme.power
         case .weather: .orange
         case .aiUsage: .mint
+        case .awake: Color(hex: 0xA2845E)
+        case .focus: PocketTheme.brand
+        case .bluetooth: .blue
         }
     }
 
@@ -35,9 +38,15 @@ final class MenuBarSettingsStore: ObservableObject {
 
     private init() {
         let needsWeather = UserDefaults.standard.object(forKey: MenuBarModule.weather.enabledKey) == nil
+        let needsBluetooth = UserDefaults.standard.object(forKey: MenuBarModule.bluetooth.enabledKey) == nil
         preferences = MenuBarPreferences.load()
         if needsWeather {
             preferences.enabled.insert(.weather)
+            preferences.save()
+        }
+        // The Bluetooth page used to own a separate status item; carry its "show in menu bar" choice over once.
+        if needsBluetooth, BluetoothBatteryService.legacyMenuBarItemRequested() {
+            preferences.enabled.insert(.bluetooth)
             preferences.save()
         }
         subscription = NotificationCenter.default.publisher(for: UserDefaults.didChangeNotification)
@@ -123,7 +132,7 @@ struct StatusBarPreferencesView: View {
                         .frame(maxWidth: 220)
                 }
                 Text(store.preferences.layout == .grouped
-                     ? "Sistem modülleri tek simgede toplanır; hava durumu ve AI kotaları etkinse ayrı gösterilir. Tıklayınca modülün ayrıntıları açılır."
+                     ? "Sistem modülleri tek simgede toplanır; hava durumu, AI kotaları, uyanık tut, odak ve Bluetooth pilleri etkinse ayrı gösterilir. Tıklayınca modülün ayrıntıları açılır."
                      : "Her etkin modül kendi menü çubuğu öğesini ve kendi ayarlarını kullanır. Gerçek menü çubuğunda öğeler ⌘ basılıyken de sürüklenebilir.")
                     .font(.subheadline).foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
@@ -143,6 +152,14 @@ struct StatusBarPreferencesView: View {
             } header: { Text("Birimler ve örnekleme") }
         }
         .formStyle(.grouped)
+        .onAppear(perform: takeRequestedModule)
+        .onReceive(PocketSettingsNavigation.shared.$menuBarModule) { _ in takeRequestedModule() }
+    }
+
+    private func takeRequestedModule() {
+        guard let module = PocketSettingsNavigation.shared.menuBarModule else { return }
+        selection = module
+        PocketSettingsNavigation.shared.menuBarModule = nil
     }
 
     @ViewBuilder private var groupedOptions: some View {
@@ -153,7 +170,7 @@ struct StatusBarPreferencesView: View {
         }
         if store.preferences.groupedStyle.isLive {
             Picker("Göstergenin izlediği", selection: $store.preferences.groupedMetric) {
-                ForEach(MenuBarModule.allCases.filter { $0 != .weather && $0 != .aiUsage }) { module in
+                ForEach(MenuBarModule.allCases.filter(\.isSystemMetric)) { module in
                     Label(module.title, systemImage: module.symbol).tag(module)
                 }
             }
@@ -179,8 +196,14 @@ private struct ModuleSettingsEditor: View {
     var body: some View {
         VStack(alignment: .leading, spacing: PocketSpacing.s) {
             if module == .weather { WeatherLocationPicker(); WeatherSourcePicker() }
-            Picker("Değer", selection: $settings.value) {
-                ForEach(module.valueOptions) { Text($0.title).tag($0) }
+            if module.valueOptions.count > 1 {
+                Picker("Değer", selection: $settings.value) {
+                    ForEach(module.valueOptions) { Text($0.title).tag($0) }
+                }
+            }
+            if module == .bluetooth {
+                Text("Bağlı aygıtlardan pili en önce bitecek olanı gösterir; tıklayınca tüm aygıtlar listelenir. Pil azalınca bildirim ayarları Araçlar › Bluetooth Pilleri’ndedir.")
+                    .font(.subheadline).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
             }
             if module == .disk {
                 Picker("Disk bölümü", selection: $settings.volumePath) {
@@ -231,8 +254,8 @@ private struct ModuleSettingsEditor: View {
             }
             .disabled(settings.style == .icon)
             .toggleStyle(.checkbox)
-            if module == .weather {
-                Text("Hava durumu her düzende kendi menü çubuğu öğesinde gösterilir.")
+            if !module.isSystemMetric {
+                Text("Bu modül her düzende kendi menü çubuğu öğesinde gösterilir.")
                     .font(.subheadline).foregroundStyle(.secondary)
             } else if layout == .grouped {
                 Text("Gruplu düzende bu modül açılır pencerede kendi sekmesinde gösterilir; seçili değer canlı göstergeyi de besler. Görünüm seçenekleri Ayrı düzende uygulanır.")
