@@ -2,6 +2,20 @@
 
 ## Yayımlanmamış
 
+## 0.1.7 — 11 Kasım 2026
+
+- **Menü çubuğuna yeni modüller:** **Uyanık tut** (açıkken dolu fincan ve kalan süre; hazır süreler, ekranı açık tutma ve otomasyon durumu panelde), **Odak** (kalan süre ve ilerleme; süre seçimi, başlat/bitir, bugünkü süre ve seri), **Bluetooth pilleri** (pili en önce bitecek aksesuar, eşiğe göre renk) ve **Parlaklık ve gece modu** (ana ekranın parlaklığı; her harici ekran için kaydırıcı, gece modu durumu, gün doğumu/batımı, duraklatma). Hepsi Ayarlar › Menü Çubuğu'ndan açılır ve her düzende kendi öğesinde gösterilir.
+
+- **Tek ayar yeri:** Uyanık tut düğmeleri Güç ve Fan panelinden, gece modu öğeleri sağ tık menüsünden yeni modüllere taşındı. Bluetooth Pilleri'nin ayrı menü çubuğu simgesi kaldırıldı; daha önce açıksa yeni modül bir kez kendiliğinden açılır.
+
+- **Alt+Tab panelinin akıcılığı:** kapanış solması pencere sunucusuna bırakıldı; panel artık kapanırken yeniden çizilmez. 24 pencerede kapanış animasyonu açıkken panelin kapanması 383–443 ms yerine 5–7 ms sürer. Seçim animasyonu yalnız tek bir çerçeveyi kaydırır; kart içerikleri animasyonsuz değişir. Kartlar yalnız kendi girdileri değişince yeniden hesaplanır.
+
+- **Arayüz güncellemeleri:** Güç, temizlik, uygulamalar, yerel ağ, hava durumu, ekran süresi ve ses mikseri ekranları ile ana model Observation'a taşındı; ekranlar yalnız okudukları değer değişince yenilenir. Güç genel bakış kartları kendi verileriyle sınırlandı; uygulama dili sabitlendiğinde yerelleştirilmiş metinler önbellekten okunur.
+
+- **Doğrulama:** XCTest'te 1.037 test; yerelde yalnız bu Mac'in `pmset` günlüğüne bağlı bilinen canlı test başarısız. Swift Testing 355 test geçti. Türkçe/İngilizce kontrolünde eksik çeviri yok. Yeni menü çubuğu modülleri ve Alt+Tab ölçümleri sahte/ekran dışı düzenlerde doğrulandı; fiziksel tıklama ve gerçek Bluetooth aygıtlarıyla kabul ayrıca izleniyor.
+
+- **Dağıtım notu:** depo özel olduğu için indirme GitHub erişimi gerektirir. Anonim Sparkle güncelleme adresi erişilebilir olmadığından bu sürüm Release sayfasından indirilerek kurulmalıdır.
+
 - **AI kota görünümü:** oturum ve haftalık yüzdeler daha büyük ve yan yana; modele özel limitler tam genişlikte gösterilir. Tekrarlanan hesap yüzdesi kaldırıldı, düşük/dolu kota uyarıları ve açık yenilenme süreleri eklendi. Menü paneli daha çok hesabı aynı anda gösterir; açık temada metin ve çubuk kontrastı güçlendirildi.
 
 - **Pano geçmişinin otomatik kaydı:** JSON üretimi ve atomik disk yazısı sıralı arka plan kuyruğuna taşındı. Yazı sürerken gelen değişiklikler son durumda birleştirilir; eski yazının tamamlanması yeni değişiklikleri kaydedilmiş saymaz. Kapanışta son kayıt korunur; silme veya diskte saklamayı kapatma, bekleyen yazının ardından tamamlanır. Geç gelen hata yanıtı başarılı yeniden denemeyi geçersiz kılamaz. Pano yakalama kapalıyken de diskte saklama tercihi uygulanır.

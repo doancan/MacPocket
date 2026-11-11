@@ -53,7 +53,7 @@
 ## İndirme
 
 İmzalı ve notarize edilmiş paket [GitHub Releases](https://github.com/doancan/MacPocket/releases/latest)
-sayfasındadır: `MacPocket-0.1.6-macOS-arm64.dmg` dosyasını aç, kurulum penceresinde **MacPocket** ikonunu
+sayfasındadır: `MacPocket-0.1.7-macOS-arm64.dmg` dosyasını aç, kurulum penceresinde **MacPocket** ikonunu
 **Applications / Uygulamalar** klasörüne sürükle. Kopyalama bitince uygulamayı Uygulamalar’dan açıp disk görüntüsünü çıkarabilirsin.
 Türkçe/İngilizce yönergeler kurulum penceresindedir. ZIP paketi de alternatif indirme ve otomatik güncellemeler için sunulur.
 Apple Silicon ve macOS 27 gerekir. 0.1.3’ten itibaren yeni sürümler uygulama içinden (Sparkle) kurulur.
@@ -79,7 +79,7 @@ sunar; Ayarlar’daki canlı düzenleyicide sürükle-bırak sıralanır, görü
 
 | | |
 | --- | --- |
-| Sürüm | **0.1.6** |
+| Sürüm | **0.1.7** |
 | Testler | 1.575 uygulama testi; 4 gerçek disk/sistem, 1 bağlı trackpad ve 1 açık hava API kabul testi isteğe bağlıdır. SSHConfigKit: 384, AIUsageKit: 420 test (3 isteğe bağlı atlama). |
 | Yerelleştirme | Türkçe (kaynak) ve İngilizce, eksik anahtar yok |
 | Belgeler | [Native macOS davranışları](docs/NATIVE_MACOS.md) · [Derleme ve canlı doğrulama](docs/NATIVE_BUILD.md) · [Alt+Tab kart geçişi](docs/WINDOW_SWITCHER.md) · [Devam eden geliştirme](docs/CONTINUED_DEVELOPMENT.md) |
