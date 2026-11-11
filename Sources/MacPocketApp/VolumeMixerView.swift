@@ -101,6 +101,7 @@ private struct MixerRow: View {
             .frame(maxWidth: 440, alignment: .leading)
             .accessibilityLabel(Text("\(app.name) çıkış aygıtı"))
             .accessibilityIdentifier("mixer.output." + app.id)
+                .pocketMenuPicker()
             status
             if resolution.preferredUnavailable {
                 Label("Seçili aygıt bağlı değil. Sistem çıkışına geçilir; yeniden bağlanınca tercih geri yüklenir.", systemImage: "cable.connector.slash")

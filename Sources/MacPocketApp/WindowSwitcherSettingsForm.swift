@@ -60,12 +60,14 @@ struct SwitcherSettingsForm: View {
                 Picker("Tema", selection: $theme) {
                     ForEach(SwitcherTheme.allCases, id: \.self) { Text($0.localizedTitle).tag($0.rawValue) }
                 }
+                    .pocketMenuPicker()
                 Slider(value: $size, in: 0.6...1.4, step: 0.1) { Text("Boyut") } minimumValueLabel: { Text("Küçük") } maximumValueLabel: { Text("Büyük") }
                 Toggle("Canlı küçük resimler (panel açıkken yenilenir)", isOn: $liveThumbnails)
                 Toggle("Seçili pencereyi yerinde tam boy göster", isOn: $previewSelected)
                 Picker("Sıralama", selection: $sort) {
                     ForEach(WindowSortOrder.allCases, id: \.self) { Text($0.localizedTitle).tag($0.rawValue) }
                 }
+                    .pocketMenuPicker()
                 if sort == WindowSortOrder.creation.rawValue { SwitcherCreationOrderNote() }
                 DisclosureGroup("Kart ayrıntıları") { SwitcherGlobalCardOptions() }.disabled(controller.recordingShortcut)
                 DisclosureGroup("Panelin yeri ve gecikme") { SwitcherGlobalPlacementOptions() }.disabled(controller.recordingShortcut)
@@ -200,6 +202,7 @@ private struct ShortcutRow: View {
             ForEach(SwitcherReleaseBehavior.allCases, id: \.self) { Text($0.localizedTitle).tag($0) }
         }
         .disabled(recordingLocked)
+            .pocketMenuPicker()
         SwitcherHoldOptions(shortcut: shortcut,update: update).disabled(recordingLocked)
         DisclosureGroup("Filtreler ve gruplama") {
             SwitcherFilterOptions(filter: binding(\.filter))
@@ -293,6 +296,7 @@ struct SwitcherFilterOptions: View {
             Text("Tüm ekranlar").tag(false)
             Text("Yalnız panelin gösterildiği ekran").tag(true)
         }
+            .pocketMenuPicker()
         option("Küçültülmüş pencereler", selection: $filter.minimized, values: WindowVisibilityPolicy.allCases) { $0.localizedTitle }
         option("Gizli uygulamalar", selection: $filter.hidden, values: WindowVisibilityPolicy.allCases) { $0.localizedTitle }
         option("Penceresiz uygulamalar", selection: $filter.windowless, values: WindowVisibilityPolicy.allCases) { $0.localizedTitle }
@@ -312,6 +316,7 @@ struct SwitcherFilterOptions: View {
         Picker(title, selection: selection) {
             ForEach(values, id: \.self) { value in Text(label(value)).tag(value) }
         }
+            .pocketMenuPicker()
     }
 }
 
@@ -331,6 +336,7 @@ struct SwitcherShortcutOptions: View {
                 Text(Double(index) / 10, format: .percent.precision(.fractionLength(0))).tag(Optional(Double(index) / 10))
             }
         }
+            .pocketMenuPicker()
         option("Tam boy önizleme", selection: binding(\.previewSelected), values: [true, false],
                title: { $0 ? String(localized: "Açık") : String(localized: "Kapalı") })
         option("Sıralama", selection: binding(\.order), values: WindowSortOrder.allCases, title: { $0.localizedTitle })
@@ -381,6 +387,7 @@ struct SwitcherShortcutOptions: View {
             Text("Genel ayarı izle").tag(Optional<Value>.none)
             ForEach(values, id: \.self) { value in Text(title(value)).tag(Optional(value)) }
         }
+            .pocketMenuPicker()
     }
 
     private func binding<Value>(_ keyPath: WritableKeyPath<SwitcherPresentationOverrides, Value>) -> Binding<Value> {

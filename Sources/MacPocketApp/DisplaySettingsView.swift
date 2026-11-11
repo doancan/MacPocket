@@ -116,6 +116,7 @@ private struct DisplaySettingsCard: View {
                     }
                     .labelsHidden()
                     .fixedSize()
+                        .pocketMenuPicker()
                 }
                 Slider(value: Binding(get: { sliderIndex ?? Double(currentIndex ?? 0) }, set: { sliderIndex = $0.rounded() }),
                        in: 0...Double(max(1, resolutions.count - 1)), step: 1) {

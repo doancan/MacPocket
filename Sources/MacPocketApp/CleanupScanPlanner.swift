@@ -215,6 +215,7 @@ private struct CleanupLocationList: View {
                 .controlSize(.small)
                 .disabled(model.busy)
                 .help("Eski İndirilenler bu süreden uzun süredir dokunulmamış öğeleri listeler.")
+                    .pocketMenuPicker()
             }
             Text(model.lastSizes.bytes[target.id].map { pocketDiskBytes($0) } ?? "—")
                 .font(.callout).foregroundStyle(.secondary).monospacedDigit()

@@ -30,12 +30,14 @@ final class PocketStatusItemController: NSObject {
             hosting.sizingOptions = [.preferredContentSize]
             return hosting
         }, didClose: { [weak self] in self?.model.menuBarProcessesWanted = false })
-    private var appearanceName: String?
     private var subscriptions = Set<AnyCancellable>()
     /// Advances keep-awake and focus countdowns while monitoring is paused (samples drive `refresh` otherwise).
     private var clock: Timer?
     /// Brightness and night mode are observed only once their module is in the menu bar.
     private var observesDisplays = false
+    /// Redraws the clock item on the second (with seconds) or on the minute boundary.
+    private var timeTimer: Timer?
+    private var timeTimerShowsSeconds = false
 
     init(model: PocketModel) {
         self.model = model
@@ -117,16 +119,11 @@ final class PocketStatusItemController: NSObject {
         WeatherService.shared.setEnabled(store.preferences.visible && store.preferences.enabled.contains(.weather))
     }
 
+    /// The dropdown always follows the macOS light or dark appearance, like the menu bar it hangs from, whatever the
+    /// main window's own appearance is set to.
     private func updateAppearance() {
         popover.animates = !PocketReduceMotion.isEnabled
-        let name = UserDefaults.standard.string(forKey: "MacPocket.appearance")
-        guard name != appearanceName else { return }
-        appearanceName = name
-        switch PocketAppearance(rawValue: name ?? PocketAppearance.defaultValue.rawValue) {
-        case .dark: popover.appearance = NSAppearance(named: .darkAqua)
-        case .light: popover.appearance = NSAppearance(named: .aqua)
-        case .system, .none: popover.appearance = nil
-        }
+        if popover.appearance != nil { popover.appearance = nil }
     }
 
     // MARK: Items
@@ -192,6 +189,7 @@ final class PocketStatusItemController: NSObject {
             }
         }
         updateClock(keys)
+        updateTimeTimer(keys)
         if keys.contains(MenuBarModule.display.rawValue) { observeDisplays() }
     }
 
@@ -204,6 +202,26 @@ final class PocketStatusItemController: NSObject {
         NightModeService.shared.$status.dropFirst().removeDuplicates().receive(on: RunLoop.main).sink { [weak self] _ in
             MainActor.assumeIsolated { self?.refresh() }
         }.store(in: &subscriptions)
+    }
+
+    private func updateTimeTimer(_ keys: [String]) {
+        guard keys.contains(MenuBarModule.clock.rawValue) else {
+            timeTimer?.invalidate(); timeTimer = nil
+            return
+        }
+        let seconds = store.preferences.settings(for: .clock).value == .clockTimeSeconds
+        guard timeTimer == nil || timeTimerShowsSeconds != seconds else { return }
+        timeTimer?.invalidate()
+        timeTimerShowsSeconds = seconds
+        let now = Date()
+        let interval: TimeInterval = seconds ? 1 : 60
+        let first = Date(timeIntervalSinceReferenceDate: (now.timeIntervalSinceReferenceDate / interval).rounded(.down) * interval + interval)
+        let timer = Timer(fire: first, interval: interval, repeats: true) { [weak self] _ in
+            MainActor.assumeIsolated { self?.refresh() }
+        }
+        timer.tolerance = seconds ? 0.05 : 0.5
+        RunLoop.main.add(timer, forMode: .common)
+        timeTimer = timer
     }
 
     private func updateClock(_ keys: [String]) {
@@ -347,6 +365,8 @@ final class PocketStatusItemController: NSObject {
                                       accessibility: String(localized: "Bluetooth Pilleri modülü kapalı"), symbol: "dot.radiowaves.left.and.right")
             }
             return MenuBarFormatter.bluetoothReading(BluetoothBatteryService.shared.devices, decimals: settings.decimals)
+        case .clock:
+            return MenuBarFormatter.clockReading(value: settings.value, zoneID: settings.timeZoneID, now: now)
         case .display:
             guard PocketModule.displays.isAvailable() else {
                 return MenuBarReading(lines: ["—"], reserve: ["—"], fraction: nil, magnitude: nil,

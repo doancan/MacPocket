@@ -69,6 +69,7 @@ struct MouseButtonsView: View {
                         Text(input.localizedTitle).tag(input)
                     }
                 }.frame(maxWidth: 260)
+                    .pocketMenuPicker()
                 Button("Satır ekle") { service.settings.set(.init(.native), for: extra, application: application) }
                     .disabled(inputs.contains(extra))
             }
@@ -89,6 +90,7 @@ struct MouseButtonsView: View {
             Text("Tüm uygulamalar").tag(nil as String?)
             ForEach(service.settings.profiles.keys.sorted(), id: \.self) { id in Text(verbatim: appName(id)).tag(Optional(id)) }
         }.frame(maxWidth: 350)
+            .pocketMenuPicker()
     }
     private var profileButtons: some View {
         HStack {
@@ -137,6 +139,7 @@ struct MouseButtonsView: View {
         .labelsHidden().frame(maxWidth: 280)
         .accessibilityLabel(Text("\(input.localizedTitle) eylemi"))
         .accessibilityIdentifier("mouse-buttons.action." + input.key)
+            .pocketMenuPicker()
     }
     @ViewBuilder private func removeRow(_ input: MouseButtonInput) -> some View {
         if !MouseButtonInput.common.contains(input), service.settings.explicitBinding(for: input, application: application) != nil || service.detected == input {

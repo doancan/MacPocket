@@ -30,6 +30,7 @@ struct PocketRootView: View {
                         sidebarRow(.overview)
                         sidebarRow(.performance)
                         sidebarRow(.power)
+                        sidebarRow(.menuBar)
                     }
                     Section("Bakım") {
                         sidebarRow(.cleanup)
@@ -143,6 +144,7 @@ struct PocketRootView: View {
         case .storage: StorageView(model: model.storage)
         case .applications: ApplicationsView(model: model.applications)
         case .ssh: SSHManagerView()
+        case .menuBar: MenuBarStudioView(model: model)
         case .practical:
             #if DEBUG
             PracticalToolsView(workspace: ToolUIAudit.practicalWorkspace ?? .shared)
@@ -346,7 +348,7 @@ struct PocketCommands: Commands {
             Button("Hızlı Bakışı Göster") { NotificationCenter.default.post(name: .pocketQuickLook, object: nil) }
                 .keyboardShortcut("m", modifiers: [.command, .shift]).disabled(!showMenuBar)
             Divider()
-            ForEach(Array(PocketPage.allCases.enumerated()), id: \.element.id) { index, page in
+            ForEach(Array(PocketPage.allCases.prefix(9).enumerated()), id: \.element.id) { index, page in
                 Button(page.localizedTitle) { navigation.select(page); showPocketWindow(openWindow) }
                     .keyboardShortcut(KeyEquivalent(Character(String(index + 1))), modifiers: .command)
             }

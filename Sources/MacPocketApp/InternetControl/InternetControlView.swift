@@ -37,6 +37,7 @@ struct InternetControlView: View {
                     Picker("İnternet erişimi", selection: Binding(get: { rule.action }, set: { model.setAction($0, for: rule.id) })) {
                         Text("İzin Ver").tag(AppNetworkAction.allow); Text("Engelle").tag(AppNetworkAction.deny)
                     }.frame(maxWidth: 180).disabled(model.busy)
+                        .pocketMenuPicker()
                     Button("Kaldır") { model.remove(rule.id) }.disabled(model.busy)
                 }.pocketCard()
             }

@@ -349,6 +349,7 @@ struct PowerHistoryPanel: View {
                         ForEach(Filter.allCases) { Text($0.localizedTitle).tag($0) }
                     }
                     .labelsHidden().fixedSize()
+                        .pocketMenuPicker()
                     Button { center.loadLog() } label: { Image(systemName: "arrow.clockwise") }
                         .help("Sistem güç günlüğünü yeniden oku")
                         .disabled(center.logLoading)

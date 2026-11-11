@@ -137,6 +137,7 @@ struct ScreenshotView: View {
                     ForEach([5, 10, 30], id: \.self) { seconds in Text("\(seconds) sn sonra").tag(Int?.some(seconds)) }
                 }
                 .labelsHidden().fixedSize()
+                    .pocketMenuPicker()
             }
             .disabled(!service.settings.showOverlay)
             SettingsRow(symbol: "speaker.wave.2.fill", color: .red, title: "Deklanşör sesi") {

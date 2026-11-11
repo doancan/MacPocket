@@ -143,7 +143,7 @@ final class MenuBarPreferencesTests: XCTestCase {
 
         let preferences = MenuBarPreferences.load(from: defaults)
         XCTAssertEqual(preferences.layout, .separate)
-        XCTAssertEqual(preferences.order, [.power, .disk, .cpu, .memory, .gpu, .network, .weather, .aiUsage, .awake, .focus, .bluetooth, .display])
+        XCTAssertEqual(preferences.order, [.power, .disk, .cpu, .memory, .gpu, .network, .weather, .aiUsage, .awake, .focus, .bluetooth, .display, .clock])
         XCTAssertEqual(preferences.enabledModules, [.power, .memory])
 
         let memory = preferences.settings(for: .memory)
@@ -199,7 +199,7 @@ final class MenuBarPreferencesTests: XCTestCase {
         XCTAssertEqual(loaded.groupedStyle, .ring)
         XCTAssertEqual(loaded.groupedMetric, .power)
         XCTAssertFalse(loaded.groupedBadge)
-        XCTAssertEqual(loaded.order, [.network, .cpu, .gpu, .memory, .disk, .power, .weather, .aiUsage, .awake, .focus, .bluetooth, .display])
+        XCTAssertEqual(loaded.order, [.network, .cpu, .gpu, .memory, .disk, .power, .weather, .aiUsage, .awake, .focus, .bluetooth, .display, .clock])
         XCTAssertEqual(loaded.enabledModules, [.network, .disk])
         XCTAssertFalse(loaded.binaryUnits)
         XCTAssertEqual(loaded.settings(for: .network), preferences.modules[.network])
@@ -231,6 +231,65 @@ final class MenuBarPreferencesTests: XCTestCase {
         defaults.set(data, forKey: MenuBarPreferences.moduleKey(.cpu))
         defaults.set(MenuBarPreferences.schemaVersion, forKey: MenuBarPreferences.schemaKey)
         XCTAssertEqual(MenuBarPreferences.load(from: defaults).settings(for: .cpu).value, .cpuTotal)
+    }
+
+    func testNewAppearanceOptionsRoundTrip() {
+        var preferences = MenuBarPreferences.load(from: defaults)
+        preferences.groupedStyle = .sparkline
+        preferences.groupedAccent = .purple
+        preferences.modules[.network] = MenuBarModuleSettings(style: .graph, value: .networkCombined, graphKind: .area, graphWidth: .wide,
+                                                              textSize: .large, labelPosition: .beside, accent: .teal)
+        preferences.save(to: defaults)
+        let loaded = MenuBarPreferences.load(from: defaults)
+        XCTAssertEqual(loaded.groupedStyle, .sparkline)
+        XCTAssertEqual(loaded.groupedAccent, .purple)
+        XCTAssertEqual(loaded.settings(for: .network), preferences.modules[.network])
+    }
+
+    func testStoredSettingsFromBeforeTheNewOptionsKeepWorking() throws {
+        let legacy = #"{"style":"graph","showLabel":false,"value":"cpuUser","colorMode":"thresholds"}"#
+        let settings = try JSONDecoder().decode(MenuBarModuleSettings.self, from: Data(legacy.utf8))
+        XCTAssertEqual(settings.graphKind, .bars)
+        XCTAssertEqual(settings.graphWidth, .standard)
+        XCTAssertEqual(settings.textSize, .regular)
+        XCTAssertEqual(settings.labelPosition, .automatic)
+        XCTAssertEqual(settings.accent, .automatic)
+    }
+
+    func testEveryModuleOffersOnlyStylesItCanDraw() {
+        for module in MenuBarModule.allCases {
+            XCTAssertTrue(module.styleOptions.contains(.value), module.rawValue)
+            XCTAssertEqual(Set(module.styleOptions).count, module.styleOptions.count, module.rawValue)
+            XCTAssertEqual(module.styleOptions.contains(.cores), module == .cpu, module.rawValue)
+        }
+    }
+
+    func testWarningCannotPassCriticalWhenHigherIsWorse() {
+        var settings = MenuBarModuleSettings.defaults(for: .cpu)
+        settings.setCriticalThreshold(80)
+        settings.setWarningThreshold(95)
+        let limits = settings.thresholds
+        XCTAssertEqual(limits?.critical, 80)
+        XCTAssertEqual(limits?.warning, 79)
+        settings.setCriticalThreshold(10)
+        XCTAssertEqual(settings.thresholds?.critical, 80)
+    }
+
+    func testCriticalCannotPassWarningWhenLowerIsWorse() {
+        var settings = MenuBarModuleSettings.defaults(for: .power)
+        XCTAssertEqual(settings.thresholds?.warning, 20)
+        settings.setWarningThreshold(5)
+        XCTAssertEqual(settings.thresholds?.warning, 11)
+        settings.setCriticalThreshold(60)
+        XCTAssertEqual(settings.thresholds?.critical, 10)
+    }
+
+    func testThresholdsStayInsideTheUnitRange() {
+        var settings = MenuBarModuleSettings.defaults(for: .cpu)
+        settings.setCriticalThreshold(500)
+        XCTAssertEqual(settings.thresholds?.critical, 100)
+        settings.setWarningThreshold(-20)
+        XCTAssertEqual(settings.thresholds?.warning, 0)
     }
 
     func testDecodingToleratesMissingFields() throws {
@@ -349,6 +408,79 @@ final class MenuBarFormatterTests: XCTestCase {
                                return power
                            }())
         XCTAssertEqual(MenuBarFormatter.reading(.power, settings: settings, snapshot: s).lines, ["1:35"])
+    }
+
+    func testLoadAverageIsShownPerCoreForColoring() throws {
+        var current = snapshot()
+        current.loadAverages = [1.5, 1.2, 1.0]
+        var settings = MenuBarModuleSettings.defaults(for: .cpu)
+        settings.value = .cpuLoad
+        let reading = MenuBarFormatter.reading(.cpu, settings: settings, snapshot: current)
+        XCTAssertEqual(reading.lines, [MenuBarFormatter.number(1.5, fractionDigits: 2)])
+        XCTAssertEqual(try XCTUnwrap(reading.fraction), 0.75, accuracy: 0.001)
+        XCTAssertEqual(try XCTUnwrap(reading.thresholdValue), 75, accuracy: 0.01)
+    }
+
+    func testSwapShowsUsedBytesAndShareOfTheSwapFile() throws {
+        var current = snapshot()
+        current.swapUsedBytes = 1 << 30
+        current.swapTotalBytes = 4 << 30
+        var settings = MenuBarModuleSettings.defaults(for: .memory)
+        settings.value = .memorySwap
+        let reading = MenuBarFormatter.reading(.memory, settings: settings, snapshot: current)
+        XCTAssertEqual(try XCTUnwrap(reading.fraction), 0.25, accuracy: 0.001)
+        XCTAssertTrue(reading.lines[0].contains("GB"))
+    }
+
+    func testPowerDrawIsShownInWattsOrAsUnavailable() {
+        var current = snapshot()
+        var settings = MenuBarModuleSettings.defaults(for: .power)
+        settings.value = .powerWatts
+        XCTAssertEqual(MenuBarFormatter.reading(.power, settings: settings, snapshot: current).lines, ["—"])
+        current.systemPowerWatts = 42.4
+        let reading = MenuBarFormatter.reading(.power, settings: settings, snapshot: current)
+        XCTAssertEqual(reading.lines, [MenuBarFormatter.number(42.4, fractionDigits: 0) + " W"])
+        XCTAssertEqual(reading.fraction ?? 0, 0.424, accuracy: 0.001)
+    }
+
+    func testEveryValueOfEveryModuleProducesAReadingWithoutData() {
+        for module in MenuBarModule.allCases {
+            for value in module.valueOptions {
+                var settings = MenuBarModuleSettings.defaults(for: module)
+                settings.value = value
+                XCTAssertFalse(MenuBarFormatter.reading(module, settings: settings, snapshot: nil).lines.isEmpty, "\(module) \(value)")
+                XCTAssertFalse(MenuBarFormatter.reading(module, settings: settings, snapshot: snapshot()).lines.isEmpty, "\(module) \(value)")
+            }
+        }
+    }
+
+    func testClockShowsTheTimeInTheChosenZone() {
+        let now = Date(timeIntervalSince1970: 1_700_000_000) // 2023-11-14 22:13:20 UTC
+        let locale = Locale(identifier: "en_GB")
+        XCTAssertEqual(MenuBarFormatter.clockReading(value: .clockTime, zoneID: "UTC", now: now, locale: locale).lines, ["22:13"])
+        XCTAssertEqual(MenuBarFormatter.clockReading(value: .clockTime, zoneID: "Europe/Istanbul", now: now, locale: locale).lines, ["01:13"])
+        XCTAssertEqual(MenuBarFormatter.clockReading(value: .clockTimeSeconds, zoneID: "Asia/Tokyo", now: now, locale: locale).lines, ["07:13:20"])
+        XCTAssertTrue(MenuBarFormatter.clockReading(value: .clockWeekdayTime, zoneID: "UTC", now: now, locale: locale).lines[0].contains("Tue"))
+        XCTAssertTrue(MenuBarFormatter.clockReading(value: .clockDateTime, zoneID: "UTC", now: now, locale: locale).lines[0].contains("14"))
+    }
+
+    func testClockFallsBackToThisMacForUnknownZones() {
+        let reading = MenuBarFormatter.clockReading(value: .clockTime, zoneID: "Not/AZone", now: Date(), locale: Locale(identifier: "en_GB"))
+        XCTAssertEqual(reading.lines.count, 1)
+        XCTAssertFalse(reading.lines[0].isEmpty)
+    }
+
+    func testClockCityNames() {
+        XCTAssertEqual(MenuBarFormatter.cityName("America/New_York"), "New York")
+        XCTAssertEqual(MenuBarFormatter.cityName("UTC"), "UTC")
+        for zone in MenuBarFormatter.commonTimeZones { XCTAssertNotNil(TimeZone(identifier: zone), zone) }
+    }
+
+    func testWorldClocksSurviveSaveAndLoad() throws {
+        let data = try JSONEncoder().encode(MenuBarModuleSettings(value: .clockTime, timeZoneID: "Asia/Tokyo", worldClocks: ["UTC", "Europe/London"]))
+        let decoded = try JSONDecoder().decode(MenuBarModuleSettings.self, from: data)
+        XCTAssertEqual(decoded.timeZoneID, "Asia/Tokyo")
+        XCTAssertEqual(decoded.worldClocks, ["UTC", "Europe/London"])
     }
 
     func testMissingSnapshotShowsPlaceholder() {

@@ -4,7 +4,7 @@ import Foundation
 
 /// One monitoring module shown in the menu bar (a status item, or a tab of the grouped popover).
 public enum MenuBarModule: String, CaseIterable, Codable, Sendable, Identifiable {
-    case cpu, gpu, memory, disk, network, power, weather, aiUsage, awake, focus, bluetooth, display
+    case cpu, gpu, memory, disk, network, power, weather, aiUsage, awake, focus, bluetooth, display, clock
 
     public var id: String { rawValue }
 
@@ -22,6 +22,7 @@ public enum MenuBarModule: String, CaseIterable, Codable, Sendable, Identifiable
         case .focus: String(localized: "Odak")
         case .bluetooth: String(localized: "Bluetooth pilleri")
         case .display: String(localized: "Parlaklık ve gece modu")
+        case .clock: String(localized: "Saat")
         }
     }
 
@@ -30,7 +31,7 @@ public enum MenuBarModule: String, CaseIterable, Codable, Sendable, Identifiable
     public var isSystemMetric: Bool {
         switch self {
         case .cpu, .gpu, .memory, .disk, .network, .power: true
-        case .weather, .aiUsage, .awake, .focus, .bluetooth, .display: false
+        case .weather, .aiUsage, .awake, .focus, .bluetooth, .display, .clock: false
         }
     }
 
@@ -49,6 +50,7 @@ public enum MenuBarModule: String, CaseIterable, Codable, Sendable, Identifiable
         case .focus: String(localized: "MenuBar.shortLabel.focus", defaultValue: "ODAK")
         case .bluetooth: "BT"
         case .display: String(localized: "MenuBar.shortLabel.display", defaultValue: "EKRAN")
+        case .clock: String(localized: "MenuBar.shortLabel.clock", defaultValue: "SAAT")
         }
     }
 
@@ -60,6 +62,8 @@ public enum MenuBarModule: String, CaseIterable, Codable, Sendable, Identifiable
         case .powerTemperature: "°C"
         case .networkPing: "PING"
         case .networkWifiSignal: "Wi-Fi"
+        case .cpuLoad: String(localized: "MenuBar.shortLabel.load", defaultValue: "YÜK")
+        case .memorySwap: "SWAP"
         default: shortLabel
         }
     }
@@ -78,24 +82,26 @@ public enum MenuBarModule: String, CaseIterable, Codable, Sendable, Identifiable
         case .focus: "scope"
         case .bluetooth: "battery.75percent"
         case .display: "sun.max.fill"
+        case .clock: "clock.fill"
         }
     }
 
     /// Value choices offered for this module, first one is the default.
     public var valueOptions: [MenuBarValue] {
         switch self {
-        case .cpu: [.cpuTotal, .cpuUser, .cpuSystem]
+        case .cpu: [.cpuTotal, .cpuUser, .cpuSystem, .cpuLoad]
         case .gpu: [.gpuUtilization, .gpuRenderer, .gpuMemory]
-        case .memory: [.memoryUsedPercent, .memoryUsedBytes, .memoryFreeBytes, .memoryPressure]
+        case .memory: [.memoryUsedPercent, .memoryUsedBytes, .memoryFreeBytes, .memoryPressure, .memorySwap]
         case .disk: [.diskFreeBytes, .diskUsedPercent, .diskFreePercent, .diskActivity, .diskReadWrite]
         case .network: [.networkUpDown, .networkCombined, .networkDownload, .networkUpload, .networkPing, .networkWifiSignal]
-        case .power: [.powerBattery, .powerTimeRemaining, .powerSource, .powerFanSpeed, .powerFanPercent, .powerThermal, .powerTemperature]
+        case .power: [.powerBattery, .powerTimeRemaining, .powerSource, .powerWatts, .powerFanSpeed, .powerFanPercent, .powerThermal, .powerTemperature]
         case .weather: [.weatherTemperature, .weatherApparent]
         case .aiUsage: [.aiQuota]
         case .awake: [.awakeRemaining]
         case .focus: [.focusRemaining]
         case .bluetooth: [.bluetoothLowest]
         case .display: [.displayBrightness]
+        case .clock: [.clockTime, .clockTimeSeconds, .clockWeekdayTime, .clockDateTime]
         }
     }
 
@@ -109,9 +115,9 @@ public enum MenuBarModule: String, CaseIterable, Codable, Sendable, Identifiable
     /// Display styles that make sense for this module; per-core bars exist only for the CPU.
     public var styleOptions: [MenuBarDisplayStyle] {
         switch self {
-        case .weather, .aiUsage: return [.value, .icon]
-        case .awake, .focus: return [.value, .pie, .icon]
-        case .bluetooth, .display: return [.value, .gauge, .pie, .icon]
+        case .weather, .aiUsage, .clock: return [.value, .icon]
+        case .awake, .focus: return [.value, .pie, .ring, .bar, .icon]
+        case .bluetooth, .display: return [.value, .gauge, .bar, .pie, .ring, .icon]
         default: break
         }
         return self == .cpu ? MenuBarDisplayStyle.allCases : MenuBarDisplayStyle.allCases.filter { $0 != .cores }
@@ -120,16 +126,17 @@ public enum MenuBarModule: String, CaseIterable, Codable, Sendable, Identifiable
 
 /// What a module shows as its menu bar value.
 public enum MenuBarValue: String, Codable, Sendable, CaseIterable, Identifiable {
-    case cpuTotal, cpuUser, cpuSystem
+    case cpuTotal, cpuUser, cpuSystem, cpuLoad
     case gpuUtilization, gpuRenderer, gpuMemory
-    case memoryUsedPercent, memoryUsedBytes, memoryFreeBytes, memoryPressure
+    case memoryUsedPercent, memoryUsedBytes, memoryFreeBytes, memoryPressure, memorySwap
     case diskFreeBytes, diskUsedPercent, diskFreePercent, diskActivity, diskReadWrite
     case networkUpDown, networkCombined, networkDownload, networkUpload, networkPing, networkWifiSignal
-    case powerBattery, powerTimeRemaining, powerSource
+    case powerBattery, powerTimeRemaining, powerSource, powerWatts
     case powerFanSpeed, powerFanPercent, powerThermal, powerTemperature
     case weatherTemperature, weatherApparent
     case aiQuota
     case awakeRemaining, focusRemaining, bluetoothLowest, displayBrightness
+    case clockTime, clockTimeSeconds, clockWeekdayTime, clockDateTime
 
     public var id: String { rawValue }
 
@@ -138,6 +145,8 @@ public enum MenuBarValue: String, Codable, Sendable, CaseIterable, Identifiable 
         switch self {
         case .powerFanSpeed, .powerFanPercent: "fan"
         case .powerThermal: "thermometer.medium"
+        case .powerWatts: "bolt.circle"
+        case .memorySwap: "arrow.left.arrow.right.square"
         case .powerTemperature: "thermometer.high"
         case .networkPing: "stopwatch"
         case .networkWifiSignal: "wifi"
@@ -150,6 +159,7 @@ public enum MenuBarValue: String, Codable, Sendable, CaseIterable, Identifiable 
         case .cpuTotal: String(localized: "Toplam kullanım")
         case .cpuUser: String(localized: "Kullanıcı")
         case .cpuSystem: String(localized: "Sistem")
+        case .cpuLoad: String(localized: "Yük ortalaması (1 dk)")
         case .gpuUtilization: String(localized: "GPU kullanımı (%)")
         case .gpuRenderer: String(localized: "İşleyici (%)")
         case .gpuMemory: String(localized: "GPU belleği (boyut)")
@@ -157,6 +167,7 @@ public enum MenuBarValue: String, Codable, Sendable, CaseIterable, Identifiable 
         case .memoryUsedBytes: String(localized: "Kullanılan (boyut)")
         case .memoryFreeBytes: String(localized: "Kullanılabilir (boyut)")
         case .memoryPressure: String(localized: "Bellek baskısı (%)")
+        case .memorySwap: String(localized: "Takas (swap) kullanımı")
         case .diskFreeBytes: String(localized: "Boş alan")
         case .diskUsedPercent: String(localized: "Doluluk (%)")
         case .diskFreePercent: String(localized: "Boş alan (%)")
@@ -171,6 +182,7 @@ public enum MenuBarValue: String, Codable, Sendable, CaseIterable, Identifiable 
         case .powerBattery: String(localized: "Pil yüzdesi")
         case .powerTimeRemaining: String(localized: "Kalan süre")
         case .powerSource: String(localized: "Güç kaynağı")
+        case .powerWatts: String(localized: "Güç tüketimi (W)")
         case .powerFanSpeed: String(localized: "Fan hızı (rpm)")
         case .powerFanPercent: String(localized: "Fan hızı (%)")
         case .powerThermal: String(localized: "Isı durumu")
@@ -181,6 +193,10 @@ public enum MenuBarValue: String, Codable, Sendable, CaseIterable, Identifiable 
         case .awakeRemaining, .focusRemaining: String(localized: "Kalan süre")
         case .bluetoothLowest: String(localized: "En düşük pil (%)")
         case .displayBrightness: String(localized: "Parlaklık (%)")
+        case .clockTime: String(localized: "Saat")
+        case .clockTimeSeconds: String(localized: "Saat ve saniye")
+        case .clockWeekdayTime: String(localized: "Gün ve saat")
+        case .clockDateTime: String(localized: "Tarih ve saat")
         }
     }
 }
@@ -204,6 +220,10 @@ public enum MenuBarGroupedStyle: String, Codable, Sendable, CaseIterable, Identi
     case dial
     /// A progress ring around the chosen metric's symbol.
     case ring
+    /// Three slim bars: CPU, memory and startup disk, side by side.
+    case bars
+    /// A short history graph of the chosen metric.
+    case sparkline
 
     public static let defaultValue = MenuBarGroupedStyle.dial
     public var id: String { rawValue }
@@ -212,6 +232,8 @@ public enum MenuBarGroupedStyle: String, Codable, Sendable, CaseIterable, Identi
         case .symbol: String(localized: "Sabit simge")
         case .dial: String(localized: "Canlı gösterge")
         case .ring: String(localized: "Canlı halka")
+        case .bars: String(localized: "Üç çubuk")
+        case .sparkline: String(localized: "Canlı grafik")
         }
     }
 
@@ -220,21 +242,133 @@ public enum MenuBarGroupedStyle: String, Codable, Sendable, CaseIterable, Identi
 
 /// How a separate status item draws its module.
 public enum MenuBarDisplayStyle: String, Codable, Sendable, CaseIterable, Identifiable {
-    case value, graph, gauge, pie, cores, icon
+    case value, graph, gauge, bar, pie, ring, cores, icon
     public var id: String { rawValue }
     public var title: String {
         switch self {
         case .value: String(localized: "Değer")
         case .graph: String(localized: "Mini grafik")
-        case .gauge: String(localized: "Mini çubuk")
+        case .gauge: String(localized: "Dikey çubuk")
         case .pie: String(localized: "Pasta")
         case .cores: String(localized: "Çekirdekler")
         case .icon: String(localized: "Yalnız simge")
+        case .ring: String(localized: "Halka")
+        case .bar: String(localized: "Yatay çubuk")
         }
     }
 
     /// Styles that draw a level or history and may show the value beside it.
-    public var drawsLevel: Bool { self == .graph || self == .gauge || self == .pie || self == .cores }
+    public var drawsLevel: Bool { self != .value && self != .icon }
+}
+
+/// How a mini graph draws its history.
+public enum MenuBarGraphKind: String, Codable, Sendable, CaseIterable, Identifiable {
+    case bars, line, area
+    public var id: String { rawValue }
+    public var title: String {
+        switch self {
+        case .bars: String(localized: "Çubuklar")
+        case .line: String(localized: "Çizgi")
+        case .area: String(localized: "Alan")
+        }
+    }
+}
+
+/// Width of a mini graph, and with it how many recent samples it shows.
+public enum MenuBarGraphWidth: String, Codable, Sendable, CaseIterable, Identifiable {
+    case compact, standard, wide
+    public var id: String { rawValue }
+    public var title: String {
+        switch self {
+        case .compact: String(localized: "Dar")
+        case .standard: String(localized: "Normal")
+        case .wide: String(localized: "Geniş")
+        }
+    }
+    /// Drawn width in points.
+    public var points: Double {
+        switch self {
+        case .compact: 20
+        case .standard: 28
+        case .wide: 44
+        }
+    }
+    /// Newest samples shown; roughly one point of width per sample.
+    public var samples: Int {
+        switch self {
+        case .compact: 14
+        case .standard: 20
+        case .wide: 32
+        }
+    }
+}
+
+/// Size of the item's text and glyphs relative to the standard menu bar size.
+public enum MenuBarTextSize: String, Codable, Sendable, CaseIterable, Identifiable {
+    case small, regular, large
+    public var id: String { rawValue }
+    public var title: String {
+        switch self {
+        case .small: String(localized: "Küçük")
+        case .regular: String(localized: "Normal")
+        case .large: String(localized: "Büyük")
+        }
+    }
+    public var scale: Double {
+        switch self {
+        case .small: 0.88
+        case .regular: 1
+        case .large: 1.14
+        }
+    }
+}
+
+/// Where the short label (CPU, RAM…) sits relative to the value.
+public enum MenuBarLabelPosition: String, Codable, Sendable, CaseIterable, Identifiable {
+    /// Above the value when the value is one line, beside the graphic otherwise.
+    case automatic
+    case above
+    case beside
+    public var id: String { rawValue }
+    public var title: String {
+        switch self {
+        case .automatic: String(localized: "Otomatik")
+        case .above: String(localized: "Üstte")
+        case .beside: String(localized: "Yanda")
+        }
+    }
+}
+
+/// Which edge stacked text lines (label over value, upload over download) share.
+public enum MenuBarTextAlignment: String, Codable, Sendable, CaseIterable, Identifiable {
+    case leading, center, trailing
+    public var id: String { rawValue }
+    public var title: String {
+        switch self {
+        case .leading: String(localized: "Sola")
+        case .center: String(localized: "Ortaya")
+        case .trailing: String(localized: "Sağa")
+        }
+    }
+}
+
+/// A fixed color for a menu bar item. `automatic` follows the menu bar like every other item.
+public enum MenuBarAccent: String, Codable, Sendable, CaseIterable, Identifiable {
+    case automatic, blue, teal, green, yellow, orange, red, pink, purple
+    public var id: String { rawValue }
+    public var title: String {
+        switch self {
+        case .automatic: String(localized: "Otomatik")
+        case .blue: String(localized: "Mavi")
+        case .teal: String(localized: "Turkuaz")
+        case .green: String(localized: "Yeşil")
+        case .yellow: String(localized: "Sarı")
+        case .orange: String(localized: "Turuncu")
+        case .red: String(localized: "Kırmızı")
+        case .pink: String(localized: "Pembe")
+        case .purple: String(localized: "Mor")
+        }
+    }
 }
 
 // MARK: - Thresholds
@@ -288,15 +422,16 @@ extension MenuBarValue {
     /// Nil for values with no meaningful alarm level (rates, power source).
     public var thresholdUnit: MenuBarThresholdUnit? {
         switch self {
-        case .cpuTotal, .cpuUser, .cpuSystem, .gpuUtilization, .gpuRenderer, .gpuMemory,
+        case .cpuTotal, .cpuUser, .cpuSystem, .cpuLoad, .gpuUtilization, .gpuRenderer, .gpuMemory,
              .memoryUsedPercent, .memoryUsedBytes, .memoryFreeBytes, .memoryPressure,
              .diskFreeBytes, .diskUsedPercent, .diskFreePercent, .powerBattery, .powerTimeRemaining,
              .powerFanSpeed, .powerFanPercent, .powerThermal, .aiQuota, .bluetoothLowest: .percent
         case .powerTemperature: .celsius
         case .networkPing: .milliseconds
         case .networkWifiSignal: .dBm
-        case .diskActivity, .diskReadWrite, .networkUpDown, .networkCombined, .networkDownload, .networkUpload, .powerSource, .weatherTemperature, .weatherApparent,
-             .awakeRemaining, .focusRemaining, .displayBrightness: nil
+        case .diskActivity, .diskReadWrite, .networkUpDown, .networkCombined, .networkDownload, .networkUpload, .powerSource, .powerWatts, .memorySwap, .weatherTemperature, .weatherApparent,
+             .awakeRemaining, .focusRemaining, .displayBrightness,
+             .clockTime, .clockTimeSeconds, .clockWeekdayTime, .clockDateTime: nil
         }
     }
 
@@ -311,7 +446,7 @@ extension MenuBarValue {
     /// Thresholds used until the user sets their own: (warning, critical).
     public var defaultThresholds: (warning: Double, critical: Double)? {
         switch self {
-        case .cpuTotal, .cpuUser, .cpuSystem, .gpuUtilization, .gpuRenderer: (70, 90)
+        case .cpuTotal, .cpuUser, .cpuSystem, .cpuLoad, .gpuUtilization, .gpuRenderer: (70, 90)
         case .gpuMemory: (50, 75)
         case .memoryUsedPercent, .memoryUsedBytes, .memoryFreeBytes: (80, 92)
         case .memoryPressure: (50, 80)
@@ -366,6 +501,15 @@ public struct MenuBarModuleSettings: Codable, Equatable, Sendable {
     /// User thresholds in the value's unit; nil keeps the value's defaults.
     public var warningThreshold: Double?
     public var criticalThreshold: Double?
+    public var graphKind: MenuBarGraphKind
+    public var graphWidth: MenuBarGraphWidth
+    public var textSize: MenuBarTextSize
+    public var labelPosition: MenuBarLabelPosition
+    public var textAlignment: MenuBarTextAlignment
+    public var accent: MenuBarAccent
+    /// Clock module: the zone the item shows (empty = this Mac's) and the extra zones listed in its popover.
+    public var timeZoneID: String
+    public var worldClocks: [String]
 
     /// The thresholds in effect for the current value, or nil when it has no scale.
     public var thresholds: (warning: Double, critical: Double)? {
@@ -373,10 +517,34 @@ public struct MenuBarModuleSettings: Codable, Equatable, Sendable {
         return (warningThreshold ?? defaults.warning, criticalThreshold ?? defaults.critical)
     }
 
+    /// Sets the warning limit, keeping it on the calm side of the critical one (one step apart at least).
+    public mutating func setWarningThreshold(_ limit: Double) {
+        guard let unit = value.thresholdUnit, let current = thresholds else { return }
+        let bounded = min(max(limit, unit.range.lowerBound), unit.range.upperBound)
+        warningThreshold = value.lowerIsWorse ? max(bounded, current.critical + unit.step)
+                                              : min(bounded, current.critical - unit.step)
+    }
+
+    /// Sets the critical limit, keeping it on the alarming side of the warning one (one step apart at least).
+    public mutating func setCriticalThreshold(_ limit: Double) {
+        guard let unit = value.thresholdUnit, let current = thresholds else { return }
+        let bounded = min(max(limit, unit.range.lowerBound), unit.range.upperBound)
+        criticalThreshold = value.lowerIsWorse ? min(bounded, current.warning - unit.step)
+                                               : max(bounded, current.warning + unit.step)
+    }
+
     public init(style: MenuBarDisplayStyle = .value, showLabel: Bool = true, showIcon: Bool = false,
                 showValue: Bool = true, decimals: Bool = false, value: MenuBarValue, volumePath: String = "",
                 sensorName: String = "", showVPN: Bool = true, colorMode: MenuBarColorMode = .monochrome,
-                warningThreshold: Double? = nil, criticalThreshold: Double? = nil) {
+                warningThreshold: Double? = nil, criticalThreshold: Double? = nil,
+                graphKind: MenuBarGraphKind = .bars, graphWidth: MenuBarGraphWidth = .standard,
+                textSize: MenuBarTextSize = .regular, labelPosition: MenuBarLabelPosition = .automatic,
+                accent: MenuBarAccent = .automatic, textAlignment: MenuBarTextAlignment = .trailing,
+                timeZoneID: String = "", worldClocks: [String] = []) {
+        self.timeZoneID = timeZoneID; self.worldClocks = worldClocks
+        self.textAlignment = textAlignment
+        self.graphKind = graphKind; self.graphWidth = graphWidth; self.textSize = textSize
+        self.labelPosition = labelPosition; self.accent = accent
         self.style = style; self.showLabel = showLabel; self.showIcon = showIcon
         self.showValue = showValue; self.decimals = decimals; self.value = value; self.volumePath = volumePath
         self.sensorName = sensorName; self.showVPN = showVPN
@@ -394,11 +562,12 @@ public struct MenuBarModuleSettings: Codable, Equatable, Sendable {
         // Colored by default, like the standalone item it replaces turned red at the alert level.
         case .bluetooth: Self(showLabel: false, showIcon: true, value: .bluetoothLowest, colorMode: .thresholds)
         case .display: Self(showLabel: false, showIcon: true, value: .displayBrightness)
+        case .clock: Self(showLabel: false, showIcon: false, value: .clockTime)
         default: Self(value: module.valueOptions[0])
         }
     }
 
-    private enum CodingKeys: String, CodingKey { case style, showLabel, showIcon, showValue, decimals, value, volumePath, sensorName, showVPN, colorMode, warningThreshold, criticalThreshold }
+    private enum CodingKeys: String, CodingKey { case style, showLabel, showIcon, showValue, decimals, value, volumePath, sensorName, showVPN, colorMode, warningThreshold, criticalThreshold, graphKind, graphWidth, textSize, labelPosition, accent, textAlignment, timeZoneID, worldClocks }
 
     /// Missing or unknown fields fall back to defaults, so stored settings survive future additions.
     public init(from decoder: Decoder) throws {
@@ -415,7 +584,15 @@ public struct MenuBarModuleSettings: Codable, Equatable, Sendable {
                   showVPN: (try? container.decodeIfPresent(Bool.self, forKey: .showVPN)) ?? true,
                   colorMode: (try? container.decodeIfPresent(MenuBarColorMode.self, forKey: .colorMode)) ?? .monochrome,
                   warningThreshold: try? container.decodeIfPresent(Double.self, forKey: .warningThreshold),
-                  criticalThreshold: try? container.decodeIfPresent(Double.self, forKey: .criticalThreshold))
+                  criticalThreshold: try? container.decodeIfPresent(Double.self, forKey: .criticalThreshold),
+                  graphKind: (try? container.decodeIfPresent(MenuBarGraphKind.self, forKey: .graphKind)) ?? .bars,
+                  graphWidth: (try? container.decodeIfPresent(MenuBarGraphWidth.self, forKey: .graphWidth)) ?? .standard,
+                  textSize: (try? container.decodeIfPresent(MenuBarTextSize.self, forKey: .textSize)) ?? .regular,
+                  labelPosition: (try? container.decodeIfPresent(MenuBarLabelPosition.self, forKey: .labelPosition)) ?? .automatic,
+                  accent: (try? container.decodeIfPresent(MenuBarAccent.self, forKey: .accent)) ?? .automatic,
+                  textAlignment: (try? container.decodeIfPresent(MenuBarTextAlignment.self, forKey: .textAlignment)) ?? .trailing,
+                  timeZoneID: (try? container.decodeIfPresent(String.self, forKey: .timeZoneID)) ?? "",
+                  worldClocks: (try? container.decodeIfPresent([String].self, forKey: .worldClocks)) ?? [])
     }
 
     /// Keeps `value` within the module's options (e.g. after decoding a hand-edited plist).
@@ -436,6 +613,8 @@ public struct MenuBarPreferences: Equatable, Sendable {
     public var groupedMetric: MenuBarModule
     /// Marks the grouped icon with a dot while something needs attention (see `MenuBarAttention`).
     public var groupedBadge: Bool
+    /// Fixed color of the grouped icon; `automatic` follows the menu bar.
+    public var groupedAccent: MenuBarAccent
     public var order: [MenuBarModule]
     public var enabled: Set<MenuBarModule>
     public var modules: [MenuBarModule: MenuBarModuleSettings]
@@ -447,6 +626,7 @@ public struct MenuBarPreferences: Equatable, Sendable {
     public static let groupedStyleKey = "MacPocket.menubar.groupedStyle"
     public static let groupedMetricKey = "MacPocket.menubar.groupedMetric"
     public static let groupedBadgeKey = "MacPocket.menubar.groupedBadge"
+    public static let groupedAccentKey = "MacPocket.menubar.groupedAccent"
     public static let orderKey = "MacPocket.menubar.order"
     public static let unitsKey = "MacPocket.bar.units"
     public static let schemaKey = "MacPocket.menubar.schema"
@@ -454,11 +634,12 @@ public struct MenuBarPreferences: Equatable, Sendable {
     public static func moduleKey(_ module: MenuBarModule) -> String { "MacPocket.menubar.module.\(module.rawValue)" }
 
     public init(visible: Bool = true, layout: MenuBarLayout = .grouped, groupedStyle: MenuBarGroupedStyle = .defaultValue,
-                groupedMetric: MenuBarModule = .cpu, groupedBadge: Bool = true, order: [MenuBarModule] = MenuBarModule.allCases,
+                groupedMetric: MenuBarModule = .cpu, groupedBadge: Bool = true,
+                groupedAccent: MenuBarAccent = .automatic, order: [MenuBarModule] = MenuBarModule.allCases,
                 enabled: Set<MenuBarModule> = Set(MenuBarModule.allCases.filter(\.enabledByDefault)),
                 modules: [MenuBarModule: MenuBarModuleSettings] = [:], binaryUnits: Bool = true) {
         self.visible = visible; self.layout = layout; self.groupedStyle = groupedStyle
-        self.groupedMetric = groupedMetric; self.groupedBadge = groupedBadge
+        self.groupedMetric = groupedMetric; self.groupedBadge = groupedBadge; self.groupedAccent = groupedAccent
         self.order = Self.completeOrder(order); self.enabled = enabled; self.modules = modules
         self.binaryUnits = binaryUnits
     }
@@ -496,6 +677,7 @@ public struct MenuBarPreferences: Equatable, Sendable {
                     groupedStyle: defaults.string(forKey: groupedStyleKey).flatMap(MenuBarGroupedStyle.init(rawValue:)) ?? .defaultValue,
                     groupedMetric: defaults.string(forKey: groupedMetricKey).flatMap(MenuBarModule.init(rawValue:)) ?? .cpu,
                     groupedBadge: defaults.object(forKey: groupedBadgeKey) as? Bool ?? true,
+                    groupedAccent: defaults.string(forKey: groupedAccentKey).flatMap(MenuBarAccent.init(rawValue:)) ?? .automatic,
                     order: order, enabled: Set(enabled), modules: modules,
                     binaryUnits: defaults.string(forKey: unitsKey) != "decimal")
     }
@@ -512,6 +694,7 @@ public struct MenuBarPreferences: Equatable, Sendable {
         set(groupedStyle.rawValue, Self.groupedStyleKey)
         set(groupedMetric.rawValue, Self.groupedMetricKey)
         set(groupedBadge, Self.groupedBadgeKey)
+        set(groupedAccent.rawValue, Self.groupedAccentKey)
         set(order.map(\.rawValue).joined(separator: ","), Self.orderKey)
         set(binaryUnits ? "binary" : "decimal", Self.unitsKey)
         for module in MenuBarModule.allCases {
@@ -589,7 +772,7 @@ public struct MenuBarPreferences: Equatable, Sendable {
                 settings.volumePath = defaults.string(forKey: "MacPocket.bar.volume") ?? ""
             case .power:
                 settings.value = battery ? .powerBattery : .powerSource
-            case .network, .weather, .aiUsage, .awake, .focus, .bluetooth, .display:
+            case .network, .weather, .aiUsage, .awake, .focus, .bluetooth, .display, .clock:
                 settings = .defaults(for: module)
             case .cpu, .gpu:
                 break
@@ -697,7 +880,7 @@ public enum MenuBarFormatter {
                                aiUsage: MenuBarReading? = nil, external: MenuBarReading? = nil) -> MenuBarReading {
         // Keep awake, focus and Bluetooth state live outside the snapshot; the app builds their readings
         // with `awakeReading`, `focusReading`, `bluetoothReading` and `displayReading`.
-        if module == .awake || module == .focus || module == .bluetooth || module == .display {
+        if module == .awake || module == .focus || module == .bluetooth || module == .display || module == .clock {
             return external ?? MenuBarReading(lines: [""], reserve: [""], fraction: nil, magnitude: nil, accessibility: module.title)
         }
         if module == .aiUsage {
@@ -746,7 +929,8 @@ public enum MenuBarFormatter {
                                   accessibility: String(localized: "Ağ: internet bağlantısı yok"))
         }
         switch settings.value {
-        case .weatherTemperature, .weatherApparent, .aiQuota, .awakeRemaining, .focusRemaining, .bluetoothLowest, .displayBrightness: return pending()
+        case .weatherTemperature, .weatherApparent, .aiQuota, .awakeRemaining, .focusRemaining, .bluetoothLowest, .displayBrightness,
+             .clockTime, .clockTimeSeconds, .clockWeekdayTime, .clockDateTime: return pending()
         case .gpuUtilization, .gpuRenderer:
             guard let gpu = s.gpu else { return pending() }
             let value = settings.value == .gpuRenderer ? (gpu.rendererPercent ?? gpu.utilizationPercent) : gpu.utilizationPercent
@@ -788,6 +972,26 @@ public enum MenuBarFormatter {
                                   reserve: [readMark + " 999 KB/s", writeMark + " 999 KB/s"], fraction: nil,
                                   magnitude: read.flatMap { r in write.map { r + $0 } },
                                   accessibility: String(localized: "Disk etkinliği: okuma \(readText), yazma \(writeText)"))
+        case .cpuLoad:
+            guard let load = s.loadAverages?.first, s.logicalCPUCount > 0 else { return pending("99,99") }
+            let text = number(load, fractionDigits: 2)
+            let fraction = min(1, load / Double(s.logicalCPUCount))
+            return MenuBarReading(lines: [text], reserve: ["99,99"], fraction: fraction, magnitude: load,
+                                  accessibility: String(localized: "CPU yük ortalaması: \(text), \(s.logicalCPUCount) çekirdek"))
+        case .memorySwap:
+            guard let used = s.swapUsedBytes else { return pending(bytesReserve) }
+            let text = bytes(Double(used), binary: binaryUnits, decimals: decimals)
+            let fraction = s.swapTotalBytes.flatMap { $0 > 0 ? min(1, Double(used) / Double($0)) : nil }
+            return MenuBarReading(lines: [text], reserve: [bytesReserve], fraction: fraction, magnitude: Double(used),
+                                  accessibility: String(localized: "Takas kullanımı: \(text)"))
+        case .powerWatts:
+            guard let watts = s.systemPowerWatts else {
+                return MenuBarReading(lines: ["—"], reserve: ["999 W"], fraction: nil, magnitude: nil,
+                                      accessibility: String(localized: "Bu Mac güç tüketimini yayınlamıyor."))
+            }
+            let text = number(watts, fractionDigits: decimals || watts < 10 ? 1 : 0) + " W"
+            return MenuBarReading(lines: [text], reserve: ["999 W"], fraction: min(1, watts / 100), magnitude: watts,
+                                  accessibility: String(localized: "Güç tüketimi: \(text)"))
         case .cpuTotal, .cpuUser, .cpuSystem:
             guard let user = s.cpuUserPercent, let system = s.cpuSystemPercent else { return pending() }
             let value = settings.value == .cpuUser ? user : settings.value == .cpuSystem ? system : min(100, user + system)
@@ -998,6 +1202,43 @@ public enum MenuBarNightState: Equatable, Sendable {
 }
 
 extension MenuBarFormatter {
+    /// Time zones offered for the clock module, big cities first; this Mac's own zone is always available.
+    public static let commonTimeZones: [String] = [
+        "Europe/Istanbul", "Europe/London", "Europe/Berlin", "Europe/Paris", "Europe/Madrid", "Europe/Rome", "Europe/Moscow",
+        "Africa/Cairo", "Africa/Johannesburg", "Asia/Dubai", "Asia/Tehran", "Asia/Kolkata", "Asia/Bangkok", "Asia/Singapore",
+        "Asia/Shanghai", "Asia/Tokyo", "Asia/Seoul", "Australia/Sydney", "Pacific/Auckland", "America/Sao_Paulo",
+        "America/Argentina/Buenos_Aires", "America/New_York", "America/Toronto", "America/Chicago", "America/Mexico_City",
+        "America/Denver", "America/Los_Angeles", "America/Anchorage", "Pacific/Honolulu", "UTC",
+    ]
+
+    /// "New York" for "America/New_York".
+    public static func cityName(_ identifier: String) -> String {
+        (identifier.split(separator: "/").last.map(String.init) ?? identifier).replacingOccurrences(of: "_", with: " ")
+    }
+
+    /// The clock module's reading: the time in `zoneID` (empty = this Mac's zone) in the user's 12 or 24 hour format.
+    public static func clockReading(value: MenuBarValue, zoneID: String, now: Date = Date(),
+                                    locale: Locale = .current) -> MenuBarReading {
+        let zone = TimeZone(identifier: zoneID) ?? .current
+        func format(_ template: String) -> String {
+            let formatter = DateFormatter()
+            formatter.locale = locale
+            formatter.timeZone = zone
+            formatter.setLocalizedDateFormatFromTemplate(template)
+            return formatter.string(from: now)
+        }
+        let text: String
+        switch value {
+        case .clockTimeSeconds: text = format("jms")
+        case .clockWeekdayTime: text = format("EEEjm")
+        case .clockDateTime: text = format("MMMdjm")
+        default: text = format("jm")
+        }
+        let place = zoneID.isEmpty ? "" : ", " + cityName(zoneID)
+        return MenuBarReading(lines: [text], reserve: [text], fraction: nil, magnitude: nil,
+                              accessibility: String(localized: "Saat: \(text)") + place)
+    }
+
     /// The brightness of the main managed display; the symbol turns into a moon while night mode dims or warms.
     public static func displayReading(level: Double?, displays: Int, night: MenuBarNightState) -> MenuBarReading {
         let nightActive: Bool = if case let .active(amount) = night { amount > 0 } else { false }

@@ -9,6 +9,7 @@ enum PocketPreferenceKey {
     static let showWindowAtLaunch = "MacPocket.showWindowAtLaunch"
     static let confirmQuitWhileAwake = "MacPocket.confirmQuitWhileAwake"
     static let accentStyle = "MacPocket.accentStyle"
+    static let theme = "MacPocket.theme"
     static let sidebarIcons = "MacPocket.sidebarIcons"
     static let reduceMotion = "MacPocket.reduceMotion"
     static let density = "MacPocket.density"
@@ -80,7 +81,7 @@ enum PocketRelaunch {
 enum PocketAccentStyle: String, CaseIterable, Identifiable {
     case brand, system
     var id: String { rawValue }
-    var localizedTitle: LocalizedStringKey { self == .brand ? "MacPocket mavisi" : "Sistem vurgu rengi" }
+    var localizedTitle: LocalizedStringKey { self == .brand ? "Tema rengi" : "Sistem vurgu rengi" }
     static var current: PocketAccentStyle {
         PocketAccentStyle(rawValue: UserDefaults.standard.string(forKey: PocketPreferenceKey.accentStyle) ?? "") ?? .brand
     }
@@ -109,11 +110,12 @@ struct PocketAppearanceRoot: ViewModifier {
     var rebuildsOnTokenChange = true
     @AppStorage("MacPocket.appearance") private var appearance = PocketAppearance.defaultValue
     @AppStorage(PocketPreferenceKey.accentStyle) private var accent = PocketAccentStyle.brand
+    @AppStorage(PocketPreferenceKey.theme) private var theme = PocketAppTheme.defaultValue
     @AppStorage(PocketPreferenceKey.density) private var density = PocketDensity.comfortable
 
     func body(content: Content) -> some View {
         content
-            .id(rebuildsOnTokenChange ? "\(accent.rawValue)/\(density.rawValue)" : "")
+            .id(rebuildsOnTokenChange ? "\(accent.rawValue)/\(density.rawValue)/\(theme.rawValue)" : "")
             .preferredColorScheme(appearance.colorScheme)
             .tint(PocketTheme.accent)
             .environment(\.locale, pocketLocale)
@@ -154,6 +156,7 @@ extension PocketPage {
         case .tools: String(localized: "Araçlar")
         case .practical: String(localized: "Pratik Araçlar")
         case .ssh: String(localized: "SSH Yöneticisi")
+        case .menuBar: String(localized: "İstatistik Çubuğu")
         }
     }
 

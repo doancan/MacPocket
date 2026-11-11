@@ -114,6 +114,7 @@ struct SimilarImagesView: View {
             }
             .fixedSize()
             .help("Mesafe eşiği: küçük değer daha sıkı eşleşme demektir; değer bir yüzde değildir.")
+                .pocketMenuPicker()
             Picker("En çok", selection: $model.maximumImages) {
                 Text("100 görsel").tag(100)
                 Text("250 görsel").tag(250)
@@ -121,6 +122,7 @@ struct SimilarImagesView: View {
             }
             .fixedSize()
             .help("İncelenecek en büyük görsel sayısı")
+                .pocketMenuPicker()
             Button { showInfo.toggle() } label: { Image(systemName: "info.circle") }
                 .buttonStyle(.borderless)
                 .accessibilityLabel("Benzerlik hakkında")

@@ -76,7 +76,7 @@ struct AIUsageSettingsView: View {
                 Spacer()
                 Picker("Yüzde gösterimi", selection: setting(\.mode)) {
                     ForEach(AIUsageDisplayMode.allCases) { Text($0.localizedTitle).tag($0) }
-                }.labelsHidden().pickerStyle(.menu).fixedSize().controlSize(.small)
+                }.labelsHidden().pocketMenuPicker().fixedSize().controlSize(.small)
             }.padding(.horizontal, 22).padding(.vertical, 12)
         }
         .background(Color(nsColor: .windowBackgroundColor))
@@ -112,6 +112,7 @@ struct AIUsageSettingsView: View {
             Picker("Yüzde gösterimi", selection: setting(\.mode)) {
                 ForEach(AIUsageDisplayMode.allCases) { Text($0.localizedTitle).tag($0) }
             }
+                .pocketMenuPicker()
             Picker("Menü çubuğu görünümü", selection: Binding(
                 get: { bar.preferences.settings(for: .aiUsage).style },
                 set: { value in var s = bar.preferences.settings(for: .aiUsage); s.style = value; bar.preferences.modules[.aiUsage] = s }
@@ -119,6 +120,7 @@ struct AIUsageSettingsView: View {
                 Text("Hesap adları ve yüzdeler").tag(MenuBarDisplayStyle.value)
                 Text("Yalnız simge").tag(MenuBarDisplayStyle.icon)
             }
+                .pocketMenuPicker()
             Toggle("Kota eşiğine göre renklendir", isOn: Binding(
                 get: { bar.preferences.settings(for: .aiUsage).colorMode == .thresholds },
                 set: { value in var s = bar.preferences.settings(for: .aiUsage); s.colorMode = value ? .thresholds : .monochrome; bar.preferences.modules[.aiUsage] = s }
@@ -139,6 +141,7 @@ struct AIUsageSettingsView: View {
                 Text("30 dakika").tag(30)
                 Text("60 dakika").tag(60)
             }
+                .pocketMenuPicker()
             HStack {
                 Button("Şimdi Yenile", systemImage: "arrow.clockwise") { Task { await service.refresh(manual: true) } }
                     .disabled(!service.active || !service.refreshing.isEmpty || service.enabledAccounts.isEmpty)
@@ -286,6 +289,7 @@ private struct AIUsageAddAccountSheet: View {
                                 Text("Profilin kendi oturumunu bul").tag("")
                                 ForEach(entries) { Text($0.service).tag($0.id) }
                             }
+                                .pocketMenuPicker()
                         }.font(.caption)
                     }
                 } else {

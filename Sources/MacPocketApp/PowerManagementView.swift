@@ -333,6 +333,7 @@ struct PowerKeepAwakeCard: View {
                     Divider()
                     Text("Ben durdurana kadar").tag(0.0)
                 }
+                    .pocketMenuPicker()
                 Toggle("Ekranı da açık tut", isOn: $displayAwake)
                 Button { run { await model.startAwake(duration: minutes > 0 ? minutes * 60 : nil, display: displayAwake) } } label: {
                     Label("Uyanık Tutmayı Başlat", systemImage: "cup.and.saucer")

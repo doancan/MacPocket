@@ -5,7 +5,6 @@ import SwiftUI
 struct BluetoothBatteryView: View {
     @ObservedObject private var service = BluetoothBatteryService.shared
     @ObservedObject private var menuBar = MenuBarSettingsStore.shared
-    @Environment(\.openSettings) private var openSettings
 
     var body: some View {
         VStack(alignment: .leading, spacing: PocketSpacing.l) {
@@ -70,15 +69,11 @@ struct BluetoothBatteryView: View {
                     Text("Menü çubuğu").font(.headline)
                     Text(menuBar.preferences.visible && menuBar.preferences.enabled.contains(.bluetooth)
                          ? "Bluetooth pilleri modülü menü çubuğunda en düşük pili gösteriyor."
-                         : "Menü çubuğunda göstermek için Menü Çubuğu ayarlarında Bluetooth pilleri modülünü aç.")
+                         : "Menü çubuğunda göstermek için İstatistik Çubuğu sayfasında Bluetooth pilleri modülünü aç.")
                         .font(.subheadline).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
                 }
                 Spacer(minLength: PocketSpacing.s)
-                Button("Menü Çubuğu Ayarları…") {
-                    PocketSettingsNavigation.shared.section = .menuBar
-                    PocketSettingsNavigation.shared.menuBarModule = .bluetooth
-                    openSettings()
-                }
+                Button("İstatistik Çubuğu…") { PocketApplicationState.shared.model.navigation.openMenuBar(module: .bluetooth) }
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)

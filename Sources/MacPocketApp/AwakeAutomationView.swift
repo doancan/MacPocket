@@ -16,6 +16,7 @@ struct AwakeAutomationView: View {
                 Picker("Koşullar", selection: $service.settings.match) {
                     ForEach(AwakeAutomationMatch.allCases) { Text($0.localizedTitle).tag($0) }
                 }.accessibilityLabel("Koşullar")
+                    .pocketMenuPicker()
                 ForEach(AwakeAutomationCondition.allCases) { condition in
                     HStack {
                         Toggle(condition.localizedTitle, isOn: Binding(get: { service.settings.conditions.contains(condition) }, set: { on in
@@ -47,6 +48,7 @@ struct AwakeAutomationView: View {
                     Text("30 dakika").tag(30); Text("1 saat").tag(60); Text("2 saat").tag(120)
                     Text("4 saat").tag(240); Text("8 saat").tag(480)
                 }.accessibilityLabel("Otomasyonun süre sınırı")
+                    .pocketMenuPicker()
                 Toggle("Otomasyonda ekranı da açık tut", isOn: $service.settings.keepDisplayAwake)
                 Toggle("Oturum kilitliyken duraklat", isOn: $service.settings.pauseWhenLocked)
                 Text("Koşullar bitince otomasyon durur. Süre sınırı, kilitte geçen süreyi de kapsar; koşullar yeniden sağlanmadan kendiliğinden yenilenmez.")

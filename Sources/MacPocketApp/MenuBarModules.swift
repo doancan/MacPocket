@@ -11,7 +11,8 @@ private struct MenuBarSection: ViewModifier {
         content
             .padding(PocketSpacing.s + 2)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .background(Color.primary.opacity(0.045), in: RoundedRectangle(cornerRadius: PocketRadius.medium, style: .continuous))
+            // The theme's opaque card color, so text never sits on a see-through surface.
+            .background(PocketTheme.panel, in: RoundedRectangle(cornerRadius: PocketRadius.medium, style: .continuous))
             .overlay {
                 RoundedRectangle(cornerRadius: PocketRadius.medium, style: .continuous).strokeBorder(PocketTheme.line, lineWidth: 0.5)
             }
@@ -263,6 +264,7 @@ struct MenuBarModuleDetail: View {
             case .focus: FocusMenuDetail(model: model)
             case .bluetooth: BluetoothMenuDetail(model: model)
             case .display: DisplayMenuDetail(model: model)
+            case .clock: ClockMenuDetail(model: model)
             }
         }
     }
@@ -767,6 +769,11 @@ private struct PowerDetail: View {
         model.openMainWindow?()
         NotificationCenter.default.post(name: .pocketOpenTool, object: id)
     }
+    /// Opens the Stats Bar page on `module`, e.g. to add world clocks.
+    static func openBarStudio(_ module: MenuBarModule, model: PocketModel) {
+        model.navigation.openMenuBar(module: module)
+        model.openMainWindow?()
+    }
     static func openModuleSettings(model: PocketModel) {
         PocketSettingsNavigation.shared.section = .modules
         model.openSettingsWindow?()
@@ -1234,5 +1241,98 @@ private struct NightModeSection: View {
                 .font(.caption).foregroundStyle(.secondary).monospacedDigit()
             }
         }
+    }
+}
+
+// MARK: - Clock
+
+/// The local time and the world clocks chosen on the Stats Bar page, ticking every second while the popover is open.
+private struct ClockMenuDetail: View {
+    var model: PocketModel
+    @ObservedObject private var store = MenuBarSettingsStore.shared
+    private let module = MenuBarModule.clock
+
+    var body: some View {
+        let settings = store.preferences.settings(for: module)
+        let zones = ([settings.timeZoneID.isEmpty ? TimeZone.current.identifier : settings.timeZoneID] + settings.worldClocks)
+            .reduce(into: [String]()) { if !$1.isEmpty, !$0.contains($1) { $0.append($1) } }
+        TimelineView(.periodic(from: .now, by: 1)) { context in
+            VStack(alignment: .leading, spacing: PocketSpacing.s + 2) {
+                ModuleHeader(module: module, value: timeText(context.date, zone: zones.first, seconds: true),
+                             subtitle: dateText(context.date, zone: zones.first)) {
+                    Text(verbatim: MenuBarFormatter.cityName(zones.first ?? TimeZone.current.identifier))
+                    Text(verbatim: offsetText(zones.first, now: context.date))
+                }
+                if zones.count > 1 {
+                    VStack(alignment: .leading, spacing: PocketSpacing.xs + 2) {
+                        SectionTitle(title: "Dünya saatleri", trailing: "\(zones.count - 1)")
+                        ForEach(zones.dropFirst(), id: \.self) { zone in
+                            HStack(spacing: PocketSpacing.s) {
+                                VStack(alignment: .leading, spacing: 0) {
+                                    Text(verbatim: MenuBarFormatter.cityName(zone)).font(.callout)
+                                    Text(verbatim: dayText(context.date, zone: zone) + " · " + offsetText(zone, now: context.date))
+                                        .font(.caption).foregroundStyle(.secondary)
+                                }
+                                Spacer(minLength: PocketSpacing.s)
+                                Text(verbatim: timeText(context.date, zone: zone, seconds: false))
+                                    .font(.system(.title3, design: .rounded, weight: .medium)).monospacedDigit()
+                            }
+                            .accessibilityElement(children: .combine)
+                        }
+                    }
+                    .menuBarSection()
+                } else {
+                    Text("Başka bir şehrin saatini görmek için İstatistik Çubuğu sayfasından dünya saati ekle.")
+                        .font(.callout).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+                        .menuBarSection()
+                }
+                Button("Dünya Saatlerini Düzenle…") { MenuBarNavigation.openBarStudio(module, model: model) }
+                    .controlSize(.small)
+            }
+        }
+    }
+
+    private func zone(_ identifier: String?) -> TimeZone { identifier.flatMap(TimeZone.init(identifier:)) ?? .current }
+
+    private func timeText(_ date: Date, zone identifier: String?, seconds: Bool) -> String {
+        let formatter = DateFormatter()
+        formatter.timeZone = zone(identifier)
+        formatter.setLocalizedDateFormatFromTemplate(seconds ? "jms" : "jm")
+        return formatter.string(from: date)
+    }
+
+    private func dateText(_ date: Date, zone identifier: String?) -> String {
+        let formatter = DateFormatter()
+        formatter.timeZone = zone(identifier)
+        formatter.setLocalizedDateFormatFromTemplate("EEEEdMMMMy")
+        return formatter.string(from: date)
+    }
+
+    /// "Bugün", "Yarın" or "Dün" relative to this Mac's calendar day.
+    private func dayText(_ date: Date, zone identifier: String) -> String {
+        var calendar = Calendar.current
+        calendar.timeZone = zone(identifier)
+        var local = Calendar.current
+        local.timeZone = .current
+        let remote = calendar.dateComponents([.year, .month, .day], from: date)
+        let here = local.dateComponents([.year, .month, .day], from: date)
+        guard let remoteDay = calendar.date(from: remote), let hereDay = local.date(from: here) else { return "" }
+        let difference = Calendar(identifier: .gregorian).dateComponents([.day], from: hereDay, to: remoteDay).day ?? 0
+        switch difference {
+        case 0: return String(localized: "Bugün")
+        case 1: return String(localized: "Yarın")
+        case -1: return String(localized: "Dün")
+        default: return dateText(date, zone: identifier)
+        }
+    }
+
+    /// "GMT+3", or the hour difference to this Mac ("+7 sa") when it differs.
+    private func offsetText(_ identifier: String?, now: Date) -> String {
+        let seconds = zone(identifier).secondsFromGMT(for: now)
+        let hours = Double(seconds) / 3600
+        let sign = hours < 0 ? "−" : "+"
+        let magnitude = abs(hours)
+        let text = magnitude == magnitude.rounded() ? String(Int(magnitude)) : MenuBarFormatter.number(magnitude, fractionDigits: 1)
+        return "GMT\(sign)\(text)"
     }
 }

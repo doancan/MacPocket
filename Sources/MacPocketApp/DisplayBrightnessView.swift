@@ -79,6 +79,7 @@ struct DisplayBrightnessView: View {
                     Text("Ana ekran").tag(DisplayBrightnessService.Target.main)
                 }
                 .labelsHidden().fixedSize()
+                    .pocketMenuPicker()
             }
             .disabled(!service.settings.keysEnabled)
             Divider()
@@ -305,6 +306,7 @@ private struct DisplayCard: View {
                 }
                 .labelsHidden()
                 .fixedSize()
+                    .pocketMenuPicker()
             }
             BrightnessFillSlider(title: "Parlaklık", symbol: display.level < 0.5 ? "sun.min.fill" : "sun.max.fill",
                                  value: display.level, height: 34) { service.setLevel($0, for: display.id) }
@@ -576,6 +578,7 @@ private struct NightScheduleSection: View {
                     Text("2 saat").tag(120)
                 }
                 .labelsHidden().fixedSize()
+                    .pocketMenuPicker()
             }
             exceptions(settings, now: now)
         }

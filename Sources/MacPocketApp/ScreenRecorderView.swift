@@ -275,11 +275,13 @@ struct ScreenRecorderView: View {
                             ForEach(ScreenRecordingSettings.frameRateChoices, id: \.self) { Text("\($0) kare/sn").tag($0) }
                         }
                         .fixedSize()
+                            .pocketMenuPicker()
                         Picker("Biçim", selection: $service.settings.codec) {
                             Text("HEVC (küçük dosya)").tag(ScreenRecordingSettings.Codec.hevc)
                             Text("H.264 (her yerde açılır)").tag(ScreenRecordingSettings.Codec.h264)
                         }
                         .fixedSize()
+                            .pocketMenuPicker()
                     }
                     LabeledContent("Kayıt klasörü") {
                         HStack {

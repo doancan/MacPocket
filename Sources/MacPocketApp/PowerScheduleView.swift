@@ -159,6 +159,7 @@ struct PowerScheduleView: View {
                         ForEach(kinds) { Label($0.title, systemImage: $0.symbol).tag($0) }
                     }
                     .fixedSize()
+                        .pocketMenuPicker()
                     DatePicker("Saat", selection: time, displayedComponents: .hourAndMinute).labelsHidden().fixedSize()
                     Spacer(minLength: PocketSpacing.s)
                     DayChips(days: days)
@@ -207,6 +208,7 @@ struct PowerScheduleView: View {
                     ForEach(PowerEventKind.allCases) { Label($0.title, systemImage: $0.symbol).tag($0) }
                 }
                 .labelsHidden().fixedSize()
+                    .pocketMenuPicker()
                 DatePicker("Zaman", selection: $model.oneTimeDate, in: Date()..., displayedComponents: [.date, .hourAndMinute])
                     .labelsHidden().fixedSize()
                 Spacer()

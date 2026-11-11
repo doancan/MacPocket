@@ -379,11 +379,13 @@ struct PracticalToolsView: View {
             Picker("Unix birimi", selection: binding(\.milliseconds)) {
                 Text("Saniye").tag(false); Text("Milisaniye").tag(true)
             }
+                .pocketMenuPicker()
             if !draft.reverse {
                 Picker("Sonuç saat dilimi", selection: binding(\.utc)) {
                     Text("Yerel (\(TimeZone.current.identifier))").tag(false)
                     Text("UTC").tag(true)
                 }
+                    .pocketMenuPicker()
             }
             Text(draft.reverse ? "Örnek: 2026-11-05T12:30:00+03:00" : "Saniye ve milisaniye birimlerini karıştırma; birimi yukarıdan seç.")
                 .font(.caption).foregroundStyle(.secondary)
@@ -405,6 +407,7 @@ struct PracticalToolsView: View {
                     ForEach(CaseFormat.allCases.filter(\.usesWords)) { Text($0.localizedTitle).tag($0) }
                 }
             }
+                .pocketMenuPicker()
             Picker("Harf kuralları", selection: binding(\.caseOptions.language)) {
                 ForEach(CaseLanguage.allCases) { Text($0.localizedTitle).tag($0) }
             }.pickerStyle(.segmented)

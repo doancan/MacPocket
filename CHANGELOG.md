@@ -2,6 +2,13 @@
 
 ## Yayımlanmamış
 
+## 0.2.0 — 11 Kasım 2026
+
+- **İstatistik Çubuğu sayfası:** menü çubuğu ayarları Ayarlar'dan çıkarıp ana pencereye taşındı. Canlı önizleme (açık/koyu menü çubuğu, 1×–2× yakınlaştırma), sürükleyerek sıralanan modül listesi ve her modül için ayrı seçenekler: gerçek çizimle stil galerisi, grafik türü (çubuk/çizgi/alan) ve genişliği, yazı boyutu, etiket konumu ve hizalama, sabit vurgu rengi, bağımsız sıralı eşik düzenleyici. Yeni stiller: yatay çubuk, halka; gruplu simge için üç çubuk ve canlı grafik.
+- **Yeni modül ve değerler:** Saat ve dünya saatleri (açılır pencerede şehir listesi); CPU yük ortalaması, takas kullanımı, güç tüketimi (W).
+- **Uygulama teması:** Ayarlar › Görünüm'de açılır menüden on yedi renk teması (MacPocket, Gece yarısı, Tokyo, Okyanus, Nane, Orman, Nord, Solarized, Gruvbox, Gün batımı, Kiraz, Kahve, Kum, Gül, Mor, Dracula, Grafit: yüzeyler ve vurgu renkleri); her temanın kontrastı testle doğrulanır.
+- **Düzeltmeler:** hava durumunda konum adı iki kez yazılıyordu ("Ankara Ankara, Türkiye"); İstatistik Çubuğu açılır penceresi artık opak, tema renklerini alır ve sistemin açık/koyu görünümünü izler; üst üste duran etiket/değer ve iki satırlı değerler dikeyde ortalandı ve aynı kenara hizalanıyor; uyarı eşiği kritik eşiği aşabiliyordu; gruplu açılır pencere kapalı modülleri de sekme olarak gösteriyordu; açılır menü seçicileri vurgu renginde okunmuyordu; 9'dan fazla sayfa eklenince ⌘ kısayol döngüsü çökerdi; SSH Yöneticisi ikonu yeniden çizildi; menü çubuğu liste satırı VoiceOver/erişilebilirlikte seçmek yerine modülü açıp kapatıyordu.
+
 ## 0.1.7 — 11 Kasım 2026
 
 - **Menü çubuğuna yeni modüller:** **Uyanık tut** (açıkken dolu fincan ve kalan süre; hazır süreler, ekranı açık tutma ve otomasyon durumu panelde), **Odak** (kalan süre ve ilerleme; süre seçimi, başlat/bitir, bugünkü süre ve seri), **Bluetooth pilleri** (pili en önce bitecek aksesuar, eşiğe göre renk) ve **Parlaklık ve gece modu** (ana ekranın parlaklığı; her harici ekran için kaydırıcı, gece modu durumu, gün doğumu/batımı, duraklatma). Hepsi Ayarlar › Menü Çubuğu'ndan açılır ve her düzende kendi öğesinde gösterilir.
