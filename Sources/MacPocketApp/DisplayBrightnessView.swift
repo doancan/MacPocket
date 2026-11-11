@@ -329,7 +329,8 @@ private struct DisplayCard: View {
 /// A thick filled track in the style of the brightness indicator and Control Center: drag or click anywhere to set
 /// the value; the symbol sits on the fill and the percentage (or `valueText`) at the trailing end. Arrow keys /
 /// VoiceOver adjust it.
-private struct BrightnessFillSlider: View {
+/// Also used by the menu bar's brightness and night mode panel.
+struct BrightnessFillSlider: View {
     let title: LocalizedStringKey
     let symbol: String
     /// 0…1.

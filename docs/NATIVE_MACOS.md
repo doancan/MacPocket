@@ -703,3 +703,13 @@ Mikro ölçüm (paketlenmiş uygulama): `localization: nil` 0,11–0,19 µs; aç
 - **Güncelleme:** Uyanık tut oturumu (Observation), odak servisi ve Bluetooth aygıt listesi değişince öğe yeniden çizilir. Süreli oturum varken izleme duraklatılmış olsa da 20 s'lik bir saat geri sayımı ilerletir; oturum yokken saat çalışmaz.
 
 **Doğrulama:** 7 yeni test: okumalar, eşik rengi, sıralama, genel okuma geçişi, eski Bluetooth ayarının okunması. XCTest 1.036 testte yalnız bilinen `pmset` canlı testi başarısız; Swift Testing 355 test geçti; yerelleştirme 0 eksik. Paneller ve menü çubuğu simgeleri ekran dışında PNG'ye çizilip gözle incelendi. Ekran kilitli olduğu için gerçek menü çubuğunda tıklama, oturum başlatma ve gerçek Bluetooth aygıtlarıyla kabul yapılmadı.
+
+### Menü çubuğu: Parlaklık ve gece modu modülü — 11 Kasım 2026
+
+**Uygulanan:**
+- **Modül:** `display`, `isSystemMetric == false`; kendi menü çubuğu öğesinde görünür. Değer olarak ana ekranın (`CGMainDisplayID`, yoksa ilk yönetilen ekranın) parlaklığını gösterir. Simge duruma göre değişir: gündüz güneş (%50 altında küçük güneş), gece eğrisi sıfırdan büyükken ay, duraklatılmışken `moon.zzz`. Okuma `MenuBarFormatter.displayReading` ile Core'da üretilir. Parlaklık bir alarm değeri olmadığından eşik rengi yoktur.
+- **Panel:** Her yönetilen harici ekran için parlaklık sayfasındaki `BrightnessFillSlider` (artık `private` değil) ve Donanım (DDC/CI) / Yazılım rozeti. Elle değişiklik yapıldıysa zamanlamaya dönüş saati gösterilir. Gece modu bölümü durumu (kapalı, elle saatler, konum gerekli, gündüz, geçişte/açık, duraklatıldı), gece oranını, Kelvin değerini, parlaklık çarpanını, gün doğumu/batımını ve konum adını gösterir. Düğmeler: "1 Saat Duraklat", "Sürdür", "Konumu Kullan", "Gece Modu Ayarları…".
+- **Tek yer:** Menü çubuğu sağ tık menüsündeki "Gece modunu 1 saat kapat / yeniden aç" öğeleri kaldırıldı.
+- **Gözlem:** `DisplayBrightnessService.$displays` ve `NightModeService.$status`, modül menü çubuğuna eklendikten sonra ve Ekran Ayarları uygulama modülü açıksa izlenir. Modül kullanılmıyorsa gece modu servisi bu yüzden oluşturulmaz.
+
+**Doğrulama:** 1 yeni test: simge geçişleri, sınırlama, ekran yokken okuma. XCTest 1.037 testte yalnız bilinen `pmset` canlı testi başarısız; Swift Testing 355 test geçti; yerelleştirme 0 eksik. Panel, gerçek iki monitörle (MateView ve LG HDR 4K, ikisi de DDC donanım) ekran dışında çizilip incelendi. Bu sırada yalnız okuma yapıldı. Gece modunun açık/duraklatılmış hâlleri ve gerçek menü çubuğunda kaydırıcı kullanımı canlı doğrulanmadı.

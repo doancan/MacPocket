@@ -262,6 +262,7 @@ struct MenuBarModuleDetail: View {
             case .awake: AwakeMenuDetail(model: model)
             case .focus: FocusMenuDetail(model: model)
             case .bluetooth: BluetoothMenuDetail(model: model)
+            case .display: DisplayMenuDetail(model: model)
             }
         }
     }
@@ -1096,6 +1097,141 @@ private struct BluetoothMenuRow: View {
             HStack(spacing: 2) {
                 Text(title).font(.caption2.weight(.semibold)).foregroundStyle(.secondary)
                 Text(percentText(Double(level))).monospacedDigit().foregroundStyle(color(level))
+            }
+        }
+    }
+}
+
+// MARK: - Brightness and night mode
+
+private struct DisplayMenuDetail: View {
+    var model: PocketModel
+    @ObservedObject private var modules = PocketModuleRuntime.shared
+    private let module = MenuBarModule.display
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: PocketSpacing.s + 2) {
+            if !modules.available.contains(.displays) {
+                MenuBarModuleOff(module: module, explanation: "Ekran Ayarları modülü kapalı. Ayarlar › Modüller’den açabilirsin.", model: model)
+            } else {
+                DisplayBrightnessSection(model: model)
+                NightModeSection(model: model, brightness: DisplayBrightnessService.shared, night: NightModeService.shared)
+            }
+        }
+    }
+}
+
+private struct DisplayBrightnessSection: View {
+    var model: PocketModel
+    @ObservedObject private var service = DisplayBrightnessService.shared
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: PocketSpacing.s) {
+            SectionTitle(title: "Parlaklık", trailing: service.displays.count > 1 ? String(localized: "\(service.displays.count) ekran") : nil)
+            if service.displays.isEmpty {
+                Text(service.detecting ? "Ekranlar algılanıyor…" : "Parlaklığı yönetilebilen harici ekran yok.")
+                    .font(.callout).foregroundStyle(.secondary)
+            }
+            ForEach(service.displays) { display in
+                VStack(alignment: .leading, spacing: PocketSpacing.xs) {
+                    HStack(spacing: PocketSpacing.xs + 2) {
+                        Text(verbatim: display.name).font(.callout).lineLimit(1)
+                        Spacer(minLength: PocketSpacing.s)
+                        PocketStatusBadge(text: display.active == .hardware ? String(localized: "Donanım") : String(localized: "Yazılım"),
+                                          tone: display.active == .hardware ? .success : .neutral)
+                            .help(display.active == .hardware ? "Monitörün kendi parlaklığı DDC/CI ile değiştirilir."
+                                                              : "Görüntü yazılımla karartılır; monitörün arka ışığı değişmez.")
+                    }
+                    BrightnessFillSlider(title: "Parlaklık", symbol: display.level < 0.5 ? "sun.min.fill" : "sun.max.fill",
+                                         value: display.level, height: 28) { service.setLevel($0, for: display.id) }
+                }
+            }
+            if let until = service.overrideUntil, until > Date() {
+                Text("Elle ayarlandı; \(until.formatted(date: .omitted, time: .shortened))’de zamanlamaya döner.")
+                    .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+            }
+        }
+        .menuBarSection()
+    }
+}
+
+private struct NightModeSection: View {
+    var model: PocketModel
+    @ObservedObject var brightness: DisplayBrightnessService
+    @ObservedObject var night: NightModeService
+    private let tint = MenuBarModule.display.tint
+
+    var body: some View {
+        let schedule = brightness.schedule
+        VStack(alignment: .leading, spacing: PocketSpacing.s) {
+            SectionTitle(title: "Gece modu")
+            if schedule.enabled && schedule.source == .solar {
+                solar(schedule.night ?? NightSettings())
+            } else {
+                HStack(spacing: PocketSpacing.s + 2) {
+                    PocketIconTile(symbol: "moon", tint: tint, size: 30)
+                    VStack(alignment: .leading, spacing: 1) {
+                        Text("Kapalı").font(.callout.weight(.medium))
+                        Text(schedule.enabled ? "Parlaklık elle belirlenen saatlere göre değişiyor." : "Gün batımında ekranları karartıp ısıtır.")
+                            .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+                    }
+                }
+            }
+            HStack {
+                Spacer(minLength: 0)
+                Button("Gece Modu Ayarları…") { MenuBarNavigation.openTool("brightness", model: model) }.controlSize(.small)
+            }
+        }
+        .menuBarSection()
+    }
+
+    @ViewBuilder private func solar(_ settings: NightSettings) -> some View {
+        switch night.status {
+        case .needsLocation:
+            HStack(spacing: PocketSpacing.s) {
+                Text("Gün doğumu ve batımı için konum gerekli.").font(.callout).foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                Spacer(minLength: PocketSpacing.s)
+                Button("Konumu Kullan") { night.useCurrentLocation() }.controlSize(.small)
+            }
+        case let .paused(until):
+            state(symbol: "moon.zzz", title: "Duraklatıldı",
+                  detail: until.map { String(localized: "\($0.formatted(date: .omitted, time: .shortened))’de yeniden başlar") }
+                      ?? String(localized: "Bir istisna nedeniyle duraklatıldı"),
+                  settings: settings) {
+                if until != nil { Button("Sürdür") { night.resume() }.controlSize(.small) }
+            }
+        case let .active(target) where target.night > 0:
+            state(symbol: "moon.fill", title: target.night >= 1 ? "Açık" : "Geçişte",
+                  detail: String(localized: "Gece \(MenuBarFormatter.percent(target.night * 100, decimals: false)) · \(Int(target.kelvin)) K · parlaklık ×\(MenuBarFormatter.number(target.level, fractionDigits: 2))"),
+                  settings: settings) {
+                Button("1 Saat Duraklat") { night.pauseForAnHour() }.controlSize(.small)
+            }
+        default:
+            state(symbol: "sun.max", title: "Gündüz", detail: String(localized: "Gün batımında kendiliğinden başlar"), settings: settings) { EmptyView() }
+        }
+    }
+
+    private func state<Action: View>(symbol: String, title: LocalizedStringKey, detail: String, settings: NightSettings,
+                                     @ViewBuilder action: () -> Action) -> some View {
+        VStack(alignment: .leading, spacing: PocketSpacing.xs + 2) {
+            HStack(spacing: PocketSpacing.s + 2) {
+                PocketIconTile(symbol: symbol, tint: tint, size: 30)
+                VStack(alignment: .leading, spacing: 1) {
+                    Text(title).font(.callout.weight(.medium))
+                    Text(detail).font(.caption).foregroundStyle(.secondary).monospacedDigit().fixedSize(horizontal: false, vertical: true)
+                }
+                Spacer(minLength: PocketSpacing.s)
+                action()
+            }
+            .accessibilityElement(children: .combine)
+            if let coordinate = settings.location, case let .normal(sunrise, sunset) = SolarCalculator.day(containing: Date(), at: coordinate, timeZone: .current) {
+                HStack(spacing: PocketSpacing.m) {
+                    Label(sunrise.formatted(date: .omitted, time: .shortened), systemImage: "sunrise").help("Gün doğumu")
+                    Label(sunset.formatted(date: .omitted, time: .shortened), systemImage: "sunset").help("Gün batımı")
+                    if let name = settings.locationName { Text(verbatim: name).lineLimit(1).foregroundStyle(.tertiary) }
+                }
+                .font(.caption).foregroundStyle(.secondary).monospacedDigit()
             }
         }
     }

@@ -4780,3 +4780,34 @@
 "Uyanık tut: kapalı" = "Keep awake: off";
 "Yalnız sistem" = "System only";
 "⌘Q koruması" = "⌘Q protection";
+
+/* Menu bar: brightness and night mode module */
+" (%lld ekran)" = " (%lld displays)";
+"%@’de yeniden başlar" = "Resumes at %@";
+"%lld ekran" = "%lld displays";
+", gece modu açık" = ", night mode on";
+", gece modu duraklatıldı" = ", night mode paused";
+"1 Saat Duraklat" = "Pause for 1 Hour";
+"Bir istisna nedeniyle duraklatıldı" = "Paused by an exception";
+"Donanım" = "Hardware";
+"Ekran Ayarları modülü kapalı" = "Display Settings module is off";
+"Ekran Ayarları modülü kapalı. Ayarlar › Modüller’den açabilirsin." = "The Display Settings module is off. You can turn it on in Settings › Modules.";
+"Ekran parlaklığı: %@" = "Display brightness: %@";
+"Elle ayarlandı; %@’de zamanlamaya döner." = "Set by hand; returns to the schedule at %@.";
+"Gece %@ · %lld K · parlaklık ×%@" = "Night %1$@ · %2$lld K · brightness ×%3$@";
+"Gece Modu Ayarları…" = "Night Mode Settings…";
+"Gece modu" = "Night mode";
+"Görüntü yazılımla karartılır; monitörün arka ışığı değişmez." = "The image is dimmed in software; the monitor's backlight does not change.";
+"Gün batımında ekranları karartıp ısıtır." = "Dims and warms the displays at sunset.";
+"Gün batımında kendiliğinden başlar" = "Starts on its own at sunset";
+"Gün doğumu ve batımı için konum gerekli." = "A location is needed for sunrise and sunset.";
+"Konumu Kullan" = "Use Location";
+"MenuBar.shortLabel.display" = "DISPLAY";
+"Monitörün kendi parlaklığı DDC/CI ile değiştirilir." = "The monitor's own brightness is changed over DDC/CI.";
+"Parlaklık (%)" = "Brightness (%)";
+"Parlaklık elle belirlenen saatlere göre değişiyor." = "Brightness follows the times set by hand.";
+"Parlaklık ve gece modu" = "Brightness and night mode";
+"Parlaklığı yönetilebilen harici ekran yok." = "No external display whose brightness can be managed.";
+"Parlaklığı yönetilen harici ekran yok" = "No managed external display";
+"Sistem modülleri tek simgede toplanır; hava durumu, AI kotaları, uyanık tut, odak, Bluetooth pilleri ve parlaklık etkinse ayrı gösterilir. Tıklayınca modülün ayrıntıları açılır." = "System modules share one icon; weather, AI quotas, keep awake, focus, Bluetooth batteries and brightness appear separately when enabled. Click to open a module's details.";
+"Sürdür" = "Resume";

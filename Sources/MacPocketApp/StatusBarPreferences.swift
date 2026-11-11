@@ -18,6 +18,7 @@ extension MenuBarModule {
         case .awake: Color(hex: 0xA2845E)
         case .focus: PocketTheme.brand
         case .bluetooth: .blue
+        case .display: .yellow
         }
     }
 
@@ -132,7 +133,7 @@ struct StatusBarPreferencesView: View {
                         .frame(maxWidth: 220)
                 }
                 Text(store.preferences.layout == .grouped
-                     ? "Sistem modülleri tek simgede toplanır; hava durumu, AI kotaları, uyanık tut, odak ve Bluetooth pilleri etkinse ayrı gösterilir. Tıklayınca modülün ayrıntıları açılır."
+                     ? "Sistem modülleri tek simgede toplanır; hava durumu, AI kotaları, uyanık tut, odak, Bluetooth pilleri ve parlaklık etkinse ayrı gösterilir. Tıklayınca modülün ayrıntıları açılır."
                      : "Her etkin modül kendi menü çubuğu öğesini ve kendi ayarlarını kullanır. Gerçek menü çubuğunda öğeler ⌘ basılıyken de sürüklenebilir.")
                     .font(.subheadline).foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)

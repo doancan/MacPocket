@@ -34,6 +34,8 @@ final class PocketStatusItemController: NSObject {
     private var subscriptions = Set<AnyCancellable>()
     /// Advances keep-awake and focus countdowns while monitoring is paused (samples drive `refresh` otherwise).
     private var clock: Timer?
+    /// Brightness and night mode are observed only once their module is in the menu bar.
+    private var observesDisplays = false
 
     init(model: PocketModel) {
         self.model = model
@@ -190,6 +192,18 @@ final class PocketStatusItemController: NSObject {
             }
         }
         updateClock(keys)
+        if keys.contains(MenuBarModule.display.rawValue) { observeDisplays() }
+    }
+
+    private func observeDisplays() {
+        guard !observesDisplays, PocketModule.displays.isAvailable() else { return }
+        observesDisplays = true
+        DisplayBrightnessService.shared.$displays.dropFirst().removeDuplicates().receive(on: RunLoop.main).sink { [weak self] _ in
+            MainActor.assumeIsolated { self?.refresh() }
+        }.store(in: &subscriptions)
+        NightModeService.shared.$status.dropFirst().removeDuplicates().receive(on: RunLoop.main).sink { [weak self] _ in
+            MainActor.assumeIsolated { self?.refresh() }
+        }.store(in: &subscriptions)
     }
 
     private func updateClock(_ keys: [String]) {
@@ -286,14 +300,6 @@ final class PocketStatusItemController: NSObject {
         menu.addItem(withTitle: String(localized: "Ayarlar"), action: #selector(openSettings), keyEquivalent: ",").target = self
         menu.addItem(withTitle: String(localized: "Komut Çubuğu’nu Aç"), action: #selector(openCommandBar), keyEquivalent: "").target = self
         menu.addItem(withTitle: String(localized: "Dosya Rafı’nı Aç"), action: #selector(openShelf), keyEquivalent: "").target = self
-        if PocketModule.displays.isAvailable(), DisplayBrightnessService.shared.schedule.enabled, DisplayBrightnessService.shared.schedule.source == .solar {
-            menu.addItem(.separator())
-            if case .paused(until: .some) = NightModeService.shared.status {
-                menu.addItem(withTitle: String(localized: "Gece modunu yeniden aç"), action: #selector(resumeNightMode), keyEquivalent: "").target = self
-            } else {
-                menu.addItem(withTitle: String(localized: "Gece modunu 1 saat kapat"), action: #selector(pauseNightMode), keyEquivalent: "").target = self
-            }
-        }
         menu.addItem(.separator())
         menu.addItem(withTitle: String(localized: "MacPocket’ten çık"), action: #selector(quit), keyEquivalent: "q").target = self
         // A menu assigned only for this click keeps the left click opening the popover.
@@ -322,10 +328,6 @@ final class PocketStatusItemController: NSObject {
         model.openSettingsWindow?()
     }
 
-    @objc private func pauseNightMode() { NightModeService.shared.pauseForAnHour() }
-
-    @objc private func resumeNightMode() { NightModeService.shared.resume() }
-
     @objc private func quit() { NSApp.terminate(nil) }
 
 }
@@ -345,6 +347,19 @@ final class PocketStatusItemController: NSObject {
                                       accessibility: String(localized: "Bluetooth Pilleri modülü kapalı"), symbol: "dot.radiowaves.left.and.right")
             }
             return MenuBarFormatter.bluetoothReading(BluetoothBatteryService.shared.devices, decimals: settings.decimals)
+        case .display:
+            guard PocketModule.displays.isAvailable() else {
+                return MenuBarReading(lines: ["—"], reserve: ["—"], fraction: nil, magnitude: nil,
+                                      accessibility: String(localized: "Ekran Ayarları modülü kapalı"), symbol: "sun.max")
+            }
+            let displays = DisplayBrightnessService.shared.displays
+            let main = displays.first { $0.id == CGMainDisplayID() } ?? displays.first
+            let night: MenuBarNightState = switch NightModeService.shared.status {
+            case let .active(target): .active(night: target.night)
+            case .paused: .paused
+            case .off, .needsLocation: .off
+            }
+            return MenuBarFormatter.displayReading(level: main?.level, displays: displays.count, night: night)
         default:
             return nil
         }

@@ -6,11 +6,11 @@ final class MenuBarControlModulesTests: XCTestCase {
     private let now = Date(timeIntervalSinceReferenceDate: 10_000)
 
     func testNewModulesAreNotSystemMetricsAndStartDisabled() {
-        for module in [MenuBarModule.awake, .focus, .bluetooth, .weather, .aiUsage] {
+        for module in [MenuBarModule.awake, .focus, .bluetooth, .display, .weather, .aiUsage] {
             XCTAssertFalse(module.isSystemMetric, "\(module)")
             XCTAssertFalse(module.enabledByDefault, "\(module)")
         }
-        for module in [MenuBarModule.awake, .focus, .bluetooth] { XCTAssertEqual(module.valueOptions.count, 1, "\(module)") }
+        for module in [MenuBarModule.awake, .focus, .bluetooth, .display] { XCTAssertEqual(module.valueOptions.count, 1, "\(module)") }
         XCTAssertTrue([MenuBarModule.cpu, .gpu, .memory, .disk, .network, .power].allSatisfy(\.isSystemMetric))
         XCTAssertEqual(MenuBarModuleSettings.defaults(for: .bluetooth).colorMode, .thresholds)
         XCTAssertTrue(MenuBarValue.bluetoothLowest.lowerIsWorse)
@@ -23,7 +23,7 @@ final class MenuBarControlModulesTests: XCTestCase {
         defaults.set(MenuBarPreferences.schemaVersion, forKey: MenuBarPreferences.schemaKey)
         defaults.set("network,cpu,gpu,memory,disk,power,weather,aiUsage", forKey: MenuBarPreferences.orderKey)
         let loaded = MenuBarPreferences.load(from: defaults)
-        XCTAssertEqual(loaded.order.suffix(3), [.awake, .focus, .bluetooth])
+        XCTAssertEqual(loaded.order.suffix(4), [.awake, .focus, .bluetooth, .display])
         XCTAssertFalse(loaded.enabled.contains(.awake))
     }
 
@@ -74,6 +74,23 @@ final class MenuBarControlModulesTests: XCTestCase {
         let empty = MenuBarFormatter.bluetoothReading([])
         XCTAssertEqual(empty.lines, ["—"]); XCTAssertNil(empty.thresholdValue)
         XCTAssertEqual(MenuBarFormatter.bluetoothReading([unknown]).lines, ["—"])
+    }
+
+    func testDisplayReadingFollowsBrightnessAndNightMode() {
+        let day = MenuBarFormatter.displayReading(level: 0.72, displays: 2, night: .off)
+        XCTAssertEqual(day.lines, [MenuBarFormatter.percent(72, decimals: false)])
+        XCTAssertEqual(day.fraction ?? -1, 0.72, accuracy: 0.0001)
+        XCTAssertEqual(day.symbol, "sun.max.fill")
+        XCTAssertNil(day.thresholdValue, "brightness has no alarm level")
+        XCTAssertEqual(MenuBarFormatter.displayReading(level: 0.3, displays: 1, night: .off).symbol, "sun.min.fill")
+        XCTAssertEqual(MenuBarFormatter.displayReading(level: 0.3, displays: 1, night: .active(night: 0)).symbol, "sun.min.fill",
+                       "night mode on but still daytime: no moon")
+        XCTAssertEqual(MenuBarFormatter.displayReading(level: 0.3, displays: 1, night: .active(night: 0.4)).symbol, "moon.fill")
+        XCTAssertEqual(MenuBarFormatter.displayReading(level: 0.8, displays: 1, night: .paused).symbol, "moon.zzz")
+        XCTAssertEqual(MenuBarFormatter.displayReading(level: 1.4, displays: 1, night: .off).fraction, 1, "clamped")
+        let none = MenuBarFormatter.displayReading(level: nil, displays: 0, night: .active(night: 1))
+        XCTAssertEqual(none.lines, ["—"]); XCTAssertEqual(none.symbol, "moon.fill"); XCTAssertNil(none.fraction)
+        XCTAssertEqual(MenuBarFormatter.reading(.display, settings: .defaults(for: .display), snapshot: nil, external: day), day)
     }
 
     func testGenericReadingPassesExternalReadingsThrough() {

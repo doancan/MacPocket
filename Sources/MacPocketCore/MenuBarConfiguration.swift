@@ -4,7 +4,7 @@ import Foundation
 
 /// One monitoring module shown in the menu bar (a status item, or a tab of the grouped popover).
 public enum MenuBarModule: String, CaseIterable, Codable, Sendable, Identifiable {
-    case cpu, gpu, memory, disk, network, power, weather, aiUsage, awake, focus, bluetooth
+    case cpu, gpu, memory, disk, network, power, weather, aiUsage, awake, focus, bluetooth, display
 
     public var id: String { rawValue }
 
@@ -21,6 +21,7 @@ public enum MenuBarModule: String, CaseIterable, Codable, Sendable, Identifiable
         case .awake: String(localized: "Uyanık tut")
         case .focus: String(localized: "Odak")
         case .bluetooth: String(localized: "Bluetooth pilleri")
+        case .display: String(localized: "Parlaklık ve gece modu")
         }
     }
 
@@ -29,7 +30,7 @@ public enum MenuBarModule: String, CaseIterable, Codable, Sendable, Identifiable
     public var isSystemMetric: Bool {
         switch self {
         case .cpu, .gpu, .memory, .disk, .network, .power: true
-        case .weather, .aiUsage, .awake, .focus, .bluetooth: false
+        case .weather, .aiUsage, .awake, .focus, .bluetooth, .display: false
         }
     }
 
@@ -47,6 +48,7 @@ public enum MenuBarModule: String, CaseIterable, Codable, Sendable, Identifiable
         case .awake: String(localized: "MenuBar.shortLabel.awake", defaultValue: "UYANIK")
         case .focus: String(localized: "MenuBar.shortLabel.focus", defaultValue: "ODAK")
         case .bluetooth: "BT"
+        case .display: String(localized: "MenuBar.shortLabel.display", defaultValue: "EKRAN")
         }
     }
 
@@ -75,6 +77,7 @@ public enum MenuBarModule: String, CaseIterable, Codable, Sendable, Identifiable
         case .awake: "cup.and.saucer.fill"
         case .focus: "scope"
         case .bluetooth: "battery.75percent"
+        case .display: "sun.max.fill"
         }
     }
 
@@ -92,6 +95,7 @@ public enum MenuBarModule: String, CaseIterable, Codable, Sendable, Identifiable
         case .awake: [.awakeRemaining]
         case .focus: [.focusRemaining]
         case .bluetooth: [.bluetoothLowest]
+        case .display: [.displayBrightness]
         }
     }
 
@@ -107,7 +111,7 @@ public enum MenuBarModule: String, CaseIterable, Codable, Sendable, Identifiable
         switch self {
         case .weather, .aiUsage: return [.value, .icon]
         case .awake, .focus: return [.value, .pie, .icon]
-        case .bluetooth: return [.value, .gauge, .pie, .icon]
+        case .bluetooth, .display: return [.value, .gauge, .pie, .icon]
         default: break
         }
         return self == .cpu ? MenuBarDisplayStyle.allCases : MenuBarDisplayStyle.allCases.filter { $0 != .cores }
@@ -125,7 +129,7 @@ public enum MenuBarValue: String, Codable, Sendable, CaseIterable, Identifiable 
     case powerFanSpeed, powerFanPercent, powerThermal, powerTemperature
     case weatherTemperature, weatherApparent
     case aiQuota
-    case awakeRemaining, focusRemaining, bluetoothLowest
+    case awakeRemaining, focusRemaining, bluetoothLowest, displayBrightness
 
     public var id: String { rawValue }
 
@@ -176,6 +180,7 @@ public enum MenuBarValue: String, Codable, Sendable, CaseIterable, Identifiable 
         case .aiQuota: String(localized: "Hesap kotaları")
         case .awakeRemaining, .focusRemaining: String(localized: "Kalan süre")
         case .bluetoothLowest: String(localized: "En düşük pil (%)")
+        case .displayBrightness: String(localized: "Parlaklık (%)")
         }
     }
 }
@@ -291,7 +296,7 @@ extension MenuBarValue {
         case .networkPing: .milliseconds
         case .networkWifiSignal: .dBm
         case .diskActivity, .diskReadWrite, .networkUpDown, .networkCombined, .networkDownload, .networkUpload, .powerSource, .weatherTemperature, .weatherApparent,
-             .awakeRemaining, .focusRemaining: nil
+             .awakeRemaining, .focusRemaining, .displayBrightness: nil
         }
     }
 
@@ -388,6 +393,7 @@ public struct MenuBarModuleSettings: Codable, Equatable, Sendable {
         case .focus: Self(showLabel: false, showIcon: true, value: .focusRemaining)
         // Colored by default, like the standalone item it replaces turned red at the alert level.
         case .bluetooth: Self(showLabel: false, showIcon: true, value: .bluetoothLowest, colorMode: .thresholds)
+        case .display: Self(showLabel: false, showIcon: true, value: .displayBrightness)
         default: Self(value: module.valueOptions[0])
         }
     }
@@ -583,7 +589,7 @@ public struct MenuBarPreferences: Equatable, Sendable {
                 settings.volumePath = defaults.string(forKey: "MacPocket.bar.volume") ?? ""
             case .power:
                 settings.value = battery ? .powerBattery : .powerSource
-            case .network, .weather, .aiUsage, .awake, .focus, .bluetooth:
+            case .network, .weather, .aiUsage, .awake, .focus, .bluetooth, .display:
                 settings = .defaults(for: module)
             case .cpu, .gpu:
                 break
@@ -690,8 +696,8 @@ public enum MenuBarFormatter {
                                snapshot: SystemSnapshot?, binaryUnits: Bool = true, weather: WeatherSnapshot? = nil,
                                aiUsage: MenuBarReading? = nil, external: MenuBarReading? = nil) -> MenuBarReading {
         // Keep awake, focus and Bluetooth state live outside the snapshot; the app builds their readings
-        // with `awakeReading`, `focusReading` and `bluetoothReading`.
-        if module == .awake || module == .focus || module == .bluetooth {
+        // with `awakeReading`, `focusReading`, `bluetoothReading` and `displayReading`.
+        if module == .awake || module == .focus || module == .bluetooth || module == .display {
             return external ?? MenuBarReading(lines: [""], reserve: [""], fraction: nil, magnitude: nil, accessibility: module.title)
         }
         if module == .aiUsage {
@@ -740,7 +746,7 @@ public enum MenuBarFormatter {
                                   accessibility: String(localized: "Ağ: internet bağlantısı yok"))
         }
         switch settings.value {
-        case .weatherTemperature, .weatherApparent, .aiQuota, .awakeRemaining, .focusRemaining, .bluetoothLowest: return pending()
+        case .weatherTemperature, .weatherApparent, .aiQuota, .awakeRemaining, .focusRemaining, .bluetoothLowest, .displayBrightness: return pending()
         case .gpuUtilization, .gpuRenderer:
             guard let gpu = s.gpu else { return pending() }
             let value = settings.value == .gpuRenderer ? (gpu.rendererPercent ?? gpu.utilizationPercent) : gpu.utilizationPercent
@@ -980,6 +986,41 @@ extension MenuBarFormatter {
         return MenuBarReading(lines: [text], reserve: [reserve], fraction: Double(level) / 100, magnitude: Double(level),
                               accessibility: String(localized: "En düşük Bluetooth pili: \(device.name) \(text)") + others,
                               thresholdValue: Double(level), symbol: device.kind.symbol)
+    }
+}
+
+/// Night mode as the menu bar shows it.
+public enum MenuBarNightState: Equatable, Sendable {
+    case off
+    /// 0…1: how far into the night the curve is (0 during the day).
+    case active(night: Double)
+    case paused
+}
+
+extension MenuBarFormatter {
+    /// The brightness of the main managed display; the symbol turns into a moon while night mode dims or warms.
+    public static func displayReading(level: Double?, displays: Int, night: MenuBarNightState) -> MenuBarReading {
+        let nightActive: Bool = if case let .active(amount) = night { amount > 0 } else { false }
+        let nightSpoken: String = switch night {
+        case .paused: String(localized: ", gece modu duraklatıldı")
+        case .active where nightActive: String(localized: ", gece modu açık")
+        default: ""
+        }
+        func symbol(_ level: Double) -> String {
+            if nightActive { return "moon.fill" }
+            if night == .paused { return "moon.zzz" }
+            return level < 0.5 ? "sun.min.fill" : "sun.max.fill"
+        }
+        guard let level else {
+            return MenuBarReading(lines: ["—"], reserve: [percent(100, decimals: false)], fraction: nil, magnitude: nil,
+                                  accessibility: String(localized: "Parlaklığı yönetilen harici ekran yok") + nightSpoken,
+                                  symbol: nightActive ? "moon.fill" : "sun.max")
+        }
+        let clamped = min(1, max(0, level))
+        let text = percent(clamped * 100, decimals: false)
+        let others = displays > 1 ? String(localized: " (\(displays) ekran)") : ""
+        return MenuBarReading(lines: [text], reserve: [percent(100, decimals: false)], fraction: clamped, magnitude: clamped * 100,
+                              accessibility: String(localized: "Ekran parlaklığı: \(text)") + others + nightSpoken, symbol: symbol(clamped))
     }
 }
 
