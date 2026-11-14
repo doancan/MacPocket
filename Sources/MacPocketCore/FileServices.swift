@@ -235,15 +235,24 @@ public struct FileTrashRequest: Sendable {
 public struct FileTrashResult: Identifiable, Sendable {
     public var id: String { source.path }
     public let source: URL
+    /// Where the item went in the Trash; nil when it was deleted permanently or the removal failed.
     public let trashURL: URL?
     public let error: String?
-    public init(source: URL, trashURL: URL?, error: String?) {
-        self.source = source; self.trashURL = trashURL; self.error = error
+    public let mode: RemovalMode
+    /// The removal failed only for lack of permission; an administrator retry would be allowed to delete it.
+    public let permissionDenied: Bool
+    public var succeeded: Bool { error == nil }
+    public init(source: URL, trashURL: URL?, error: String?, mode: RemovalMode = .moveToTrash, permissionDenied: Bool = false) {
+        self.source = source; self.trashURL = trashURL; self.error = error; self.mode = mode; self.permissionDenied = permissionDenied
     }
 }
 
+/// Removes validated items, either recoverably (Trash) or for good.
 public actor FileTrashService {
     private let move: @Sendable (URL) throws -> URL
+    private let delete: @Sendable (URL) throws -> Void
+    private let administrator: AdministratorRemover
+
     public init() {
         move = { url in
             var destination: NSURL?
@@ -251,19 +260,75 @@ public actor FileTrashService {
             guard let destination else { throw FileServiceError.unreadable }
             return destination as URL
         }
+        delete = { try FileManager.default.removeItem(at: $0) }
+        administrator = AdministratorRemover()
     }
-    init(move: @escaping @Sendable (URL) throws -> URL) { self.move = move }
+    init(move: @escaping @Sendable (URL) throws -> URL,
+         delete: @escaping @Sendable (URL) throws -> Void = { try FileManager.default.removeItem(at: $0) },
+         administrator: AdministratorRemover = AdministratorRemover()) {
+        self.move = move; self.delete = delete; self.administrator = administrator
+    }
 
     /// Each item is revalidated immediately before the recoverable Trash operation.
     public func trash(_ requests: [FileTrashRequest]) async -> [FileTrashResult] {
+        await remove(requests, mode: .moveToTrash)
+    }
+
+    /// Each item is revalidated immediately before it is removed. With `administratorPrompt`, items that fail
+    /// only for lack of permission are retried together as root after one password prompt. Only permanent
+    /// deletion is ever retried that way: the Trash stays recoverable or fails.
+    public func remove(_ requests: [FileTrashRequest], mode: RemovalMode,
+                       administratorPrompt: String? = nil, launchdLabels: [String] = []) async -> [FileTrashResult] {
         var results: [FileTrashResult] = []
+        var needsAdministrator: [FileTrashRequest] = []
         for request in requests {
             if Task.isCancelled { break }
             do {
                 try request.validate()
-                results.append(.init(source: request.url, trashURL: try move(request.url), error: nil))
-            } catch { results.append(.init(source: request.url, trashURL: nil, error: error.localizedDescription)) }
+                switch mode {
+                case .moveToTrash:
+                    results.append(.init(source: request.url, trashURL: try move(request.url), error: nil, mode: mode))
+                case .deletePermanently:
+                    try delete(request.url)
+                    results.append(.init(source: request.url, trashURL: nil, error: nil, mode: mode))
+                }
+            } catch {
+                let denied = FileRemovalClassifier.isPermissionFailure(error)
+                if administratorPrompt != nil, mode == .deletePermanently, denied {
+                    needsAdministrator.append(request)
+                } else {
+                    results.append(.init(source: request.url, trashURL: nil, error: error.localizedDescription, mode: mode,
+                                         permissionDenied: denied))
+                }
+            }
             await Task.yield()
+        }
+        if let administratorPrompt, !needsAdministrator.isEmpty {
+            results += await removeAsAdministrator(needsAdministrator, prompt: administratorPrompt, launchdLabels: launchdLabels)
+        }
+        return results
+    }
+
+    private func removeAsAdministrator(_ requests: [FileTrashRequest], prompt: String, launchdLabels: [String]) async -> [FileTrashResult] {
+        // Identity may have changed while the first pass ran; only still-valid items reach the root shell.
+        var valid: [FileTrashRequest] = []
+        var results: [FileTrashResult] = []
+        for request in requests {
+            do { try request.validate(); valid.append(request) }
+            catch { results.append(.init(source: request.url, trashURL: nil, error: error.localizedDescription, mode: .deletePermanently)) }
+        }
+        guard !valid.isEmpty else { return results }
+        do {
+            let outcome = try await administrator.remove(valid.map(\.url), launchdLabels: launchdLabels, prompt: prompt)
+            let remaining = Set(outcome.remaining.map(\.path))
+            let reason = outcome.diagnostic.flatMap { $0.isEmpty ? nil : $0 } ?? FileRemovalError.stillExists.localizedDescription
+            results += valid.map { request in
+                remaining.contains(request.url.path)
+                    ? .init(source: request.url, trashURL: nil, error: FileRemovalError.administratorFailed(reason).localizedDescription, mode: .deletePermanently)
+                    : .init(source: request.url, trashURL: nil, error: nil, mode: .deletePermanently)
+            }
+        } catch {
+            results += valid.map { .init(source: $0.url, trashURL: nil, error: error.localizedDescription, mode: .deletePermanently) }
         }
         return results
     }

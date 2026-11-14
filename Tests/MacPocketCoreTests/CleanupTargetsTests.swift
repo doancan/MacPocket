@@ -164,6 +164,28 @@ final class CleanupTargetsTests: StorageFixtureCase {
         }
     }
 
+    func testPermanentCleanupFreesTheItemsAndRefusesTheSameInvalidOnes() async throws {
+        let home = try fakeHome()
+        let report = try await scan(home)
+        let targets = report.targets.map(\.target)
+        let viewer = try XCTUnwrap(try target(report, .userCaches).items.first { $0.name == "com.example.Viewer" })
+        let derived = try XCTUnwrap(try target(report, .derivedData).items.first)
+        let trashItem = try XCTUnwrap(try target(report, .trash).items.first)
+        let service = CleanupService(move: { _ in XCTFail("permanent cleanup must not use the Trash"); throw FileServiceError.unreadable })
+        let results = await service.remove([viewer, derived, trashItem], targets: targets, mode: .deletePermanently)
+        XCTAssertEqual(results.map(\.succeeded), [true, true, false])
+        XCTAssertEqual(results.prefix(2).map(\.mode), [.deletePermanently, .deletePermanently])
+        XCTAssertNil(results[0].trashURL)
+        XCTAssertFalse(FileManager.default.fileExists(atPath: viewer.url.path))
+        XCTAssertFalse(FileManager.default.fileExists(atPath: derived.url.path))
+        XCTAssertTrue(FileManager.default.fileExists(atPath: trashItem.url.path), "Trash items are only removed by emptying the Trash")
+        XCTAssertEqual(results[2].error, CleanupError.trashItem.errorDescription)
+        // A second scan proves the bytes are really gone, not merely hidden.
+        let after = try await scan(home)
+        XCTAssertNil(try target(after, .userCaches).items.first { $0.name == "com.example.Viewer" })
+        XCTAssertTrue(try target(after, .derivedData).items.isEmpty)
+    }
+
     func testValidItemsMoveAndInvalidAreRefused() async throws {
         let home = try fakeHome()
         let report = try await scan(home)
