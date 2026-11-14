@@ -1,5 +1,13 @@
 # Uygulama kaldırma — kapsam ve doğrulama
 
+## Tamamen Kaldır
+
+Uygulamalar'daki **Tamamen Kaldır…** düğmesi hiçbir şey seçtirmeden uygulamayı ve bulunan her ilişkili öğeyi (kullanıcı verileri dahil) kalıcı siler. Tek onay istenir; onaydan sonra uygulama normal çıkış isteğiyle kapatılır, plan yeniden taranır (kapanırken yazılan dosyalar kaçmaz) ve sırayla kullanıcı öğeleri, /Library öğeleri ve en son uygulama paketi silinir. İlk hatada kalan öğelere dokunulmaz. /Library öğeleri ve root sahipli dosyalar için tek bir sistem parolası istenir; launchd işleri silinmeden önce durdurulur. Plan penceresinde ayrıca ayrıntılı seçim ve "Silme biçimi" (kalıcı / Çöp) kalır.
+
+Eşleşme kuralları: tam bundle kimliği ve `kimlik.` ile başlayan aileler (Caches, Logs, Preferences, ByHost, Containers, Group Containers, Application Scripts, Cookies, HTTPStorages, WebKit, LaunchAgents; /Library altında LaunchDaemons, PrivilegedHelperTools, Application Support, Preferences, Caches) ve uygulama adıyla birebir aynı adlı Application Support/Caches/Logs klasörleri (en az 4 karakter). Yalnız üretici öneki (`com.vendor`) paylaşan klasörler çıkarılmaz.
+
+## Plan
+
 Kaldırma planı uygulama paketini, önbellek/günlükleri ve kullanıcı verilerini ayrı gösterir. Başlangıçta yalnız uygulama paketi seçilir. Tercihler, uygulama verileri ve kapsayıcılar açıkça seçilmelidir. Grup seçimi yalnız kendi grubunu etkiler; Finder düğmesi dosyayı açığa çıkarır.
 
 ## Kapatma ve kaldırma
@@ -13,7 +21,7 @@ Kaldırma servisi arayüzden bağımsız olarak da çalışan süreçleri kontro
 ## Sınırlar
 
 - Süreç sahipliği seçilen uygulama paketinin gerçek dosya yolu ile doğrulanır. Benzer ad, bundle-ID öneki veya üst süreç ilişkisi tek başına yeterli değildir. Aynı bundle-ID ile başka konumda çalışan kopya kapatılmaz.
-- Paket dışındaki yardımcılar, paylaşılan servisler, LaunchAgent/Daemon ve App Group klasörleri otomatik durdurulmaz veya kaldırılmaz. Homebrew seçiliyse paketin kendi kaldırma yönergelerini çalıştırır; bu yönergeler ayrıca servis durdurabilir ve uygulamayı Çöp’e taşımayabilir.
+- Uygulamanın bundle kimliğiyle adlandırılmış LaunchAgent/Daemon, ayrıcalıklı yardımcı ve App Group klasörleri plana girer; başka kimlikli paylaşılan servisler ve üretici ortak klasörleri girmez. Homebrew seçiliyse paketin kendi kaldırma yönergelerini çalıştırır; bu yönergeler ayrıca servis durdurabilir ve uygulamayı Çöp’e taşımayabilir.
 - Süreç/PID ve dosya kimliği kontrolleri aradaki yarış penceresini daraltır; macOS süreç başlatma ve dosya taşıma işlemlerini tek atomik işlem olarak sunmaz. Tam kapsamlı yardımcı temizliği iddia edilmez.
 - Kaldırma sonrası yeniden denemede uygulama paketi değişmiş veya kaybolmuşsa güncel envanterden yeni plan açılmalıdır. Kısmi dosya taşımaları otomatik geri alınmaz.
 

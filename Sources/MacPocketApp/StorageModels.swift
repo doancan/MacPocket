@@ -211,7 +211,7 @@ final class SpaceLensModel: ObservableObject {
         if selection.contains(node.id) { selection.remove(node.id) } else { selection.insert(node.id) }
     }
 
-    func trashSelection() {
+    func trashSelection(mode: RemovalMode = RemovalModePreference.load()) {
         guard !busy, let tree else { return }
         let root = tree.url
         let requests = selectedNodes.compactMap { node in
@@ -221,14 +221,16 @@ final class SpaceLensModel: ObservableObject {
         working = true; failure = nil; resultMessage = nil
         task = Task { [weak self] in
             guard let self else { return }
-            let results = await trashService.trash(requests)
-            let moved = Set(results.filter { $0.trashURL != nil }.map(\.id))
+            let results = await trashService.remove(requests, mode: mode)
+            let moved = Set(results.filter(\.succeeded).map(\.id))
             let freed = selectedNodes.filter { moved.contains($0.path) }.reduce(Int64(0)) { $0 + $1.allocatedBytes }
             if !moved.isEmpty, let current = self.tree { self.tree = current.removing(moved) }
             selection = []
             let errors = results.compactMap(\.error)
             resultMessage = moved.isEmpty ? nil
-                : String(localized: "\(moved.count) öğe Çöp’e taşındı (\(pocketDiskBytes(freed))). Finder’daki Çöp’ten geri alabilirsin; alan Çöp boşaltılınca açılır.")
+                : mode == .deletePermanently
+                    ? String(localized: "\(moved.count) öğe kalıcı olarak silindi (\(pocketDiskBytes(freed))). Alan hemen açıldı; işlem geri alınamaz.")
+                    : String(localized: "\(moved.count) öğe Çöp’e taşındı (\(pocketDiskBytes(freed))). Finder’daki Çöp’ten geri alabilirsin; alan Çöp boşaltılınca açılır.")
             failure = errors.isEmpty ? nil : errors.prefix(3).joined(separator: "\n")
             working = false
         }
@@ -238,7 +240,7 @@ final class SpaceLensModel: ObservableObject {
 // MARK: - Cleanup
 
 struct CleanupSummary: Equatable {
-    enum Kind { case movedToTrash, emptiedTrash }
+    enum Kind { case movedToTrash, deleted, emptiedTrash }
     let kind: Kind
     let itemCount: Int
     let bytes: Int64
@@ -403,8 +405,8 @@ final class CleanupModel {
 
     // MARK: Actions
 
-    /// Moves the selected items to the Trash; every item is revalidated right before it moves.
-    func clean() {
+    /// Removes the selected items, permanently or through the Trash; every item is revalidated right before it goes.
+    func clean(mode: RemovalMode = RemovalModePreference.load()) {
         guard !busy else { return }
         let items = selectedItems
         guard !items.isEmpty else { return }
@@ -414,12 +416,12 @@ final class CleanupModel {
         task = Task { [weak self] in
             guard let self else { return }
             let before = try? VolumeCapacity.read()
-            let results = await service.moveToTrash(items, targets: targets, protectedPaths: protection.paths)
+            let results = await service.remove(items, targets: targets, mode: mode, protectedPaths: protection.paths)
             let after = try? VolumeCapacity.read()
-            let moved = Set(results.filter { $0.trashURL != nil }.map(\.id))
+            let moved = Set(results.filter(\.succeeded).map(\.id))
             let bytes = items.filter { moved.contains($0.id) }.reduce(Int64(0)) { $0 + $1.bytes }
             removeItems(moved)
-            summary = CleanupSummary(kind: .movedToTrash, itemCount: moved.count, bytes: bytes,
+            summary = CleanupSummary(kind: mode == .deletePermanently ? .deleted : .movedToTrash, itemCount: moved.count, bytes: bytes,
                                      availableDelta: delta(before, after), failures: failureLines(results), date: Date())
             working = false
             PocketOperationState.shared.preventTermination = false

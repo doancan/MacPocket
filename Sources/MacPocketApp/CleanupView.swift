@@ -33,6 +33,7 @@ struct CleanupView: View {
     var model: CleanupModel
     @Environment(\.pocketTint) private var tint
     @State private var confirmClean = false
+    @AppStorage(RemovalModePreference.storageKey) private var removalMode: RemovalMode = .deletePermanently
     @State private var confirmEmptyTrash = false
     @State private var celebration = 0
     @PocketReduceMotion private var reduceMotion
@@ -40,7 +41,7 @@ struct CleanupView: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: PocketSpacing.l) {
-                PocketPageHeading(title: "Temizlik", subtitle: "Önbellekleri, günlükleri ve geliştirici artıklarını bul; seçtiklerini Çöp’e taşı.",
+                PocketPageHeading(title: "Temizlik", subtitle: "Önbellekleri, günlükleri ve geliştirici artıklarını bul; seçtiklerini kalıcı olarak sil.",
                                   icon: "sparkles") {
                     if model.report != nil, !model.busy {
                         HStack(spacing: PocketSpacing.s) {
@@ -52,6 +53,7 @@ struct CleanupView: View {
                 }
                 hero
                 if let failure = model.failure { PocketMessage(failure, tone: .critical) }
+                FullDiskAccessBanner(consequence: "Mail ekleri ve uygulama kapsayıcıları gibi korunan klasörler taranamaz ve silinemez.")
                 if let summary = model.summary { summaryCard(summary) }
                 if let report = model.report, !model.scanning {
                     results(report)
@@ -62,9 +64,9 @@ struct CleanupView: View {
             .padding(PocketSpacing.page)
             .frame(maxWidth: .infinity, alignment: .topLeading)
         }
-        .alert("Seçilen öğeler Çöp’e taşınsın mı?", isPresented: $confirmClean) {
+        .alert(removalMode == .deletePermanently ? "Seçilen öğeler kalıcı olarak silinsin mi?" : "Seçilen öğeler Çöp’e taşınsın mı?", isPresented: $confirmClean) {
             Button("Vazgeç", role: .cancel) {}
-            Button("Çöp’e Taşı", role: .destructive) { model.clean() }
+            Button(removalMode == .deletePermanently ? "Kalıcı Olarak Sil" : "Çöp’e Taşı", role: .destructive) { model.clean(mode: removalMode) }
         } message: {
             Text(cleanConfirmationText)
         }
@@ -77,7 +79,9 @@ struct CleanupView: View {
     }
 
     private var cleanConfirmationText: String {
-        var text = String(localized: "\(model.selectedItems.count) öğe · \(pocketDiskBytes(model.selectedBytes)). Öğeler Çöp’e taşınır; Finder’daki Çöp’ten geri alabilirsin. Alan, Çöp boşaltılınca açılır.")
+        var text = removalMode == .deletePermanently
+            ? String(localized: "\(model.selectedItems.count) öğe · \(pocketDiskBytes(model.selectedBytes)). Öğeler kalıcı olarak silinir; geri alınamaz. Alan hemen açılır.")
+            : String(localized: "\(model.selectedItems.count) öğe · \(pocketDiskBytes(model.selectedBytes)). Öğeler Çöp’e taşınır; Finder’daki Çöp’ten geri alabilirsin. Alan, Çöp boşaltılınca açılır.")
         if model.selectedWarnings > 0 {
             text += "\n\n" + String(localized: "\(model.selectedWarnings) öğenin uygulaması açık veya incelenmesi gerekiyor.")
         }
@@ -138,7 +142,8 @@ struct CleanupView: View {
                         .controlSize(.large)
                         .keyboardShortcut(.defaultAction)
                         .disabled(model.selectedItems.isEmpty)
-                        .help("Seçili öğeleri Çöp’e taşı")
+                        .help(removalMode == .deletePermanently ? "Seçili öğeleri kalıcı olarak sil" : "Seçili öğeleri Çöp’e taşı")
+                        RemovalModePicker().disabled(model.busy)
                         if report.limitReached {
                             PocketStatusBadge(text: "Kısmi tarama", systemImage: PocketTone.warning.symbol, tone: .warning)
                                 .help("Süre veya öğe sınırına ulaşıldı; bazı boyutlar eksik olabilir.")
@@ -190,6 +195,9 @@ struct CleanupView: View {
                         Text("\(summary.itemCount) öğe Çöp’e taşındı · \(pocketDiskBytes(summary.bytes))").font(.headline)
                         Text("Geri alınabilir: Finder’daki Çöp’ten geri koyabilirsin. Disk alanı Çöp boşaltılınca açılır.")
                             .font(.callout).foregroundStyle(.secondary)
+                    case .deleted:
+                        Text("\(summary.itemCount) öğe kalıcı olarak silindi · \(pocketDiskBytes(summary.bytes))").font(.headline)
+                        Text("Bu öğeler geri alınamaz. Disk alanı hemen açıldı.").font(.callout).foregroundStyle(.secondary)
                     case .emptiedTrash:
                         Text("Çöp boşaltıldı: \(summary.itemCount) öğe · \(pocketDiskBytes(summary.bytes))").font(.headline)
                         Text("Bu öğeler kalıcı olarak silindi ve geri alınamaz.").font(.callout).foregroundStyle(.secondary)
@@ -209,7 +217,7 @@ struct CleanupView: View {
             }
             if !summary.failures.isEmpty {
                 VStack(alignment: .leading, spacing: PocketSpacing.xxs) {
-                    Text("Taşınamayanlar").font(.callout.weight(.semibold))
+                    Text("Kaldırılamayanlar").font(.callout.weight(.semibold))
                     ForEach(summary.failures, id: \.self) { Text($0).font(.subheadline).foregroundStyle(.secondary).textSelection(.enabled) }
                 }
             }

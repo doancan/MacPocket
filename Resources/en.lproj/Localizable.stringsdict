@@ -941,5 +941,37 @@
 			<string>%lld pixels</string>
 		</dict>
 	</dict>
+	<key>%lld öğe kalıcı olarak silindi.</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key>
+		<string>%#@count@</string>
+		<key>count</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key>
+			<string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key>
+			<string>lld</string>
+			<key>one</key>
+			<string>%lld item permanently deleted.</string>
+			<key>other</key>
+			<string>%lld items permanently deleted.</string>
+		</dict>
+	</dict>
+	<key>%lld öğe kalıcı olarak siliniyor…</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key>
+		<string>%#@count@</string>
+		<key>count</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key>
+			<string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key>
+			<string>lld</string>
+			<key>one</key>
+			<string>Permanently deleting %lld item…</string>
+			<key>other</key>
+			<string>Permanently deleting %lld items…</string>
+		</dict>
+	</dict>
 </dict>
 </plist>

@@ -433,26 +433,33 @@ public enum CleanupRemovalPolicy {
     }
 }
 
-/// Moves validated cleanup items to the Trash (recoverable).
+/// Removes validated cleanup items, permanently or through the Trash.
 public actor CleanupService {
     private let trash: FileTrashService
     public init() { trash = FileTrashService() }
-    init(move: @escaping @Sendable (URL) throws -> URL) { trash = FileTrashService(move: move) }
+    init(move: @escaping @Sendable (URL) throws -> URL, delete: @escaping @Sendable (URL) throws -> Void = { try FileManager.default.removeItem(at: $0) }) {
+        trash = FileTrashService(move: move, delete: delete)
+    }
 
-    public func moveToTrash(_ items: [CleanupItem], targets: [CleanupTarget], protectedPaths: Set<String> = []) async -> [FileTrashResult] {
+    public func remove(_ items: [CleanupItem], targets: [CleanupTarget], mode: RemovalMode,
+                       protectedPaths: Set<String> = []) async -> [FileTrashResult] {
         var results: [FileTrashResult] = []
         for item in items {
             if Task.isCancelled { break }
             do {
                 try CleanupRemovalPolicy.validate(item, targets: targets, protectedPaths: protectedPaths)
             } catch {
-                results.append(.init(source: item.url, trashURL: nil, error: error.localizedDescription))
+                results.append(.init(source: item.url, trashURL: nil, error: error.localizedDescription, mode: mode))
                 continue
             }
-            // FileTrashService revalidates immediately before moving.
-            results += await trash.trash([FileTrashRequest(url: item.url, identity: item.identity, root: item.root)])
+            // FileTrashService revalidates immediately before removing.
+            results += await trash.remove([FileTrashRequest(url: item.url, identity: item.identity, root: item.root)], mode: mode)
         }
         return results
+    }
+
+    public func moveToTrash(_ items: [CleanupItem], targets: [CleanupTarget], protectedPaths: Set<String> = []) async -> [FileTrashResult] {
+        await remove(items, targets: targets, mode: .moveToTrash, protectedPaths: protectedPaths)
     }
 }
 

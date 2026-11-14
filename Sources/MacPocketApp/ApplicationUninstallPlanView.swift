@@ -16,18 +16,22 @@ struct UninstallPlanView: View {
     @State private var operationError: String?
     @State private var work: Task<Void, Never>?
     @State private var processesExpanded = false
+    @State private var removingEverything = false
+    @AppStorage(RemovalModePreference.storageKey) private var removalMode: RemovalMode = .deletePermanently
+    private let startsComplete: Bool
 
     private var working: Bool { pending || model.busy || model.updatingToken != nil }
     private var includesApplication: Bool { selected.contains(plan.application.id) }
-    private var removesHomebrewApplication: Bool { model.cask(for: plan.application) != nil && includesApplication }
+    private var removesHomebrewApplication: Bool { model.cask(for: plan.application) != nil && (includesApplication || removingEverything) }
     private var userDataSelected: Bool { plan.candidates.contains { $0.containsUserData && selected.contains($0.id) } }
     private var error: String? { preparation.failure ?? operationError }
     private var temporaryItems: [UninstallCandidate] { plan.candidates.filter { !$0.request.applicationBundle && !$0.containsUserData } }
     private var userDataItems: [UninstallCandidate] { plan.candidates.filter(\.containsUserData) }
 
-    init(plan: UninstallPlan, model: ApplicationWorkspaceModel, preparation: UninstallPreparationModel? = nil) {
-        self.plan = plan; self.model = model
-        _selected = State(initialValue: [plan.application.id])
+    init(plan: UninstallPlan, model: ApplicationWorkspaceModel, removeEverything: Bool = false,
+         preparation: UninstallPreparationModel? = nil) {
+        self.plan = plan; self.model = model; startsComplete = removeEverything
+        _selected = State(initialValue: removeEverything ? plan.completeSelection : [plan.application.id])
         _preparation = StateObject(wrappedValue: preparation ?? model.uninstallPreparation(for: plan.application))
     }
 
@@ -39,6 +43,7 @@ struct UninstallPlanView: View {
                 ScrollView {
                     VStack(alignment: .leading, spacing: PocketSpacing.xl) {
                         processStatus.id("uninstall-status")
+                        FullDiskAccessBanner(consequence: "Uygulama kapsayıcıları ve korunan klasörlerdeki veriler bulunamayabilir ve silinemeyebilir.")
                         candidateGroup(title: "Uygulama", subtitle: "Uygulama paketini kaldır.", items: plan.candidates.filter { $0.request.applicationBundle }, bulkSelection: false)
                         if !temporaryItems.isEmpty {
                             candidateGroup(title: "Önbellek ve günlükler", subtitle: "Bu uygulamaya ait geçici ve tanılama dosyaları.", items: temporaryItems)
@@ -49,7 +54,7 @@ struct UninstallPlanView: View {
                         DisclosureGroup("Kaldırma kapsamı") {
                             VStack(alignment: .leading, spacing: PocketSpacing.s) {
                                 Text("Yalnız seçilen uygulama paketine ait süreçler kapatılır. Paylaşılan servisler ve paket dışındaki yardımcılar otomatik durdurulmaz.")
-                                Text("Seçilen klasörler içerikleriyle birlikte taşınır. Paylaşılan üretici ve App Group klasörleri plana eklenmez.")
+                                Text("Plan, bundle kimliğiyle ve uygulama adıyla birebir eşleşen klasörleri (uygulamaya ait App Group kapsayıcıları dahil) bulur. Yalnız üretici önekini paylaşan klasörler ve başka kurulu uygulamaların verileri eklenmez.")
                                 if removesHomebrewApplication {
                                     Text("Homebrew, paketin kendi kaldırma yönergelerini de çalıştırır; bu yönergeler ek servisleri durdurabilir.")
                                 }
@@ -68,6 +73,10 @@ struct UninstallPlanView: View {
         .frame(minWidth: 700, idealWidth: 800, maxWidth: 1000, minHeight: 560, idealHeight: 680, maxHeight: 850)
         .interactiveDismissDisabled(working)
         .task {
+            if startsComplete {
+                await preparation.refresh()
+                askCompleteRemoval()
+            }
             while !Task.isCancelled {
                 if !pending { await preparation.refresh() }
                 do { try await Task.sleep(for: .seconds(1)) } catch { return }
@@ -75,7 +84,7 @@ struct UninstallPlanView: View {
         }
         .onAppear { processesExpanded = error != nil }
         .onDisappear { work?.cancel(); preparation.cancel() }
-        .alert(forceConfirmation ? String(localized: "Zorla kapatıp kaldırmak istiyor musun?") : String(localized: "Seçilen öğeler kaldırılsın mı?"), isPresented: $confirm) {
+        .alert(confirmationTitle, isPresented: $confirm) {
             Button("Vazgeç", role: .cancel) {}
             Button(confirmationAction, role: .destructive, action: execute)
         } message: { Text(confirmationMessage) }
@@ -142,7 +151,7 @@ struct UninstallPlanView: View {
             }
             if let error { PocketMessage(error, tone: .warning) }
             if preparation.canOfferForce {
-                Button("Zorla Kapat ve Kaldır…", role: .destructive) { askConfirmation(force: true) }
+                Button("Zorla Kapat ve Kaldır…", role: .destructive) { askForce() }
                     .buttonStyle(.borderless).disabled(working || selected.isEmpty)
             }
         }.padding(PocketSpacing.m)
@@ -193,11 +202,17 @@ struct UninstallPlanView: View {
                 Text("Seçilen öğe sayısı: \(selected.count)").font(.callout.weight(.semibold)).monospacedDigit()
                 Text(selectionSummary).font(.caption).foregroundStyle(userDataSelected ? Color.orange : .secondary)
                     .fixedSize(horizontal: false, vertical: true)
+                if plan.requiresAdministrator {
+                    Text("Sistem dosyaları bulundu; silmek için yönetici parolası istenecek.").font(.caption).foregroundStyle(.secondary)
+                }
             }.frame(maxWidth: .infinity, alignment: .leading)
+            RemovalModePicker().disabled(working || removesHomebrewApplication)
             Button("Vazgeç") { dismiss() }.keyboardShortcut(.cancelAction).disabled(working)
             Button(removalTitle, role: .destructive) { askConfirmation(force: false) }
-                .buttonStyle(.borderedProminent).tint(.red)
                 .disabled(selected.isEmpty || working || !preparation.checked)
+            Button("Tamamen Kaldır…", role: .destructive) { askCompleteRemoval() }
+                .buttonStyle(.borderedProminent).tint(.red)
+                .disabled(working || !preparation.checked)
         }.controlSize(.large).padding(.horizontal, PocketSpacing.xl).padding(.vertical, PocketSpacing.l)
     }
     private var selectionSummary: String {
@@ -212,30 +227,61 @@ struct UninstallPlanView: View {
     }
     private var removalTitle: String {
         if !preparation.processes.isEmpty { return String(localized: "Kapat ve Kaldır…") }
-        return removesHomebrewApplication ? String(localized: "Homebrew ile Kaldır…") : String(localized: "Seçilenleri Çöp’e Taşı")
+        if removesHomebrewApplication { return String(localized: "Homebrew ile Kaldır…") }
+        return removalMode == .deletePermanently ? String(localized: "Seçilenleri Kalıcı Sil…") : String(localized: "Seçilenleri Çöp’e Taşı")
+    }
+    private var permanent: Bool { removingEverything || removalMode == .deletePermanently }
+    private var confirmationTitle: String {
+        if forceConfirmation { return String(localized: "Zorla kapatıp kaldırmak istiyor musun?") }
+        return removingEverything ? String(localized: "\(plan.application.name) tamamen kaldırılsın mı?") : String(localized: "Seçilen öğeler kaldırılsın mı?")
     }
     private var confirmationAction: String {
         if forceConfirmation { return String(localized: "Zorla Kapat ve Kaldır") }
+        if removingEverything { return String(localized: "Tamamen Kaldır") }
         if !preparation.processes.isEmpty { return String(localized: "Kapat ve Devam Et") }
-        return removesHomebrewApplication ? String(localized: "Homebrew ile Kaldır") : String(localized: "Çöp’e Taşı")
+        if removesHomebrewApplication { return String(localized: "Homebrew ile Kaldır") }
+        return permanent ? String(localized: "Kalıcı Olarak Sil") : String(localized: "Çöp’e Taşı")
     }
     private var confirmationMessage: String {
-        let files = removesHomebrewApplication ? String(localized: "\(plan.application.name) ve paket kaydı Homebrew tarafından kaldırılır. Uygulamanın kendisi Çöp’e gitmeyebilir; geri almak için yeniden kurman gerekir. Seçili ilişkili dosyalar Çöp’e taşınır.") :
-            String(localized: "\(plan.application.name) için \(confirmedSelection.count) öğe seçildi. Seçili kullanıcı verileri de taşınır. Gerekirse Finder’daki Çöp’ten geri alabilirsin.")
+        let files: String
+        if removingEverything {
+            files = String(localized: "\(plan.application.name) ve bulunan \(confirmedSelection.count - 1) ilişkili öğe, kullanıcı verileri dahil, kalıcı olarak silinecek. Bu işlem geri alınamaz.")
+        } else if removesHomebrewApplication {
+            files = String(localized: "\(plan.application.name) ve paket kaydı Homebrew tarafından kaldırılır. Uygulamanın kendisi Çöp’e gitmeyebilir; geri almak için yeniden kurman gerekir. Seçili ilişkili dosyalar \(permanent ? String(localized: "kalıcı olarak silinir") : String(localized: "Çöp’e taşınır")).")
+        } else if permanent {
+            files = String(localized: "\(plan.application.name) için \(confirmedSelection.count) öğe seçildi. Seçili kullanıcı verileri de dahil kalıcı olarak silinir; geri alınamaz.")
+        } else {
+            files = String(localized: "\(plan.application.name) için \(confirmedSelection.count) öğe seçildi. Seçili kullanıcı verileri de taşınır. Gerekirse Finder’daki Çöp’ten geri alabilirsin.")
+        }
         let closing = forceConfirmation ? String(localized: "Listelenen süreçler zorla kapatılacak. Kaydedilmemiş çalışmalar kaybolabilir. Süreç listesi değişirse yeniden onay gerekir.") :
             String(localized: "Çalışan uygulamaya önce normal çıkış isteği gönderilir. Kaydetme penceresi açılırsa yanıtla; uygulama ve yardımcıları kapanmadan dosyalar kaldırılmaz.")
-        return closing + "\n\n" + files
+        let administrator = plan.requiresAdministrator && (removingEverything || plan.candidates.contains { $0.isSystemLevel && confirmedSelection.contains($0.id) })
+            ? "\n\n" + String(localized: "Sistem dosyaları için yönetici parolası istenecek.") : ""
+        return closing + "\n\n" + files + administrator
+    }
+    private func askForce() {
+        let everything = removingEverything
+        askConfirmation(force: true)
+        removingEverything = everything
     }
     private func askConfirmation(force: Bool) {
+        removingEverything = false
         forceConfirmation = force; confirmedSelection = selected; forceConsent = force ? preparation.forceIdentities : []; confirm = true
+    }
+    /// One click, nothing to pick: the app and everything found for it, user data included.
+    private func askCompleteRemoval() {
+        removingEverything = true
+        forceConfirmation = false; confirmedSelection = plan.completeSelection; forceConsent = []; confirm = true
     }
     private func execute() {
         let selection = confirmedSelection, consent = forceConfirmation ? forceConsent : nil
+        let everything = removingEverything
+        let mode = permanent ? RemovalMode.deletePermanently : .moveToTrash
         pending = true; operationError = nil
         work = Task { @MainActor in
             defer { pending = false; work = nil }
             guard await preparation.prepare(forceConsent: consent), !Task.isCancelled else { return }
-            if await model.uninstall(plan, selected: selection) { dismiss() }
+            if await model.uninstall(plan, selected: selection, everything: everything, mode: mode) { dismiss() }
             else {
                 operationError = [model.resultMessage, model.failure ?? String(localized: "Kaldırma tamamlanamadı.")]
                     .compactMap { $0 }.filter { !$0.isEmpty }.joined(separator: "\n")

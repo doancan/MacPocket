@@ -2,6 +2,10 @@
 
 ## Yayımlanmamış
 
+- **Kalıcı silme:** Temizlik, Space Lens, Dosya Araçları, Uygulama Kalıntıları ve Kaldırma artık varsayılan olarak öğeleri kalıcı siler; alan hemen açılır. Her ekranda "Silme biçimi" menüsüyle Çöp'e taşıma seçilebilir. Çöp, ayrı onayla boşaltılmaya devam eder.
+- **Tamamen Kaldır:** Uygulamalar'da tek düğme ve tek onayla uygulama ile bulunan tüm ilişkili dosyalar (kullanıcı verileri dahil) kalıcı silinir. Uygulama kapandıktan sonra plan yeniden taranır; kapanırken yazılan dosyalar da silinir. Kaldırma planı artık Group Containers, Application Scripts, çerezler, ByHost tercihleri, LaunchAgents ve /Library altındaki yardımcıları/hizmetleri ile adıyla eşleşen Application Support klasörlerini de bulur. Sistem dosyaları ve root sahipli öğeler için tek bir yönetici parolası istenir.
+- **Tam Disk Erişimi:** Temizlik, Disk Analizi, Kaldırma ve Kalıntılar ekranlarında izin yoksa uyarı kartı çıkar; Sistem Ayarları'nı ve sürükle-bırak kartını açar, izin verildikten sonra yeniden başlatmayı önerir. Kurulum sihirbazındaki açıklama bu kullanımları anlatır.
+
 ## 0.2.0 — 11 Kasım 2026
 
 - **İstatistik Çubuğu sayfası:** menü çubuğu ayarları Ayarlar'dan çıkarıp ana pencereye taşındı. Canlı önizleme (açık/koyu menü çubuğu, 1×–2× yakınlaştırma), sürükleyerek sıralanan modül listesi ve her modül için ayrı seçenekler: gerçek çizimle stil galerisi, grafik türü (çubuk/çizgi/alan) ve genişliği, yazı boyutu, etiket konumu ve hizalama, sabit vurgu rengi, bağımsız sıralı eşik düzenleyici. Yeni stiller: yatay çubuk, halka; gruplu simge için üç çubuk ve canlı grafik.

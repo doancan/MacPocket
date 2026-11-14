@@ -6,6 +6,7 @@ import SwiftUI
 struct FileWorkspaceView: View {
     @ObservedObject var model: FileWorkspaceModel
     @State private var confirmTrash = false
+    @AppStorage(RemovalModePreference.storageKey) private var removalMode: RemovalMode = .deletePermanently
     @State private var showInfo = false
     @FocusState private var searchFocused: Bool
 
@@ -38,11 +39,13 @@ struct FileWorkspaceView: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .onReceive(NotificationCenter.default.publisher(for: .pocketFind)) { _ in searchFocused = true }
-        .alert("Seçilen öğeler Çöp’e taşınsın mı?", isPresented: $confirmTrash) {
+        .alert(removalMode == .deletePermanently ? "Seçilen öğeler kalıcı olarak silinsin mi?" : "Seçilen öğeler Çöp’e taşınsın mı?", isPresented: $confirmTrash) {
             Button("Vazgeç", role: .cancel) {}
-            Button("Çöp’e Taşı", role: .destructive) { model.trashSelection() }
+            Button(removalMode == .deletePermanently ? "Kalıcı Olarak Sil" : "Çöp’e Taşı", role: .destructive) { model.trashSelection(mode: removalMode) }
         } message: {
-            Text("\(model.selectedRows.count) öğe · \(pocketDiskBytes(model.selectedBytes)) mantıksal boyut. Gerekirse Finder’daki Çöp’ten geri alabilirsin.")
+            removalMode == .deletePermanently
+                ? Text("\(model.selectedRows.count) öğe · \(pocketDiskBytes(model.selectedBytes)) mantıksal boyut. Kalıcı olarak silinir; geri alınamaz.")
+                : Text("\(model.selectedRows.count) öğe · \(pocketDiskBytes(model.selectedBytes)) mantıksal boyut. Gerekirse Finder’daki Çöp’ten geri alabilirsin.")
         }
     }
 
@@ -101,7 +104,7 @@ struct FileWorkspaceView: View {
     private var infoPopover: some View {
         VStack(alignment: .leading, spacing: PocketSpacing.s) {
             Text("Tarama hakkında").font(.headline)
-            Label("Tarama dosyaları değiştirmez; yalnız seçtiğin öğeler Çöp’e taşınır ve Finder’dan geri alınabilir.", systemImage: "trash")
+            Label("Tarama dosyaları değiştirmez; yalnız seçtiğin öğeler, seçtiğin silme biçimiyle kaldırılır.", systemImage: "trash")
             Label("Bu görünümdeki boyutlar mantıksal dosya boyutudur; APFS paylaşımlı alanı nedeniyle kazanılan alan farklı olabilir.", systemImage: "internaldrive")
             Label("Sembolik bağlantılar takip edilmez, hard link’ler bir kez sayılır, paket içleri tek tek sunulmaz.", systemImage: "link")
         }
@@ -128,7 +131,7 @@ struct FileWorkspaceView: View {
                 Label("\(report.fileCount) tekil dosya", systemImage: "doc.on.doc")
                 Label(pocketDiskBytes(report.bytes), systemImage: "externaldrive").monospacedDigit()
                 if model.hasTrashedItems {
-                    PocketStatusBadge(text: "Çöp’e taşınanlar gizlendi", systemImage: "trash", tone: .neutral)
+                    PocketStatusBadge(text: "Kaldırılanlar gizlendi", systemImage: "trash", tone: .neutral)
                         .help("Toplamlar bir sonraki taramada güncellenir.")
                 }
                 Spacer(minLength: PocketSpacing.s)
@@ -245,10 +248,11 @@ struct FileWorkspaceView: View {
                 }
                 .disabled(model.selectedRows.isEmpty)
                 .help("Seçili öğeleri Finder’da göster")
-                Button("Çöp’e Taşı…", role: .destructive) { confirmTrash = true }
+                RemovalModePicker().disabled(model.busy)
+                Button(removalMode.actionTitle, role: .destructive) { confirmTrash = true }
                     .keyboardShortcut(.delete, modifiers: .command)
                     .disabled(model.selectedRows.isEmpty || model.busy || !model.preservesDuplicateOriginals)
-                    .help("Seçili öğeleri Çöp’e taşı (⌘⌫)")
+                    .help("Seçili öğeleri kaldır (⌘⌫)")
             }
             if !model.preservesDuplicateOriginals {
                 Label("Her yinelenen grupta en az bir dosyayı korumalısın.", systemImage: PocketTone.warning.symbol)
