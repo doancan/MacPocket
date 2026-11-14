@@ -39,7 +39,7 @@ enum PocketTool: String, Identifiable {
     case mouseButtons = "Fare Tuşları"
     case mouseScroll = "Fare Kaydırma", audio = "Ses Çıkışı", mixer = "Ses Mikseri"
     case recorder = "Ekran Kaydı", privacy = "Gizlilik Kontrolü", screenshot = "Ekran Görüntüsü", bluetoothBattery = "Bluetooth Pilleri", displays = "Ekran Ayarları"
-    case networkTraffic = "Ağ Trafiği", peripherals = "USB ve Thunderbolt", diskHealth = "Disk Sağlığı"
+    case networkTraffic = "Ağ Trafiği", peripherals = "USB ve Thunderbolt", diskHealth = "Disk Sağlığı", systemData = "Disk Röntgeni"
     case wifi = "Wi-Fi Analizi", hosts = "Hosts Dosyası", screenTime = "Ekran Süresi", localNetwork = "Yerel Ağ", powerSchedule = "Güç Zamanlaması"
     case startupItems = "Başlangıç Öğeleri", maintenance = "Bakım"
     case usbEject = "USB Çıkarma Yöneticisi"

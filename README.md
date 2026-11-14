@@ -38,6 +38,7 @@
 - **Uygulama başına ağ trafiği** — hangi uygulamanın şu an ne kadar indirip yüklediği, yardımcı süreçler uygulamada toplanmış halde.
 - **Wi-Fi analizi** — sinyal, gürültü, BSSID, çevredeki ağların kanal yoğunluğu ve modem için kanal önerisi.
 - **Kablo etki haritası** — kabloyu çekmeden önce bağlı diskleri, açık dosyaları, TCP/SSH oturumlarını ve ekran/ses etkilerini gör; otomatik bağlantılar ile elle eşleştirmeler ayrı gösterilir. [Kapsam ve doğrulama](docs/CABLE_IMPACT.md).
+- **Disk Röntgeni** — macOS’un “Sistem Verisi” kovasının içini aç: simülatörler, Xcode, paket yöneticileri, Docker, yapay zekâ modelleri, günlükler ve proje derleme klasörleri tek tek ölçülür, Güvenli/İncele/Elle diye sınıflandırılır, çalışacak komut silmeden önce gösterilir; “X GB aç”, geçmiş ve büyüme uyarıları; [kapsam ve doğrulama](docs/SYSTEM_DATA.md).
 - **Disk sağlığı** — SSD’nin kendi bildirdiği yıpranma, yazılan veri ve sıcaklık (NVMe SMART), yönetici izni gerekmeden.
 - **Temizlik ve uygulama bakımı** — büyük/eski ve aynı içerikli dosyalar, uygulama kalıntıları, Homebrew güncelleme/kaldırma.
 - **Alt+Tab pencere geçişi** — animasyonlu önizleme kartları; dokuz kısayol için bağımsız filtre, görünüm ve bırakma davranışı; özelleştirilebilir pencere eylemleri.

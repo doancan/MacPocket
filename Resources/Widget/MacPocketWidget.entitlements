@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "https://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0"><dict>
+  <key>com.apple.security.app-sandbox</key><true/>
+  <!-- The widget only reads the numbers MacPocket wrote after its last scan; nothing else in the home folder. -->
+  <key>com.apple.security.temporary-exception.files.home-relative-path.read-only</key>
+  <array><string>/Library/Application Support/MacPocket/system-data-summary.json</string></array>
+</dict></plist>

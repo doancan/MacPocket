@@ -89,6 +89,8 @@ struct MacPocketProbe {
                 try output(report.targets.map { ["target": $0.id.rawValue, "group": $0.target.group.rawValue, "state": "\($0.state)",
                                                  "items": String($0.items.count), "bytes": String($0.bytes),
                                                  "names": $0.items.prefix(4).map { $0.label ?? $0.name }.joined(separator: ", ")] })
+            case "system-data":
+                try await systemData(Array(arguments.dropFirst()))
             case "startup":
                 let snapshot = await StartupItems.load()
                 try output(snapshot.items.map { ["label": $0.label, "class": $0.kind.rawValue, "enabled": String($0.isEnabled),
@@ -191,6 +193,9 @@ struct MacPocketProbe {
                   startup                      launchd startup items by class (read-only)
                   maintenance [run <id>]       Maintenance tasks and support; run one ready task
                   cleanup                      Read-only cleanup scan summary per target
+                  system-data [--json]         What fills System Data, item by item (read-only)
+                  system-data free <GB>        The least worrying selection that frees this much (read-only)
+                  system-data clean [--apply]  Safe items needing no password; prints the plan, --apply removes them
                   fans                         Fan RPM, range and mode (read-only)
                   fan-set <fan> <rpm>          Set one fan's speed, verified by readback (needs root)
                   fan-release                  Hand every fan back to the system (needs root)
@@ -204,6 +209,48 @@ struct MacPocketProbe {
             FileHandle.standardError.write(Data("MacPocket: \(error)\n".utf8))
             exit(1)
         }
+    }
+
+    static func systemData(_ arguments: [String]) async throws {
+        let environment = SystemDataEnvironment(installedAppName: { id in
+            NSWorkspace.shared.urlForApplication(withBundleIdentifier: id).map { FileManager.default.displayName(atPath: $0.path) }
+        })
+        var report: SystemDataReport?
+        for await event in SystemDataScanner(environment: environment).scan() {
+            if case .finished(let finished) = event { report = finished }
+        }
+        guard let report else { throw ProbeError.usage("system-data: scan produced no report") }
+        switch arguments.first {
+        case nil, "--json":
+            try output(report)
+        case "free":
+            guard arguments.count == 2, let gigabytes = Double(arguments[1]), gigabytes > 0 else { throw ProbeError.usage("system-data free <GB>") }
+            let plan = FreeUpPlanner.plan(items: report.items, targetBytes: Int64(gigabytes * 1_000_000_000))
+            let byID = Dictionary(report.items.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
+            try output(["target": plan.targetBytes, "selected": plan.selectedBytes, "shortfall": plan.shortfallBytes] as [String: Int64],
+                       extra: plan.selectedIDs.compactMap { byID[$0] }.map { "\($0.safety.rawValue)\t\($0.sizeBytes)\t\($0.id)" })
+        case "clean":
+            let apply = arguments.contains("--apply")
+            guard arguments.dropFirst().allSatisfy({ $0 == "--apply" }) else { throw ProbeError.usage("system-data clean [--apply]") }
+            let running = Set(NSWorkspace.shared.runningApplications.compactMap(\.bundleIdentifier))
+            let items = SystemDataAutoClean.eligible(report.items, runningBundleIDs: running)
+            let preview = SystemDataRemovalPlanner.preview(items: items, mode: .deletePermanently)
+            print(preview.copyText)
+            guard apply else { print("\n# dry run: \(items.count) items, \(ByteCountFormatter.string(fromByteCount: preview.totalBytes, countStyle: .file)). Add --apply to remove."); return }
+            let remover = SystemDataRemover(runningAppName: { id in
+                NSWorkspace.shared.runningApplications.first { $0.bundleIdentifier == id }?.localizedName
+            })
+            let outcomes = await remover.remove(items, mode: .deletePermanently, administratorPrompt: "MacPocket")
+            for outcome in outcomes { print("\(outcome.succeeded ? "ok  " : "FAIL") \(outcome.title)\(outcome.error.map { " — \($0)" } ?? "")") }
+            if outcomes.contains(where: { !$0.succeeded }) { exit(1) }
+        default:
+            throw ProbeError.usage("system-data [--json] | free <GB> | clean [--apply]")
+        }
+    }
+
+    static func output(_ value: [String: Int64], extra lines: [String]) throws {
+        try output(value)
+        for line in lines { print(line) }
     }
 
     static func fanReport(_ controller: FanController) throws -> [[String: Double]] {

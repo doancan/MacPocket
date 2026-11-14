@@ -172,6 +172,12 @@ final class PrivacyMonitorService: NSObject, ObservableObject, UNUserNotificatio
     }
 
     nonisolated func userNotificationCenter(_ center: UNUserNotificationCenter, didReceive response: UNNotificationResponse) async {
+        // Disk Röntgeni notifications open the tool, on the tab that explains them.
+        if response.notification.request.identifier.hasPrefix(SystemDataRouting.notificationPrefix) {
+            let tab = response.notification.request.content.userInfo["tab"] as? String
+            await MainActor.run { SystemDataRouting.open(tab: tab) }
+            return
+        }
         guard response.actionIdentifier == Self.ignoreAction,
               let bundleID = response.notification.request.content.userInfo["bundleID"] as? String,
               let name = response.notification.request.content.userInfo["name"] as? String else { return }

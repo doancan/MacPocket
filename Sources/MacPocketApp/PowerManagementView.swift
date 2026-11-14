@@ -298,6 +298,7 @@ struct PowerKeepAwakeCard: View {
     @AppStorage("MacPocket.power.awakeMinutes") private var minutes = 30.0
     @AppStorage(PocketModel.awakeDisplayKey) private var displayAwake = PocketModel.awakeDisplayDefault
     @State private var changing = false
+    @State private var idleOff = IdleDisplayOffSettings.load(from: .standard)
 
     var body: some View {
         VStack(alignment: .leading, spacing: PocketSpacing.m) {
@@ -344,12 +345,25 @@ struct PowerKeepAwakeCard: View {
             Text("Boşta uyku geçici olarak engellenir; süre dolunca veya MacPocket kapanınca sona erer. Kalıcı ayar değişmez.")
                 .font(.subheadline).foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
+            Divider()
+            Toggle("Boşta kalınca ekranı kapat, Mac uyanık kalsın", isOn: $idleOff.enabled)
+                .toggleStyle(.switch)
+            if idleOff.enabled {
+                Picker("Ekranı kapatma süresi", selection: $idleOff.minutes) {
+                    Text("1 dakika").tag(1); Text("2 dakika").tag(2); Text("5 dakika").tag(5)
+                    Text("10 dakika").tag(10); Text("15 dakika").tag(15); Text("30 dakika").tag(30)
+                }
+                .pocketMenuPicker()
+                Text("Klavye ve fare boşta kalınca yalnızca ekran kapanır; Mac uyanık tutulurken arka plan işleri sürer. Fare veya klavyeye dokununca ekran anında açılır. “Ekranı da açık tut” seçiliyken bu ayar çalışmaz.")
+                    .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+            }
             if let error = model.awakeError { PocketMessage(error, error: true) }
             Divider()
             AwakeAutomationView(service: model.awakeAutomation)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .pocketCard()
+        .onChange(of: idleOff) { _, value in value.save(to: .standard) }
     }
 
     private func remaining(until end: Date, now: Date) -> String {

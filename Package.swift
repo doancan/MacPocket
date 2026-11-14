@@ -9,6 +9,7 @@ let package = Package(
         .executable(name: "macpocket-probe", targets: ["MacPocketProbe"]),
         .executable(name: "MacPocket", targets: ["MacPocketApp"]),
         .executable(name: "MacPocketHelper", targets: ["MacPocketHelper"]),
+        .executable(name: "MacPocketWidget", targets: ["MacPocketWidget"]),
         .executable(name: "MacPocketNetworkFilter", targets: ["MacPocketNetworkFilter"]),
     ],
     dependencies: [
@@ -18,7 +19,11 @@ let package = Package(
         .package(path: "Packages/AIUsageKit"),
     ],
     targets: [
-        .target(name: "MacPocketCore"),
+        .target(name: "MacPocketShared"),
+        .target(name: "MacPocketCore", dependencies: ["MacPocketShared"]),
+        .target(name: "MacPocketWidgetUI", dependencies: ["MacPocketShared"]),
+        .executableTarget(name: "MacPocketWidget", dependencies: ["MacPocketWidgetUI"],
+                          linkerSettings: [.unsafeFlags(["-Xlinker", "-e", "-Xlinker", "_NSExtensionMain"])]),
         .target(name: "MacPocketNetworkPolicy"),
         .executableTarget(name: "MacPocketNetworkFilter", dependencies: ["MacPocketNetworkPolicy"]),
         .target(name: "MacPocketAIUsage", dependencies: ["MacPocketCore", .product(name: "UsageCore", package: "AIUsageKit")]),
@@ -28,6 +33,7 @@ let package = Package(
         .executableTarget(name: "MacPocketHelper", dependencies: ["MacPocketCore"]),
         .testTarget(name: "MacPocketNetworkPolicyTests", dependencies: ["MacPocketNetworkPolicy"]),
         .testTarget(name: "MacPocketCoreTests", dependencies: ["MacPocketCore"]),
+        .testTarget(name: "MacPocketWidgetTests", dependencies: ["MacPocketWidgetUI", "MacPocketShared"]),
         .testTarget(name: "MacPocketAppTests", dependencies: ["MacPocketApp", "MacPocketCore"]),
         .testTarget(name: "MacPocketAIUsageTests", dependencies: ["MacPocketAIUsage", .product(name: "UsageCore", package: "AIUsageKit")]),
         .testTarget(name: "MacPocketSSHTests", dependencies: ["MacPocketSSH", .product(name: "SSHConfigKit", package: "SSHConfigKit")]),

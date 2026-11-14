@@ -297,6 +297,7 @@ struct HubTool: Identifiable {
         .init(id: "peripherals", title: "USB ve Thunderbolt", description: "Takılı aygıtları, bağlantı hızlarını ve çektikleri gücü gör; yavaş kablo veya portu fark et.", icon: "cable.connector", category: .system),
         .init(id: "usb-eject", title: "USB Çıkarma Yöneticisi", description: "Harici diskleri güvenle çıkar; diski kullanan uygulamaları gör, seçili diskleri birlikte çıkar.", icon: "eject.circle", category: .files),
         .init(id: "listening-ports", title: "Port Yöneticisi", description: "Hangi sürecin hangi portu dinlediğini ve ağa açık olup olmadığını gör; gerekirse durdur.", icon: "network", category: .system),
+        .init(id: "system-data", title: "Disk Röntgeni", description: "“Sistem Verisi”nin içini aç: simülatörler, önbellekler, Docker, modeller ve proje klasörleri tek tek ölçülür, sınıflandırılır ve komutu gösterilerek silinir.", icon: "scope", category: .files),
         .init(id: "disk-health", title: "Disk Sağlığı", description: "SSD’nin yıpranmasını, yazılan veriyi, sıcaklığını ve hata sayaçlarını gör.", icon: "internaldrive.fill", category: .files),
         .init(id: "privacy-check", title: "Gizlilik Kontrolü", description: "Mikrofon ya da kamera kullanılmaya başladığında bildirim al; hangi uygulamanın dinlediğini gör.", icon: "eye.trianglebadge.exclamationmark", category: .privacy),
         .init(id: "task-manager", title: "Görev Yöneticisi", description: "Süreçleri ve kaynak kullanımını incele, seçtiğin uygulamayı sonlandır.", icon: "list.bullet.rectangle", category: .system),

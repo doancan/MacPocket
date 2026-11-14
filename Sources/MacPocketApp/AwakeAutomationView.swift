@@ -47,6 +47,8 @@ struct AwakeAutomationView: View {
                 Picker("Otomasyonun süre sınırı", selection: $service.settings.maximumMinutes) {
                     Text("30 dakika").tag(30); Text("1 saat").tag(60); Text("2 saat").tag(120)
                     Text("4 saat").tag(240); Text("8 saat").tag(480)
+                    Divider()
+                    Text("7 gün (en uzun)").tag(10_080)
                 }.accessibilityLabel("Otomasyonun süre sınırı")
                     .pocketMenuPicker()
                 Toggle("Otomasyonda ekranı da açık tut", isOn: $service.settings.keepDisplayAwake)

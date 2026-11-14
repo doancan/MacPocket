@@ -209,6 +209,7 @@ extension PocketTool {
         case .internetControl: String(localized: "İnternet Kontrolü")
         case .cableImpact: String(localized: "Kablo Etki Haritası")
         case .diskHealth: String(localized: "Disk Sağlığı")
+        case .systemData: String(localized: "Disk Röntgeni")
         case .wifi: String(localized: "Wi-Fi Analizi")
         case .hosts: String(localized: "Hosts Dosyası")
         case .screenTime: String(localized: "Ekran Süresi")
