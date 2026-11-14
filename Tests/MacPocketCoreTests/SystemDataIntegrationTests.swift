@@ -103,7 +103,7 @@ import Testing
     }
 
     /// Creates a throwaway simulator with the real `simctl`, then removes it through the same command path the page uses.
-    @Test(.enabled(if: FileManager.default.isExecutableFile(atPath: "/usr/bin/xcrun")))
+    @Test(.enabled(if: liveSystemTestsEnabled && FileManager.default.isExecutableFile(atPath: "/usr/bin/xcrun")))
     func aRealSimulatorDeviceIsRemovedThroughTheCommandPath() async throws {
         let listing = try #require(await SystemDataEnvironment.liveRunner("/usr/bin/xcrun", ["simctl", "list", "-j", "devicetypes", "runtimes"]))
         let json = try #require(try JSONSerialization.jsonObject(with: Data(listing.utf8)) as? [String: Any])
@@ -194,10 +194,14 @@ import Testing
     }
 }
 
+/// These touch the real machine (a real local snapshot, a real simulator boot), so they run only on request:
+/// `MACPOCKET_LIVE_SYSTEM=1 swift test`. A CI virtual machine has neither.
+private let liveSystemTestsEnabled = ProcessInfo.processInfo.environment["MACPOCKET_LIVE_SYSTEM"] == "1"
+
 @Suite struct TimeMachineLiveTests {
     /// Creates a real local snapshot, finds it with the real scanner and removes it through the page's command path,
     /// without an administrator prompt (macOS lets a user delete the snapshots made for them).
-    @Test(.enabled(if: FileManager.default.isExecutableFile(atPath: "/usr/bin/tmutil")))
+    @Test(.enabled(if: liveSystemTestsEnabled && FileManager.default.isExecutableFile(atPath: "/usr/bin/tmutil")))
     func aRealLocalSnapshotIsFoundAndRemovedWithoutAPasswordPrompt() async throws {
         let created = try #require(await SystemDataEnvironment.liveRunner("/usr/bin/tmutil", ["localsnapshot"]))
         guard let stamp = SystemDataParsers.localSnapshotDates(created).first else { return }   // snapshots unavailable on this Mac
@@ -226,7 +230,7 @@ import Testing
     }
 
     /// Boots a real throwaway simulator, then checks that `shutdownAll` leaves none booted.
-    @Test(.enabled(if: FileManager.default.isExecutableFile(atPath: "/usr/bin/xcrun")))
+    @Test(.enabled(if: liveSystemTestsEnabled && FileManager.default.isExecutableFile(atPath: "/usr/bin/xcrun")))
     func shutdownAllTurnsARealBootedSimulatorOff() async throws {
         let listing = try #require(await SystemDataEnvironment.liveRunner("/usr/bin/xcrun", ["simctl", "list", "-j", "devicetypes", "runtimes"]))
         let json = try #require(try JSONSerialization.jsonObject(with: Data(listing.utf8)) as? [String: Any])
