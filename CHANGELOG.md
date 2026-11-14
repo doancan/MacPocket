@@ -2,7 +2,10 @@
 
 ## Yayımlanmamış
 
+## 0.3.0 — 14 Kasım 2026
+
 - **Disk Röntgeni (yeni araç):** “Sistem Verisi”nin içini kalem kalem açar. Xcode, simülatör çalışma zamanları ve aygıtları, paket yöneticileri, geliştirici araç zincirleri, yapay zekâ modelleri (Ollama dahil), günlükler, geçici dosyalar, Docker, sanal makineler, iOS yedekleri, Android SDK, uygulama önbellekleri, proje derleme klasörleri ve açıklanamayan büyük klasörler (sahibi uygulama dahil) ölçülür; her kalem Güvenli, İncele veya Elle olarak sınıflanır. Silmeden önce işlemler birebir gösterilir ve kopyalanabilir; “X GB aç” en az endişe verici seçimi yapar; geçmiş, trend, büyüme uyarısı ve “silinip geri gelenler” bu Mac’te tutulur. Şeffaf APFS sıkıştırmasıyla “Sil yerine küçült” (doğrulanmış, atomik takas), doğrulanmış arşive alma ve geri yükleme, küçük/orta widget, menü çubuğu öğesi, Shortcuts eylemleri (boyutu al, güvenlileri temizle), isteğe bağlı harici disk projeleri, kapanışta simülatörleri kapatma, bildirimden sayfaya geçiş; isteğe bağlı günlük tarama, düşük alan uyarısı, haftalık özet ve haftalık güvenli otomatik temizlik. `macpocket-probe system-data [--json | free <GB> | clean [--apply]]`.
+- **Yerinde sıkıştırma:** Disk Röntgeni “Küçült” artık dosya dosya, klasör içi sabit bağları koruyarak ve her kopyayı doğrulayarak çalışır; yalnızca en büyük dosya kadar boş alan ister, klasörde derleme aracı (cargo, xcodebuild…) çalışıyorsa reddeder, kazancı önceden gerçek örnekle tahmin eder. 188 GB’lık bir Rust `target` klasörü 63,8 GB’a indi.
 - **Uyanık tut:** “Boşta kalınca ekranı kapat, Mac uyanık kalsın” ayarı (1–30 dk); koşullu uyanık tutma süre listesine “7 gün (en uzun)” eklendi.
 
 - **Kalıcı silme:** Temizlik, Space Lens, Dosya Araçları, Uygulama Kalıntıları ve Kaldırma artık varsayılan olarak öğeleri kalıcı siler; alan hemen açılır. Her ekranda "Silme biçimi" menüsüyle Çöp'e taşıma seçilebilir. Çöp, ayrı onayla boşaltılmaya devam eder.
