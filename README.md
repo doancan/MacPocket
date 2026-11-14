@@ -38,6 +38,7 @@
 - **Uygulama başına ağ trafiği** — hangi uygulamanın şu an ne kadar indirip yüklediği, yardımcı süreçler uygulamada toplanmış halde.
 - **Wi-Fi analizi** — sinyal, gürültü, BSSID, çevredeki ağların kanal yoğunluğu ve modem için kanal önerisi.
 - **Kablo etki haritası** — kabloyu çekmeden önce bağlı diskleri, açık dosyaları, TCP/SSH oturumlarını ve ekran/ses etkilerini gör; otomatik bağlantılar ile elle eşleştirmeler ayrı gösterilir. [Kapsam ve doğrulama](docs/CABLE_IMPACT.md).
+- **Disk Röntgeni** — macOS’un “Sistem Verisi” kovasının içini aç: simülatörler, Xcode, paket yöneticileri, Docker, yapay zekâ modelleri, günlükler ve proje derleme klasörleri tek tek ölçülür, Güvenli/İncele/Elle diye sınıflandırılır, çalışacak komut silmeden önce gösterilir; “X GB aç”, geçmiş ve büyüme uyarıları; [kapsam ve doğrulama](docs/SYSTEM_DATA.md).
 - **Disk sağlığı** — SSD’nin kendi bildirdiği yıpranma, yazılan veri ve sıcaklık (NVMe SMART), yönetici izni gerekmeden.
 - **Temizlik ve uygulama bakımı** — büyük/eski ve aynı içerikli dosyalar, uygulama kalıntıları, Homebrew güncelleme/kaldırma.
 - **Alt+Tab pencere geçişi** — animasyonlu önizleme kartları; dokuz kısayol için bağımsız filtre, görünüm ve bırakma davranışı; özelleştirilebilir pencere eylemleri.
@@ -53,7 +54,7 @@
 ## İndirme
 
 İmzalı ve notarize edilmiş paket [GitHub Releases](https://github.com/doancan/MacPocket/releases/latest)
-sayfasındadır: `MacPocket-0.2.0-macOS-arm64.dmg` dosyasını aç, kurulum penceresinde **MacPocket** ikonunu
+sayfasındadır: `MacPocket-0.3.0-macOS-arm64.dmg` dosyasını aç, kurulum penceresinde **MacPocket** ikonunu
 **Applications / Uygulamalar** klasörüne sürükle. Kopyalama bitince uygulamayı Uygulamalar’dan açıp disk görüntüsünü çıkarabilirsin.
 Türkçe/İngilizce yönergeler kurulum penceresindedir. ZIP paketi de alternatif indirme ve otomatik güncellemeler için sunulur.
 Apple Silicon ve macOS 27 gerekir. 0.1.3’ten itibaren yeni sürümler uygulama içinden (Sparkle) kurulur.
@@ -79,7 +80,7 @@ sunar; Ayarlar’daki canlı düzenleyicide sürükle-bırak sıralanır, görü
 
 | | |
 | --- | --- |
-| Sürüm | **0.2.0** |
+| Sürüm | **0.3.0** |
 | Testler | 1.575 uygulama testi; 4 gerçek disk/sistem, 1 bağlı trackpad ve 1 açık hava API kabul testi isteğe bağlıdır. SSHConfigKit: 384, AIUsageKit: 420 test (3 isteğe bağlı atlama). |
 | Yerelleştirme | Türkçe (kaynak) ve İngilizce, eksik anahtar yok |
 | Belgeler | [Native macOS davranışları](docs/NATIVE_MACOS.md) · [Derleme ve canlı doğrulama](docs/NATIVE_BUILD.md) · [Alt+Tab kart geçişi](docs/WINDOW_SWITCHER.md) · [Devam eden geliştirme](docs/CONTINUED_DEVELOPMENT.md) |

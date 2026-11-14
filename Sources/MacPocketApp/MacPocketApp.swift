@@ -21,6 +21,7 @@ struct MacPocketApplication: App {
         UninstallRuntimeAudit.configureIfRequested()
         WeatherBasketRuntimeAudit.configureIfRequested()
         StatusPopoverRuntimeAudit.configureIfRequested()
+        SystemDataRuntimeAudit.configureIfRequested()
         WindowSwitcherPermissionProbe.runIfRequested()
         WindowExternalRuntimeAudit.runIfRequested()
         WindowLifecycleAuditProducer.runIfRequested()
@@ -78,6 +79,7 @@ final class PocketAppDelegate: NSObject, NSApplicationDelegate {
         if UninstallRuntimeAudit.requested { UninstallRuntimeAudit.launch(); return }
         if WeatherBasketRuntimeAudit.requested { WeatherBasketRuntimeAudit.launch(); return }
         if StatusPopoverRuntimeAudit.requested { StatusPopoverRuntimeAudit.launch(); return }
+        if SystemDataRuntimeAudit.requested { SystemDataRuntimeAudit.launch(); return }
         #endif
         _ = PocketRelaunch.languageAtLaunch
         PocketDock.apply()
@@ -280,6 +282,7 @@ final class PocketModel {
     let systemMonitor = SystemMonitor()
     let sleepController: any SleepControlling
     @ObservationIgnored private var awakeOperationGeneration = 0
+    @ObservationIgnored private var idleDisplayPolicy = IdleDisplayOffPolicy()
     @ObservationIgnored private var awakeAutomationInstance: AwakeAutomationService?
     var awakeAutomation: AwakeAutomationService {
         if let awakeAutomationInstance { return awakeAutomationInstance }
@@ -319,6 +322,10 @@ final class PocketModel {
                 Task { @MainActor [weak self] in await self?.recordPowerEvent(event) }
             }.store(in: &subscriptions)
         }
+        // A booted simulator ignores the quit request and makes macOS wait for its service timeout; shut them down first.
+        NSWorkspace.shared.notificationCenter.publisher(for: NSWorkspace.willPowerOffNotification).sink { _ in
+            if SimulatorShutdown.isEnabled() { SimulatorShutdown.shutdownAll() }
+        }.store(in: &subscriptions)
         pollingTask = Task { [weak self] in
             while !Task.isCancelled {
                 guard let seconds = await self?.monitoringTick() else { return }
@@ -372,10 +379,25 @@ final class PocketModel {
         if awakeAutomationInstance != nil || UserDefaults.standard.data(forKey: AwakeAutomationSettings.key) != nil {
             await awakeAutomation.refreshPreferencesAndReconcile()
         }
+        await sleepDisplayIfIdle()
+        SystemDataAutomationService.shared.tick()
+        SystemDataMenuBarController.shared.refresh()
         if !paused {
             await refresh()
         }
         return refreshSeconds
+    }
+
+    /// Turns only the display off (the keep-awake assertion keeps the Mac running); keyboard or mouse input wakes it.
+    private func sleepDisplayIfIdle() async {
+        let settings = IdleDisplayOffSettings.load(from: .standard)
+        guard settings.enabled else { idleDisplayPolicy = .init(); return }
+        let idle = CGEventSource.secondsSinceLastEventType(.combinedSessionState, eventType: CGEventType(rawValue: ~0)!)
+        guard idleDisplayPolicy.shouldSleepDisplay(settings, idleSeconds: idle, session: awakeSession) else { return }
+        do {
+            let result = try await BoundedProcess.run("/usr/bin/pmset", ["displaysleepnow"], timeout: 5)
+            if result.status != 0 { awakeError = String(localized: "Ekran kapatılamadı.") }
+        } catch { awakeError = error.localizedDescription }
     }
 
     func refresh(includeProcesses: Bool? = nil) async {

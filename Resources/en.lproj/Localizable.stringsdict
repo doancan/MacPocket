@@ -973,5 +973,373 @@
 			<string>Permanently deleting %lld items…</string>
 		</dict>
 	</dict>
+	<key>%lld öğe seçili · %@</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key>
+		<string>%#@count@ · %@</string>
+		<key>count</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key>
+			<string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key>
+			<string>lld</string>
+			<key>one</key>
+			<string>%lld item selected</string>
+			<key>other</key>
+			<string>%lld items selected</string>
+		</dict>
+	</dict>
+	<key>%lld seçili öğe filtre yüzünden görünmüyor</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key>
+		<string>%#@count@</string>
+		<key>count</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key>
+			<string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key>
+			<string>lld</string>
+			<key>one</key>
+			<string>%lld selected item is hidden by the filter</string>
+			<key>other</key>
+			<string>%lld selected items are hidden by the filter</string>
+		</dict>
+	</dict>
+	<key>%lld gizli kalemi geri getir</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key>
+		<string>%#@count@</string>
+		<key>count</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key>
+			<string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key>
+			<string>lld</string>
+			<key>one</key>
+			<string>Bring back %lld hidden item</string>
+			<key>other</key>
+			<string>Bring back %lld hidden items</string>
+		</dict>
+	</dict>
+	<key>%lld öğe Çöp’e taşındı (%@); alan Çöp boşaltılınca geri gelir.</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key>
+		<string>%#@count@ (%@); the space returns when you empty it.</string>
+		<key>count</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key>
+			<string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key>
+			<string>lld</string>
+			<key>one</key>
+			<string>%lld item moved to the Trash</string>
+			<key>other</key>
+			<string>%lld items moved to the Trash</string>
+		</dict>
+	</dict>
+	<key>%lld öğe kaldırıldı; %@ boşaldı.</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key>
+		<string>%#@count@; %@ freed.</string>
+		<key>count</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key>
+			<string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key>
+			<string>lld</string>
+			<key>one</key>
+			<string>%lld item removed</string>
+			<key>other</key>
+			<string>%lld items removed</string>
+		</dict>
+	</dict>
+	<key>%lld öğe kaldırılamadı. İlki: %@: %@</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key>
+		<string>%#@count@ First: %@: %@</string>
+		<key>count</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key>
+			<string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key>
+			<string>lld</string>
+			<key>one</key>
+			<string>%lld item could not be removed.</string>
+			<key>other</key>
+			<string>%lld items could not be removed.</string>
+		</dict>
+	</dict>
+	<key>%lld güvenli öğe kaldırıldı; %@ boşaldı.</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key>
+		<string>%#@count@; %@ freed.</string>
+		<key>count</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key>
+			<string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key>
+			<string>lld</string>
+			<key>one</key>
+			<string>%lld safe item removed</string>
+			<key>other</key>
+			<string>%lld safe items removed</string>
+		</dict>
+	</dict>
+	<key>%lld işlem yönetici parolası ister; mümkün olan her şey tek istemde toplanır.</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key>
+		<string>%#@count@</string>
+		<key>count</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key>
+			<string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key>
+			<string>lld</string>
+			<key>one</key>
+			<string>%lld operation needs the administrator password; everything possible is folded into one prompt.</string>
+			<key>other</key>
+			<string>%lld operations need the administrator password; everything possible is folded into one prompt.</string>
+		</dict>
+	</dict>
+	<key>%lld aygıtın uygulamaları, verileri ve fotoğrafları. Sıfırlamak aygıtı fabrika durumuna getirir.</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key>
+		<string>%#@count@</string>
+		<key>count</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key>
+			<string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key>
+			<string>lld</string>
+			<key>one</key>
+			<string>Apps, data and photos of %lld device. Erasing resets it to factory state.</string>
+			<key>other</key>
+			<string>Apps, data and photos of %lld devices. Erasing resets a device to factory state.</string>
+		</dict>
+	</dict>
+	<key>Bu sürümde %lld simülatör aygıtı var; kaldırırsan aygıtlar da kullanılamaz olur.</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key>
+		<string>%#@count@</string>
+		<key>count</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key>
+			<string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key>
+			<string>lld</string>
+			<key>one</key>
+			<string>This version has %lld simulator device; removing it makes it unusable too.</string>
+			<key>other</key>
+			<string>This version has %lld simulator devices; removing it makes them unusable too.</string>
+		</dict>
+	</dict>
+	<key>Çalışma zamanı kaldırılmış %lld aygıt; hiçbir zaman açılamazlar.</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key>
+		<string>%#@count@</string>
+		<key>count</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key>
+			<string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key>
+			<string>lld</string>
+			<key>one</key>
+			<string>%lld device whose runtime was removed; it can never boot.</string>
+			<key>other</key>
+			<string>%lld devices whose runtime was removed; they can never boot.</string>
+		</dict>
+	</dict>
+	<key>%lld gündür boşta</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key>
+		<string>%#@count@</string>
+		<key>count</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key>
+			<string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key>
+			<string>lld</string>
+			<key>one</key>
+			<string>Idle for %lld day</string>
+			<key>other</key>
+			<string>Idle for %lld days</string>
+		</dict>
+	</dict>
+	<key>%lld gündür dokunulmadı</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key>
+		<string>%#@count@</string>
+		<key>count</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key>
+			<string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key>
+			<string>lld</string>
+			<key>one</key>
+			<string>Untouched for %lld day</string>
+			<key>other</key>
+			<string>Untouched for %lld days</string>
+		</dict>
+	</dict>
+	<key>Kullanıcı geçici klasöründe %lld günden uzun süredir dokunulmamış dosyalar.</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key>
+		<string>%#@count@</string>
+		<key>count</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key>
+			<string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key>
+			<string>lld</string>
+			<key>one</key>
+			<string>Files in the user temporary folder untouched for more than %lld day.</string>
+			<key>other</key>
+			<string>Files in the user temporary folder untouched for more than %lld days.</string>
+		</dict>
+	</dict>
+	<key>%@ içinde %lld günden eski öğeleri sil</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key>
+		<string>Delete items in %@ older than %#@count@</string>
+		<key>count</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key>
+			<string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key>
+			<string>lld</string>
+			<key>one</key>
+			<string>%lld day</string>
+			<key>other</key>
+			<string>%lld days</string>
+		</dict>
+	</dict>
+	<key>%lld klasör arşivlendi; %@ kazanıldı. Gerektiğinde “Arşivler”den geri yükleyebilirsin.</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key>
+		<string>%#@count@; %@ saved. You can restore from “Archives” when needed.</string>
+		<key>count</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key>
+			<string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key>
+			<string>lld</string>
+			<key>one</key>
+			<string>%lld folder archived</string>
+			<key>other</key>
+			<string>%lld folders archived</string>
+		</dict>
+	</dict>
+	<key>%lld güvenli kalem kaldırıldı; %@ boşaldı.</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key>
+		<string>%#@count@; %@ freed.</string>
+		<key>count</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key>
+			<string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key>
+			<string>lld</string>
+			<key>one</key>
+			<string>%lld safe item removed</string>
+			<key>other</key>
+			<string>%lld safe items removed</string>
+		</dict>
+	</dict>
+	<key>%lld öğe sıkıştırıldı; %@ kazanıldı. Hiçbir şey silinmedi, tüm yollar çalışmaya devam ediyor.</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key>
+		<string>%#@count@; %@ saved. Nothing was deleted and every path keeps working.</string>
+		<key>count</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key>
+			<string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key>
+			<string>lld</string>
+			<key>one</key>
+			<string>%lld item compressed</string>
+			<key>other</key>
+			<string>%lld items compressed</string>
+		</dict>
+	</dict>
+	<key>Klasördeki %lld dosya başka dosyalarla aynı alanı paylaşıyor (sabit bağ veya APFS klonu); sıkıştırmak bu paylaşımı bozar. Dokunulmadı.</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key>
+		<string>%#@count@</string>
+		<key>count</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key>
+			<string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key>
+			<string>lld</string>
+			<key>one</key>
+			<string>%lld file in the folder shares its space with other files (hard link or APFS clone); compressing would break that sharing. Left untouched.</string>
+			<key>other</key>
+			<string>%lld files in the folder share their space with other files (hard links or APFS clones); compressing would break that sharing. Left untouched.</string>
+		</dict>
+	</dict>
+	<key>%lld Güvenli kalem; her komut silmeden önce gösterilir ve onayını bekler.</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key>
+		<string>%#@count@; every command is shown before deleting and waits for your confirmation.</string>
+		<key>count</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key>
+			<string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key>
+			<string>lld</string>
+			<key>one</key>
+			<string>%lld Safe item</string>
+			<key>other</key>
+			<string>%lld Safe items</string>
+		</dict>
+	</dict>
+	<key>%lld kalem</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key>
+		<string>%#@count@</string>
+		<key>count</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key>
+			<string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key>
+			<string>lld</string>
+			<key>one</key>
+			<string>%lld item</string>
+			<key>other</key>
+			<string>%lld items</string>
+		</dict>
+	</dict>
+	<key>%lld yer okunamadı (izin yok); bunların boyutu toplamlara dahil değil. Tam Disk Erişimi daha eksiksiz bir tarama sağlar.</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key>
+		<string>%#@count@ (no permission); their size is not in the totals. Full Disk Access gives a more complete scan.</string>
+		<key>count</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key>
+			<string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key>
+			<string>lld</string>
+			<key>one</key>
+			<string>%lld place could not be read</string>
+			<key>other</key>
+			<string>%lld places could not be read</string>
+		</dict>
+	</dict>
+	<key>%lld öğe · toplam %@</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key>
+		<string>%#@count@ · total %@</string>
+		<key>count</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key>
+			<string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key>
+			<string>lld</string>
+			<key>one</key>
+			<string>%lld item</string>
+			<key>other</key>
+			<string>%lld items</string>
+		</dict>
+	</dict>
 </dict>
 </plist>

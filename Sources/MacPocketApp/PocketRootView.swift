@@ -190,6 +190,7 @@ struct PocketRootView: View {
                 case .peripherals: PeripheralsView()
                 case .usbEject: USBEjectView()
                 case .diskHealth: DiskHealthView()
+                case .systemData: SystemDataView()
                 case .wifi: WiFiView()
                 case .hosts: HostsView()
                 case .screenTime: ScreenTimeView()

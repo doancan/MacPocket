@@ -59,6 +59,26 @@ for macpocket_lproj in Resources/*.lproj; do
     done
 done
 plutil -lint "$macpocket_app_dir/Contents/Info.plist" >/dev/null
+# App Intents (Shortcuts actions): SwiftPM does not run Xcode's metadata step, so run the processor on the constant
+# values the build already produced. Without them the app still works; it just offers no Shortcuts actions.
+if [ "$macpocket_configuration" = release ]; then macpocket_intents_config=Release; else macpocket_intents_config=Debug; fi
+macpocket_intents_objects="$macpocket_root/.build/out/Intermediates.noindex/MacPocket.build/$macpocket_intents_config/MacPocket-p.build/Objects-normal/arm64"
+if ls "$macpocket_intents_objects"/*.swiftconstvalues >/dev/null 2>&1; then
+    macpocket_intents_work="$(mktemp -d)"
+    ls "$macpocket_intents_objects"/*.swiftconstvalues > "$macpocket_intents_work/consts.txt"
+    ls "$macpocket_root"/Sources/MacPocketApp/*.swift > "$macpocket_intents_work/sources.txt"
+    : > "$macpocket_intents_work/none.txt"
+    xcrun appintentsmetadataprocessor --output "$macpocket_app_dir/Contents/Resources" \
+        --toolchain-dir "$(dirname "$(dirname "$(dirname "$(xcrun --find swiftc)")")")" --module-name MacPocketApp \
+        --sdk-root "$(xcrun --show-sdk-path)" --xcode-version "$(xcodebuild -version | awk '/Build version/ {print $3}')" \
+        --platform-family macOS --deployment-target 27.0 --target-triple arm64-apple-macos27.0 \
+        --source-file-list "$macpocket_intents_work/sources.txt" --swift-const-vals-list "$macpocket_intents_work/consts.txt" \
+        --metadata-file-list "$macpocket_intents_work/none.txt" --static-metadata-file-list "$macpocket_intents_work/none.txt" --force >&2
+    rm -rf "$macpocket_intents_work"
+    [ -f "$macpocket_app_dir/Contents/Resources/Metadata.appintents/extract.actionsdata" ] || echo "Uyarı: App Intents meta verisi üretilemedi." >&2
+else
+    echo "Uyarı: App Intents için sabit değer dosyaları bulunamadı; Shortcuts eylemleri eklenmedi." >&2
+fi
 # The helper is signed on its own, before the app seals it into the bundle.
 macpocket_helper_flags=(--force --identifier com.doancan.MacPocket.FanHelper --sign "$macpocket_identity")
 if [ "$macpocket_configuration" = release ]; then macpocket_helper_flags+=(--options runtime); fi
@@ -74,6 +94,11 @@ codesign "${macpocket_sparkle_flags[@]}" --preserve-metadata=entitlements "$macp
 codesign "${macpocket_sparkle_flags[@]}" "$macpocket_sparkle/Versions/B/Autoupdate"
 codesign "${macpocket_sparkle_flags[@]}" "$macpocket_sparkle/Versions/B/Updater.app"
 codesign "${macpocket_sparkle_flags[@]}" "$macpocket_sparkle"
+# The Disk Röntgeni widget (WidgetKit extension), signed before the app seals it. The app works without it.
+if ! ./scripts/embed-widget.sh "$macpocket_app_dir" "$macpocket_configuration" "$macpocket_identity"; then
+    echo "Uyarı: widget uzantısı eklenemedi; uygulama widget olmadan paketlendi." >&2
+    rm -rf "$macpocket_app_dir/Contents/PlugIns/MacPocketWidget.appex"
+fi
 macpocket_app_entitlements="Resources/MacPocket.entitlements"
 if [ "$macpocket_configuration" = release ]; then macpocket_app_entitlements="Resources/MacPocketRelease.entitlements"; fi
 if [ -n "${MACPOCKET_FILTER_HOST_PROFILE:-}${MACPOCKET_FILTER_PROVIDER_PROFILE:-}" ]; then

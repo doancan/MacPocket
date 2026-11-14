@@ -42,6 +42,7 @@ extension PocketModel {
         case "peripherals": navigation.open(.peripherals)
         case "usb-eject": navigation.open(.usbEject)
         case "disk-health": navigation.open(.diskHealth)
+        case "system-data": navigation.open(.systemData)
         case "wifi": navigation.open(.wifi)
         case "hosts": navigation.open(.hosts)
         case "screen-time": navigation.open(.screenTime)

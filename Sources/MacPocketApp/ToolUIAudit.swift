@@ -203,8 +203,25 @@ enum ToolUIAudit {
             let label = ["accessibilityLabel", "accessibilityTitle", "accessibilityDescription", "accessibilityHelp"]
                 .compactMap { attribute(element, $0) as? String }.first(where: { !$0.isEmpty }) ?? ""
             var node = ["role": role, "name": label]
+            if let value = attribute(element, "accessibilityValue") { node["value"] = String(describing: value) }
+            if label.isEmpty {
+                // Ask the way an assistive client does, by attribute name.
+                for name in ["AXTitle", "AXDescription", "AXLabel", "AXHelp", "AXTitleUIElement"] {
+                    if element.responds(to: NSSelectorFromString("accessibilityAttributeValue:")),
+                       let value = element.perform(NSSelectorFromString("accessibilityAttributeValue:"), with: name)?.takeUnretainedValue(),
+                       !(value is NSNull), !String(describing: value).isEmpty { node["attr" + name] = String(describing: value).prefix(80).description }
+                }
+                node["attrs"] = ((element.perform(NSSelectorFromString("accessibilityAttributeNames"))?.takeUnretainedValue() as? [String]) ?? []).joined(separator: ",")
+            }
+            if let description = attribute(element, "accessibilityRoleDescription") as? String { node["roleDescription"] = description }
+            if let identifier = attribute(element, "accessibilityIdentifier") as? String, !identifier.isEmpty { node["identifier"] = identifier }
             if let accessible = element as? any NSAccessibilityProtocol {
                 let rect = accessible.accessibilityFrame()
+                node["x"] = String(Double(rect.minX)); node["y"] = String(Double(rect.minY))
+                node["width"] = String(Double(rect.width)); node["height"] = String(Double(rect.height))
+            } else if element.responds(to: NSSelectorFromString("accessibilityFrame")),
+                      let rect = (element.value(forKey: "accessibilityFrame") as? NSValue)?.rectValue {
+                // SwiftUI's accessibility nodes answer the same question without adopting the protocol.
                 node["x"] = String(Double(rect.minX)); node["y"] = String(Double(rect.minY))
                 node["width"] = String(Double(rect.width)); node["height"] = String(Double(rect.height))
             }
