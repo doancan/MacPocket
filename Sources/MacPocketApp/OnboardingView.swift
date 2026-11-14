@@ -26,7 +26,7 @@ extension OnboardingPermission {
         switch self {
         case .accessibility: "Pencereleri yönetmek, kısayolları ve fare tekerleğini dinlemek için."
         case .screenRecording: "Ekran görüntüsü, ekran kaydı ve pencere geçişindeki canlı önizlemeler için."
-        case .fullDiskAccess: "Temizlik ve disk analizinin korunan klasörlerdeki önbellek ve kalıntıları görmesi için."
+        case .fullDiskAccess: "Temizlik, disk analizi ve tam kaldırmanın korunan klasörlerdeki (Mail, Safari, uygulama kapsayıcıları) önbellek ve kalıntıları görüp kalıcı silebilmesi için."
         case .inputMonitoring: "Logitech fare ve klavyelerin pil seviyesini okumak için."
         case .location: "Wi-Fi ağ adlarını göstermek ve gece modunda gün batımını hesaplamak için. Konum bu Mac’ten çıkmaz."
         case .notifications: "Düşük pil, dolan disk ve aşırı ısınma uyarıları için."

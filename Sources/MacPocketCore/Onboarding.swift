@@ -32,8 +32,8 @@ public enum OnboardingPermission: String, CaseIterable, Identifiable, Sendable {
     /// Asked by macOS itself with a dialog the first time; the others are switched on in System Settings.
     public var hasSystemPrompt: Bool { self == .location || self == .notifications }
 
-    /// macOS applies these to a running process only after a relaunch.
-    public var mayNeedRelaunch: Bool { self == .screenRecording || self == .inputMonitoring }
+    /// macOS applies these to a running process only after a relaunch (Full Disk Access shows "Quit & Reopen").
+    public var mayNeedRelaunch: Bool { self == .screenRecording || self == .inputMonitoring || self == .fullDiskAccess }
 
     /// Shown first and marked "Recommended": they unlock the most tools.
     public var isRecommended: Bool { self == .accessibility || self == .fullDiskAccess }

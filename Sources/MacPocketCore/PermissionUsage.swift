@@ -1,12 +1,13 @@
 import Foundation
 
 public enum CorePermissionFeature: Sendable, Equatable {
-    case cleanup, diskAnalysis, leftovers, wifi, monitorAlerts
+    case cleanup, diskAnalysis, leftovers, uninstall, wifi, monitorAlerts
     public var localizedTitle: String {
         switch self {
         case .cleanup: String(localized: "Temizlik")
         case .diskAnalysis: String(localized: "Disk Analizi")
         case .leftovers: String(localized: "Uygulama Kalıntıları")
+        case .uninstall: String(localized: "Tam Kaldırma")
         case .wifi: String(localized: "Wi-Fi Analizi")
         case .monitorAlerts: String(localized: "İzleme uyarıları")
         }
@@ -30,7 +31,7 @@ public enum PermissionUsageMap {
             // The process-tap audio permission is checked by the mixer itself, not CGPreflightScreenCaptureAccess.
             modules = [.screenGrab, .screenshot, .recorder, .windowSwitcher, .dockPreview]; core = []
         case .fullDiskAccess:
-            modules = []; core = [.cleanup, .diskAnalysis, .leftovers]
+            modules = []; core = [.cleanup, .diskAnalysis, .leftovers, .uninstall]
         case .inputMonitoring:
             modules = [.bluetoothBattery]; core = []
         case .location:
