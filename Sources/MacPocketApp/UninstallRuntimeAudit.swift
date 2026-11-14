@@ -108,7 +108,7 @@ private actor UninstallAuditTrash {
                 }
                 let applications = try await ApplicationInventory().scan(roots: [home])
                 guard let application = applications.first(where: { $0.url.path == app.path }) else { throw FileServiceError.unreadable }
-                let plan = try UninstallPlanner.plan(application, home: home)
+                let plan = try UninstallPlanner.plan(application, home: home, systemLibrary: nil)
                 var extra = ["--preference", preference.path]
                 if mode == "refuses" { extra.append("--refuse-quit") }
                 if mode == "helper" { extra.append("--stubborn-helper") }
@@ -122,7 +122,7 @@ private actor UninstallAuditTrash {
                     otherIdentity = try await ProcessMonitor().snapshot().processes.first { $0.pid == otherCopy?.processIdentifier }?.identity
                 }
                 let service = ApplicationUninstallProcesses(), trash = UninstallAuditTrash(root: root)
-                let model = ApplicationWorkspaceModel(uninstallProcesses: service, uninstallTrash: { await trash.move($0) })
+                let model = ApplicationWorkspaceModel(uninstallProcesses: service, uninstallRemoval: { requests, _, _, _ in await trash.move(requests) })
                 let preparation = UninstallPreparationModel(application: application, service: service)
                 await preparation.refresh()
                 checks["\(mode)MainAndHelperDetected"] = preparation.processes.count == 2 && preparation.processes.contains(where: \.isMainApplication)

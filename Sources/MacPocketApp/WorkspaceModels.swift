@@ -246,17 +246,17 @@ final class FileWorkspaceModel: ObservableObject {
 
     func cancel() { operation?.cancel() }
 
-    func trashSelection() {
+    func trashSelection(mode: RemovalMode = RemovalModePreference.load()) {
         guard !busy, preservesDuplicateOriginals, let root = report?.root else { return }
         let requests = selectedRows.map { FileTrashRequest(url: $0.url, identity: $0.identity, root: root) }
         guard !requests.isEmpty else { return }
         busy = true; failure = nil; resultMessage = nil
-        progress = String(localized: "\(requests.count) öğe Çöp’e taşınıyor…")
+        progress = mode.inProgress(requests.count)
         operation = Task { [weak self] in
             guard let self else { return }
             defer { busy = false; operation = nil }
-            let results = await trashService.trash(requests)
-            let moved = Set(results.filter { $0.trashURL != nil }.map(\.id))
+            let results = await trashService.remove(requests, mode: mode)
+            let moved = Set(results.filter(\.succeeded).map(\.id))
             let errors = results.compactMap(\.error)
             if !moved.isEmpty {
                 trashedPaths.formUnion(moved)
@@ -269,11 +269,14 @@ final class FileWorkspaceModel: ObservableObject {
             }
             selection = []
             resultMessage = moved.isEmpty ? nil
-                : String(localized: "\(moved.count) öğe Çöp’e taşındı. Toplamlar bir sonraki taramada güncellenir.")
+                : mode.completed(moved.count) + " " + String(localized: "Toplamlar bir sonraki taramada güncellenir.")
             failure = errors.isEmpty ? nil : errors.prefix(3).joined(separator: "\n")
         }
     }
 }
+
+/// Removes validated requests: mode, administrator prompt text (nil = never elevate), launchd daemons to stop first.
+typealias UninstallRemoval = @Sendable ([FileTrashRequest], RemovalMode, String?, [String]) async -> [FileTrashResult]
 
 @MainActor
 @Observable
@@ -309,13 +312,15 @@ final class ApplicationWorkspaceModel {
     private let homebrew = HomebrewApplications()
     private let updateScanner: ApplicationUpdateScanner
     private let uninstallProcesses: any UninstallProcessManaging
-    private let uninstallTrash: @Sendable ([FileTrashRequest]) async -> [FileTrashResult]
+    private let uninstallRemoval: UninstallRemoval
     @ObservationIgnored private var updateTask: Task<Void, Never>?
 
     init(updateScanner: ApplicationUpdateScanner = ApplicationUpdateScanner(),
          uninstallProcesses: any UninstallProcessManaging = ApplicationUninstallProcesses(),
-         uninstallTrash: @escaping @Sendable ([FileTrashRequest]) async -> [FileTrashResult] = { await FileTrashService().trash($0) }) {
-        self.updateScanner = updateScanner; self.uninstallProcesses = uninstallProcesses; self.uninstallTrash = uninstallTrash
+         uninstallRemoval: @escaping UninstallRemoval = { requests, mode, prompt, labels in
+             await FileTrashService().remove(requests, mode: mode, administratorPrompt: prompt, launchdLabels: labels)
+         }) {
+        self.updateScanner = updateScanner; self.uninstallProcesses = uninstallProcesses; self.uninstallRemoval = uninstallRemoval
     }
     func uninstallPreparation(for application: InstalledApplication) -> UninstallPreparationModel {
         .init(application: application, service: uninstallProcesses)
@@ -407,44 +412,103 @@ final class ApplicationWorkspaceModel {
         return applications.first { names.contains($0.url.lastPathComponent) && self.cask(for: $0)?.token == cask.token }
             ?? applications.first { names.contains($0.url.lastPathComponent) }
     }
+    /// - Parameters:
+    ///   - selected: the plan items the user ticked; ignored when `everything` is set.
+    ///   - everything: "remove completely": the plan is rebuilt after the app quits and every item found,
+    ///     user data included, is removed, so files the app wrote while quitting do not survive.
+    ///   - mode: items under /Library cannot be recovered from the Trash and are always deleted permanently.
     @discardableResult
-    func uninstall(_ plan: UninstallPlan, selected: Set<String>) async -> Bool {
+    func uninstall(_ plan: UninstallPlan, selected: Set<String>, everything: Bool = false,
+                   mode: RemovalMode = RemovalModePreference.load()) async -> Bool {
         guard !busy, !checkingUpdates, updatingToken == nil else { return false }
-        guard !selected.isEmpty, selected.isSubset(of: Set(plan.candidates.map(\.id))) else {
+        guard everything || (!selected.isEmpty && selected.isSubset(of: Set(plan.candidates.map(\.id)))) else {
             failure = String(localized: "Kaldırılacak öğeleri geçerli plandan seç."); return false
         }
         busy = true
         failure = nil; resultMessage = nil
         defer { busy = false; updatingToken = nil; PocketOperationState.shared.preventTermination = false }
         var results: [FileTrashResult] = [], packageResult = "", operationFailure: String?
+        var failures: [String] = []
+        let prompt = String(localized: "\(plan.application.name) ile ilişkili sistem dosyalarını silmek için yönetici izni gerekiyor.")
+        func removal(_ candidates: [UninstallCandidate], mode: RemovalMode, prompt: String? = nil, labels: [String] = []) async -> [FileTrashResult] {
+            await uninstallRemoval(candidates.map(\.request), mode, prompt, labels)
+        }
+        func stopAgents(_ candidates: [UninstallCandidate]) async {
+            for candidate in candidates where candidate.request.url.deletingLastPathComponent().lastPathComponent == "LaunchAgents" {
+                if let label = candidate.launchdLabel { await LaunchdJobs.stopUserAgent(label: label) }
+            }
+        }
         do {
             try await requireStopped(plan.application, validateBundle: true)
-            // Graceful quit can save preferences. Refresh identities, retain only explicitly selected paths,
-            // and never select newly discovered files or user-data categories automatically.
-            let fresh = try UninstallPlanner.plan(plan.application, home: plan.home)
-            var requests = fresh.candidates.filter { selected.contains($0.id) }.map(\.request)
-            requests.sort { !$0.applicationBundle && $1.applicationBundle }
+            // Graceful quit can save preferences. Refresh identities and keep only what was selected
+            // (or, for a complete removal, everything the fresh scan finds).
+            let fresh = try UninstallPlanner.plan(plan.application, home: plan.home, systemLibrary: plan.systemLibrary,
+                                                  siblingIDs: plan.siblingIDs)
+            let chosen = everything ? fresh.candidates : fresh.candidates.filter { selected.contains($0.id) }
             var removedByHomebrew = false
-            if let cask = cask(for: plan.application), selected.contains(plan.application.id) {
+            if let cask = cask(for: plan.application), chosen.contains(where: \.request.applicationBundle) {
                 try await requireStopped(plan.application, validateBundle: true)
                 updatingToken = cask.token; packageAction = String(localized: "kaldırılıyor")
                 PocketOperationState.shared.preventTermination = true
                 packageResult = try await homebrew.uninstall(cask.token); removedByHomebrew = true
-                requests.removeAll { $0.applicationBundle }
                 casks = (try? await homebrew.installed()) ?? []
             }
-            for request in requests {
+            PocketOperationState.shared.preventTermination = true
+            let userLevel = chosen.filter { !$0.isSystemLevel && !$0.request.applicationBundle }
+            let systemLevel = chosen.filter(\.isSystemLevel)
+            let bundle = removedByHomebrew ? [] : chosen.filter(\.request.applicationBundle)
+            // A complete removal keeps going past a stubborn item and reports it at the end; a hand-picked
+            // removal stops at the first failure and leaves the rest untouched.
+            var halted = false
+            func record(_ removed: [FileTrashResult]) {
+                results += removed
+                let failed = removed.filter { !$0.succeeded }.compactMap(\.error)
+                failures += failed
+                if !failed.isEmpty, !everything { halted = true }
+            }
+
+            // 1. The user's own files, one at a time with a process check before each. Permission failures are
+            //    set aside so a single password prompt can cover all of them.
+            var needsAdministrator: [UninstallCandidate] = []
+            for candidate in userLevel where !halted {
                 try Task.checkCancellation()
                 try await requireStopped(plan.application, validateBundle: !removedByHomebrew)
-                let moved = await uninstallTrash([request]); results += moved
-                if moved.count != 1 || moved.contains(where: { $0.trashURL == nil }) {
-                    operationFailure = moved.compactMap(\.error).first ?? String(localized: "Seçilen öğe taşınamadı; kalan öğelere dokunulmadı."); break
-                }
+                await stopAgents([candidate])
+                let removed = await removal([candidate], mode: mode)
+                if mode == .deletePermanently, removed.first?.permissionDenied == true { needsAdministrator.append(candidate) }
+                else { record(removed) }
+            }
+            // 2. Everything that needs root in one go: denied user files, /Library items, then a root-owned app last.
+            var elevated = needsAdministrator + systemLevel
+            if mode == .deletePermanently, let app = bundle.first, !Self.isOwnedByCurrentUser(app.request.url) { elevated += bundle }
+            if !halted, !elevated.isEmpty {
+                try Task.checkCancellation()
+                try await requireStopped(plan.application, validateBundle: !removedByHomebrew)
+                await stopAgents(elevated)
+                let daemons = elevated.filter { $0.request.url.deletingLastPathComponent().lastPathComponent == "LaunchDaemons" }
+                record(await removal(elevated, mode: .deletePermanently, prompt: prompt, labels: daemons.compactMap(\.launchdLabel)))
+            } else if halted { failures.append(String(localized: "Kalan öğelere dokunulmadı.")) }
+            // 3. The application bundle last, so a failure above never leaves leftovers without their app.
+            let bundleDone = elevated.contains { $0.request.applicationBundle }
+            if !halted, !bundle.isEmpty, !bundleDone {
+                try Task.checkCancellation()
+                try await requireStopped(plan.application, validateBundle: !removedByHomebrew)
+                record(await removal(bundle, mode: mode))
+            }
+            if !failures.isEmpty {
+                operationFailure = failures.prefix(3).joined(separator: "\n")
+                    + (failures.count > 3 ? "\n" + String(localized: "ve \(failures.count - 3) öğe daha.") : "")
             }
         } catch is CancellationError { operationFailure = String(localized: "Kaldırma durduruldu; kalan öğelere dokunulmadı.") }
         catch { operationFailure = error.localizedDescription }
         if !results.isEmpty || !packageResult.isEmpty {
-            resultMessage = String(localized: "\(results.filter { $0.trashURL != nil }.count) öğe Çöp’e taşındı.") + (packageResult.isEmpty ? "" : "\nHomebrew: \(packageResult)")
+            let deleted = results.filter { $0.succeeded && $0.mode == .deletePermanently }.count
+            let trashed = results.filter { $0.succeeded && $0.mode == .moveToTrash }.count
+            var lines: [String] = []
+            if deleted > 0 { lines.append(RemovalMode.deletePermanently.completed(deleted)) }
+            if trashed > 0 || deleted == 0 { lines.append(RemovalMode.moveToTrash.completed(trashed)) }
+            if !packageResult.isEmpty { lines.append("Homebrew: \(packageResult)") }
+            resultMessage = lines.joined(separator: "\n")
         }
         if !FileManager.default.fileExists(atPath: plan.application.url.path) {
             applications.removeAll { $0.id == plan.application.id }
@@ -453,6 +517,11 @@ final class ApplicationWorkspaceModel {
         if operationFailure == nil, resultMessage == nil { resultMessage = String(localized: "Seçili öğeler artık bu konumda yok.") }
         if operationFailure == nil { selection = nil }
         return operationFailure == nil
+    }
+    /// A root-owned bundle (Xcode, some pkg installers) cannot be deleted by the user even inside a writable folder.
+    private static func isOwnedByCurrentUser(_ url: URL) -> Bool {
+        guard let owner = (try? FileManager.default.attributesOfItem(atPath: url.path))?[.ownerAccountID] as? NSNumber else { return true }
+        return owner.uint32Value == getuid()
     }
     private func requireStopped(_ application: InstalledApplication, validateBundle: Bool) async throws {
         let running = try await uninstallProcesses.inspect(application, validateBundle: validateBundle)

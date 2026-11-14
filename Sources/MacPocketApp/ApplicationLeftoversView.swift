@@ -78,14 +78,15 @@ final class ApplicationLeftoversModel: ObservableObject {
                 !installedIDs.contains(where: { candidate.bundleID == $0 || candidate.bundleID.hasPrefix($0 + ".") })
                     && NSWorkspace.shared.urlForApplication(withBundleIdentifier: candidate.bundleID) == nil
             }
-            progress = String(localized: "\(stillUnregistered.count) öğe Çöp’e taşınıyor…")
-            let results = await FileTrashService().trash(stillUnregistered.map(\.request))
-            let moved = Set(results.filter { $0.trashURL != nil }.map(\.id))
+            let mode = RemovalModePreference.load()
+            progress = mode.inProgress(stillUnregistered.count)
+            let results = await FileTrashService().remove(stillUnregistered.map(\.request), mode: mode)
+            let moved = Set(results.filter(\.succeeded).map(\.id))
             rows.removeAll { moved.contains($0.id) }; selection = []
             let skipped = selected.count - stillUnregistered.count
             message = skipped > 0
-                ? String(localized: "\(moved.count) öğe Çöp’e taşındı. \(skipped) öğe artık kurulu bir uygulamayla eşleştiği için atlandı.")
-                : String(localized: "\(moved.count) öğe Çöp’e taşındı.")
+                ? mode.completed(moved.count) + " " + String(localized: "\(skipped) öğe artık kurulu bir uygulamayla eşleştiği için atlandı.")
+                : mode.completed(moved.count)
             let errors = results.compactMap(\.error)
             failure = errors.isEmpty ? nil : errors.prefix(3).joined(separator: "\n")
         }
@@ -96,6 +97,7 @@ struct ApplicationLeftoversView: View {
     @StateObject private var model = ApplicationLeftoversModel()
     @State private var confirm = false
     @State private var showInfo = false
+    @AppStorage(RemovalModePreference.storageKey) private var removalMode: RemovalMode = .deletePermanently
     @FocusState private var searchFocused: Bool
 
     var body: some View {
@@ -115,6 +117,7 @@ struct ApplicationLeftoversView: View {
                     .popover(isPresented: $showInfo, arrowEdge: .bottom) { infoPopover }
                 Spacer(minLength: 0)
             }
+            FullDiskAccessBanner(consequence: "Korunan klasörlerdeki kalıntılar taramaya girmez.")
             if model.busy { PocketProgressRow(message: model.progress) }
             if let failure = model.failure { PocketMessage(failure, tone: .critical) }
             if let message = model.message { PocketMessage(message, tone: .success) }
@@ -136,9 +139,9 @@ struct ApplicationLeftoversView: View {
         .pocketPage()
         .onReceive(NotificationCenter.default.publisher(for: .pocketFind)) { _ in searchFocused = true }
         .onDisappear { model.cancel() }
-        .alert("Seçili adaylar Çöp’e taşınsın mı?", isPresented: $confirm) {
+        .alert(removalMode == .deletePermanently ? "Seçili adaylar kalıcı olarak silinsin mi?" : "Seçili adaylar Çöp’e taşınsın mı?", isPresented: $confirm) {
             Button("Vazgeç", role: .cancel) {}
-            Button("Çöp’e Taşı", role: .destructive) { model.trash() }
+            Button(removalMode == .deletePermanently ? "Kalıcı Olarak Sil" : "Çöp’e Taşı", role: .destructive) { model.trash() }
         } message: {
             Text(confirmationMessage)
         }
@@ -148,9 +151,13 @@ struct ApplicationLeftoversView: View {
         let selected = model.selectedRows
         let shared = selected.filter(\.sharedVendor).count
         if shared > 0 {
-            return String(localized: "Seçilen \(selected.count) öğe tercih veya kullanıcı verisi içerebilir. Uygulaması başka yerdeyse bu verilere ihtiyaç duyabilir. \(shared) öğenin üreticisine ait başka bir uygulama kurulu; bu öğeler hâlâ kullanılıyor olabilir. Gerekirse Finder’daki Çöp’ten geri alabilirsin.")
+            return String(localized: "Seçilen \(selected.count) öğe tercih veya kullanıcı verisi içerebilir. Uygulaması başka yerdeyse bu verilere ihtiyaç duyabilir. \(shared) öğenin üreticisine ait başka bir uygulama kurulu; bu öğeler hâlâ kullanılıyor olabilir. \(recoveryNote)")
         }
-        return String(localized: "Seçilen \(selected.count) öğe tercih veya kullanıcı verisi içerebilir. Uygulaması başka yerdeyse bu verilere ihtiyaç duyabilir. Gerekirse Finder’daki Çöp’ten geri alabilirsin.")
+        return String(localized: "Seçilen \(selected.count) öğe tercih veya kullanıcı verisi içerebilir. Uygulaması başka yerdeyse bu verilere ihtiyaç duyabilir. \(recoveryNote)")
+    }
+
+    private var recoveryNote: String {
+        removalMode == .deletePermanently ? String(localized: "Kalıcı silme geri alınamaz.") : String(localized: "Gerekirse Finder’daki Çöp’ten geri alabilirsin.")
     }
 
     private var headingActions: some View {
@@ -173,7 +180,7 @@ struct ApplicationLeftoversView: View {
             Label("Taşınmış veya başka diskteki uygulamaların verileri de aday olarak görünebilir.", systemImage: "externaldrive.badge.questionmark")
             Label("“Üretici uygulaması kurulu” işaretli öğeler aynı üreticinin başka bir uygulaması tarafından kullanılıyor olabilir.", systemImage: "building.2")
             Label("Kullanıcı Library içindeki yedi konumun her birinde en fazla 10.000 doğrudan öğe incelenir; erişilemeyen klasörler atlanır.", systemImage: "folder.badge.questionmark")
-            Label("Taşımadan önce envanter yeniden doğrulanır; öğeler Çöp’ten geri alınabilir.", systemImage: "trash")
+            Label("Silmeden önce envanter yeniden doğrulanır. Çöp’e taşıma seçiliyse öğeler Çöp’ten geri alınabilir.", systemImage: "trash")
         }
         .font(.callout)
         .fixedSize(horizontal: false, vertical: true)
@@ -233,10 +240,11 @@ struct ApplicationLeftoversView: View {
                 }
                 .disabled(model.selection.isEmpty)
                 .help("Seçili öğeleri Finder’da göster")
-                Button("Çöp’e Taşı…", role: .destructive) { confirm = true }
+                RemovalModePicker().disabled(model.busy)
+                Button(removalMode.actionTitle, role: .destructive) { confirm = true }
                     .keyboardShortcut(.delete, modifiers: .command)
                     .disabled(model.selectedRows.isEmpty || model.busy)
-                    .help("Seçili adayları Çöp’e taşı (⌘⌫)")
+                    .help("Seçili adayları kaldır (⌘⌫)")
             }
         }
     }

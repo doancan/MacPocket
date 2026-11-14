@@ -5,6 +5,7 @@ import SwiftUI
 struct ApplicationsView: View {
     @Bindable var model: ApplicationWorkspaceModel
     @State private var uninstallPlan: UninstallPlan?
+    @State private var removeEverything = false
     @State private var pendingUpdate: HomebrewCask?
     @State private var confirmUpdate = false
     @FocusState private var searchFocused: Bool
@@ -41,7 +42,7 @@ struct ApplicationsView: View {
             searchFocused = true
         }
         .sheet(item: $uninstallPlan) { plan in
-            UninstallPlanView(plan: plan, model: model)
+            UninstallPlanView(plan: plan, model: model, removeEverything: removeEverything)
         }
         .alert("Uygulama güncellensin mi?", isPresented: $confirmUpdate) {
             Button("Vazgeç", role: .cancel) { pendingUpdate = nil }
@@ -113,7 +114,7 @@ struct ApplicationsView: View {
                     .overlay { installedEmptyState }
                 if let app = model.selectedApplication {
                     Divider()
-                    ApplicationInspector(app: app, model: model) { plan in uninstallPlan = plan }
+                    ApplicationInspector(app: app, model: model) { plan, everything in removeEverything = everything; uninstallPlan = plan }
                         .frame(width: 280)
                 }
             }
@@ -228,7 +229,10 @@ struct ApplicationsView: View {
 private struct ApplicationInspector: View {
     let app: InstalledApplication
     var model: ApplicationWorkspaceModel
-    let reviewUninstall: (UninstallPlan) -> Void
+    /// The flag asks for the one-click "remove everything" flow instead of the item-by-item review.
+    let reviewUninstall: (UninstallPlan, Bool) -> Void
+    /// Other installed apps' identifiers keep a prefix match (`com.x.App` vs `com.x.App.beta`) from taking their data.
+    private var siblingIDs: Set<String> { Set(model.applications.map(\.bundleID)) }
 
     private var channel: String { model.cask(for: app) != nil ? ApplicationUpdateSource.homebrew.localizedTitle : app.channel.localizedTitle }
     private var version: String { app.build.isEmpty || app.build == app.version ? app.version : "\(app.version) (\(app.build))" }
@@ -268,16 +272,19 @@ private struct ApplicationInspector: View {
                 Divider()
 
                 VStack(alignment: .leading, spacing: PocketSpacing.s) {
-                    Button(role: .destructive) {
-                        do { reviewUninstall(try UninstallPlanner.plan(app)) }
-                        catch { model.failure = error.localizedDescription }
-                    } label: {
-                        Label("Kaldırma Planını İncele…", systemImage: "trash").frame(maxWidth: .infinity)
+                    Button(role: .destructive) { openPlan(everything: true) } label: {
+                        Label("Tamamen Kaldır…", systemImage: "trash.fill").frame(maxWidth: .infinity)
+                    }
+                    .buttonStyle(.pocketPrimary)
+                    .disabled(app.protected || model.busy || model.updatingToken != nil)
+                    .help("Uygulamayı ve bulunan tüm ilişkili dosyaları, kullanıcı verileri dahil, kalıcı olarak siler")
+                    Button { openPlan(everything: false) } label: {
+                        Label("Kaldırma Planını İncele…", systemImage: "checklist").frame(maxWidth: .infinity)
                     }
                     .disabled(app.protected || model.busy || model.updatingToken != nil)
-                    .help("Hiçbir şey hemen silinmez; önce kaldırılacak öğeleri seçersin")
+                    .help("Kaldırılacak öğeleri tek tek seçersin")
                     Text(app.protected ? "Sistem uygulamaları ve MacPocket korunuyor."
-                         : "Uygulama ve tam bundle kimliğiyle eşleşen dosyalar ayrı ayrı listelenir.")
+                         : "Tamamen Kaldır, uygulamayı ve bulunan tüm ilişkili dosyaları tek onayla kalıcı olarak siler.")
                         .font(.subheadline).foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)
                 }
@@ -286,6 +293,11 @@ private struct ApplicationInspector: View {
             .frame(maxWidth: .infinity, alignment: .leading)
         }
         .background(PocketTheme.panel)
+    }
+
+    private func openPlan(everything: Bool) {
+        do { reviewUninstall(try UninstallPlanner.plan(app, siblingIDs: siblingIDs), everything) }
+        catch { model.failure = error.localizedDescription }
     }
 
     private func inspectorRow(_ title: LocalizedStringKey, value: String, monospaced: Bool = false) -> some View {

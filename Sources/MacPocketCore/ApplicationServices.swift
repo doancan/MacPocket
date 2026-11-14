@@ -83,6 +83,12 @@ public struct UninstallCandidate: Identifiable, Sendable {
     public let title: String
     public let containsUserData: Bool
     public let request: FileTrashRequest
+    /// Lives in /Library rather than the user's Library: removing it asks for an administrator password.
+    public var isSystemLevel = false
+    /// Found by the app's exact name rather than its bundle identifier.
+    public var matchedByName = false
+    /// launchd job that must be stopped before its property list is removed.
+    public var launchdLabel: String?
 }
 
 public struct UninstallPlan: Identifiable, Sendable {
@@ -91,9 +97,19 @@ public struct UninstallPlan: Identifiable, Sendable {
     public let candidates: [UninstallCandidate]
     public let createdAt: Date
     public let home: URL
+    /// The machine-wide Library that was searched; nil when only the user's Library was.
+    public var systemLibrary: URL?
+    /// Bundle identifiers of the other installed applications the search steered clear of.
+    public var siblingIDs: Set<String> = []
+
+    /// "Remove everything": the app and every leftover found, user data included.
+    public var completeSelection: Set<String> { Set(candidates.map(\.id)) }
+    public var requiresAdministrator: Bool { candidates.contains(where: \.isSystemLevel) }
 }
 
 public enum UninstallPlanner {
+    public static let defaultSystemLibrary = URL(fileURLWithPath: "/Library", isDirectory: true)
+
     public static func validateApplication(_ application: InstalledApplication) throws {
         guard !application.protected else { throw FileServiceError.protectedItem }
         guard application.url.pathExtension.lowercased() == "app", application.identity.isDirectory,
@@ -101,32 +117,128 @@ public enum UninstallPlanner {
         guard try FileIdentity.read(application.url) == application.identity,
               ApplicationInventory.read(application.url)?.bundleID == application.bundleID else { throw FileServiceError.changed }
     }
-    /// Exact bundle identifiers only. Shared vendor/App Group directories are never inferred.
-    public static func plan(_ application: InstalledApplication, home: URL = FileManager.default.homeDirectoryForCurrentUser) throws -> UninstallPlan {
+
+    private struct Rule {
+        let folder: String
+        let title: String
+        let userData: Bool
+        let matches: (String) -> Bool
+    }
+
+    /// Bundle identifiers are case-insensitive on disk; `name` and `id` are lowercased before comparison.
+    private static func rules(id: String, system: Bool) -> [Rule] {
+        let id = id.lowercased()
+        func exact(_ name: String) -> Bool { name == id }
+        func family(_ name: String) -> Bool { name == id || name.hasPrefix(id + ".") }
+        func plist(_ name: String) -> Bool { name.hasSuffix(".plist") && (name == id + ".plist" || name.hasPrefix(id + ".")) }
+        if system {
+            return [
+                Rule(folder: "LaunchDaemons", title: String(localized: "Sistem arka plan hizmeti"), userData: false, matches: plist),
+                Rule(folder: "LaunchAgents", title: String(localized: "Sistem başlangıç öğesi"), userData: false, matches: plist),
+                Rule(folder: "PrivilegedHelperTools", title: String(localized: "Ayrıcalıklı yardımcı"), userData: false, matches: family),
+                Rule(folder: "Application Support", title: String(localized: "Ortak uygulama verileri"), userData: true, matches: exact),
+                Rule(folder: "Preferences", title: String(localized: "Ortak tercihler"), userData: true,
+                     matches: { $0 == id + ".plist" }),
+                Rule(folder: "Caches", title: String(localized: "Ortak önbellek"), userData: false, matches: family),
+            ]
+        }
+        return [
+            Rule(folder: "Caches", title: String(localized: "Önbellek"), userData: false, matches: family),
+            Rule(folder: "Logs", title: String(localized: "Günlükler"), userData: false, matches: family),
+            Rule(folder: "HTTPStorages", title: String(localized: "HTTP verileri"), userData: true, matches: family),
+            Rule(folder: "Preferences", title: String(localized: "Tercihler"), userData: true, matches: plist),
+            Rule(folder: "Preferences/ByHost", title: String(localized: "Bu Mac’e özel tercihler"), userData: true, matches: plist),
+            Rule(folder: "Application Support", title: String(localized: "Uygulama verileri"), userData: true, matches: exact),
+            Rule(folder: "Saved Application State", title: String(localized: "Kaydedilmiş durum"), userData: true,
+                 matches: { $0 == id + ".savedstate" }),
+            Rule(folder: "WebKit", title: String(localized: "Web verileri"), userData: true, matches: family),
+            Rule(folder: "Containers", title: String(localized: "Uygulama kapsayıcısı"), userData: true, matches: family),
+            Rule(folder: "Group Containers", title: String(localized: "Grup kapsayıcısı"), userData: true,
+                 matches: { $0 == "group." + id || $0.hasSuffix("." + id) }),
+            Rule(folder: "Application Scripts", title: String(localized: "Uygulama betikleri"), userData: false, matches: family),
+            Rule(folder: "Cookies", title: String(localized: "Çerezler"), userData: true, matches: { $0 == id + ".binarycookies" }),
+            Rule(folder: "LaunchAgents", title: String(localized: "Başlangıç öğesi"), userData: false, matches: plist),
+        ]
+    }
+
+    /// Folders that apps name after themselves instead of their bundle identifier.
+    private static let nameKeyedFolders: [(folder: String, title: String, userData: Bool)] = [
+        ("Application Support", String(localized: "Uygulama verileri (ada göre)"), true),
+        ("Caches", String(localized: "Önbellek (ada göre)"), false),
+        ("Logs", String(localized: "Günlükler (ada göre)"), false),
+    ]
+
+    /// Names too generic to prove ownership.
+    private static let minimumNameLength = 4
+
+    /// Everything that provably belongs to the application: exact bundle identifier families in the user's
+    /// Library and, when `systemLibrary` is given, in /Library; plus folders named exactly like the app.
+    /// Vendor-wide folders (a shared prefix such as `com.vendor`) are never inferred. `siblingIDs` are the other
+    /// installed applications' identifiers: an app named `com.x.Editor` must not take the data of an installed
+    /// `com.x.Editor.beta` with it just because the names share a prefix.
+    public static func plan(_ application: InstalledApplication, home: URL = FileManager.default.homeDirectoryForCurrentUser,
+                            systemLibrary: URL? = defaultSystemLibrary, siblingIDs: Set<String> = []) throws -> UninstallPlan {
         try validateApplication(application)
         let id = application.bundleID
         guard id.range(of: #"^[A-Za-z0-9][A-Za-z0-9._-]+$"#, options: .regularExpression) != nil,
               !id.contains("..") else { throw FileServiceError.outsideScope }
         var candidates = [UninstallCandidate(title: String(localized: "Uygulama"), containsUserData: false,
             request: .init(url: application.url, identity: application.identity, root: application.url, applicationBundle: true))]
-        let library = try canonicalFileURL(home).appendingPathComponent("Library", isDirectory: true)
-        let locations: [(String, String, Bool)] = [
-            ("Caches/" + id, String(localized: "Önbellek"), false),
-            ("Logs/" + id, String(localized: "Günlükler"), false),
-            ("Preferences/" + id + ".plist", String(localized: "Tercihler"), true),
-            ("Application Support/" + id, String(localized: "Uygulama verileri"), true),
-            ("Saved Application State/" + id + ".savedState", String(localized: "Kaydedilmiş durum"), true),
-            ("WebKit/" + id, String(localized: "Web verileri"), true),
-            ("HTTPStorages/" + id, String(localized: "HTTP verileri"), true),
-            ("Containers/" + id, String(localized: "Uygulama kapsayıcısı"), true),
-        ]
-        for (path, title, userData) in locations {
-            let url = library.appendingPathComponent(path)
-            guard let identity = try? FileIdentity.read(url), !identity.isSymbolicLink else { continue }
+        var seen = Set([application.url.path])
+        func add(_ url: URL, root: URL, title: String, userData: Bool, system: Bool, byName: Bool = false) {
+            guard let identity = lstatIdentity(url.path), !identity.isSymbolicLink, seen.insert(url.path).inserted else { return }
             candidates.append(.init(title: title, containsUserData: userData,
-                                    request: .init(url: url, identity: identity, root: library)))
+                                    request: .init(url: url, identity: identity, root: root),
+                                    isSystemLevel: system, matchedByName: byName,
+                                    launchdLabel: launchdLabel(url, folder: root, system: system)))
         }
-        return .init(application: application, candidates: candidates, createdAt: Date(), home: home)
+        let library = try canonicalFileURL(home).appendingPathComponent("Library", isDirectory: true)
+        // Only identifiers nested under this one can collide with its prefix matches; unrelated or ancestor
+        // identifiers must never hide this application's own data.
+        let siblings = Set(siblingIDs.map { $0.lowercased() }.filter { $0.hasPrefix(id.lowercased() + ".") })
+        scan(library, rules: rules(id: id, system: false), siblings: siblings) { add($0, root: library, title: $1, userData: $2, system: false) }
+        if let systemLibrary, let canonical = try? canonicalFileURL(systemLibrary) {
+            scan(canonical, rules: rules(id: id, system: true), siblings: siblings) { add($0, root: canonical, title: $1, userData: $2, system: true) }
+        }
+        for name in nameCandidates(application) {
+            for (folder, title, userData) in nameKeyedFolders {
+                let url = library.appendingPathComponent(folder).appendingPathComponent(name)
+                add(url, root: library, title: title, userData: userData, system: false, byName: true)
+            }
+        }
+        return .init(application: application, candidates: candidates, createdAt: Date(), home: home,
+                     systemLibrary: systemLibrary, siblingIDs: siblingIDs)
+    }
+
+    private static func nameCandidates(_ application: InstalledApplication) -> [String] {
+        let names = [application.name, application.url.deletingPathExtension().lastPathComponent]
+        var unique: [String] = []
+        for name in names where name.count >= minimumNameLength && !name.contains("/") && !unique.contains(name) { unique.append(name) }
+        return unique
+    }
+
+    /// True when `name` (lowercased) is the data of another installed application: its identifier or a family member of it.
+    private static func belongsToSibling(_ name: String, siblings: Set<String>) -> Bool {
+        siblings.contains { name == $0 || name.hasPrefix($0 + ".") || name.hasSuffix("." + $0) }
+    }
+
+    private static func scan(_ library: URL, rules: [Rule], siblings: Set<String>, found: (URL, String, Bool) -> Void) {
+        for rule in rules {
+            let directory = library.appendingPathComponent(rule.folder, isDirectory: true)
+            guard let identity = lstatIdentity(directory.path), identity.isDirectory, !identity.isSymbolicLink,
+                  let names = try? FileManager.default.contentsOfDirectory(atPath: directory.path) else { continue }
+            for name in names.sorted() where rule.matches(name.lowercased()) && !belongsToSibling(name.lowercased(), siblings: siblings) {
+                found(directory.appendingPathComponent(name), rule.title, rule.userData)
+            }
+        }
+    }
+
+    private static func launchdLabel(_ url: URL, folder: URL, system: Bool) -> String? {
+        guard url.pathExtension == "plist", url.deletingLastPathComponent().lastPathComponent.hasPrefix("Launch"),
+              let data = try? Data(contentsOf: url),
+              let plist = try? PropertyListSerialization.propertyList(from: data, format: nil) as? [String: Any],
+              let label = plist["Label"] as? String, AdministratorRemover.isValidLaunchdLabel(label) else { return nil }
+        return label
     }
 }
 

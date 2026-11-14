@@ -48,20 +48,24 @@ struct SpaceLensView: View {
     @ObservedObject var model: SpaceLensModel
     @State private var hovered: String?
     @State private var confirmTrash = false
+    @AppStorage(RemovalModePreference.storageKey) private var removalMode: RemovalMode = .deletePermanently
 
     var body: some View {
         VStack(alignment: .leading, spacing: PocketSpacing.m) {
             toolbar
+            FullDiskAccessBanner(consequence: "Korunan klasörler boyutlara sayılmaz; toplamlar gerçek kullanımdan düşük görünebilir.")
             if let failure = model.failure { PocketMessage(failure, tone: model.tree == nil ? .critical : .warning) }
             if let result = model.resultMessage { PocketMessage(result, tone: .success) }
             content
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-        .alert("Seçilen öğeler Çöp’e taşınsın mı?", isPresented: $confirmTrash) {
+        .alert(removalMode == .deletePermanently ? "Seçilen öğeler kalıcı olarak silinsin mi?" : "Seçilen öğeler Çöp’e taşınsın mı?", isPresented: $confirmTrash) {
             Button("Vazgeç", role: .cancel) {}
-            Button("Çöp’e Taşı", role: .destructive) { model.trashSelection() }
+            Button(removalMode == .deletePermanently ? "Kalıcı Olarak Sil" : "Çöp’e Taşı", role: .destructive) { model.trashSelection(mode: removalMode) }
         } message: {
-            Text("\(model.selectedNodes.count) öğe · \(pocketDiskBytes(model.selectedBytes)). Finder’daki Çöp’ten geri alabilirsin; alan Çöp boşaltılınca açılır.")
+            removalMode == .deletePermanently
+                ? Text("\(model.selectedNodes.count) öğe · \(pocketDiskBytes(model.selectedBytes)). Kalıcı olarak silinir; geri alınamaz. Alan hemen açılır.")
+                : Text("\(model.selectedNodes.count) öğe · \(pocketDiskBytes(model.selectedBytes)). Finder’daki Çöp’ten geri alabilirsin; alan Çöp boşaltılınca açılır.")
         }
     }
 
@@ -166,7 +170,7 @@ struct SpaceLensView: View {
             Text("\(node.fileCount) dosya").foregroundStyle(.secondary).monospacedDigit()
             if model.working {
                 ProgressView().controlSize(.small)
-                Text("Çöp’e taşınıyor…").foregroundStyle(.secondary)
+                Text(removalMode == .deletePermanently ? "Siliniyor…" : "Çöp’e taşınıyor…").foregroundStyle(.secondary)
             }
             if model.scanning, let path = model.expandingPath {
                 ProgressView().controlSize(.small)
@@ -215,10 +219,11 @@ struct SpaceLensView: View {
             }
             Button("Finder’da Göster") { NSWorkspace.shared.activateFileViewerSelecting(model.selectedNodes.map(\.url)) }
                 .disabled(model.selectedNodes.isEmpty)
-            Button("Çöp’e Taşı…", role: .destructive) { confirmTrash = true }
+            RemovalModePicker().disabled(model.busy)
+            Button(removalMode.actionTitle, role: .destructive) { confirmTrash = true }
                 .keyboardShortcut(.delete, modifiers: .command)
                 .disabled(model.selectedNodes.isEmpty || model.busy)
-                .help("Seçili öğeleri Çöp’e taşı (⌘⌫)")
+                .help("Seçili öğeleri kaldır (⌘⌫)")
         }
     }
 

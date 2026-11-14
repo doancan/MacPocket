@@ -126,6 +126,7 @@ struct StorageOverviewPanel: View {
         ScrollView {
             VStack(alignment: .leading, spacing: PocketSpacing.l) {
                 capacityCard
+                FullDiskAccessBanner(consequence: "Korunan klasörler kategori boyutlarına sayılmaz; \"Sistem ve Diğer\" payı gerçekte olduğundan büyük görünebilir.")
                 if let failure = model.failure { PocketMessage(failure, tone: .critical) }
                 if let report = model.report {
                     categoryGrid(report)

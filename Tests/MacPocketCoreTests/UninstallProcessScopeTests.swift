@@ -31,7 +31,7 @@ final class UninstallProcessScopeTests: XCTestCase {
         try write("org.example.UninstallFixture")
         let applications = try await ApplicationInventory().scan(roots: [root])
         let application = try XCTUnwrap(applications.first)
-        let plan = try UninstallPlanner.plan(application, home: root)
+        let plan = try UninstallPlanner.plan(application, home: root, systemLibrary: nil)
         XCTAssertEqual(plan.home, root)
         try write("org.example.Replacement")
         XCTAssertThrowsError(try UninstallPlanner.validateApplication(application))
