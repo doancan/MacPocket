@@ -145,6 +145,22 @@ final class ApplicationServicesTests: XCTestCase {
         XCTAssertTrue(plan.candidates.contains { $0.request.url.lastPathComponent == "com.example.Editor.beta" })
     }
 
+    func testShortIdentifierMatchesExactlyAndNeverByPrefix() async throws {
+        let root = try fixture(), home = try fixture()
+        _ = try app(root, id: "com.evil")
+        let lib = home.appendingPathComponent("Library")
+        for path in ["Caches/com.evil", "Caches/com.other.App", "Caches/com.evil.sub", "Containers/com.other.App",
+                     "Group Containers/TEAM123456.com.evil", "Preferences/com.other.App.plist"] {
+            try touch(lib.appendingPathComponent(path), directory: !path.hasSuffix(".plist"))
+        }
+        let scanned = try await ApplicationInventory().scan(roots: [root])
+        let plan = try UninstallPlanner.plan(try XCTUnwrap(scanned.first), home: home, systemLibrary: nil)
+        let names = Set(plan.candidates.map(\.request.url.lastPathComponent))
+        XCTAssertTrue(names.contains("com.evil"))
+        XCTAssertFalse(names.contains("com.other.App") || names.contains("com.evil.sub") || names.contains("TEAM123456.com.evil")
+                       || names.contains("com.other.App.plist"))
+    }
+
     func testSystemAndOwnApplicationsCannotBeUninstalled() async throws {
         for id in ["com.apple.example", "com.doancan.MacPocket"] {
             let root = try fixture()

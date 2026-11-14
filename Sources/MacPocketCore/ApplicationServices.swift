@@ -128,9 +128,12 @@ public enum UninstallPlanner {
     /// Bundle identifiers are case-insensitive on disk; `name` and `id` are lowercased before comparison.
     private static func rules(id: String, system: Bool) -> [Rule] {
         let id = id.lowercased()
+        // A short identifier ("com", "net.x") is a prefix of countless unrelated names, so it only ever matches exactly.
+        let specific = id.split(separator: ".").count >= minimumIdentifierComponents
         func exact(_ name: String) -> Bool { name == id }
-        func family(_ name: String) -> Bool { name == id || name.hasPrefix(id + ".") }
-        func plist(_ name: String) -> Bool { name.hasSuffix(".plist") && (name == id + ".plist" || name.hasPrefix(id + ".")) }
+        func family(_ name: String) -> Bool { name == id || (specific && name.hasPrefix(id + ".")) }
+        func plist(_ name: String) -> Bool { name.hasSuffix(".plist") && (name == id + ".plist" || (specific && name.hasPrefix(id + "."))) }
+        func group(_ name: String) -> Bool { name == "group." + id || (specific && name.hasSuffix("." + id)) }
         if system {
             return [
                 Rule(folder: "LaunchDaemons", title: String(localized: "Sistem arka plan hizmeti"), userData: false, matches: plist),
@@ -154,7 +157,7 @@ public enum UninstallPlanner {
             Rule(folder: "WebKit", title: String(localized: "Web verileri"), userData: true, matches: family),
             Rule(folder: "Containers", title: String(localized: "Uygulama kapsayıcısı"), userData: true, matches: family),
             Rule(folder: "Group Containers", title: String(localized: "Grup kapsayıcısı"), userData: true,
-                 matches: { $0 == "group." + id || $0.hasSuffix("." + id) }),
+                 matches: group),
             Rule(folder: "Application Scripts", title: String(localized: "Uygulama betikleri"), userData: false, matches: family),
             Rule(folder: "Cookies", title: String(localized: "Çerezler"), userData: true, matches: { $0 == id + ".binarycookies" }),
             Rule(folder: "LaunchAgents", title: String(localized: "Başlangıç öğesi"), userData: false, matches: plist),
@@ -170,6 +173,8 @@ public enum UninstallPlanner {
 
     /// Names too generic to prove ownership.
     private static let minimumNameLength = 4
+    /// Identifiers with fewer dot-separated parts than this are matched exactly, never by prefix.
+    private static let minimumIdentifierComponents = 3
 
     /// Everything that provably belongs to the application: exact bundle identifier families in the user's
     /// Library and, when `systemLibrary` is given, in /Library; plus folders named exactly like the app.
