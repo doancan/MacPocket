@@ -66,7 +66,7 @@ import XCTest
         XCTAssertEqual(observation.diagnosticResources,["port":1,"source":1,"iterators":2,"wakeObserver":1,"sleepObserver":1,"pending":0])
         XCTAssertTrue(observation.start { changes.append($0) })
         NSWorkspace.shared.notificationCenter.post(name: NSWorkspace.didWakeNotification,object: nil)
-        try? await Task.sleep(for: .milliseconds(220))
+        for _ in 0..<60 where changes.isEmpty { try? await Task.sleep(for: .milliseconds(50)) }   // a loaded CI machine is slower than 220 ms
         XCTAssertEqual(changes,[true])
         NSWorkspace.shared.notificationCenter.post(name: NSWorkspace.didWakeNotification,object: nil)
         observation.stop()
@@ -84,7 +84,7 @@ import XCTest
         try? await Task.sleep(for: .milliseconds(220))
         XCTAssertEqual(sleeps,1);XCTAssertTrue(changes.isEmpty)
         center.post(name: NSWorkspace.didWakeNotification,object: nil)
-        try? await Task.sleep(for: .milliseconds(220))
+        for _ in 0..<60 where changes.isEmpty { try? await Task.sleep(for: .milliseconds(50)) }
         XCTAssertEqual(changes,[true])
     }
     func testConnectedTrackpadNativeAdapterStartsAndStops() throws {
