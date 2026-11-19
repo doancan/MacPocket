@@ -14,7 +14,7 @@ public enum WeatherProviderClient {
             var request = URLRequest(url: components.url!, cachePolicy: .reloadIgnoringLocalCacheData, timeoutInterval: 25)
             request.setValue("application/json", forHTTPHeaderField: "Accept")
             request.setValue("gzip", forHTTPHeaderField: "Accept-Encoding")
-            request.setValue("MacPocket/0.3.0 (https://github.com/doancan/MacPocket)", forHTTPHeaderField: "User-Agent")
+            request.setValue("MacPocket/0.4.0 (https://github.com/doancan/MacPocket)", forHTTPHeaderField: "User-Agent")
             return request
         }
         if source.isOpenMeteo {
