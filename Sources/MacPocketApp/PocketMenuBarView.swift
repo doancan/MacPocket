@@ -84,7 +84,8 @@ struct PocketMenuBarView: View {
     }
 
     private var detail: some View {
-        MenuBarModuleDetail(module: module, model: model, history: history, binaryUnits: store.preferences.binaryUnits)
+        MenuBarModuleDetail(module: module, model: model, history: history, binaryUnits: store.preferences.binaryUnits,
+                            showsTitle: content != .grouped)
             .padding(PocketSpacing.m)
             .frame(width: Self.width, alignment: .topLeading)
     }

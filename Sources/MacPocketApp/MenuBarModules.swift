@@ -272,18 +272,23 @@ private struct ProcessIcon: View {
 
 // MARK: - Module views
 
-/// Detail view for one module, as shown in a popover: its icon and name, then all of its details.
+/// Detail view for one module, as shown in a popover: its icon and name (unless a tab shows them), then all of
+/// its details.
 struct MenuBarModuleDetail: View {
     let module: MenuBarModule
     var model: PocketModel
     @ObservedObject var history: MenuBarHistory
     let binaryUnits: Bool
+    /// The grouped popover's tab already names the page; a separate item's popover has no tab, so it shows it.
+    var showsTitle = true
 
     var body: some View {
         VStack(alignment: .leading, spacing: PocketSpacing.s + 2) {
-            HStack(spacing: PocketSpacing.s) {
-                PocketIconTile(symbol: module.symbol, tint: module.tint, size: 24)
-                Text(module.title).font(.title3.weight(.semibold)).accessibilityAddTraits(.isHeader)
+            if showsTitle {
+                HStack(spacing: PocketSpacing.s) {
+                    PocketIconTile(symbol: module.symbol, tint: module.tint, size: 24)
+                    Text(module.title).font(.title3.weight(.semibold)).accessibilityAddTraits(.isHeader)
+                }
             }
             switch module {
             case .cpu: CPUDetail(model: model, history: history)
