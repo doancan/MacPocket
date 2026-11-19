@@ -136,6 +136,9 @@ public actor SystemMonitor {
     private var diskIO = DiskIOSampler()
     private let fanSensor = FanSensor()
     private let temperatureSensor = TemperatureSensor()
+    /// Temperatures move over seconds, while reading them costs one IOHID event per sensor (about 50 on Apple
+    /// silicon) and was most of the monitor's CPU time at a 1-second refresh.
+    private var temperatureThrottle = SampleThrottle<[TemperatureReading]?>(interval: 5)
     private let gpuSampler = GPUSampler()
     private let connectivityMonitor = ConnectivityMonitor()
     /// The ping leaves the Mac, so it runs only while something the user turned on shows latency.
@@ -175,7 +178,7 @@ public actor SystemMonitor {
         snapshot.network = network.sample()
         snapshot.diskIO = diskIO.sample()
         snapshot.fans = fanSensor.sample()
-        snapshot.temperatures = temperatureSensor.sample()
+        snapshot.temperatures = temperatureThrottle.value(now: snapshot.capturedAt) { temperatureSensor.sample() }
         (snapshot.systemPowerWatts, snapshot.powerInputWatts) = fanSensor.power()
         snapshot.gpu = gpuSampler.sample()
         snapshot.connectivity = connectivityMonitor.sample(pingEnabled: pingEnabled)

@@ -22,7 +22,6 @@ struct PocketMenuBarView: View {
     @AppStorage("MacPocket.menubar.selectedTab") private var storedTab = MenuBarModule.cpu.rawValue
     @State private var selection: MenuBarModule
     @State private var showsSSH = false
-    @PocketReduceMotion private var reduceMotion
 
     init(model: PocketModel, history: MenuBarHistory, content: MenuBarPopoverContent, close: @escaping @MainActor () -> Void = {}) {
         self.model = model
@@ -34,7 +33,11 @@ struct PocketMenuBarView: View {
         _selection = State(initialValue: MenuBarModule(rawValue: stored) ?? .cpu)
     }
 
+    /// Width of the module content; the grouped popover adds the tab rail beside it.
     static let width: CGFloat = 368
+    /// The grouped popover keeps one size for every tab, so switching tabs never resizes or jumps it; taller
+    /// content scrolls.
+    static let groupedContentHeight: CGFloat = 520
 
     private var module: MenuBarModule {
         if case let .module(module) = content { return module }
@@ -52,20 +55,9 @@ struct PocketMenuBarView: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: PocketSpacing.m) {
-            if content == .grouped {
-                MenuBarTabStrip(tabs: tabs, selection: $selection)
-                    .background { GlassTabKeyboardShortcuts(tabs: tabs, selection: $selection) }
-            }
-            MenuBarModuleDetail(module: module, model: model, history: history, binaryUnits: store.preferences.binaryUnits,
-                                showsTitle: content != .grouped)
-                .id(module)
-                .transition(reduceMotion ? .identity : .opacity.combined(with: .offset(y: 4)))
-            Divider().padding(.horizontal, -PocketSpacing.m)
-            footer
+        Group {
+            if content == .grouped { grouped } else { single }
         }
-        .padding(PocketSpacing.m)
-        .frame(width: Self.width)
         .tint(PocketTheme.accent)
         .environment(\.pocketTint, PocketTheme.brand)
         .environment(\.closeMenuBarPopover, close)
@@ -79,6 +71,38 @@ struct PocketMenuBarView: View {
             updateProcessSampling()
         }
         .onDisappear { model.menuBarProcessesWanted = false }
+    }
+
+    private var detail: some View {
+        MenuBarModuleDetail(module: module, model: model, history: history, binaryUnits: store.preferences.binaryUnits)
+            .padding(PocketSpacing.m)
+            .frame(width: Self.width, alignment: .topLeading)
+    }
+
+    /// Tab bar, content and footer at a fixed size; the content swaps without a transition.
+    private var grouped: some View {
+        VStack(spacing: 0) {
+            MenuBarTabBar(tabs: tabs, selection: $selection)
+                .background { GlassTabKeyboardShortcuts(tabs: tabs, selection: $selection) }
+                .padding(.horizontal, PocketSpacing.s)
+                .padding(.top, PocketSpacing.s)
+            ScrollView(.vertical) { detail.id(module) }
+                .scrollIndicators(.automatic)
+                .frame(height: Self.groupedContentHeight)
+            Divider()
+            footer.padding(.horizontal, PocketSpacing.m).padding(.vertical, PocketSpacing.s)
+        }
+        .frame(width: Self.width)
+    }
+
+    /// A separate item's popover: one module at its natural height.
+    private var single: some View {
+        VStack(spacing: 0) {
+            detail
+            Divider()
+            footer.padding(.horizontal, PocketSpacing.m).padding(.vertical, PocketSpacing.s)
+        }
+        .frame(width: Self.width)
     }
 
     /// A module switched off since the popover last opened has no tab; fall back to the first one.

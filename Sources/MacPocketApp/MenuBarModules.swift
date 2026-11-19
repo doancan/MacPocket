@@ -11,16 +11,19 @@ private struct MenuBarSection: ViewModifier {
         content
             .padding(PocketSpacing.s + 2)
             .frame(maxWidth: .infinity, alignment: .leading)
-            // The theme's opaque card color, so text never sits on a see-through surface.
-            .background(PocketTheme.panel, in: RoundedRectangle(cornerRadius: PocketRadius.medium, style: .continuous))
-            .overlay {
-                RoundedRectangle(cornerRadius: PocketRadius.medium, style: .continuous).strokeBorder(PocketTheme.line, lineWidth: 0.5)
-            }
+            // A platter like Control Center's modules: a fill on the popover's glass, never glass on glass.
+            .background(MenuBarPlatter.fill, in: RoundedRectangle(cornerRadius: PocketRadius.large, style: .continuous))
     }
 }
 
 extension View {
     fileprivate func menuBarSection() -> some View { modifier(MenuBarSection()) }
+}
+
+/// Surfaces placed on the popover's glass.
+enum MenuBarPlatter {
+    /// Stronger in light mode, where the glass takes the tone of whatever is behind the popover.
+    static let fill = Color(light: 0xFFFFFF, dark: 0x323236, lightOpacity: 0.9, darkOpacity: 0.92)
 }
 
 private struct ModuleHeader<Trailing: View>: View {
@@ -31,7 +34,6 @@ private struct ModuleHeader<Trailing: View>: View {
 
     var body: some View {
         HStack(alignment: .center, spacing: PocketSpacing.s + 2) {
-            PocketIconTile(symbol: module.symbol, tint: module.tint, size: 30)
             VStack(alignment: .leading, spacing: 0) {
                 Text(value).font(.system(size: 22, weight: .semibold, design: .rounded)).monospacedDigit()
                     .lineLimit(1).minimumScaleFactor(0.7)
@@ -230,19 +232,18 @@ private struct ProcessIcon: View {
 
 // MARK: - Module views
 
-/// Detail view for one module, as shown in a popover. Every module shows all of its details; the title is shown
-/// when no tab bar names the module already (a separate item's popover).
+/// Detail view for one module, as shown in a popover: its icon and name, then all of its details.
 struct MenuBarModuleDetail: View {
     let module: MenuBarModule
     var model: PocketModel
     @ObservedObject var history: MenuBarHistory
     let binaryUnits: Bool
-    var showsTitle = true
 
     var body: some View {
         VStack(alignment: .leading, spacing: PocketSpacing.s + 2) {
-            if showsTitle {
-                Text(module.title).font(.headline).accessibilityAddTraits(.isHeader)
+            HStack(spacing: PocketSpacing.s) {
+                PocketIconTile(symbol: module.symbol, tint: module.tint, size: 24)
+                Text(module.title).font(.title3.weight(.semibold)).accessibilityAddTraits(.isHeader)
             }
             switch module {
             case .cpu: CPUDetail(model: model, history: history)

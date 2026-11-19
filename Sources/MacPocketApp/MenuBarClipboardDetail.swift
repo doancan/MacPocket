@@ -58,10 +58,7 @@ struct ClipboardMenuDetail: View {
         .font(.system(size: 13))
         .padding(.horizontal, 10)
         .frame(height: 30)
-        .background(PocketTheme.panel, in: RoundedRectangle(cornerRadius: PocketRadius.medium, style: .continuous))
-        .overlay {
-            RoundedRectangle(cornerRadius: PocketRadius.medium, style: .continuous).strokeBorder(PocketTheme.line, lineWidth: 0.5)
-        }
+        .background(MenuBarPlatter.fill, in: RoundedRectangle(cornerRadius: PocketRadius.large, style: .continuous))
     }
 
     private var kindFilter: some View {
@@ -102,7 +99,7 @@ struct ClipboardMenuDetail: View {
             Text(search.query.isEmpty ? "Henüz kopyalanmış bir şey yok." : "Eşleşen öğe yok.")
                 .font(.callout).foregroundStyle(.secondary)
                 .frame(maxWidth: .infinity, minHeight: 80)
-                .background(PocketTheme.panel, in: RoundedRectangle(cornerRadius: PocketRadius.medium, style: .continuous))
+                .background(MenuBarPlatter.fill, in: RoundedRectangle(cornerRadius: PocketRadius.large, style: .continuous))
         } else {
             ScrollViewReader { proxy in
                 ScrollView {
@@ -117,10 +114,7 @@ struct ClipboardMenuDetail: View {
                 }
                 .scrollIndicators(.automatic)
                 .frame(height: min(Self.listHeight, CGFloat(items.count) * 46 + 8))
-                .background(PocketTheme.panel, in: RoundedRectangle(cornerRadius: PocketRadius.medium, style: .continuous))
-                .overlay {
-                    RoundedRectangle(cornerRadius: PocketRadius.medium, style: .continuous).strokeBorder(PocketTheme.line, lineWidth: 0.5)
-                }
+                .background(MenuBarPlatter.fill, in: RoundedRectangle(cornerRadius: PocketRadius.large, style: .continuous))
                 .onChange(of: selectedID) { _, id in
                     if let id { proxy.scrollTo(id) }
                 }
