@@ -5422,3 +5422,9 @@
 "Son olaylar" = "Recent Events";
 "Uyanık" = "Awake";
 "Özet" = "Summary";
+"Boş alan azalmıyor ya da tahmin için yeterli geçmiş yok." = "Free space isn’t shrinking, or there isn’t enough history for a forecast yet.";
+"Bu hızla bir yıldan uzun sürede dolar." = "At this pace it takes over a year to fill.";
+"Bu hızla yaklaşık %lld gün içinde dolar." = "At this pace it fills in about %lld days.";
+"Canlı" = "Live";
+"Grafik aralığı" = "Chart Range";
+"Son 7 günde boş alan" = "Free Space, Last 7 Days";

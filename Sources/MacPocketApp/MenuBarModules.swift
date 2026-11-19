@@ -320,11 +320,14 @@ private struct CPUDetail: View {
                 Text("Kullanıcı \(percentText(system?.cpuUserPercent, decimals: true))")
                 Text("Sistem \(percentText(system?.cpuSystemPercent, decimals: true))")
             }
-            HistoryChart(series: [
-                .init(name: String(localized: "Sistem"), color: .orange, values: history.samples.compactMap { s in s.cpuSystem.map { (s.date, $0) } }),
-                .init(name: String(localized: "Kullanıcı"), color: module.tint, values: history.samples.compactMap { s in s.cpuUser.map { (s.date, $0) } }),
-            ], ceiling: 100, stacked: true)
-            .menuBarSection()
+            RangedHistoryChart(series: { range in
+                [.init(name: String(localized: "Toplam"), color: module.tint, values: MenuBarInsights.shared.series(range) { $0.cpu })]
+            }, ceiling: 100) {
+                HistoryChart(series: [
+                    .init(name: String(localized: "Sistem"), color: .orange, values: history.samples.compactMap { s in s.cpuSystem.map { (s.date, $0) } }),
+                    .init(name: String(localized: "Kullanıcı"), color: module.tint, values: history.samples.compactMap { s in s.cpuUser.map { (s.date, $0) } }),
+                ], ceiling: 100, stacked: true)
+            }
 
             if let cores = system?.cpuCorePercents, !cores.isEmpty {
                 VStack(alignment: .leading, spacing: PocketSpacing.xs + 2) {
@@ -463,10 +466,14 @@ private struct MemoryDetail: View {
             }
             .menuBarSection()
 
-            HistoryChart(series: [.init(name: String(localized: "Kullanılan"), color: module.tint,
-                                        values: history.samples.compactMap { s in s.memoryFraction.map { (s.date, $0 * 100) } })],
-                         ceiling: 100)
-                .menuBarSection()
+            RangedHistoryChart(series: { range in
+                [.init(name: String(localized: "Kullanılan"), color: module.tint,
+                       values: MenuBarInsights.shared.series(range) { $0.memory.map { $0 * 100 } })]
+            }, ceiling: 100) {
+                HistoryChart(series: [.init(name: String(localized: "Kullanılan"), color: module.tint,
+                                            values: history.samples.compactMap { s in s.memoryFraction.map { (s.date, $0 * 100) } })],
+                             ceiling: 100)
+            }
 
             TopProcessList(model: model, metric: .memory).menuBarSection()
         }
@@ -537,6 +544,8 @@ private struct DiskDetail: View {
             }
             .menuBarSection()
 
+            DiskTrend(binary: binary)
+
             VStack(alignment: .leading, spacing: PocketSpacing.xs + 2) {
                 SectionTitle(title: "Etkinlik")
                 HistoryChart(series: [
@@ -565,11 +574,15 @@ private struct NetworkDetail: View {
                 rate(title: "Gönderme", symbol: "arrow.up", value: network?.sentBytesPerSecond, color: .pink)
             }
 
-            HistoryChart(series: [
-                .init(name: String(localized: "Alma"), color: module.tint, values: history.samples.compactMap { s in s.networkDown.map { (s.date, $0) } }),
-                .init(name: String(localized: "Gönderme"), color: .pink, values: history.samples.compactMap { s in s.networkUp.map { (s.date, $0) } }),
-            ], height: 76, axisLabel: { MenuBarFormatter.rate($0, binary: binary) })
-            .menuBarSection()
+            RangedHistoryChart(series: { range in
+                [.init(name: String(localized: "Alma"), color: module.tint, values: MenuBarInsights.shared.series(range) { $0.networkDown }),
+                 .init(name: String(localized: "Gönderme"), color: .pink, values: MenuBarInsights.shared.series(range) { $0.networkUp })]
+            }, axisLabel: { MenuBarFormatter.rate($0, binary: binary) }) {
+                HistoryChart(series: [
+                    .init(name: String(localized: "Alma"), color: module.tint, values: history.samples.compactMap { s in s.networkDown.map { (s.date, $0) } }),
+                    .init(name: String(localized: "Gönderme"), color: .pink, values: history.samples.compactMap { s in s.networkUp.map { (s.date, $0) } }),
+                ], height: 76, axisLabel: { MenuBarFormatter.rate($0, binary: binary) })
+            }
 
             connectionStatus(model.system?.connectivity).menuBarSection()
 
