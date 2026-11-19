@@ -224,6 +224,8 @@ public enum MenuBarGroupedStyle: String, Codable, Sendable, CaseIterable, Identi
     case bars
     /// A short history graph of the chosen metric.
     case sparkline
+    /// The chosen metric's symbol beside its value, for a grouped item that reads like a separate one.
+    case value
 
     public static let defaultValue = MenuBarGroupedStyle.dial
     public var id: String { rawValue }
@@ -234,6 +236,7 @@ public enum MenuBarGroupedStyle: String, Codable, Sendable, CaseIterable, Identi
         case .ring: String(localized: "Canlı halka")
         case .bars: String(localized: "Üç çubuk")
         case .sparkline: String(localized: "Canlı grafik")
+        case .value: String(localized: "Simge ve değer")
         }
     }
 

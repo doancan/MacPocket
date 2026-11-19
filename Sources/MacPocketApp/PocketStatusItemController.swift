@@ -144,6 +144,8 @@ final class PocketStatusItemController: NSObject {
         let snapshot = model.system
         for key in keys {
             guard let button = items[key]?.button else { continue }
+            let appearance = button.effectiveAppearance
+            let dark = appearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua
             let image: () -> NSImage
             let renderKey: MenuBarRenderer.Key
             let spoken: String
@@ -156,13 +158,14 @@ final class PocketStatusItemController: NSObject {
                 let reading = MenuBarFormatter.reading(module, settings: settings, snapshot: snapshot,
                                                        binaryUnits: preferences.binaryUnits, weather: WeatherService.shared.snapshot, aiUsage: AIUsageService.shared.menuBarReading,
                                                        external: MenuBarExternalReadings.reading(for: module, model: model, settings: settings))
-                let dark = button.effectiveAppearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua
                 var moduleKey = MenuBarRenderer.moduleKey(module, settings: settings, reading: reading, snapshot: snapshot, history: history)
-                if module == .aiUsage { moduleKey.parts.append(dark ? "ai-dark" : "ai-light") }
+                // Colored items resolve their label color for the bar's appearance, so they re-render when it flips.
+                moduleKey.parts.append(dark ? "dark" : "light")
                 renderKey = moduleKey
                 image = {
                     if module == .aiUsage, let image = AIUsageMenuBarImage.make(service: .shared, settings: settings, dark: dark) { return image }
-                    return MenuBarRenderer.module(module, settings: settings, reading: reading, snapshot: snapshot, history: self.history)
+                    return MenuBarRenderer.module(module, settings: settings, reading: reading, snapshot: snapshot, history: self.history,
+                                                  appearance: appearance)
                 }
                 spoken = reading.accessibility
             } else {
@@ -173,8 +176,10 @@ final class PocketStatusItemController: NSObject {
                 let reasons = MenuBarAttention.reasons(snapshot, diskFreeThreshold: diskFreeThreshold)
                 let state = MenuBarRenderer.groupedState(preferences: preferences, snapshot: snapshot, history: history,
                                                          attention: !reasons.isEmpty)
-                renderKey = MenuBarRenderer.groupedKey(state)
-                image = { MenuBarRenderer.grouped(state) }
+                var groupedKey = MenuBarRenderer.groupedKey(state)
+                groupedKey.parts.append(dark ? "dark" : "light")
+                renderKey = groupedKey
+                image = { MenuBarRenderer.grouped(state, appearance: appearance) }
                 let parts = readings.map(\.1.accessibility) + (state.attention ? reasons : [])
                 spoken = parts.isEmpty ? String(localized: "Sistem durumu") : parts.joined(separator: ", ")
             }

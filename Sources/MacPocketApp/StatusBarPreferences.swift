@@ -111,6 +111,7 @@ extension MenuBarGroupedStyle {
         case .ring: "circle.circle"
         case .bars: "chart.bar.fill"
         case .sparkline: "waveform.path.ecg"
+        case .value: "textformat.123"
         }
     }
 }

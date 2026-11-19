@@ -4823,6 +4823,7 @@
 "Bu Modülü Varsayılana Döndür…" = "Reset This Module…";
 "Bu modülün görünümü varsayılana dönsün mü?" = "Reset this module's look to the default?";
 "Canlı grafik" = "Live graph";
+"Simge ve değer" = "Symbol and value";
 "Daha kısa aralık daha canlı grafik, biraz daha fazla işlemci kullanımı demektir." = "A shorter interval means livelier graphs and slightly more CPU use.";
 "Dar" = "Narrow";
 "Değer, görünüm, renk ve eşikler ilk haline döner. Modül açık ya da kapalı kalır." = "Value, look, color and thresholds return to their original state. The module stays on or off.";
