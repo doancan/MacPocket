@@ -95,7 +95,7 @@ struct MenuBarGeneralInspector: View {
         switch preferences.groupedStyle {
         case .symbol: nil
         case .bars: "Üç çubuk sırasıyla CPU, bellek ve başlangıç diskinin doluluğunu gösterir."
-        case .dial, .ring, .sparkline:
+        case .dial, .ring, .sparkline, .value:
             "Gösterge, modülün kendi ayarlarında seçili değeri izler; eşiğe göre renk açıksa simge de renklenir. Hız gibi üst sınırı olmayan değerler son ölçümlerin en yükseğine göre oranlanır."
         }
     }

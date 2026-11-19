@@ -16,22 +16,32 @@ struct PocketMenuBarView: View {
     @ObservedObject var history: MenuBarHistory
     @ObservedObject private var store = MenuBarSettingsStore.shared
     let content: MenuBarPopoverContent
+    /// Closes the popover (a clipboard paste must reach the app in front).
+    var close: @MainActor () -> Void = {}
+    var pasteTarget: NSRunningApplication?
 
-    @AppStorage("MacPocket.menubar.selectedTab") private var storedTab = MenuBarModule.cpu.rawValue
+    @AppStorage(Self.selectedTabKey) private var storedTab = MenuBarModule.cpu.rawValue
     @State private var selection: MenuBarModule
     @State private var showsSSH = false
-    @PocketReduceMotion private var reduceMotion
 
-    init(model: PocketModel, history: MenuBarHistory, content: MenuBarPopoverContent) {
+    init(model: PocketModel, history: MenuBarHistory, content: MenuBarPopoverContent, close: @escaping @MainActor () -> Void = {},
+         pasteTarget: NSRunningApplication? = nil) {
+        self.pasteTarget = pasteTarget
         self.model = model
         self.history = history
         self.content = content
+        self.close = close
         // Reopen on the last tab without a first frame on the default tab.
-        let stored = UserDefaults.standard.string(forKey: "MacPocket.menubar.selectedTab") ?? ""
+        let stored = UserDefaults.standard.string(forKey: Self.selectedTabKey) ?? ""
         _selection = State(initialValue: MenuBarModule(rawValue: stored) ?? .cpu)
     }
 
+    /// Width of the popover and its content.
     static let width: CGFloat = 368
+    static let selectedTabKey = "MacPocket.menubar.selectedTab"
+    /// The grouped popover keeps one size for every tab, so switching tabs never resizes or jumps it; taller
+    /// content scrolls.
+    static let groupedContentHeight: CGFloat = 520
 
     private var module: MenuBarModule {
         if case let .module(module) = content { return module }
@@ -40,30 +50,31 @@ struct PocketMenuBarView: View {
 
     /// The enabled modules, in menu bar order; with none enabled the popover still offers every module.
     private var tabModules: [MenuBarModule] {
-        let enabled = store.preferences.enabledModules
-        return enabled.isEmpty ? store.preferences.order : enabled
+        let enabled = store.preferences.enabledModules.filter(\.isRuntimeAvailable)
+        return enabled.isEmpty ? store.preferences.order.filter(\.isRuntimeAvailable) : enabled
     }
 
     private var tabs: [GlassTab<MenuBarModule>] {
-        tabModules.map { GlassTab(id: $0, title: $0.title, symbol: $0.symbol, tint: $0.tint) }
+        tabModules.map { GlassTab(id: $0, title: $0.tabTitle, symbol: $0.symbol, tint: $0.tint) }
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: PocketSpacing.m) {
-            if content == .grouped {
-                GlassTabBar(tabs: tabs, selection: $selection, showsShortcutHints: true, showsTitles: false)
-                    .background { GlassTabKeyboardShortcuts(tabs: tabs, selection: $selection) }
-            }
-            MenuBarModuleDetail(module: module, model: model, history: history, binaryUnits: store.preferences.binaryUnits)
-                .id(module)
-                .transition(reduceMotion ? .identity : .opacity.combined(with: .offset(y: 4)))
-            footer
+        Group {
+            if content == .grouped { grouped } else { single }
         }
-        .padding(PocketSpacing.m)
-        .frame(width: Self.width)
-        .background { PocketPopoverBackdrop() }
+        .background(MenuBarPlatter.background)
         .tint(PocketTheme.accent)
         .environment(\.pocketTint, PocketTheme.brand)
+        .environment(\.closeMenuBarPopover, close)
+        .environment(\.menuBarPasteTarget, pasteTarget)
+        .environment(\.menuBarPageLinks, MenuBarPageLinks(
+            tabs: content == .grouped ? Set(tabModules) : [],
+            selectTab: { selection = $0 },
+            openPage: { page in
+                close()
+                model.navigation.select(page)
+                model.openMainWindow?()
+            }))
         .onAppear {
             keepSelectionOnAVisibleTab()
             updateProcessSampling()
@@ -74,6 +85,39 @@ struct PocketMenuBarView: View {
             updateProcessSampling()
         }
         .onDisappear { model.menuBarProcessesWanted = false }
+    }
+
+    private var detail: some View {
+        MenuBarModuleDetail(module: module, model: model, history: history, binaryUnits: store.preferences.binaryUnits,
+                            showsTitle: content != .grouped)
+            .padding(PocketSpacing.m)
+            .frame(width: Self.width, alignment: .topLeading)
+    }
+
+    /// Tab bar, content and footer at a fixed size; the content swaps without a transition.
+    private var grouped: some View {
+        VStack(spacing: 0) {
+            MenuBarTabBar(tabs: tabs, selection: $selection)
+                .background { GlassTabKeyboardShortcuts(tabs: tabs, selection: $selection) }
+                .padding(.horizontal, PocketSpacing.s)
+                .padding(.top, PocketSpacing.s)
+            ScrollView(.vertical) { detail.id(module) }
+                .scrollIndicators(.automatic)
+                .frame(height: Self.groupedContentHeight)
+            Divider()
+            footer.padding(.horizontal, PocketSpacing.m).padding(.vertical, PocketSpacing.s)
+        }
+        .frame(width: Self.width)
+    }
+
+    /// A separate item's popover: one module at its natural height.
+    private var single: some View {
+        VStack(spacing: 0) {
+            detail
+            Divider()
+            footer.padding(.horizontal, PocketSpacing.m).padding(.vertical, PocketSpacing.s)
+        }
+        .frame(width: Self.width)
     }
 
     /// A module switched off since the popover last opened has no tab; fall back to the first one.
@@ -93,29 +137,43 @@ struct PocketMenuBarView: View {
     }
 
     private var footer: some View {
-        HStack(spacing: PocketSpacing.s) {
+        HStack(spacing: PocketSpacing.xs) {
+            Button { model.openMainWindow?() } label: {
+                Label("MacPocket’ı aç", systemImage: "macwindow")
+                    .font(.callout)
+                    .padding(.horizontal, PocketSpacing.s)
+                    .frame(height: 28)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(MenuBarFooterButtonStyle())
+            .keyboardShortcut("0", modifiers: .command)
+            .help("MacPocket’ı aç (⌘0)")
+            if model.paused {
+                Label("Duraklatıldı", systemImage: "pause.circle.fill")
+                    .font(.subheadline)
+                    .foregroundStyle(.orange)
+                    .labelStyle(.titleAndIcon)
+                    .accessibilityLabel("İzleme duraklatıldı")
+            }
             Spacer(minLength: PocketSpacing.s)
             footerButton("SSH Hızlı Bağlan", symbol: "terminal") { showsSSH.toggle() }
                 .popover(isPresented: $showsSSH) {
                     SSHQuickConnectView { showsSSH = false }
                 }
-            footerButton("MacPocket’ı aç", symbol: "macwindow") { model.openMainWindow?() }
-                .keyboardShortcut("0", modifiers: .command)
-            footerButton("Ayarlar", symbol: "gearshape") { model.openSettingsWindow?() }
-                .keyboardShortcut(",", modifiers: .command)
             footerButton(model.paused ? "İzlemeyi sürdür" : "İzlemeyi duraklat",
                          symbol: model.paused ? "play.fill" : "pause.fill") { model.paused.toggle() }
+            footerButton("Ayarlar", symbol: "gearshape") { model.openSettingsWindow?() }
+                .keyboardShortcut(",", modifiers: .command)
             footerButton("MacPocket’tan çık", symbol: "power") { NSApp.terminate(nil) }
                 .keyboardShortcut("q", modifiers: .command)
         }
-        .padding(.top, PocketSpacing.xxs)
     }
 
     private func footerButton(_ title: LocalizedStringKey, symbol: String, action: @escaping () -> Void) -> some View {
         Button(action: action) {
             Image(systemName: symbol)
-                .font(.system(size: 12, weight: .medium))
-                .frame(width: 26, height: 22)
+                .font(.body).imageScale(.large)
+                .frame(width: 30, height: 28)
                 .contentShape(Rectangle())
         }
         .buttonStyle(MenuBarFooterButtonStyle())
@@ -124,20 +182,8 @@ struct PocketMenuBarView: View {
     }
 }
 
-/// The chosen app theme behind the popover: its opaque canvas tone with a soft wash of the brand colors, so the Stats Bar
-/// dropdown matches the main window and stays readable over any window behind it (no translucency).
-private struct PocketPopoverBackdrop: View {
-    var body: some View {
-        ZStack {
-            PocketTheme.background
-            RadialGradient(colors: [PocketTheme.brand.opacity(0.20), .clear], center: .topLeading, startRadius: 0, endRadius: 360)
-            RadialGradient(colors: [PocketTheme.brandSecondary.opacity(0.12), .clear], center: .topTrailing, startRadius: 0, endRadius: 280)
-        }
-        .accessibilityHidden(true)
-    }
-}
-
-/// Borderless icon button with a hover/press highlight, like Control Center's small buttons.
+/// Borderless button with a hover/press highlight, like Control Center's small buttons. Labels stay `.primary`:
+/// on the glass popover, secondary text falls below a readable contrast.
 private struct MenuBarFooterButtonStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
         HoverHighlight(pressed: configuration.isPressed) { configuration.label }
@@ -150,9 +196,9 @@ private struct MenuBarFooterButtonStyle: ButtonStyle {
 
         var body: some View {
             label()
-                .foregroundStyle(hovering ? .primary : .secondary)
+                .foregroundStyle(.primary)
                 .background(Color.primary.opacity(pressed ? 0.14 : hovering ? 0.08 : 0),
-                            in: RoundedRectangle(cornerRadius: PocketRadius.small, style: .continuous))
+                            in: RoundedRectangle(cornerRadius: PocketRadius.small + 1, style: .continuous))
                 .onHover { hovering = $0 }
         }
     }

@@ -29,16 +29,12 @@ struct GlassTab<ID: Hashable>: Identifiable {
 ///   `glassEffectID`: tinted at rest, clear while held so the labels read through it as through a lens.
 /// - Reduce Motion: no lens travel or scaling, the selection jumps. Reduce Transparency: solid fills.
 /// - Each tab is a real button (keyboard focus, VoiceOver "selected" trait); arrow keys and ⌘1… are
-///   handled by the owner through `GlassTabBar.keyboardShortcuts`.
+///   handled by the owner through `GlassTabKeyboardShortcuts`.
 struct GlassTabBar<ID: Hashable>: View {
     let tabs: [GlassTab<ID>]
     @Binding var selection: ID
     /// false: clear, untinted glass lens and monochrome labels, like the system segmented control.
     var tinted = true
-    /// true when the owner installs `GlassTabKeyboardShortcuts`, so tooltips mention ⌘1…
-    var showsShortcutHints = false
-    /// false: symbols only (the title stays as tooltip and VoiceOver label), for narrow bars.
-    var showsTitles = true
 
     @Namespace private var namespace
     @State private var trackWidth: CGFloat = 0
@@ -157,16 +153,14 @@ struct GlassTabBar<ID: Hashable>: View {
                     HStack(spacing: 4) {
                         if let symbol = tab.symbol {
                             Image(systemName: symbol)
-                                .font(.system(size: showsTitles ? 11 : 13, weight: .semibold))
+                                .font(.system(size: 11, weight: .semibold))
                                 .foregroundStyle(isSelected ? (tinted ? tab.tint ?? pageTint : .primary) : .secondary)
                         }
-                        if showsTitles || tab.symbol == nil {
-                            tab.title
-                                .font(.system(size: 11.5, weight: isSelected ? .semibold : .medium))
-                                .foregroundStyle(isSelected ? .primary : .secondary)
-                                .lineLimit(1)
-                                .minimumScaleFactor(0.8)
-                        }
+                        tab.title
+                            .font(.system(size: 11.5, weight: isSelected ? .semibold : .medium))
+                            .foregroundStyle(isSelected ? .primary : .secondary)
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.8)
                     }
                     .frame(width: segmentWidth > 0 ? segmentWidth : nil, height: height - inset * 2)
                     .contentShape(Capsule())
@@ -175,7 +169,7 @@ struct GlassTabBar<ID: Hashable>: View {
                 .accessibilityLabel(tab.title)
                 .accessibilityAddTraits(isSelected ? [.isSelected, .isButton] : .isButton)
                 .accessibilityHint("Sekmeyi göster")
-                .help(showsShortcutHints ? Text("\(tab.title) (⌘\(index + 1))") : tab.title)
+                .help(tab.title)
             }
         }
     }

@@ -1,36 +1,6 @@
 import MacPocketCore
 import SwiftUI
 
-/// Basic or advanced view of a menu bar tab. Each tab remembers its own choice; the main window is always advanced.
-enum PocketDetailLevel: String, CaseIterable, Identifiable {
-    case basic, advanced
-    var id: String { rawValue }
-    static let defaultValue = PocketDetailLevel.basic
-
-    /// UserDefaults key for one page or tab, e.g. `key("performance")`, `key("menubar.cpu")`.
-    static func key(_ scope: String) -> String { "MacPocket.detail.\(scope)" }
-}
-
-/// "Gelişmiş" on/off switch for the top-right corner of a menu bar tab. Flipping it animates the
-/// advanced sections in and out (they fade while the layout around them resizes).
-struct PocketDetailLevelSwitch: View {
-    @Binding var level: PocketDetailLevel
-    @PocketReduceMotion private var reduceMotion
-
-    var body: some View {
-        Toggle("Gelişmiş", isOn: Binding(
-            get: { level == .advanced },
-            set: { advanced in
-                withAnimation(reduceMotion ? nil : .spring(response: 0.38, dampingFraction: 0.86)) {
-                    level = advanced ? .advanced : .basic
-                }
-            }))
-        .toggleStyle(.switch)
-        .fixedSize()
-        .help("Kapalıyken özet, açıkken tüm ayrıntılar gösterilir")
-    }
-}
-
 func pocketCelsius(_ celsius: Double) -> String {
     Measurement(value: celsius, unit: UnitTemperature.celsius)
         .formatted(.measurement(width: .abbreviated, usage: .asProvided,

@@ -530,6 +530,86 @@
 			<string>%lld items</string>
 		</dict>
 	</dict>
+	<key>Pano geçmişinde %lld öğe</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key>
+		<string>%#@count@</string>
+		<key>count</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key>
+			<string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key>
+			<string>lld</string>
+			<key>one</key>
+			<string>%lld item in clipboard history</string>
+			<key>other</key>
+			<string>%lld items in clipboard history</string>
+		</dict>
+	</dict>
+	<key>%lld favori</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key>
+		<string>%#@count@</string>
+		<key>count</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key>
+			<string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key>
+			<string>lld</string>
+			<key>one</key>
+			<string>%lld favorite</string>
+			<key>other</key>
+			<string>%lld favorites</string>
+		</dict>
+	</dict>
+	<key>%lld konu dikkat istiyor.</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key>
+		<string>%#@count@</string>
+		<key>count</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key>
+			<string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key>
+			<string>lld</string>
+			<key>one</key>
+			<string>%lld issue needs attention.</string>
+			<key>other</key>
+			<string>%lld issues need attention.</string>
+		</dict>
+	</dict>
+	<key>Son haftanın hızıyla yaklaşık %lld gün içinde dolacak.</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key>
+		<string>%#@count@</string>
+		<key>count</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key>
+			<string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key>
+			<string>lld</string>
+			<key>one</key>
+			<string>At last week’s pace it fills in about %lld day.</string>
+			<key>other</key>
+			<string>At last week’s pace it fills in about %lld days.</string>
+		</dict>
+	</dict>
+	<key>Bu hızla yaklaşık %lld gün içinde dolar.</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key>
+		<string>%#@count@</string>
+		<key>count</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key>
+			<string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key>
+			<string>lld</string>
+			<key>one</key>
+			<string>At this pace it fills in about %lld day.</string>
+			<key>other</key>
+			<string>At this pace it fills in about %lld days.</string>
+		</dict>
+	</dict>
 	<key>%lld öğe seçili</key>
 	<dict>
 		<key>NSStringLocalizedFormatKey</key>

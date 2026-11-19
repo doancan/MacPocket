@@ -3,6 +3,23 @@ import XCTest
 
 /// Keep awake, focus and Bluetooth battery modules: readings built outside the system snapshot.
 final class MenuBarControlModulesTests: XCTestCase {
+    func testClipboardShowsTheCountTheAppProvides() {
+        let count = MenuBarReading(lines: ["12"], reserve: ["999"], fraction: nil, magnitude: 12, accessibility: "12 öğe")
+        let reading = MenuBarFormatter.reading(.clipboard, settings: .defaults(for: .clipboard), snapshot: nil, external: count)
+        XCTAssertEqual(reading, count)
+    }
+
+    func testClipboardLivesInTheGroupedPopoverNotBesideIt() {
+        XCTAssertFalse(MenuBarModule.clipboard.keepsOwnItemWhenGrouped)
+        XCTAssertTrue(MenuBarModule.clock.keepsOwnItemWhenGrouped)
+        XCTAssertFalse(MenuBarModule.cpu.keepsOwnItemWhenGrouped)
+    }
+
+    func testDefaultTabsAreTheEverydayOnes() {
+        let enabled = MenuBarModule.allCases.filter(\.enabledByDefault)
+        XCTAssertEqual(Set(enabled), [.overview, .cpu, .memory, .network, .clipboard])
+    }
+
     private let now = Date(timeIntervalSinceReferenceDate: 10_000)
 
     func testNewModulesAreNotSystemMetricsAndStartDisabled() {
@@ -23,7 +40,8 @@ final class MenuBarControlModulesTests: XCTestCase {
         defaults.set(MenuBarPreferences.schemaVersion, forKey: MenuBarPreferences.schemaKey)
         defaults.set("network,cpu,gpu,memory,disk,power,weather,aiUsage", forKey: MenuBarPreferences.orderKey)
         let loaded = MenuBarPreferences.load(from: defaults)
-        XCTAssertEqual(loaded.order.suffix(5), [.awake, .focus, .bluetooth, .display, .clock])
+        XCTAssertEqual(loaded.order.first, .overview, "the overview leads orders saved before it existed")
+        XCTAssertEqual(loaded.order.suffix(9), [.awake, .focus, .bluetooth, .display, .clock, .clipboard, .health, .timeline, .launcher])
         XCTAssertFalse(loaded.enabled.contains(.awake))
     }
 

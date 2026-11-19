@@ -12,6 +12,9 @@ struct PocketRootView: View {
     @Environment(\.dismissWindow) private var dismissWindow
     @PocketReduceMotion private var reduceMotion
     @AppStorage(PocketPreferenceKey.sidebarIcons) private var sidebarIcons = PocketSidebarIconStyle.colorful
+    /// SwiftUI keeps a closed `Window`'s views alive, and they kept re-rendering every sample; the page is
+    /// rebuilt when the window opens again.
+    @State private var windowOpen = true
 
     private var destinationKey: String { navigation.page.rawValue + "/" + (navigation.tool?.rawValue ?? "") }
 
@@ -49,7 +52,7 @@ struct PocketRootView: View {
                 .navigationSplitViewColumnWidth(min: 200, ideal: 220, max: 280)
                 .safeAreaInset(edge: .bottom) { PocketSidebarSettingsButton().padding(.horizontal, 10).padding(.bottom, 10) }
             } detail: {
-                destination
+                Group { if windowOpen { destination } else { Color.clear } }
                     // A short crossfade on page/tool changes only; nothing animates while a page is idle.
                     .id(destinationKey)
                     .transition(.opacity.combined(with: .offset(y: 6)))
@@ -89,7 +92,8 @@ struct PocketRootView: View {
             .frame(width: bounds.size.width, height: bounds.size.height)
         }
         .frame(minWidth: 960, minHeight: 620)
-        .background(MainWindowVisibility { model.setMainWindowVisible($0) }.frame(width: 1, height: 1).allowsHitTesting(false))
+        .background(MainWindowVisibility(changed: { model.setMainWindowVisible($0) }, opened: { windowOpen = $0 })
+            .frame(width: 1, height: 1).allowsHitTesting(false))
         .onAppear {
             let windowAction = openWindow, settingsAction = openSettings
             AIUsageIntegration.shared.openSettingsWindow = {

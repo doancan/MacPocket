@@ -26,7 +26,11 @@ final class PocketStatusItemController: NSObject {
         content: { [weak self] key in
             guard let self else { return nil }
             let content: MenuBarPopoverContent = MenuBarModule(rawValue: key).map { .module($0) } ?? .grouped
-            let hosting = NSHostingController(rootView: PocketMenuBarView(model: self.model, history: self.history, content: content))
+            // Captured before the popover can activate MacPocket: the clipboard tab pastes into this app.
+            let target = NSWorkspace.shared.frontmostApplication
+            let hosting = NSHostingController(rootView: PocketMenuBarView(model: self.model, history: self.history, content: content,
+                                                                          close: { [weak self] in self?.closePopover() },
+                                                                          pasteTarget: target))
             hosting.sizingOptions = [.preferredContentSize]
             return hosting
         }, didClose: { [weak self] in self?.model.menuBarProcessesWanted = false })
@@ -48,7 +52,10 @@ final class PocketStatusItemController: NSObject {
         refresh()
         // Observation (not Combine) drives the menu bar: only `system` and `paused` writes reach here.
         observe({ [model] in model.system }) { controller, snapshot in
-            if let snapshot { controller.history.record(snapshot) }
+            if let snapshot {
+                controller.history.record(snapshot)
+                MenuBarInsights.shared.record(snapshot)
+            }
             controller.refresh()
         }
         store.$preferences.dropFirst().removeDuplicates().receive(on: RunLoop.main).sink { [weak self] _ in
@@ -76,6 +83,12 @@ final class PocketStatusItemController: NSObject {
         FocusSessionService.shared.objectWillChange.receive(on: RunLoop.main).sink { [weak self] _ in
             MainActor.assumeIsolated { self?.refresh() }
         }.store(in: &subscriptions)
+        // The clipboard item and tab come and go with clipboard history; its count follows the history.
+        ClipboardService.shared.$history.map(\.items.count).removeDuplicates()
+            .combineLatest(ClipboardService.shared.$settings.map(\.enabled).removeDuplicates())
+            .dropFirst().receive(on: RunLoop.main).sink { [weak self] _ in
+                MainActor.assumeIsolated { self?.refresh() }
+            }.store(in: &subscriptions)
         BluetoothBatteryService.shared.$devices.dropFirst().removeDuplicates().receive(on: RunLoop.main).sink { [weak self] _ in
             MainActor.assumeIsolated { self?.refresh() }
         }.store(in: &subscriptions)
@@ -130,11 +143,12 @@ final class PocketStatusItemController: NSObject {
 
     private func desiredKeys(_ preferences: MenuBarPreferences) -> [String] {
         guard preferences.visible else { return [] }
-        let enabled = preferences.enabledModules
+        let enabled = preferences.enabledModules.filter(\.isRuntimeAvailable)
         // With nothing enabled the grouped glyph stays, so MacPocket is always reachable.
         if preferences.layout == .separate && !enabled.isEmpty { return enabled.map(\.rawValue) }
-        // Weather, AI quotas, keep awake, focus and Bluetooth batteries keep their own item beside the grouped one.
-        return [Self.groupedKey] + enabled.filter { !$0.isSystemMetric }.map(\.rawValue)
+        // Weather, AI quotas, keep awake, focus and Bluetooth batteries keep their own item beside the grouped one;
+        // the clipboard history is a tab of the grouped popover.
+        return [Self.groupedKey] + enabled.filter(\.keepsOwnItemWhenGrouped).map(\.rawValue)
     }
 
     private func refresh() {
@@ -144,6 +158,8 @@ final class PocketStatusItemController: NSObject {
         let snapshot = model.system
         for key in keys {
             guard let button = items[key]?.button else { continue }
+            let appearance = button.effectiveAppearance
+            let dark = appearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua
             let image: () -> NSImage
             let renderKey: MenuBarRenderer.Key
             let spoken: String
@@ -156,13 +172,14 @@ final class PocketStatusItemController: NSObject {
                 let reading = MenuBarFormatter.reading(module, settings: settings, snapshot: snapshot,
                                                        binaryUnits: preferences.binaryUnits, weather: WeatherService.shared.snapshot, aiUsage: AIUsageService.shared.menuBarReading,
                                                        external: MenuBarExternalReadings.reading(for: module, model: model, settings: settings))
-                let dark = button.effectiveAppearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua
                 var moduleKey = MenuBarRenderer.moduleKey(module, settings: settings, reading: reading, snapshot: snapshot, history: history)
-                if module == .aiUsage { moduleKey.parts.append(dark ? "ai-dark" : "ai-light") }
+                // Colored items resolve their label color for the bar's appearance, so they re-render when it flips.
+                moduleKey.parts.append(dark ? "dark" : "light")
                 renderKey = moduleKey
                 image = {
                     if module == .aiUsage, let image = AIUsageMenuBarImage.make(service: .shared, settings: settings, dark: dark) { return image }
-                    return MenuBarRenderer.module(module, settings: settings, reading: reading, snapshot: snapshot, history: self.history)
+                    return MenuBarRenderer.module(module, settings: settings, reading: reading, snapshot: snapshot, history: self.history,
+                                                  appearance: appearance)
                 }
                 spoken = reading.accessibility
             } else {
@@ -173,8 +190,10 @@ final class PocketStatusItemController: NSObject {
                 let reasons = MenuBarAttention.reasons(snapshot, diskFreeThreshold: diskFreeThreshold)
                 let state = MenuBarRenderer.groupedState(preferences: preferences, snapshot: snapshot, history: history,
                                                          attention: !reasons.isEmpty)
-                renderKey = MenuBarRenderer.groupedKey(state)
-                image = { MenuBarRenderer.grouped(state) }
+                var groupedKey = MenuBarRenderer.groupedKey(state)
+                groupedKey.parts.append(dark ? "dark" : "light")
+                renderKey = groupedKey
+                image = { MenuBarRenderer.grouped(state, appearance: appearance) }
                 let parts = readings.map(\.1.accessibility) + (state.attention ? reasons : [])
                 spoken = parts.isEmpty ? String(localized: "Sistem durumu") : parts.joined(separator: ", ")
             }
@@ -284,6 +303,9 @@ final class PocketStatusItemController: NSObject {
         presentation.toggle(key)
     }
 
+    /// Called from inside the popover; a method so the lazy presenter does not reference itself.
+    private func closePopover() { presentation.close() }
+
     /// Shows the popover under the item `key`, or under the first item when nil (⇧⌘M quick look).
     private func showPopover(for key: String?) {
         guard let key = key ?? itemOrder.first else { return }
@@ -367,6 +389,23 @@ final class PocketStatusItemController: NSObject {
             return MenuBarFormatter.bluetoothReading(BluetoothBatteryService.shared.devices, decimals: settings.decimals)
         case .clock:
             return MenuBarFormatter.clockReading(value: settings.value, zoneID: settings.timeZoneID, now: now)
+        case .overview, .health:
+            guard let snapshot = model.system else { return nil }
+            let report = MenuBarInsights.shared.health(snapshot, processes: model.processes)
+            return MenuBarReading(lines: ["\(report.score)"], reserve: ["100"], fraction: Double(report.score) / 100, magnitude: Double(report.score),
+                                  accessibility: String(localized: "Sağlık puanı \(report.score)"), symbol: module.symbol)
+        case .timeline:
+            let count = MenuBarInsights.shared.events.events.count
+            return MenuBarReading(lines: ["\(count)"], reserve: ["999"], fraction: nil, magnitude: Double(count),
+                                  accessibility: String(localized: "\(count) olay"), symbol: module.symbol)
+        case .launcher:
+            let count = LauncherStore.shared.items.count
+            return MenuBarReading(lines: ["\(count)"], reserve: ["99"], fraction: nil, magnitude: Double(count),
+                                  accessibility: String(localized: "\(count) favori"), symbol: module.symbol)
+        case .clipboard:
+            let count = ClipboardService.shared.history.items.count
+            return MenuBarReading(lines: ["\(count)"], reserve: ["999"], fraction: nil, magnitude: Double(count),
+                                  accessibility: String(localized: "Pano geçmişinde \(count) öğe"), symbol: "doc.on.clipboard")
         case .display:
             guard PocketModule.displays.isAvailable() else {
                 return MenuBarReading(lines: ["—"], reserve: ["—"], fraction: nil, magnitude: nil,

@@ -36,9 +36,24 @@ import XCTest
     }
 
     private func render(_ module: MenuBarModule, _ settings: MenuBarModuleSettings, _ history: MenuBarHistory, _ snapshot: SystemSnapshot,
-                        external: MenuBarReading? = nil) -> NSImage {
+                        external: MenuBarReading? = nil, appearance: NSAppearance? = nil) -> NSImage {
         let reading = MenuBarFormatter.reading(module, settings: settings, snapshot: snapshot, binaryUnits: true, external: external)
-        return MenuBarRenderer.module(module, settings: settings, reading: reading, snapshot: snapshot, history: history)
+        return MenuBarRenderer.module(module, settings: settings, reading: reading, snapshot: snapshot, history: history, appearance: appearance)
+    }
+
+    /// `image` drawn into a bitmap at `scale` device pixels per point (1 = non-Retina).
+    private func bitmap(_ image: NSImage, scale: CGFloat) -> NSBitmapImageRep? {
+        let width = Int(image.size.width * scale), height = Int(image.size.height * scale)
+        guard let rep = NSBitmapImageRep(bitmapDataPlanes: nil, pixelsWide: width, pixelsHigh: height, bitsPerSample: 8, samplesPerPixel: 4,
+                                         hasAlpha: true, isPlanar: false, colorSpaceName: .deviceRGB, bytesPerRow: 0, bitsPerPixel: 0) else { return nil }
+        // The point size must be set before the context is made, or the context draws one point per pixel.
+        rep.size = image.size
+        guard let context = NSGraphicsContext(bitmapImageRep: rep) else { return nil }
+        NSGraphicsContext.saveGraphicsState()
+        NSGraphicsContext.current = context
+        image.draw(in: NSRect(origin: .zero, size: image.size))
+        NSGraphicsContext.restoreGraphicsState()
+        return rep
     }
 
     private func sample(_ module: MenuBarModule) -> MenuBarReading? {
@@ -127,6 +142,64 @@ import XCTest
             keys.insert(MenuBarRenderer.groupedKey(state).parts.joined(separator: "|"))
         }
         XCTAssertEqual(keys.count, MenuBarGroupedStyle.allCases.count)
+    }
+
+    func testAttentionDotNeverChangesTheGroupedItemWidth() {
+        let (history, snapshot) = history()
+        for style in MenuBarGroupedStyle.allCases {
+            var preferences = MenuBarPreferences()
+            preferences.groupedStyle = style; preferences.groupedBadge = true
+            let calm = MenuBarRenderer.grouped(MenuBarRenderer.groupedState(preferences: preferences, snapshot: snapshot, history: history, attention: false))
+            let alert = MenuBarRenderer.grouped(MenuBarRenderer.groupedState(preferences: preferences, snapshot: snapshot, history: history, attention: true))
+            XCTAssertEqual(calm.size.width, alert.size.width, style.rawValue)
+        }
+    }
+
+    func testValueStyleShowsTheMetricBesideItsSymbol() {
+        let (history, snapshot) = history()
+        var preferences = MenuBarPreferences()
+        preferences.groupedStyle = .value
+        let state = MenuBarRenderer.groupedState(preferences: preferences, snapshot: snapshot, history: history, attention: false)
+        XCTAssertFalse(state.text.isEmpty)
+        XCTAssertGreaterThan(MenuBarRenderer.grouped(state).size.width, 30)
+    }
+
+    /// A colored item keeps its label in the menu bar's label color: only the value and graphic take the accent.
+    func testColoredItemKeepsItsLabelInTheLabelColor() throws {
+        let (history, snapshot) = history()
+        var settings = MenuBarModuleSettings.defaults(for: .cpu)
+        settings.accent = .red; settings.showLabel = true; settings.showIcon = false
+        let dark = try XCTUnwrap(NSAppearance(named: .darkAqua))
+        let image = render(.cpu, settings, history, snapshot, appearance: dark)
+        let rep = try XCTUnwrap(bitmap(image, scale: 4))
+        var labelPixels = 0, valuePixels = 0
+        for y in 0..<rep.pixelsHigh {
+            for x in 0..<rep.pixelsWide {
+                guard let color = rep.colorAt(x: x, y: y), color.alphaComponent > 0.6 else { continue }
+                let saturated = color.redComponent - color.blueComponent > 0.25
+                if y < rep.pixelsHigh / 2 { if !saturated { labelPixels += 1 } } else if saturated { valuePixels += 1 }
+            }
+        }
+        XCTAssertGreaterThan(labelPixels, 20, "the label above the value stays neutral")
+        XCTAssertGreaterThan(valuePixels, 20, "the value takes the accent")
+    }
+
+    /// On a 1× display every bar of a bar graph and of the core meter lands on whole pixels: no half-covered
+    /// columns blur the bars into a gray smear.
+    func testBarEdgesAreCrispOnNonRetinaDisplays() throws {
+        let (history, snapshot) = history()
+        for style in [MenuBarDisplayStyle.graph, .cores] {
+            var settings = MenuBarModuleSettings.defaults(for: .cpu)
+            settings.style = style; settings.graphKind = .bars
+            settings.showValue = false; settings.showIcon = false; settings.showLabel = false
+            let rep = try XCTUnwrap(bitmap(render(.cpu, settings, history, snapshot), scale: 1))
+            // The bottom row inside the frame, where every bar has ink.
+            let row = rep.pixelsHigh - 1 - Int(((MenuBarRenderer.height - 16) / 2).rounded()) - 2
+            let alphas = (0..<rep.pixelsWide).map { rep.colorAt(x: $0, y: row)?.alphaComponent ?? 0 }
+            let full = alphas.max() ?? 1
+            let blurred = alphas.filter { $0 > 0.45 && $0 < full - 0.15 }
+            XCTAssertLessThanOrEqual(blurred.count, 2, "\(style): \(alphas.map { String(format: "%.2f", $0) })")
+        }
     }
 
     func testRenderKeyChangesWithEveryAppearanceOption() {
@@ -277,7 +350,8 @@ import XCTest
     }
 
     private func sheet(_ rows: [(String, [NSImage])], surface: MenuBarSurface) -> Data {
-        let scale: CGFloat = 3, rowHeight: CGFloat = 30, labelWidth: CGFloat = 70, gap: CGFloat = 14
+        // 1 shows what a non-Retina display gets; the default 3 is for close inspection.
+        let scale = CGFloat(Double(ProcessInfo.processInfo.environment["MACPOCKET_MENUBAR_GALLERY_SCALE"] ?? "") ?? 3), rowHeight: CGFloat = 30, labelWidth: CGFloat = 70, gap: CGFloat = 14
         let width = (rows.map { $0.1.reduce(labelWidth) { $0 + $1.size.width + gap } }.max() ?? 400) + 20
         let height = rowHeight * CGFloat(rows.count) + 10
         let rep = NSBitmapImageRep(bitmapDataPlanes: nil, pixelsWide: Int(width * scale), pixelsHigh: Int(height * scale), bitsPerSample: 8,

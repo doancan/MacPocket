@@ -91,23 +91,27 @@ public actor ProcessEnergySampler {
             : Double(ProcessEnergyMath.nanoseconds(fromAbsolute: now &- previousAt, numer: timebase.numer,
                                                    denom: timebase.denom)) / 1_000_000_000
         var fresh: [Int32: ProcessEnergyCounters] = [:]
-        var usages: [ProcessEnergyUsage] = []
+        var ranked: [(usage: ProcessEnergyUsage, previous: ProcessEnergyCounters, current: ProcessEnergyCounters)] = []
         var unreadable = 0
         for pid in Self.listPIDs() where pid > 0 {
             guard let counters = counters(pid: pid) else { unreadable += 1; continue }
             fresh[pid] = counters
-            guard let old = previous[pid] else { continue }
-            let path = Self.path(pid: pid)
-            let name = Self.name(pid: pid, path: path)
-            if let usage = ProcessEnergyMath.usage(previous: old, current: counters, interval: interval, name: name, path: path),
-               usage.milliwatts > 0 || usage.cpuPercent > 0 {
-                usages.append(usage)
-            }
+            guard let old = previous[pid],
+                  let usage = ProcessEnergyMath.usage(previous: old, current: counters, interval: interval, name: "", path: ""),
+                  usage.milliwatts > 0 || usage.cpuPercent > 0 else { continue }
+            ranked.append((usage, old, counters))
         }
         previous = fresh
         previousAt = now
-        usages.sort { $0.milliwatts == $1.milliwatts ? $0.cpuPercent > $1.cpuPercent : $0.milliwatts > $1.milliwatts }
-        return ProcessEnergySample(capturedAt: Date(), interval: interval, processes: Array(usages.prefix(limit)),
+        ranked.sort { $0.usage.milliwatts == $1.usage.milliwatts ? $0.usage.cpuPercent > $1.usage.cpuPercent
+                                                                  : $0.usage.milliwatts > $1.usage.milliwatts }
+        // Names and paths cost two system calls per process; only the processes shown need them.
+        let processes = ranked.prefix(limit).compactMap { entry -> ProcessEnergyUsage? in
+            let path = Self.path(pid: entry.current.pid)
+            return ProcessEnergyMath.usage(previous: entry.previous, current: entry.current, interval: interval,
+                                           name: Self.name(pid: entry.current.pid, path: path), path: path)
+        }
+        return ProcessEnergySample(capturedAt: Date(), interval: interval, processes: processes,
                                    readableCount: fresh.count, unreadableCount: unreadable)
     }
 

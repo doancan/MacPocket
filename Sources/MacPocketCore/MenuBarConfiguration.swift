@@ -4,7 +4,8 @@ import Foundation
 
 /// One monitoring module shown in the menu bar (a status item, or a tab of the grouped popover).
 public enum MenuBarModule: String, CaseIterable, Codable, Sendable, Identifiable {
-    case cpu, gpu, memory, disk, network, power, weather, aiUsage, awake, focus, bluetooth, display, clock
+    case overview, cpu, gpu, memory, disk, network, power, weather, aiUsage, awake, focus, bluetooth, display, clock, clipboard
+    case health, timeline, launcher
 
     public var id: String { rawValue }
 
@@ -23,6 +24,11 @@ public enum MenuBarModule: String, CaseIterable, Codable, Sendable, Identifiable
         case .bluetooth: String(localized: "Bluetooth pilleri")
         case .display: String(localized: "Parlaklık ve gece modu")
         case .clock: String(localized: "Saat")
+        case .clipboard: String(localized: "Pano")
+        case .overview: String(localized: "Genel Bakış")
+        case .health: String(localized: "Sağlık")
+        case .timeline: String(localized: "Olaylar")
+        case .launcher: String(localized: "Başlatıcı")
         }
     }
 
@@ -31,7 +37,8 @@ public enum MenuBarModule: String, CaseIterable, Codable, Sendable, Identifiable
     public var isSystemMetric: Bool {
         switch self {
         case .cpu, .gpu, .memory, .disk, .network, .power: true
-        case .weather, .aiUsage, .awake, .focus, .bluetooth, .display, .clock: false
+        case .weather, .aiUsage, .awake, .focus, .bluetooth, .display, .clock, .clipboard,
+             .overview, .health, .timeline, .launcher: false
         }
     }
 
@@ -51,6 +58,11 @@ public enum MenuBarModule: String, CaseIterable, Codable, Sendable, Identifiable
         case .bluetooth: "BT"
         case .display: String(localized: "MenuBar.shortLabel.display", defaultValue: "EKRAN")
         case .clock: String(localized: "MenuBar.shortLabel.clock", defaultValue: "SAAT")
+        case .clipboard: String(localized: "MenuBar.shortLabel.clipboard", defaultValue: "PANO")
+        case .overview: String(localized: "MenuBar.shortLabel.overview", defaultValue: "ÖZET")
+        case .health: String(localized: "MenuBar.shortLabel.health", defaultValue: "SAĞLIK")
+        case .timeline: String(localized: "MenuBar.shortLabel.timeline", defaultValue: "OLAY")
+        case .launcher: String(localized: "MenuBar.shortLabel.launcher", defaultValue: "AÇ")
         }
     }
 
@@ -83,6 +95,11 @@ public enum MenuBarModule: String, CaseIterable, Codable, Sendable, Identifiable
         case .bluetooth: "battery.75percent"
         case .display: "sun.max.fill"
         case .clock: "clock.fill"
+        case .clipboard: "doc.on.clipboard"
+        case .overview: "square.grid.2x2"
+        case .health: "stethoscope"
+        case .timeline: "clock.arrow.circlepath"
+        case .launcher: "star"
         }
     }
 
@@ -102,6 +119,10 @@ public enum MenuBarModule: String, CaseIterable, Codable, Sendable, Identifiable
         case .bluetooth: [.bluetoothLowest]
         case .display: [.displayBrightness]
         case .clock: [.clockTime, .clockTimeSeconds, .clockWeekdayTime, .clockDateTime]
+        case .clipboard: [.clipboardCount]
+        case .overview, .health: [.healthScore]
+        case .timeline: [.eventCount]
+        case .launcher: [.favoriteCount]
         }
     }
 
@@ -110,12 +131,20 @@ public enum MenuBarModule: String, CaseIterable, Codable, Sendable, Identifiable
     public var enabledKey: String { self == .cpu ? "MacPocket.menuBarCPU" : "MacPocket.bar.\(rawValue)" }
 
     /// Enabled state when the user never chose one.
-    public var enabledByDefault: Bool { self == .cpu || self == .memory }
+    public var enabledByDefault: Bool { [.overview, .cpu, .memory, .network, .clipboard].contains(self) }
+
+    /// Whether the module keeps a status item of its own beside the grouped one. Status modules (weather, clock,
+    /// timers) do; system metrics and the clipboard history live in the grouped popover's tabs instead.
+    public var keepsOwnItemWhenGrouped: Bool { !isSystemMetric && !Self.groupedTabs.contains(self) }
+
+    /// Modules that are pages of the grouped popover rather than status items of their own.
+    public static let groupedTabs: Set<MenuBarModule> = [.clipboard, .overview, .health, .timeline, .launcher]
 
     /// Display styles that make sense for this module; per-core bars exist only for the CPU.
     public var styleOptions: [MenuBarDisplayStyle] {
         switch self {
         case .weather, .aiUsage, .clock: return [.value, .icon]
+        case .clipboard, .overview, .health, .timeline, .launcher: return [.icon, .value]
         case .awake, .focus: return [.value, .pie, .ring, .bar, .icon]
         case .bluetooth, .display: return [.value, .gauge, .bar, .pie, .ring, .icon]
         default: break
@@ -136,6 +165,7 @@ public enum MenuBarValue: String, Codable, Sendable, CaseIterable, Identifiable 
     case weatherTemperature, weatherApparent
     case aiQuota
     case awakeRemaining, focusRemaining, bluetoothLowest, displayBrightness
+    case clipboardCount, healthScore, eventCount, favoriteCount
     case clockTime, clockTimeSeconds, clockWeekdayTime, clockDateTime
 
     public var id: String { rawValue }
@@ -197,6 +227,9 @@ public enum MenuBarValue: String, Codable, Sendable, CaseIterable, Identifiable 
         case .clockTimeSeconds: String(localized: "Saat ve saniye")
         case .clockWeekdayTime: String(localized: "Gün ve saat")
         case .clockDateTime: String(localized: "Tarih ve saat")
+        case .clipboardCount, .favoriteCount: String(localized: "Öğe sayısı")
+        case .healthScore: String(localized: "Sağlık puanı")
+        case .eventCount: String(localized: "Olay sayısı")
         }
     }
 }
@@ -224,6 +257,8 @@ public enum MenuBarGroupedStyle: String, Codable, Sendable, CaseIterable, Identi
     case bars
     /// A short history graph of the chosen metric.
     case sparkline
+    /// The chosen metric's symbol beside its value, for a grouped item that reads like a separate one.
+    case value
 
     public static let defaultValue = MenuBarGroupedStyle.dial
     public var id: String { rawValue }
@@ -234,6 +269,7 @@ public enum MenuBarGroupedStyle: String, Codable, Sendable, CaseIterable, Identi
         case .ring: String(localized: "Canlı halka")
         case .bars: String(localized: "Üç çubuk")
         case .sparkline: String(localized: "Canlı grafik")
+        case .value: String(localized: "Simge ve değer")
         }
     }
 
@@ -431,7 +467,8 @@ extension MenuBarValue {
         case .networkWifiSignal: .dBm
         case .diskActivity, .diskReadWrite, .networkUpDown, .networkCombined, .networkDownload, .networkUpload, .powerSource, .powerWatts, .memorySwap, .weatherTemperature, .weatherApparent,
              .awakeRemaining, .focusRemaining, .displayBrightness,
-             .clockTime, .clockTimeSeconds, .clockWeekdayTime, .clockDateTime: nil
+             .clockTime, .clockTimeSeconds, .clockWeekdayTime, .clockDateTime, .clipboardCount,
+             .healthScore, .eventCount, .favoriteCount: nil
         }
     }
 
@@ -483,7 +520,7 @@ public enum MenuBarThresholds {
 // MARK: - Settings
 
 /// Per-module menu bar options, stored as JSON under `MenuBarPreferences.moduleKey(_:)`.
-public struct MenuBarModuleSettings: Codable, Equatable, Sendable {
+public struct MenuBarModuleSettings: Codable, Hashable, Sendable {
     public var style: MenuBarDisplayStyle
     public var showLabel: Bool
     public var showIcon: Bool
@@ -563,6 +600,10 @@ public struct MenuBarModuleSettings: Codable, Equatable, Sendable {
         case .bluetooth: Self(showLabel: false, showIcon: true, value: .bluetoothLowest, colorMode: .thresholds)
         case .display: Self(showLabel: false, showIcon: true, value: .displayBrightness)
         case .clock: Self(showLabel: false, showIcon: false, value: .clockTime)
+        case .clipboard: Self(style: .icon, showLabel: false, showIcon: true, value: .clipboardCount)
+        case .overview, .health: Self(style: .icon, showLabel: false, showIcon: true, value: .healthScore)
+        case .timeline: Self(style: .icon, showLabel: false, showIcon: true, value: .eventCount)
+        case .launcher: Self(style: .icon, showLabel: false, showIcon: true, value: .favoriteCount)
         default: Self(value: module.valueOptions[0])
         }
     }
@@ -654,7 +695,9 @@ public struct MenuBarPreferences: Equatable, Sendable {
     /// Appends missing modules and drops duplicates, so the order always lists every module once.
     static func completeOrder(_ order: [MenuBarModule]) -> [MenuBarModule] {
         var seen = Set<MenuBarModule>()
-        return (order + MenuBarModule.allCases).filter { seen.insert($0).inserted }
+        // The overview is the grouped popover's first page, also for orders saved before it existed.
+        let leading: [MenuBarModule] = order.contains(.overview) ? [] : [.overview]
+        return (leading + order + MenuBarModule.allCases).filter { seen.insert($0).inserted }
     }
 
     public static func load(from defaults: UserDefaults = .standard) -> Self {
@@ -772,7 +815,8 @@ public struct MenuBarPreferences: Equatable, Sendable {
                 settings.volumePath = defaults.string(forKey: "MacPocket.bar.volume") ?? ""
             case .power:
                 settings.value = battery ? .powerBattery : .powerSource
-            case .network, .weather, .aiUsage, .awake, .focus, .bluetooth, .display, .clock:
+            case .network, .weather, .aiUsage, .awake, .focus, .bluetooth, .display, .clock, .clipboard,
+                 .overview, .health, .timeline, .launcher:
                 settings = .defaults(for: module)
             case .cpu, .gpu:
                 break
@@ -878,9 +922,10 @@ public enum MenuBarFormatter {
     public static func reading(_ module: MenuBarModule, settings raw: MenuBarModuleSettings,
                                snapshot: SystemSnapshot?, binaryUnits: Bool = true, weather: WeatherSnapshot? = nil,
                                aiUsage: MenuBarReading? = nil, external: MenuBarReading? = nil) -> MenuBarReading {
-        // Keep awake, focus and Bluetooth state live outside the snapshot; the app builds their readings
-        // with `awakeReading`, `focusReading`, `bluetoothReading` and `displayReading`.
-        if module == .awake || module == .focus || module == .bluetooth || module == .display || module == .clock {
+        // Keep awake, focus, Bluetooth, display, clock and clipboard state live outside the snapshot; the app builds
+        // their readings (`awakeReading`, `focusReading`, `bluetoothReading`, `displayReading`, the clipboard count).
+        if module == .awake || module == .focus || module == .bluetooth || module == .display || module == .clock
+            || MenuBarModule.groupedTabs.contains(module) {
             return external ?? MenuBarReading(lines: [""], reserve: [""], fraction: nil, magnitude: nil, accessibility: module.title)
         }
         if module == .aiUsage {
@@ -930,7 +975,8 @@ public enum MenuBarFormatter {
         }
         switch settings.value {
         case .weatherTemperature, .weatherApparent, .aiQuota, .awakeRemaining, .focusRemaining, .bluetoothLowest, .displayBrightness,
-             .clockTime, .clockTimeSeconds, .clockWeekdayTime, .clockDateTime: return pending()
+             .clockTime, .clockTimeSeconds, .clockWeekdayTime, .clockDateTime, .clipboardCount,
+             .healthScore, .eventCount, .favoriteCount: return pending()
         case .gpuUtilization, .gpuRenderer:
             guard let gpu = s.gpu else { return pending() }
             let value = settings.value == .gpuRenderer ? (gpu.rendererPercent ?? gpu.utilizationPercent) : gpu.utilizationPercent

@@ -20,6 +20,35 @@ extension MenuBarModule {
         case .bluetooth: .blue
         case .display: Color(hex: 0xD99A00)
         case .clock: Color(hex: 0xD6455D)
+        case .clipboard: Color(hex: 0x5E6AD2)
+        case .overview: PocketTheme.brand
+        case .health: Color(hex: 0xE5484D)
+        case .timeline: Color(hex: 0x8E6CEF)
+        case .launcher: Color(hex: 0xF5A524)
+        }
+    }
+
+    /// The name in the popover's tab bar: one short word, as toolbar labels are (HIG Toolbars). The full title
+    /// heads the page.
+    var tabTitle: String {
+        switch self {
+        case .overview: String(localized: "Özet")
+        case .power: String(localized: "Güç")
+        case .weather: String(localized: "Hava")
+        case .aiUsage: "AI"
+        case .awake: String(localized: "Uyanık")
+        case .bluetooth: "Bluetooth"
+        case .display: String(localized: "Ekran")
+        default: title
+        }
+    }
+
+    /// Whether the module can show anything right now. The clipboard tab and item exist only while clipboard
+    /// history is on; the other modules show their own empty or disabled states.
+    @MainActor var isRuntimeAvailable: Bool {
+        switch self {
+        case .clipboard: PocketModule.clipboard.isAvailable() && ClipboardService.shared.settings.enabled
+        default: true
         }
     }
 
@@ -111,6 +140,7 @@ extension MenuBarGroupedStyle {
         case .ring: "circle.circle"
         case .bars: "chart.bar.fill"
         case .sparkline: "waveform.path.ecg"
+        case .value: "textformat.123"
         }
     }
 }

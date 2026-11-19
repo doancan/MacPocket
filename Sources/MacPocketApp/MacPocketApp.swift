@@ -322,6 +322,14 @@ final class PocketModel {
                 Task { @MainActor [weak self] in await self?.recordPowerEvent(event) }
             }.store(in: &subscriptions)
         }
+        // Regular apps (the Task Manager marks them) change only when an app launches or quits; asking the
+        // workspace for every running application on each sample was a large share of a process refresh.
+        for notification in [NSWorkspace.didLaunchApplicationNotification, NSWorkspace.didTerminateApplicationNotification] {
+            NSWorkspace.shared.notificationCenter.publisher(for: notification).receive(on: RunLoop.main).sink { [weak self] _ in
+                MainActor.assumeIsolated { self?.updateAppPIDs() }
+            }.store(in: &subscriptions)
+        }
+        updateAppPIDs()
         // A booted simulator ignores the quit request and makes macOS wait for its service timeout; shut them down first.
         NSWorkspace.shared.notificationCenter.publisher(for: NSWorkspace.willPowerOffNotification).sink { _ in
             if SimulatorShutdown.isEnabled() { SimulatorShutdown.shutdownAll() }
@@ -336,6 +344,11 @@ final class PocketModel {
     }
 
     deinit { pollingTask?.cancel() }
+
+    private func updateAppPIDs() {
+        let pids = Set(NSWorkspace.shared.runningApplications.filter { $0.activationPolicy == .regular }.map(\.processIdentifier))
+        if pids != appPIDs { appPIDs = pids }
+    }
 
     static let sampleCapacity = 150
 
@@ -428,8 +441,6 @@ final class PocketModel {
                 let snapshot = if let readProcessSnapshot { try await readProcessSnapshot() } else { try await processMonitor.snapshot() }
                 processes = snapshot.processes
                 if unreadableCount != snapshot.unreadableProcessCount { unreadableCount = snapshot.unreadableProcessCount }
-                let pids = Set(NSWorkspace.shared.runningApplications.filter { $0.activationPolicy == .regular }.map(\.processIdentifier))
-                if pids != appPIDs { appPIDs = pids }
             }
             lastUpdate = system.capturedAt
             alerts.evaluate(system)
