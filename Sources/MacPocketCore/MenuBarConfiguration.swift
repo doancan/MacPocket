@@ -520,7 +520,7 @@ public enum MenuBarThresholds {
 // MARK: - Settings
 
 /// Per-module menu bar options, stored as JSON under `MenuBarPreferences.moduleKey(_:)`.
-public struct MenuBarModuleSettings: Codable, Equatable, Sendable {
+public struct MenuBarModuleSettings: Codable, Hashable, Sendable {
     public var style: MenuBarDisplayStyle
     public var showLabel: Bool
     public var showIcon: Bool

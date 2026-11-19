@@ -174,6 +174,8 @@ enum MenuBarRenderer {
     struct Key: Hashable {
         var parts: [String]
         var levels: [Int]
+        /// The module's settings, compared directly rather than through a reflected description.
+        var settings: MenuBarModuleSettings?
     }
 
     // MARK: Ink
@@ -548,10 +550,10 @@ enum MenuBarRenderer {
         case .value, .icon:
             break
         }
-        return Key(parts: [module.rawValue, String(describing: settings), reading.symbol ?? symbol(for: module, value: settings.value, snapshot: snapshot),
+        return Key(parts: [module.rawValue, reading.symbol ?? symbol(for: module, value: settings.value, snapshot: snapshot),
                            showsVPN(module, settings: settings, snapshot: snapshot) ? "vpn" : "",
                            "\(MenuBarThresholds.level(reading, settings: settings).rawValue)"]
-                   + reading.lines + reading.reserve, levels: levels)
+                   + reading.lines + reading.reserve, levels: levels, settings: settings)
     }
 
     /// The item of one module. `appearance` is the menu bar's; it matters only for colored items, which the caller
