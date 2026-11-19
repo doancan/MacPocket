@@ -170,27 +170,44 @@ import Testing
 
 @Suite struct DockerLiveTests {
     /// Uses the real `docker` when its daemon answers (read-only: `docker system df`); nothing is pruned.
+    ///
+    /// The scan takes about 30 seconds and asks the daemon on its own, so the daemon is read before and after it:
+    /// unchanged, the scanner must report exactly what it says; changed in the meantime (a build, a pull, another
+    /// app's containers), the scanner's figure must lie between the two real readings.
     @Test(.enabled(if: FileManager.default.isExecutableFile(atPath: "/opt/homebrew/bin/docker")))
     func theScannerReportsWhatARealDockerDaemonSaysIsReclaimable() async throws {
-        let docker = "/opt/homebrew/bin/docker"
-        guard let df = await SystemDataEnvironment.liveRunner(docker, ["system", "df", "--format", "{{json .}}"]) else { return }   // daemon not running
-        let usage = SystemDataParsers.dockerUsage(df)
-        #expect(!usage.isEmpty, "the real output must parse")
+        guard let before = await Self.reclaimable() else { return }   // daemon not running
+        #expect(!before.isEmpty, "the real output must parse")
         var items: [SystemDataItem] = []
         for await event in SystemDataScanner(environment: SystemDataEnvironment(toolSearchPaths: ["/opt/homebrew/bin"], capacity: { nil })).scan() {
             if case .finished(let report) = event { items = report.items.filter { $0.group == .docker } }
         }
-        for entry in usage where entry.reclaimableBytes > 0 {
-            let id: String
-            switch entry.kind {
-            case .images: id = "docker.images"
-            case .buildCache: id = "docker.buildCache"
-            case .containers: id = "docker.containers"
-            case .volumes: id = "docker.volumes"
-            }
-            #expect(items.first { $0.id == id }?.sizeBytes == entry.reclaimableBytes, "\(id)")
+        let after = try #require(await Self.reclaimable(), "the daemon stopped answering during the scan")
+        for id in Set(before.keys).union(after.keys) {
+            let low = min(before[id] ?? 0, after[id] ?? 0), high = max(before[id] ?? 0, after[id] ?? 0)
+            let reported = items.first { $0.id == id }?.sizeBytes ?? 0
+            #expect((low...high).contains(reported), "\(id): scanner \(reported), daemon \(before[id] ?? 0) before and \(after[id] ?? 0) after")
         }
-        #expect(items.count == usage.filter { $0.reclaimableBytes > 0 }.count)
+        // Every reported item is a kind the daemon had something reclaimable in, before or after.
+        #expect(items.allSatisfy { (before[$0.id] ?? 0) > 0 || (after[$0.id] ?? 0) > 0 }, "\(items.map(\.id))")
+    }
+
+    /// Reclaimable bytes by scanner item id, as the daemon reports them now; nil when it does not answer.
+    private static func reclaimable() async -> [String: Int64]? {
+        guard let df = await SystemDataEnvironment.liveRunner("/opt/homebrew/bin/docker", ["system", "df", "--format", "{{json .}}"]) else {
+            return nil
+        }
+        var bytes: [String: Int64] = [:]
+        for entry in SystemDataParsers.dockerUsage(df) where entry.reclaimableBytes > 0 {
+            let id = switch entry.kind {
+            case .images: "docker.images"
+            case .buildCache: "docker.buildCache"
+            case .containers: "docker.containers"
+            case .volumes: "docker.volumes"
+            }
+            bytes[id] = entry.reclaimableBytes
+        }
+        return bytes
     }
 }
 
