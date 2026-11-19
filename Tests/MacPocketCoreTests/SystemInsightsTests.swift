@@ -43,6 +43,14 @@ final class SystemInsightsTests: XCTestCase {
         XCTAssertEqual(history.points(.hour).first?.cpu, 40)
     }
 
+    func testASmallClockCorrectionKeepsTheHistory() {
+        var history = MetricHistory()
+        history.record(MetricPoint(date: start + 9, cpu: 10))
+        history.record(MetricPoint(date: start + 21, cpu: 20))
+        history.record(MetricPoint(date: start + 18, cpu: 30))
+        XCTAssertEqual(history.points(.hour).count, 2, "a 3-second step back must not wipe the hour")
+    }
+
     func testHistoryStartsOverWhenTheClockGoesBack() {
         var history = MetricHistory()
         history.record(MetricPoint(date: start, cpu: 1))

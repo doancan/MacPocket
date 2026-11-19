@@ -591,3 +591,8 @@ final class SystemDiagnosticCommandRunner: @unchecked Sendable {
         }
     }
 }
+
+extension SystemSnapshot {
+    /// The startup disk ("/"), or the first volume when the root volume was not reported.
+    public var startupVolume: VolumeSnapshot? { volumes.first { $0.path == "/" } ?? volumes.first }
+}

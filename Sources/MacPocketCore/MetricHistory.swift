@@ -25,7 +25,7 @@ public struct MetricPoint: Codable, Sendable, Equatable {
 
     /// The point a snapshot contributes.
     public init(_ snapshot: SystemSnapshot) {
-        let startup = snapshot.volumes.first { $0.path == "/" } ?? snapshot.volumes.first
+        let startup = snapshot.startupVolume
         self.init(date: snapshot.capturedAt, cpu: snapshot.cpuTotalPercent,
                   memory: snapshot.usedMemoryBytes.map { Double($0) / Double(max(1, snapshot.physicalMemoryBytes)) },
                   networkDown: snapshot.network?.receivedBytesPerSecond, networkUp: snapshot.network?.sentBytesPerSecond,
@@ -98,7 +98,9 @@ public struct MetricHistory: Codable, Sendable, Equatable {
             var points = tiers[range] ?? []
             let bucketStart = Date(timeIntervalSinceReferenceDate:
                 (point.date.timeIntervalSinceReferenceDate / range.bucket).rounded(.down) * range.bucket)
-            if let last = points.last, last.date == bucketStart {
+            // A sample up to one bucket behind the newest (an NTP correction after wake) joins the newest
+            // bucket; only a larger jump back discards the range.
+            if let last = points.last, bucketStart <= last.date, last.date.timeIntervalSince(bucketStart) <= range.bucket {
                 points[points.count - 1] = last.merged(with: point)
             } else if points.last.map({ $0.date < bucketStart }) ?? true {
                 var opened = point

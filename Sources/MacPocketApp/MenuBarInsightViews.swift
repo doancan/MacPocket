@@ -2,26 +2,57 @@ import AppKit
 import MacPocketCore
 import SwiftUI
 import UniformTypeIdentifiers
+import os
+
+/// Where a link inside a menu bar page can take the user: the module's tab in the grouped popover, else its
+/// page in the main window. A link with neither is shown disabled rather than doing nothing.
+struct MenuBarPageLinks {
+    /// Tabs of the grouped popover; empty in a separate item's popover.
+    var tabs: Set<MenuBarModule> = []
+    var selectTab: @MainActor (MenuBarModule) -> Void = { _ in }
+    var openPage: @MainActor (PocketPage) -> Void = { _ in }
+
+    func canOpen(_ module: MenuBarModule) -> Bool { tabs.contains(module) || module.mainWindowPage != nil }
+
+    @MainActor func open(_ module: MenuBarModule) {
+        if tabs.contains(module) { selectTab(module) }
+        else if let page = module.mainWindowPage { openPage(page) }
+    }
+}
+
+extension MenuBarModule {
+    /// The main-window page that covers the module, for links whose tab is not in the popover.
+    var mainWindowPage: PocketPage? {
+        switch self {
+        case .cpu, .gpu, .memory, .network: .performance
+        case .power: .power
+        case .disk: .storage
+        default: nil
+        }
+    }
+}
 
 extension EnvironmentValues {
-    /// Switches the grouped popover to another tab; a no-op in a separate item's popover.
-    @Entry var selectMenuBarTab: @MainActor (MenuBarModule) -> Void = { _ in }
+    @Entry var menuBarPageLinks = MenuBarPageLinks()
 }
 
 // MARK: - Overview
 
 /// The grouped popover's first page: health at a glance and one tile per everyday metric, each opening its tab.
 struct OverviewMenuDetail: View {
+    /// Height of a tile's graphic (sparkline or capacity bar), the same in every tile so the grid's rows line up.
+    private static let tileGraphicHeight: CGFloat = 22
     var model: PocketModel
     @ObservedObject var history: MenuBarHistory
     let binary: Bool
-    @Environment(\.selectMenuBarTab) private var select
+    @Environment(\.menuBarPageLinks) private var navigation
 
     var body: some View {
         let system = model.system
         VStack(alignment: .leading, spacing: PocketSpacing.s + 2) {
             if let system {
-                HealthSummary(report: MenuBarInsights.shared.health(system, processes: model.processes)) { select(.health) }
+                HealthSummary(report: MenuBarInsights.shared.health(system, processes: model.processes),
+                              open: navigation.canOpen(.health) ? { navigation.open(.health) } : nil)
                 Grid(horizontalSpacing: PocketSpacing.s, verticalSpacing: PocketSpacing.s) {
                     GridRow {
                         tile(.cpu, value: percent(system.cpuTotalPercent),
@@ -35,7 +66,7 @@ struct OverviewMenuDetail: View {
                              series: normalized(history.samples.map { $0.networkDown ?? 0 }))
                     }
                 }
-                RecentEvents { select(.timeline) }
+                RecentEvents(open: navigation.canOpen(.timeline) ? { navigation.open(.timeline) } : nil)
                 VStack(spacing: PocketSpacing.xs + 1) {
                     if let hottest = system.temperatures.flatMap(TemperatureSummary.hottest) {
                         InfoRow(title: "En sıcak sensör", value: pocketCelsius(hottest.celsius))
@@ -51,7 +82,7 @@ struct OverviewMenuDetail: View {
 
     /// Every tile has the same parts (title, value, a graphic) so the grid's rows line up.
     private func tile(_ module: MenuBarModule, value: String, series: [Double], fill: Double? = nil) -> some View {
-        Button { select(module) } label: {
+        Button { navigation.open(module) } label: {
             VStack(alignment: .leading, spacing: PocketSpacing.xs) {
                 HStack(spacing: PocketSpacing.xs + 2) {
                     PocketIconTile(symbol: module.symbol, tint: module.tint, size: 18)
@@ -67,48 +98,52 @@ struct OverviewMenuDetail: View {
                         Color.clear
                     }
                 }
-                .frame(height: 22)
+                .frame(height: Self.tileGraphicHeight)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             .menuBarSection()
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
+        .disabled(!navigation.canOpen(module))
         .accessibilityLabel(Text("\(module.title): \(value)"))
         .accessibilityHint("Ayrıntıları göster")
     }
 
     private func diskUsed(_ system: SystemSnapshot) -> Double? {
-        guard let startup = system.volumes.first(where: { $0.path == "/" }) ?? system.volumes.first, startup.totalBytes > 0 else { return nil }
+        guard let startup = system.startupVolume, startup.totalBytes > 0 else { return nil }
         return 1 - Double(startup.availableBytes) / Double(startup.totalBytes)
     }
 
     private func percent(_ value: Double?) -> String { value.map { MenuBarFormatter.percent($0, decimals: false) } ?? "—" }
 
     private func diskFree(_ system: SystemSnapshot) -> String {
-        guard let startup = system.volumes.first(where: { $0.path == "/" }) ?? system.volumes.first else { return "—" }
+        guard let startup = system.startupVolume else { return "—" }
         return MenuBarFormatter.bytes(Double(startup.availableBytes), binary: binary)
     }
 
     private func normalized(_ values: [Double]) -> [Double] {
-        let ceiling = max(65_536, values.max() ?? 0)
+        let ceiling = max(MenuBarRenderer.networkScaleFloor, values.max() ?? 0)
         return values.map { $0 / ceiling }
     }
 }
 
 /// The last few events, opening the Events page; nothing when there are none yet.
 private struct RecentEvents: View {
-    let open: () -> Void
+    /// Events shown on the Overview; the Events page lists the rest.
+    private static let count = 3
+    /// nil when the Events page is not available; the list is then not a link.
+    let open: (() -> Void)?
     private let insights = MenuBarInsights.shared
 
     var body: some View {
-        let recent = Array(insights.events.events.suffix(3).reversed())
+        let recent = Array(insights.events.events.suffix(Self.count).reversed())
         if !recent.isEmpty {
-            Button(action: open) {
+            MenuBarLink(open: open, hint: "Tüm olayları göster") {
                 VStack(alignment: .leading, spacing: PocketSpacing.xs + 2) {
                     HStack {
                         SectionTitle(title: "Son olaylar")
-                        Image(systemName: "chevron.right").font(.callout).foregroundStyle(.tertiary)
+                        if open != nil { Image(systemName: "chevron.right").font(.callout).foregroundStyle(.tertiary) }
                     }
                     ForEach(recent) { event in
                         HStack(spacing: PocketSpacing.s) {
@@ -121,9 +156,26 @@ private struct RecentEvents: View {
                     }
                 }
                 .menuBarSection()
-                .contentShape(Rectangle())
             }
-            .buttonStyle(.plain)
+        }
+    }
+}
+
+/// A card that opens another page when there is one, and is plain, fully legible content when there is not
+/// (a disabled button would gray out information the user still needs to read).
+private struct MenuBarLink<Content: View>: View {
+    let open: (() -> Void)?
+    let hint: LocalizedStringKey
+    @ViewBuilder var content: () -> Content
+
+    var body: some View {
+        if let open {
+            Button(action: open) { content().contentShape(Rectangle()) }
+                .buttonStyle(.plain)
+                .accessibilityElement(children: .combine)
+                .accessibilityHint(hint)
+        } else {
+            content().accessibilityElement(children: .combine)
         }
     }
 }
@@ -131,10 +183,11 @@ private struct RecentEvents: View {
 /// Score ring and the most serious issue; opens the Health page.
 private struct HealthSummary: View {
     let report: HealthReport
-    let open: () -> Void
+    /// nil when the Health page is not available; the summary is then not a link.
+    let open: (() -> Void)?
 
     var body: some View {
-        Button(action: open) {
+        MenuBarLink(open: open, hint: "Sağlık ayrıntılarını göster") {
             HStack(spacing: PocketSpacing.m) {
                 HealthGauge(score: report.score).frame(width: 44, height: 44)
                 VStack(alignment: .leading, spacing: 2) {
@@ -143,14 +196,10 @@ private struct HealthSummary: View {
                         .font(.callout).foregroundStyle(.secondary).lineLimit(1)
                 }
                 Spacer(minLength: 0)
-                Image(systemName: "chevron.right").font(.callout).foregroundStyle(.tertiary)
+                if open != nil { Image(systemName: "chevron.right").font(.callout).foregroundStyle(.tertiary) }
             }
             .menuBarSection()
-            .contentShape(Rectangle())
         }
-        .buttonStyle(.plain)
-        .accessibilityElement(children: .combine)
-        .accessibilityHint("Sağlık ayrıntılarını göster")
     }
 }
 
@@ -174,7 +223,7 @@ private struct HealthGauge: View {
 /// "Why is my Mac slow?": the score, then each issue with what it means and one action that addresses it.
 struct HealthMenuDetail: View {
     var model: PocketModel
-    @Environment(\.selectMenuBarTab) private var select
+    @Environment(\.menuBarPageLinks) private var navigation
     @Environment(\.closeMenuBarPopover) private var close
 
     var body: some View {
@@ -209,24 +258,20 @@ struct HealthMenuDetail: View {
             VStack(alignment: .leading, spacing: 3) {
                 Text(issue.title).font(.body.weight(.semibold))
                 Text(issue.explanation).font(.callout).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
-                Button(issue.actionTitle) { act(issue) }.buttonStyle(.link).font(.callout)
+                if let target = issue.target, navigation.canOpen(target) {
+                    Button(issue.actionTitle) { navigation.open(target) }.buttonStyle(.link).font(.callout)
+                } else if issue.kind == .diskLow {
+                    Button(issue.actionTitle) {
+                        close()
+                        model.navigation.select(.cleanup)
+                        model.openMainWindow?()
+                    }
+                    .buttonStyle(.link).font(.callout)
+                }
             }
             Spacer(minLength: 0)
         }
         .menuBarSection()
-    }
-
-    private func act(_ issue: HealthIssue) {
-        switch issue.kind {
-        case .cpuBusy: select(.cpu)
-        case .memoryPressure, .swap: select(.memory)
-        case .thermal: select(.power)
-        case .diskFillingSoon: select(.disk)
-        case .diskLow:
-            close()
-            model.navigation.select(.cleanup)
-            model.openMainWindow?()
-        }
     }
 }
 
@@ -243,6 +288,17 @@ extension HealthReport {
 }
 
 extension HealthIssue {
+    /// The module that shows what the issue is about; nil when the action leaves the popover (cleanup).
+    var target: MenuBarModule? {
+        switch kind {
+        case .cpuBusy: .cpu
+        case .memoryPressure, .swap: .memory
+        case .thermal: .power
+        case .diskFillingSoon: .disk
+        case .diskLow: nil
+        }
+    }
+
     var title: String {
         switch kind {
         case .cpuBusy: String(localized: "İşlemci yoğun")
@@ -285,10 +341,12 @@ extension HealthIssue {
 
 /// What happened to the Mac recently, newest first, grouped by day.
 struct TimelineMenuDetail: View {
+    /// Newest events listed; enough for several days without building hundreds of rows in a popover.
+    private static let visibleCount = 60
     private let insights = MenuBarInsights.shared
 
     var body: some View {
-        let events = Array(insights.events.events.reversed().prefix(60))
+        let events = Array(insights.events.events.reversed().prefix(Self.visibleCount))
         VStack(alignment: .leading, spacing: PocketSpacing.s + 2) {
             if events.isEmpty {
                 VStack(spacing: PocketSpacing.s) {
@@ -402,14 +460,26 @@ final class LauncherStore {
     static let capacity = 16
 
     private(set) var items: [LauncherItem]
+    @ObservationIgnored private let defaults: UserDefaults
+    @ObservationIgnored private let logger = Logger(subsystem: "com.doancan.MacPocket", category: "Launcher")
 
     init(defaults: UserDefaults = .standard) {
-        items = defaults.data(forKey: Self.key).flatMap { try? JSONDecoder().decode([LauncherItem].self, from: $0) } ?? []
+        self.defaults = defaults
+        items = []
+        guard let data = defaults.data(forKey: Self.key) else { return }
+        do {
+            items = try JSONDecoder().decode([LauncherItem].self, from: data)
+        } catch {
+            // Keep the unreadable data in place (it is overwritten only by the next change), and say so.
+            logger.error("Unreadable launcher favorites: \(error.localizedDescription, privacy: .public)")
+        }
     }
 
     func add(_ urls: [URL]) {
         let known = Set(items.map(\.url))
-        let new = urls.filter { !known.contains($0) }.map { LauncherItem(url: $0) }
+        var seen = known
+        let new = urls.filter { seen.insert($0).inserted }.map { LauncherItem(url: $0) }
+        guard !new.isEmpty else { return }
         items = Array((items + new).prefix(Self.capacity))
         save()
     }
@@ -420,7 +490,22 @@ final class LauncherStore {
     }
 
     private func save() {
-        if let data = try? JSONEncoder().encode(items) { UserDefaults.standard.set(data, forKey: Self.key) }
+        do {
+            defaults.set(try JSONEncoder().encode(items), forKey: Self.key)
+        } catch {
+            logger.error("Saving launcher favorites failed: \(error.localizedDescription, privacy: .public)")
+        }
+    }
+
+    /// A web address typed by the user, with `https://` added to a bare host; nil for anything that is not an
+    /// http(s) address with a host (a typo, a file path, another scheme).
+    nonisolated static func webAddress(_ text: String) -> URL? {
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return nil }
+        let candidate = trimmed.contains("://") ? trimmed : "https://" + trimmed
+        guard let url = URL(string: candidate), ["http", "https"].contains(url.scheme?.lowercased() ?? ""),
+              let host = url.host(), !host.isEmpty else { return nil }
+        return url
     }
 }
 
@@ -515,13 +600,7 @@ struct LauncherMenuDetail: View {
         .padding(PocketSpacing.m)
     }
 
-    /// Accepts only web addresses; anything else (a typo, a file path) is not added.
-    private var validLink: URL? {
-        let text = link.trimmingCharacters(in: .whitespaces)
-        let candidate = text.contains("://") ? text : "https://" + text
-        guard let url = URL(string: candidate), ["http", "https"].contains(url.scheme?.lowercased()), url.host() != nil else { return nil }
-        return url
-    }
+    private var validLink: URL? { LauncherStore.webAddress(link) }
 
     private func addLink() {
         guard let url = validLink else { return }

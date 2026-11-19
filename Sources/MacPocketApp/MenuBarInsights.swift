@@ -33,7 +33,8 @@ final class MenuBarInsights {
     func record(_ snapshot: SystemSnapshot) {
         history.record(MetricPoint(snapshot))
         events.append(detector.events(from: snapshot), now: snapshot.capturedAt)
-        if snapshot.capturedAt.timeIntervalSince(lastSave) >= Self.saveInterval { save(now: snapshot.capturedAt) }
+        // abs: after the clock is set back, saving must not pause until it catches up with the last save.
+        if abs(snapshot.capturedAt.timeIntervalSince(lastSave)) >= Self.saveInterval { save(now: snapshot.capturedAt) }
     }
 
     /// Days until the startup disk is full at the pace of the last week; nil while there is no shrinking trend.

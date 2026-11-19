@@ -11,8 +11,12 @@ struct MenuBarSection: ViewModifier {
         content
             .padding(PocketSpacing.s + 2)
             .frame(maxWidth: .infinity, alignment: .leading)
-            // A platter like Control Center's modules: a fill on the popover's glass, never glass on glass.
+            // Grouped like System Settings: a card on the window background with a hairline separator.
             .background(MenuBarPlatter.fill, in: RoundedRectangle(cornerRadius: PocketRadius.large, style: .continuous))
+            .overlay {
+                RoundedRectangle(cornerRadius: PocketRadius.large, style: .continuous)
+                    .strokeBorder(Color(nsColor: .separatorColor), lineWidth: 0.5)
+            }
     }
 }
 
@@ -20,10 +24,12 @@ extension View {
     func menuBarSection() -> some View { modifier(MenuBarSection()) }
 }
 
-/// Surfaces placed on the popover's glass.
+/// Surfaces of the popover. The popover has an opaque system window background: system glass takes the tone of
+/// whatever window is behind the popover, which turned the light appearance a muddy gray over dark windows.
 enum MenuBarPlatter {
-    /// Stronger in light mode, where the glass takes the tone of whatever is behind the popover.
-    static let fill = Color(light: 0xFFFFFF, dark: 0x323236, lightOpacity: 0.9, darkOpacity: 0.92)
+    static var background: Color { Color(nsColor: .windowBackgroundColor) }
+    /// White cards on the light background; a slightly raised tone on the dark one.
+    static let fill = Color(light: 0xFFFFFF, dark: 0xFFFFFF, lightOpacity: 1, darkOpacity: 0.06)
 }
 
 private struct ModuleHeader<Trailing: View>: View {

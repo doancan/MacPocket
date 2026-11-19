@@ -106,7 +106,7 @@ struct ClipboardMenuDetail: View {
                     LazyVStack(spacing: 2) {
                         ForEach(items) { item in
                             ClipboardMenuRow(item: item, service: service, selected: item.id == selectedID,
-                                             paste: { paste(item) }, copy: { copy(item) })
+                                             paste: { paste(item) }, pastePlain: { paste(item, plain: true) }, copy: { copy(item) })
                                 .id(item.id)
                         }
                     }
@@ -155,9 +155,9 @@ struct ClipboardMenuDetail: View {
     // MARK: Actions
 
     /// The popover closes first, so the paste keystroke reaches the app the user was working in.
-    private func paste(_ item: ClipboardItem) {
+    private func paste(_ item: ClipboardItem, plain: Bool = false) {
         close()
-        service.paste(item)
+        service.paste(item, plain: plain)
     }
 
     private func copy(_ item: ClipboardItem) {
@@ -172,6 +172,7 @@ private struct ClipboardMenuRow: View {
     @ObservedObject var service: ClipboardService
     let selected: Bool
     let paste: () -> Void
+    let pastePlain: () -> Void
     let copy: () -> Void
 
     @State private var hovering = false
@@ -206,7 +207,7 @@ private struct ClipboardMenuRow: View {
         .help("Yapıştırmak için tıkla")
         .contextMenu {
             Button("Yapıştır", action: paste)
-            Button("Düz metin olarak yapıştır") { service.paste(item, plain: true) }
+            Button("Düz metin olarak yapıştır", action: pastePlain)
             Button("Kopyala", action: copy)
             Divider()
             Button(item.pinned ? "Sabitlemeyi kaldır" : "Sabitle") { service.setPinned(!item.pinned, item) }

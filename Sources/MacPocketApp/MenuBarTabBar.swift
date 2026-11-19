@@ -1,10 +1,9 @@
 import MacPocketCore
 import SwiftUI
 
-/// Horizontal tab bar of the grouped popover, after the classic macOS preferences toolbar: each tab is a
-/// monochrome glyph over its short name, legible on the glass in both appearances. The selected tab sits in an
-/// accent-filled tile with a white glyph and name. Tabs share the width evenly; when there are more than fit,
-/// the bar scrolls sideways instead of shrinking them.
+/// Horizontal tab bar of the grouped popover: compact capsules with a bold glyph and the tab's short name beside
+/// it, centered as a group. The selected tab is an accent-filled capsule with a white glyph and name. When the
+/// tabs no longer fit, the bar scrolls sideways (with faded edges) instead of shrinking them.
 struct MenuBarTabBar: View {
     let tabs: [GlassTab<MenuBarModule>]
     @Binding var selection: MenuBarModule
@@ -16,48 +15,39 @@ struct MenuBarTabBar: View {
     /// reposition response.
     static let highlightSpring = Animation.spring(response: 0.3, dampingFraction: 1)
 
-    /// Narrowest a tab may get before the bar scrolls instead.
-    private static let minimumTabWidth: CGFloat = 64
-
     var body: some View {
-        GeometryReader { proxy in
-            let fits = CGFloat(tabs.count) * Self.minimumTabWidth <= proxy.size.width
-            let tabWidth = fits ? proxy.size.width / CGFloat(max(1, tabs.count)) : Self.minimumTabWidth
+        ViewThatFits(in: .horizontal) {
+            row.frame(maxWidth: .infinity)
             ScrollViewReader { scroller in
-                ScrollView(.horizontal) {
-                    HStack(spacing: 0) {
-                        ForEach(Array(tabs.enumerated()), id: \.element.id) { index, tab in
-                            MenuBarTabButton(tab: tab, index: index, selected: tab.id == selection, highlight: highlight) {
-                                // Only the highlight moves; the content swaps at once, so nothing slides or resizes.
-                                withAnimation(reduceMotion ? nil : Self.highlightSpring) { selection = tab.id }
-                            }
-                            .frame(width: tabWidth)
-                            .id(tab.id)
-                        }
-                    }
-                }
-                .scrollDisabled(fits)
-                .scrollIndicators(.never)
-                // A scroll edge effect instead of a hard cut: tabs past the edge fade out.
-                .mask {
-                    if fits {
-                        Color.black
-                    } else {
-                        LinearGradient(stops: [.init(color: .clear, location: 0), .init(color: .black, location: 0.06),
-                                               .init(color: .black, location: 0.94), .init(color: .clear, location: 1)],
+                ScrollView(.horizontal) { row.padding(.horizontal, PocketSpacing.xs) }
+                    .scrollIndicators(.never)
+                    .mask {
+                        LinearGradient(stops: [.init(color: .clear, location: 0), .init(color: .black, location: 0.05),
+                                               .init(color: .black, location: 0.95), .init(color: .clear, location: 1)],
                                        startPoint: .leading, endPoint: .trailing)
                     }
-                }
-                .onAppear { scroller.scrollTo(selection, anchor: .center) }
-                .onChange(of: selection) { _, tab in
-                    guard !fits else { return }
-                    withAnimation(reduceMotion ? nil : Self.highlightSpring) { scroller.scrollTo(tab, anchor: .center) }
-                }
+                    .onAppear { scroller.scrollTo(selection, anchor: .center) }
+                    .onChange(of: selection) { _, tab in
+                        withAnimation(reduceMotion ? nil : Self.highlightSpring) { scroller.scrollTo(tab, anchor: .center) }
+                    }
             }
         }
         .frame(height: MenuBarTabButton.height)
         .accessibilityElement(children: .contain)
         .accessibilityLabel("Modüller")
+    }
+
+    private var row: some View {
+        HStack(spacing: PocketSpacing.xs) {
+            ForEach(Array(tabs.enumerated()), id: \.element.id) { index, tab in
+                MenuBarTabButton(tab: tab, index: index, selected: tab.id == selection, highlight: highlight) {
+                    // Only the highlight moves; the content swaps at once, so nothing slides or resizes.
+                    withAnimation(reduceMotion ? nil : Self.highlightSpring) { selection = tab.id }
+                }
+                .id(tab.id)
+            }
+        }
+        .fixedSize()
     }
 }
 
@@ -69,36 +59,33 @@ private struct MenuBarTabButton: View {
     let action: () -> Void
 
     @State private var hovering = false
-    static let height: CGFloat = 48
+    static let height: CGFloat = 30
 
     var body: some View {
         Button(action: action) {
-            VStack(spacing: 3) {
+            HStack(spacing: PocketSpacing.xs + 1) {
                 Image(systemName: tab.symbol ?? "circle")
-                    .font(.title3)
-                    .frame(height: 18)
+                    .font(.body.weight(.semibold))
+                    .imageScale(.medium)
                 tab.title
-                    .font(.subheadline)
+                    .font(.callout.weight(.semibold))
                     .lineLimit(1)
-                    .minimumScaleFactor(0.85)
+                    .fixedSize()
             }
             .foregroundStyle(selected ? Color.white : Color.primary)
-            .padding(.horizontal, 4)
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .padding(.horizontal, PocketSpacing.s + 2)
+            .frame(height: Self.height)
             .background {
                 if selected {
-                    RoundedRectangle(cornerRadius: 10, style: .continuous)
-                        .fill(Color.accentColor)
+                    Capsule().fill(Color.accentColor)
                         .matchedGeometryEffect(id: "selection", in: highlight)
                 } else if hovering {
-                    RoundedRectangle(cornerRadius: 10, style: .continuous).fill(Color.primary.opacity(0.08))
+                    Capsule().fill(Color.primary.opacity(0.08))
                 }
             }
-            .padding(.horizontal, 2)
-            .contentShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+            .contentShape(Capsule())
         }
         .buttonStyle(MenuBarTabPressStyle())
-        .frame(height: Self.height)
         .onHover { hovering = $0 }
         .help(index < 9 ? Text("\(tab.title) (⌘\(index + 1))") : tab.title)
         .accessibilityLabel(tab.title)

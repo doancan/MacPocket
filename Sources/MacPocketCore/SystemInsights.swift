@@ -76,7 +76,7 @@ public enum SystemHealth {
         case "fair": issues.append(HealthIssue(kind: .thermal, severity: .warning))
         default: break
         }
-        if let startup = snapshot.volumes.first(where: { $0.path == "/" }) ?? snapshot.volumes.first, startup.totalBytes > 0 {
+        if let startup = snapshot.startupVolume, startup.totalBytes > 0 {
             let freeShare = Double(startup.availableBytes) / Double(startup.totalBytes)
             if freeShare < 0.05 { issues.append(HealthIssue(kind: .diskLow, severity: .critical, value: freeShare)) }
             else if freeShare < 0.10 { issues.append(HealthIssue(kind: .diskLow, severity: .warning, value: freeShare)) }

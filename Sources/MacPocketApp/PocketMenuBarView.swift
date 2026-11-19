@@ -19,7 +19,7 @@ struct PocketMenuBarView: View {
     /// Closes the popover (a clipboard paste must reach the app in front).
     var close: @MainActor () -> Void = {}
 
-    @AppStorage("MacPocket.menubar.selectedTab") private var storedTab = MenuBarModule.cpu.rawValue
+    @AppStorage(Self.selectedTabKey) private var storedTab = MenuBarModule.cpu.rawValue
     @State private var selection: MenuBarModule
     @State private var showsSSH = false
 
@@ -29,12 +29,13 @@ struct PocketMenuBarView: View {
         self.content = content
         self.close = close
         // Reopen on the last tab without a first frame on the default tab.
-        let stored = UserDefaults.standard.string(forKey: "MacPocket.menubar.selectedTab") ?? ""
+        let stored = UserDefaults.standard.string(forKey: Self.selectedTabKey) ?? ""
         _selection = State(initialValue: MenuBarModule(rawValue: stored) ?? .cpu)
     }
 
-    /// Width of the module content; the grouped popover adds the tab rail beside it.
+    /// Width of the popover and its content.
     static let width: CGFloat = 368
+    static let selectedTabKey = "MacPocket.menubar.selectedTab"
     /// The grouped popover keeps one size for every tab, so switching tabs never resizes or jumps it; taller
     /// content scrolls.
     static let groupedContentHeight: CGFloat = 520
@@ -58,14 +59,18 @@ struct PocketMenuBarView: View {
         Group {
             if content == .grouped { grouped } else { single }
         }
+        .background(MenuBarPlatter.background)
         .tint(PocketTheme.accent)
         .environment(\.pocketTint, PocketTheme.brand)
         .environment(\.closeMenuBarPopover, close)
-        .environment(\.selectMenuBarTab) { module in
-            // Only the grouped popover has tabs to switch to.
-            guard content == .grouped, tabModules.contains(module) else { return }
-            selection = module
-        }
+        .environment(\.menuBarPageLinks, MenuBarPageLinks(
+            tabs: content == .grouped ? Set(tabModules) : [],
+            selectTab: { selection = $0 },
+            openPage: { page in
+                close()
+                model.navigation.select(page)
+                model.openMainWindow?()
+            }))
         .onAppear {
             keepSelectionOnAVisibleTab()
             updateProcessSampling()

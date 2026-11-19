@@ -119,7 +119,7 @@ final class MenuBarHistory: ObservableObject {
                 default: (sample.networkDown ?? 0) + (sample.networkUp ?? 0)
                 }
             }
-            return scaled(values, floor: 65_536)
+            return scaled(values, floor: MenuBarRenderer.networkScaleFloor)
         case .power:
             return recent.map { sample in
                 switch settings.value {
@@ -145,7 +145,7 @@ final class MenuBarHistory: ObservableObject {
     func networkMirror(count: Int) -> (up: [Double], down: [Double]) {
         let recent = samples.suffix(count)
         let up = recent.map { $0.networkUp ?? 0 }, down = recent.map { $0.networkDown ?? 0 }
-        let ceiling = max(65_536, up.max() ?? 0, down.max() ?? 0)
+        let ceiling = max(MenuBarRenderer.networkScaleFloor, up.max() ?? 0, down.max() ?? 0)
         return (up.map { min(1, $0 / ceiling) }, down.map { min(1, $0 / ceiling) })
     }
 }
@@ -166,6 +166,9 @@ enum MenuBarRenderer {
     /// Height of the status item's drawing area.
     static let height: CGFloat = max(22, NSStatusBar.system.thickness.rounded())
     static let graphSamples = 20
+    /// Bytes per second a network graph is scaled to at least (64 KB/s), so an idle link draws a flat line
+    /// instead of amplified noise.
+    static let networkScaleFloor: Double = 65_536
 
     /// Cache key: an image is re-rendered only when one of these inputs changes.
     struct Key: Hashable {
