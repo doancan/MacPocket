@@ -255,11 +255,17 @@ final class ClipboardService: ObservableObject {
     }
 
     /// Copies the item and, when allowed, pastes it into the app in front by sending ⌘V.
-    func paste(_ item: ClipboardItem, plain: Bool = false) {
+    /// `target` is the app to paste into when MacPocket itself became active while choosing (a click in the menu
+    /// bar popover activates MacPocket); it is brought back to the front before the keystroke is sent.
+    func paste(_ item: ClipboardItem, plain: Bool = false, into target: NSRunningApplication? = nil) {
         guard copy(item, plain: plain) else { return }
         guard settings.pasteOnSelect else { return }
         guard AXIsProcessTrusted() else {
             report(String(localized: "Kopyalandı. Doğrudan yapıştırmak için MacPocket’e Erişilebilirlik izni ver; şimdilik ⌘V ile yapıştır."))
+            return
+        }
+        if let target, target.processIdentifier != getpid() {
+            pasteAfterActivating(target)
             return
         }
         // Let the panel give focus back before the keystroke arrives.
@@ -271,6 +277,29 @@ final class ClipboardService: ObservableObject {
                   NSWorkspace.shared.frontmostApplication?.processIdentifier == pid,
                   NSRunningApplication(processIdentifier: pid)?.launchDate == launch else { return }
             Self.sendPasteKeystroke()
+        }
+    }
+
+    /// How long the target app may take to come to the front before the paste is given up (the item stays copied).
+    private static let activationTimeout: Duration = .seconds(1)
+    private static let activationPoll: Duration = .milliseconds(40)
+
+    private func pasteAfterActivating(_ target: NSRunningApplication) {
+        let pid = target.processIdentifier, launch = target.launchDate
+        target.activate()
+        Task { @MainActor [weak self] in
+            let deadline = ContinuousClock.now + Self.activationTimeout
+            while ContinuousClock.now < deadline {
+                guard self?.moduleRunning == true, NSRunningApplication(processIdentifier: pid)?.launchDate == launch else { return }
+                if NSWorkspace.shared.frontmostApplication?.processIdentifier == pid {
+                    // The app is in front; give its key window a moment to take focus.
+                    try? await Task.sleep(for: Self.activationPoll)
+                    Self.sendPasteKeystroke()
+                    return
+                }
+                try? await Task.sleep(for: Self.activationPoll)
+            }
+            self?.report(String(localized: "Kopyalandı; hedef uygulama öne gelmediği için yapıştırılamadı. ⌘V ile yapıştır."))
         }
     }
 

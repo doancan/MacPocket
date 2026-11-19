@@ -4,6 +4,9 @@ import SwiftUI
 extension EnvironmentValues {
     /// Closes the menu bar popover the view is in; a no-op elsewhere.
     @Entry var closeMenuBarPopover: @MainActor () -> Void = {}
+    /// The app that was in front when the popover opened: clicking in the popover activates MacPocket, so a
+    /// paste must go back to this app.
+    @Entry var menuBarPasteTarget: NSRunningApplication? = nil
 }
 
 /// Clipboard history in the menu bar popover: search, kind filter, and the recent items. Clicking an item (or
@@ -14,6 +17,7 @@ struct ClipboardMenuDetail: View {
     @StateObject private var search = ClipboardSearchModel(service: .shared)
     @FocusState private var searchFocused: Bool
     @Environment(\.closeMenuBarPopover) private var close
+    @Environment(\.menuBarPasteTarget) private var pasteTarget
 
     /// Rows shown at once; the list scrolls past this height.
     private static let listHeight: CGFloat = 330
@@ -157,7 +161,7 @@ struct ClipboardMenuDetail: View {
     /// The popover closes first, so the paste keystroke reaches the app the user was working in.
     private func paste(_ item: ClipboardItem, plain: Bool = false) {
         close()
-        service.paste(item, plain: plain)
+        service.paste(item, plain: plain, into: pasteTarget)
     }
 
     private func copy(_ item: ClipboardItem) {

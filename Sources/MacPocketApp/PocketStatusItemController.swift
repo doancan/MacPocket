@@ -26,8 +26,11 @@ final class PocketStatusItemController: NSObject {
         content: { [weak self] key in
             guard let self else { return nil }
             let content: MenuBarPopoverContent = MenuBarModule(rawValue: key).map { .module($0) } ?? .grouped
+            // Captured before the popover can activate MacPocket: the clipboard tab pastes into this app.
+            let target = NSWorkspace.shared.frontmostApplication
             let hosting = NSHostingController(rootView: PocketMenuBarView(model: self.model, history: self.history, content: content,
-                                                                          close: { [weak self] in self?.closePopover() }))
+                                                                          close: { [weak self] in self?.closePopover() },
+                                                                          pasteTarget: target))
             hosting.sizingOptions = [.preferredContentSize]
             return hosting
         }, didClose: { [weak self] in self?.model.menuBarProcessesWanted = false })

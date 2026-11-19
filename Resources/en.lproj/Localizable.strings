@@ -5423,3 +5423,4 @@
 "Bu hızla bir yıldan uzun sürede dolar." = "At this pace it takes over a year to fill.";
 "Bu hızla yaklaşık %lld gün içinde dolar." = "At this pace it fills in about %lld days.";
 "Tüm olayları göster" = "Show all events";
+"Kopyalandı; hedef uygulama öne gelmediği için yapıştırılamadı. ⌘V ile yapıştır." = "Copied; the target app did not come to the front, so it was not pasted. Paste with ⌘V.";

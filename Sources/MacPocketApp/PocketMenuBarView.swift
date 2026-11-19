@@ -18,12 +18,15 @@ struct PocketMenuBarView: View {
     let content: MenuBarPopoverContent
     /// Closes the popover (a clipboard paste must reach the app in front).
     var close: @MainActor () -> Void = {}
+    var pasteTarget: NSRunningApplication?
 
     @AppStorage(Self.selectedTabKey) private var storedTab = MenuBarModule.cpu.rawValue
     @State private var selection: MenuBarModule
     @State private var showsSSH = false
 
-    init(model: PocketModel, history: MenuBarHistory, content: MenuBarPopoverContent, close: @escaping @MainActor () -> Void = {}) {
+    init(model: PocketModel, history: MenuBarHistory, content: MenuBarPopoverContent, close: @escaping @MainActor () -> Void = {},
+         pasteTarget: NSRunningApplication? = nil) {
+        self.pasteTarget = pasteTarget
         self.model = model
         self.history = history
         self.content = content
@@ -63,6 +66,7 @@ struct PocketMenuBarView: View {
         .tint(PocketTheme.accent)
         .environment(\.pocketTint, PocketTheme.brand)
         .environment(\.closeMenuBarPopover, close)
+        .environment(\.menuBarPasteTarget, pasteTarget)
         .environment(\.menuBarPageLinks, MenuBarPageLinks(
             tabs: content == .grouped ? Set(tabModules) : [],
             selectTab: { selection = $0 },
