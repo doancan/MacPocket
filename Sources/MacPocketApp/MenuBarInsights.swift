@@ -3,9 +3,9 @@ import MacPocketCore
 import Observation
 import os
 
-/// Long-range history, the event timeline and the health report behind the menu bar's Overview, Health and
+/// The disk trend, the event timeline and the health report behind the menu bar's Overview, Health and
 /// Events pages. Fed with every snapshot by the status item controller; persisted to Application Support so
-/// the 24-hour and 7-day charts and the timeline survive relaunches.
+/// the disk forecast and the timeline survive relaunches.
 @MainActor @Observable
 final class MenuBarInsights {
     static let shared = MenuBarInsights()
@@ -39,7 +39,7 @@ final class MenuBarInsights {
 
     /// Days until the startup disk is full at the pace of the last week; nil while there is no shrinking trend.
     var diskDaysLeft: Double? {
-        DiskForecast.daysUntilFull(history.points(.week).compactMap { point in point.diskFree.map { (point.date, $0) } })
+        DiskForecast.daysUntilFull(history.points.compactMap { point in point.diskFree.map { (point.date, $0) } })
     }
 
     func health(_ snapshot: SystemSnapshot, processes: [ProcessEntry]) -> HealthReport {

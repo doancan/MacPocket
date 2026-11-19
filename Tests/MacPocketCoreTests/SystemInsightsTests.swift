@@ -22,45 +22,41 @@ final class SystemInsightsTests: XCTestCase {
 
     // MARK: History
 
-    func testHistoryAveragesSamplesIntoBucketsAndStaysBounded() {
+    func testHistoryKeepsTheLatestFreeSpacePerBucketForAWeek() {
         var history = MetricHistory()
-        for second in stride(from: 0, to: 7_200, by: 1) {
-            history.record(MetricPoint(date: start + Double(second), cpu: second < 5 ? 10 : 30, diskFree: Double(second)))
+        for minute in stride(from: 0, to: 8 * 24 * 60, by: 5) {
+            history.record(MetricPoint(date: start + Double(minute) * 60, diskFree: Double(minute)))
         }
-        let hour = history.points(.hour)
-        XCTAssertLessThanOrEqual(hour.count, 361, "an hour of 10-s buckets")
-        XCTAssertGreaterThanOrEqual(hour.first!.date, start + 3_600 - 10, "older points fall off")
-        XCTAssertEqual(hour.last!.cpu!, 30, accuracy: 0.001)
-        XCTAssertEqual(hour.last!.diskFree, 7_199, "free space keeps the latest reading, not an average")
-        // Two hours of 2-minute buckets; the start need not sit on a bucket edge, which adds one.
-        XCTAssertTrue((60...61).contains(history.points(.day).count))
+        XCTAssertLessThanOrEqual(history.points.count, 673, "a week of 15-minute buckets")
+        XCTAssertGreaterThanOrEqual(history.points.first!.date, start + 86_400 - MetricHistory.bucket, "older points fall off")
+        XCTAssertEqual(history.points.last?.diskFree, Double(8 * 24 * 60 - 5), "the latest reading, not an average")
     }
 
-    func testHistoryMergesAMissingValueWithoutDraggingTheAverage() {
+    func testAMissingReadingIsNotRecorded() {
         var history = MetricHistory()
-        history.record(MetricPoint(date: start, cpu: 40))
-        history.record(MetricPoint(date: start + 1, cpu: nil))
-        XCTAssertEqual(history.points(.hour).first?.cpu, 40)
+        history.record(MetricPoint(date: start, diskFree: nil))
+        XCTAssertTrue(history.points.isEmpty)
     }
 
     func testASmallClockCorrectionKeepsTheHistory() {
         var history = MetricHistory()
-        history.record(MetricPoint(date: start + 9, cpu: 10))
-        history.record(MetricPoint(date: start + 21, cpu: 20))
-        history.record(MetricPoint(date: start + 18, cpu: 30))
-        XCTAssertEqual(history.points(.hour).count, 2, "a 3-second step back must not wipe the hour")
+        history.record(MetricPoint(date: start, diskFree: 1))
+        history.record(MetricPoint(date: start + 1_000, diskFree: 2))
+        history.record(MetricPoint(date: start + 890, diskFree: 3))
+        XCTAssertEqual(history.points.count, 2, "a step back within one bucket must not wipe the week")
+        XCTAssertEqual(history.points.last?.diskFree, 3)
     }
 
     func testHistoryStartsOverWhenTheClockGoesBack() {
         var history = MetricHistory()
-        history.record(MetricPoint(date: start, cpu: 1))
-        history.record(MetricPoint(date: start - 3_600, cpu: 2))
-        XCTAssertEqual(history.points(.hour).map(\.cpu), [2])
+        history.record(MetricPoint(date: start, diskFree: 1))
+        history.record(MetricPoint(date: start - 86_400, diskFree: 2))
+        XCTAssertEqual(history.points.map(\.diskFree), [2])
     }
 
     func testHistoryRoundTripsThroughJSON() throws {
         var history = MetricHistory()
-        history.record(MetricPoint(date: start, cpu: 12, memory: 0.5))
+        history.record(MetricPoint(date: start, diskFree: 12))
         let decoded = try JSONDecoder().decode(MetricHistory.self, from: JSONEncoder().encode(history))
         XCTAssertEqual(decoded, history)
     }
