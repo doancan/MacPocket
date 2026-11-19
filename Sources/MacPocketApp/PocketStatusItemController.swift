@@ -49,7 +49,10 @@ final class PocketStatusItemController: NSObject {
         refresh()
         // Observation (not Combine) drives the menu bar: only `system` and `paused` writes reach here.
         observe({ [model] in model.system }) { controller, snapshot in
-            if let snapshot { controller.history.record(snapshot) }
+            if let snapshot {
+                controller.history.record(snapshot)
+                MenuBarInsights.shared.record(snapshot)
+            }
             controller.refresh()
         }
         store.$preferences.dropFirst().removeDuplicates().receive(on: RunLoop.main).sink { [weak self] _ in
@@ -383,6 +386,19 @@ final class PocketStatusItemController: NSObject {
             return MenuBarFormatter.bluetoothReading(BluetoothBatteryService.shared.devices, decimals: settings.decimals)
         case .clock:
             return MenuBarFormatter.clockReading(value: settings.value, zoneID: settings.timeZoneID, now: now)
+        case .overview, .health:
+            guard let snapshot = model.system else { return nil }
+            let report = MenuBarInsights.shared.health(snapshot, processes: model.processes)
+            return MenuBarReading(lines: ["\(report.score)"], reserve: ["100"], fraction: Double(report.score) / 100, magnitude: Double(report.score),
+                                  accessibility: String(localized: "Sağlık puanı \(report.score)"), symbol: module.symbol)
+        case .timeline:
+            let count = MenuBarInsights.shared.events.events.count
+            return MenuBarReading(lines: ["\(count)"], reserve: ["999"], fraction: nil, magnitude: Double(count),
+                                  accessibility: String(localized: "\(count) olay"), symbol: module.symbol)
+        case .launcher:
+            let count = LauncherStore.shared.items.count
+            return MenuBarReading(lines: ["\(count)"], reserve: ["99"], fraction: nil, magnitude: Double(count),
+                                  accessibility: String(localized: "\(count) favori"), symbol: module.symbol)
         case .clipboard:
             let count = ClipboardService.shared.history.items.count
             return MenuBarReading(lines: ["\(count)"], reserve: ["999"], fraction: nil, magnitude: Double(count),

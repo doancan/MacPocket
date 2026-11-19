@@ -38,6 +38,16 @@ struct MenuBarTabBar: View {
                 }
                 .scrollDisabled(fits)
                 .scrollIndicators(.never)
+                // A scroll edge effect instead of a hard cut: tabs past the edge fade out.
+                .mask {
+                    if fits {
+                        Color.black
+                    } else {
+                        LinearGradient(stops: [.init(color: .clear, location: 0), .init(color: .black, location: 0.06),
+                                               .init(color: .black, location: 0.94), .init(color: .clear, location: 1)],
+                                       startPoint: .leading, endPoint: .trailing)
+                    }
+                }
                 .onAppear { scroller.scrollTo(selection, anchor: .center) }
                 .onChange(of: selection) { _, tab in
                     guard !fits else { return }

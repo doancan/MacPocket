@@ -51,7 +51,7 @@ struct PocketMenuBarView: View {
     }
 
     private var tabs: [GlassTab<MenuBarModule>] {
-        tabModules.map { GlassTab(id: $0, title: $0.title, symbol: $0.symbol, tint: $0.tint) }
+        tabModules.map { GlassTab(id: $0, title: $0.tabTitle, symbol: $0.symbol, tint: $0.tint) }
     }
 
     var body: some View {
@@ -61,6 +61,11 @@ struct PocketMenuBarView: View {
         .tint(PocketTheme.accent)
         .environment(\.pocketTint, PocketTheme.brand)
         .environment(\.closeMenuBarPopover, close)
+        .environment(\.selectMenuBarTab) { module in
+            // Only the grouped popover has tabs to switch to.
+            guard content == .grouped, tabModules.contains(module) else { return }
+            selection = module
+        }
         .onAppear {
             keepSelectionOnAVisibleTab()
             updateProcessSampling()

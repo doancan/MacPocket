@@ -6,7 +6,7 @@ import SwiftUI
 // MARK: - Building blocks
 
 /// Dense inset surface used inside popovers (lighter than `pocketCard`, no shadow).
-private struct MenuBarSection: ViewModifier {
+struct MenuBarSection: ViewModifier {
     func body(content: Content) -> some View {
         content
             .padding(PocketSpacing.s + 2)
@@ -17,7 +17,7 @@ private struct MenuBarSection: ViewModifier {
 }
 
 extension View {
-    fileprivate func menuBarSection() -> some View { modifier(MenuBarSection()) }
+    func menuBarSection() -> some View { modifier(MenuBarSection()) }
 }
 
 /// Surfaces placed on the popover's glass.
@@ -49,7 +49,7 @@ private struct ModuleHeader<Trailing: View>: View {
     }
 }
 
-private struct InfoRow: View {
+struct InfoRow: View {
     let title: LocalizedStringKey
     let value: String
     var dot: Color?
@@ -70,7 +70,7 @@ private struct InfoRow: View {
     }
 }
 
-private struct SectionTitle: View {
+struct SectionTitle: View {
     let title: LocalizedStringKey
     var trailing: String?
     var body: some View {
@@ -84,7 +84,7 @@ private struct SectionTitle: View {
 }
 
 /// Horizontal capacity bar; the fill color turns orange/red as it approaches full.
-private struct CapacityBar: View {
+struct CapacityBar: View {
     let fraction: Double
     let tint: Color
     var height: CGFloat = 6
@@ -126,7 +126,7 @@ private struct SegmentBar: View {
 }
 
 /// Compact time-series chart for the popovers.
-private struct HistoryChart: View {
+struct HistoryChart: View {
     struct Series { let name: String; let color: Color; let values: [(Date, Double)] }
     let series: [Series]
     var ceiling: Double?
@@ -294,6 +294,10 @@ struct MenuBarModuleDetail: View {
             case .display: DisplayMenuDetail(model: model)
             case .clock: ClockMenuDetail(model: model)
             case .clipboard: ClipboardMenuDetail(model: model)
+            case .overview: OverviewMenuDetail(model: model, history: history, binary: binaryUnits)
+            case .health: HealthMenuDetail(model: model)
+            case .timeline: TimelineMenuDetail()
+            case .launcher: LauncherMenuDetail()
             }
         }
     }

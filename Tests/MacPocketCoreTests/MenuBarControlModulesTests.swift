@@ -17,7 +17,7 @@ final class MenuBarControlModulesTests: XCTestCase {
 
     func testDefaultTabsAreTheEverydayOnes() {
         let enabled = MenuBarModule.allCases.filter(\.enabledByDefault)
-        XCTAssertEqual(Set(enabled), [.cpu, .memory, .network, .clipboard])
+        XCTAssertEqual(Set(enabled), [.overview, .cpu, .memory, .network, .clipboard])
     }
 
     private let now = Date(timeIntervalSinceReferenceDate: 10_000)
@@ -40,7 +40,8 @@ final class MenuBarControlModulesTests: XCTestCase {
         defaults.set(MenuBarPreferences.schemaVersion, forKey: MenuBarPreferences.schemaKey)
         defaults.set("network,cpu,gpu,memory,disk,power,weather,aiUsage", forKey: MenuBarPreferences.orderKey)
         let loaded = MenuBarPreferences.load(from: defaults)
-        XCTAssertEqual(loaded.order.suffix(6), [.awake, .focus, .bluetooth, .display, .clock, .clipboard])
+        XCTAssertEqual(loaded.order.first, .overview, "the overview leads orders saved before it existed")
+        XCTAssertEqual(loaded.order.suffix(9), [.awake, .focus, .bluetooth, .display, .clock, .clipboard, .health, .timeline, .launcher])
         XCTAssertFalse(loaded.enabled.contains(.awake))
     }
 
