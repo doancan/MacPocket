@@ -530,6 +530,22 @@
 			<string>%lld items</string>
 		</dict>
 	</dict>
+	<key>Pano geçmişinde %lld öğe</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key>
+		<string>%#@count@</string>
+		<key>count</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key>
+			<string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key>
+			<string>lld</string>
+			<key>one</key>
+			<string>%lld item in clipboard history</string>
+			<key>other</key>
+			<string>%lld items in clipboard history</string>
+		</dict>
+	</dict>
 	<key>%lld öğe seçili</key>
 	<dict>
 		<key>NSStringLocalizedFormatKey</key>

@@ -26,7 +26,8 @@ final class PocketStatusItemController: NSObject {
         content: { [weak self] key in
             guard let self else { return nil }
             let content: MenuBarPopoverContent = MenuBarModule(rawValue: key).map { .module($0) } ?? .grouped
-            let hosting = NSHostingController(rootView: PocketMenuBarView(model: self.model, history: self.history, content: content))
+            let hosting = NSHostingController(rootView: PocketMenuBarView(model: self.model, history: self.history, content: content,
+                                                                          close: { [weak self] in self?.closePopover() }))
             hosting.sizingOptions = [.preferredContentSize]
             return hosting
         }, didClose: { [weak self] in self?.model.menuBarProcessesWanted = false })
@@ -76,6 +77,12 @@ final class PocketStatusItemController: NSObject {
         FocusSessionService.shared.objectWillChange.receive(on: RunLoop.main).sink { [weak self] _ in
             MainActor.assumeIsolated { self?.refresh() }
         }.store(in: &subscriptions)
+        // The clipboard item and tab come and go with clipboard history; its count follows the history.
+        ClipboardService.shared.$history.map(\.items.count).removeDuplicates()
+            .combineLatest(ClipboardService.shared.$settings.map(\.enabled).removeDuplicates())
+            .dropFirst().receive(on: RunLoop.main).sink { [weak self] _ in
+                MainActor.assumeIsolated { self?.refresh() }
+            }.store(in: &subscriptions)
         BluetoothBatteryService.shared.$devices.dropFirst().removeDuplicates().receive(on: RunLoop.main).sink { [weak self] _ in
             MainActor.assumeIsolated { self?.refresh() }
         }.store(in: &subscriptions)
@@ -130,11 +137,12 @@ final class PocketStatusItemController: NSObject {
 
     private func desiredKeys(_ preferences: MenuBarPreferences) -> [String] {
         guard preferences.visible else { return [] }
-        let enabled = preferences.enabledModules
+        let enabled = preferences.enabledModules.filter(\.isRuntimeAvailable)
         // With nothing enabled the grouped glyph stays, so MacPocket is always reachable.
         if preferences.layout == .separate && !enabled.isEmpty { return enabled.map(\.rawValue) }
-        // Weather, AI quotas, keep awake, focus and Bluetooth batteries keep their own item beside the grouped one.
-        return [Self.groupedKey] + enabled.filter { !$0.isSystemMetric }.map(\.rawValue)
+        // Weather, AI quotas, keep awake, focus and Bluetooth batteries keep their own item beside the grouped one;
+        // the clipboard history is a tab of the grouped popover.
+        return [Self.groupedKey] + enabled.filter(\.keepsOwnItemWhenGrouped).map(\.rawValue)
     }
 
     private func refresh() {
@@ -289,6 +297,9 @@ final class PocketStatusItemController: NSObject {
         presentation.toggle(key)
     }
 
+    /// Called from inside the popover; a method so the lazy presenter does not reference itself.
+    private func closePopover() { presentation.close() }
+
     /// Shows the popover under the item `key`, or under the first item when nil (⇧⌘M quick look).
     private func showPopover(for key: String?) {
         guard let key = key ?? itemOrder.first else { return }
@@ -372,6 +383,10 @@ final class PocketStatusItemController: NSObject {
             return MenuBarFormatter.bluetoothReading(BluetoothBatteryService.shared.devices, decimals: settings.decimals)
         case .clock:
             return MenuBarFormatter.clockReading(value: settings.value, zoneID: settings.timeZoneID, now: now)
+        case .clipboard:
+            let count = ClipboardService.shared.history.items.count
+            return MenuBarReading(lines: ["\(count)"], reserve: ["999"], fraction: nil, magnitude: Double(count),
+                                  accessibility: String(localized: "Pano geçmişinde \(count) öğe"), symbol: "doc.on.clipboard")
         case .display:
             guard PocketModule.displays.isAvailable() else {
                 return MenuBarReading(lines: ["—"], reserve: ["—"], fraction: nil, magnitude: nil,

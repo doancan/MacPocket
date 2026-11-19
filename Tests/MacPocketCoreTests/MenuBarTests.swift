@@ -121,7 +121,8 @@ final class MenuBarPreferencesTests: XCTestCase {
         XCTAssertEqual(preferences.groupedMetric, .cpu)
         XCTAssertTrue(preferences.groupedBadge)
         XCTAssertEqual(preferences.order, MenuBarModule.allCases)
-        XCTAssertEqual(preferences.enabledModules, [.cpu, .memory])
+        // The everyday tabs; the clipboard tab still appears only while clipboard history is on.
+        XCTAssertEqual(preferences.enabledModules, [.cpu, .memory, .network, .clipboard])
         XCTAssertEqual(preferences.settings(for: .network).value, .networkUpDown)
         XCTAssertTrue(preferences.visible)
     }
@@ -143,8 +144,8 @@ final class MenuBarPreferencesTests: XCTestCase {
 
         let preferences = MenuBarPreferences.load(from: defaults)
         XCTAssertEqual(preferences.layout, .separate)
-        XCTAssertEqual(preferences.order, [.power, .disk, .cpu, .memory, .gpu, .network, .weather, .aiUsage, .awake, .focus, .bluetooth, .display, .clock])
-        XCTAssertEqual(preferences.enabledModules, [.power, .memory])
+        XCTAssertEqual(preferences.order, [.power, .disk, .cpu, .memory, .gpu, .network, .weather, .aiUsage, .awake, .focus, .bluetooth, .display, .clock, .clipboard])
+        XCTAssertEqual(preferences.enabledModules, [.power, .memory, .clipboard])
 
         let memory = preferences.settings(for: .memory)
         XCTAssertEqual(memory.style, .gauge)
@@ -165,7 +166,7 @@ final class MenuBarPreferencesTests: XCTestCase {
         defaults.set("combined", forKey: "MacPocket.bar.layout")
         let preferences = MenuBarPreferences.load(from: defaults)
         XCTAssertEqual(preferences.layout, .grouped)
-        XCTAssertEqual(preferences.enabledModules, [.cpu])
+        XCTAssertEqual(preferences.enabledModules, [.cpu, .clipboard])
         XCTAssertEqual(preferences.settings(for: .memory).value, .memoryUsedBytes)
         XCTAssertEqual(preferences.settings(for: .disk).value, .diskFreeBytes)
     }
@@ -199,7 +200,7 @@ final class MenuBarPreferencesTests: XCTestCase {
         XCTAssertEqual(loaded.groupedStyle, .ring)
         XCTAssertEqual(loaded.groupedMetric, .power)
         XCTAssertFalse(loaded.groupedBadge)
-        XCTAssertEqual(loaded.order, [.network, .cpu, .gpu, .memory, .disk, .power, .weather, .aiUsage, .awake, .focus, .bluetooth, .display, .clock])
+        XCTAssertEqual(loaded.order, [.network, .cpu, .gpu, .memory, .disk, .power, .weather, .aiUsage, .awake, .focus, .bluetooth, .display, .clock, .clipboard])
         XCTAssertEqual(loaded.enabledModules, [.network, .disk])
         XCTAssertFalse(loaded.binaryUnits)
         XCTAssertEqual(loaded.settings(for: .network), preferences.modules[.network])

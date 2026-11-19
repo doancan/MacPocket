@@ -2176,7 +2176,6 @@
 "SoC kalıpları" = "SoC dies";
 "Güç yönetimi (PMU)" = "Power management (PMU)";
 "SSD" = "SSD";
-"Kapalıyken özet, açıkken tüm ayrıntılar gösterilir" = "Off shows a summary; on shows every detail";
 "Son ölçüm %@" = "Last measured %@";
 
 /* Gizlilik Kontrolü */
@@ -5351,3 +5350,15 @@
 "En büyük dosyanın sıkıştırılmış kopyası için bile yeterli boş alan yok." = "There is not enough free space even for a compressed copy of the largest file.";
 "Bu klasörde sıkıştırılabilecek uygun dosya bulunmadı (hepsi küçük, zaten sıkıştırılmış, başka yerlerle paylaşımlı veya çok yeni)." = "No suitable files to compress in this folder (all are small, already compressed, shared with other places or too recent).";
 "Sıkıştırılmış kopya doğrulanamadı; işlem durduruldu ve dosyalar olduğu gibi duruyor. %@" = "The compressed copy could not be verified; the run was stopped and the files are left as they were. %@";
+"MacPocket’ı aç (⌘0)" = "Open MacPocket (⌘0)";
+"Açıldığında kopyaladığın metin, bağlantı, görsel ve dosyalar burada listelenir." = "When on, the text, links, images and files you copy are listed here.";
+"Düz metin olarak yapıştır" = "Paste as Plain Text";
+"Eşleşen öğe yok." = "No matching items.";
+"Henüz kopyalanmış bir şey yok." = "Nothing copied yet.";
+"MenuBar.shortLabel.clipboard" = "CLIP";
+"Pano geçmişi kapalı" = "Clipboard history is off";
+"Pano geçmişinde %lld öğe" = "%lld items in clipboard history";
+"Panoda ara" = "Search Clipboard";
+"Tüm geçmiş" = "Full History";
+"Yapıştırmak için tıkla" = "Click to paste";
+"Öğe sayısı" = "Item count";

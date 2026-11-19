@@ -20,6 +20,16 @@ extension MenuBarModule {
         case .bluetooth: .blue
         case .display: Color(hex: 0xD99A00)
         case .clock: Color(hex: 0xD6455D)
+        case .clipboard: Color(hex: 0x5E6AD2)
+        }
+    }
+
+    /// Whether the module can show anything right now. The clipboard tab and item exist only while clipboard
+    /// history is on; the other modules show their own empty or disabled states.
+    @MainActor var isRuntimeAvailable: Bool {
+        switch self {
+        case .clipboard: PocketModule.clipboard.isAvailable() && ClipboardService.shared.settings.enabled
+        default: true
         }
     }
 
