@@ -128,3 +128,19 @@ final class SystemInsightsTests: XCTestCase {
         XCTAssertEqual(log.events.last?.date, start + Double(SystemEventLog.maximumCount + 19))
     }
 }
+
+final class ProcessExecutableCacheTests: XCTestCase {
+    /// The cached executable and eligibility match a fresh read, on the first snapshot and on later ones.
+    func testCachedSnapshotsMatchFreshReads() async throws {
+        let monitor = ProcessMonitor()
+        for _ in 0..<3 {
+            let snapshot = try await monitor.snapshot()
+            let me = try XCTUnwrap(snapshot.processes.first { $0.pid == getpid() })
+            XCTAssertEqual(me.command, ProcessMonitor.executablePath(pid: getpid()))
+            XCTAssertFalse(me.canTerminate, "the test process itself is protected")
+            for entry in snapshot.processes.prefix(40) where !entry.command.isEmpty {
+                XCTAssertEqual(entry.command, ProcessMonitor.executablePath(pid: entry.pid), "pid \(entry.pid)")
+            }
+        }
+    }
+}

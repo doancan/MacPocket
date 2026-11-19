@@ -86,6 +86,15 @@ public actor ProcessMonitor {
 
     private var previousCPU: [Int32: CPUObservation] = [:]
     private var observed: [Int32: ProcessEntry] = [:]
+    /// A process's executable and whether it is session-critical do not change while it lives (same pid and
+    /// start time), and reading them was most of each snapshot's cost. Termination re-reads both anyway.
+    private var executables: [Int32: CachedExecutable] = [:]
+
+    private struct CachedExecutable {
+        let startSeconds: UInt64, startMicroseconds: UInt64
+        let path: String
+        let sessionCritical: Bool
+    }
     private var userNames: [UInt32: String] = [:]
     private let protectedPIDs: Set<Int32>
 
@@ -103,6 +112,7 @@ public actor ProcessMonitor {
         let pids = try Self.listPIDs()
         var entries: [ProcessEntry] = []
         var freshCPU: [Int32: CPUObservation] = [:]
+        var freshExecutables: [Int32: CachedExecutable] = [:]
         var unreadableCount = 0
         entries.reserveCapacity(pids.count)
 
@@ -116,7 +126,17 @@ public actor ProcessMonitor {
                 continue
             }
             let sampledAt = mach_absolute_time()
-            let executable = Self.executablePath(pid: pid)
+            let cached: CachedExecutable
+            if let known = executables[pid], known.startSeconds == bsd.pbi_start_tvsec,
+               known.startMicroseconds == bsd.pbi_start_tvusec {
+                cached = known
+            } else {
+                let path = Self.executablePath(pid: pid)
+                cached = CachedExecutable(startSeconds: bsd.pbi_start_tvsec, startMicroseconds: bsd.pbi_start_tvusec,
+                                          path: path, sessionCritical: !path.isEmpty && Self.isSessionCritical(path))
+            }
+            freshExecutables[pid] = cached
+            let executable = cached.path
             let identity = Self.identity(pid: pid, info: bsd, executablePath: executable)
             let rawName = Self.name(info: bsd)
             let name = rawName.isEmpty
@@ -149,7 +169,7 @@ public actor ProcessMonitor {
                 && (bsd.pbi_flags & UInt32(PROC_FLAG_SYSTEM)) == 0
                 && bsd.pbi_status != UInt32(SZOMB)
                 && !executable.isEmpty
-                && !Self.isSessionCritical(executable)
+                && !cached.sessionCritical
             entries.append(ProcessEntry(
                 pid: pid, name: name, user: userName(uid: bsd.pbi_uid),
                 state: Self.stateName(bsd.pbi_status),
@@ -163,6 +183,8 @@ public actor ProcessMonitor {
         }
 
         previousCPU = freshCPU
+        // Only live processes are kept, so a reused pid never inherits a dead process's path.
+        executables = freshExecutables
         observed = Dictionary(uniqueKeysWithValues: entries.map { ($0.pid, $0) })
         return ProcessSnapshot(
             capturedAt: Date(), processes: entries.sorted { $0.pid < $1.pid },
@@ -275,7 +297,7 @@ public actor ProcessMonitor {
         return proc_pidinfo(pid, PROC_PIDTBSDINFO, 0, &info, size) == size ? info : nil
     }
 
-    private static func executablePath(pid: Int32) -> String {
+    static func executablePath(pid: Int32) -> String {
         // PROC_PIDPATHINFO_MAXSIZE is (4 * MAXPATHLEN), a C macro Swift cannot import.
         var buffer = [CChar](repeating: 0, count: 4 * Int(MAXPATHLEN))
         let size = UInt32(buffer.count)

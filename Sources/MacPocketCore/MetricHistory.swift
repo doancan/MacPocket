@@ -74,13 +74,6 @@ public enum MetricRange: String, Codable, Sendable, CaseIterable, Identifiable {
         }
     }
 
-    public var title: String {
-        switch self {
-        case .hour: String(localized: "1 sa")
-        case .day: String(localized: "24 sa")
-        case .week: String(localized: "7 g")
-        }
-    }
 }
 
 /// Long-range metric history at three resolutions. Every recorded sample is averaged into the current bucket

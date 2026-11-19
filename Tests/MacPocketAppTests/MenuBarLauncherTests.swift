@@ -52,10 +52,6 @@ import XCTest
         XCTAssertNil(LauncherStore.webAddress("https://"))
     }
 
-    func testChartRangesMapToTheRecordedHistory() {
-        XCTAssertNil(ChartRange.live.metricRange)
-        XCTAssertEqual(ChartRange.allCases.compactMap(\.metricRange), MetricRange.allCases)
-    }
 }
 
 @MainActor final class MenuBarPageLinksTests: XCTestCase {

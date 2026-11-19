@@ -628,80 +628,19 @@ struct LauncherMenuDetail: View {
     }
 }
 
-// MARK: - Long-range charts
+// MARK: - Disk forecast
 
-/// The span a module chart shows: the live last minutes, or a range of the recorded history.
-enum ChartRange: String, CaseIterable, Identifiable {
-    case live, hour, day, week
-    var id: String { rawValue }
-    static let storageKey = "MacPocket.menubar.chartRange"
-
-    var metricRange: MetricRange? {
-        switch self {
-        case .live: nil
-        case .hour: .hour
-        case .day: .day
-        case .week: .week
-        }
-    }
-
-    var title: String { metricRange?.title ?? String(localized: "Canlı") }
-}
-
-/// A module chart with a range picker. One choice for every module, so switching tabs keeps the same span.
-struct RangedHistoryChart<Live: View>: View {
-    /// The long-range series of one range.
-    let series: (MetricRange) -> [HistoryChart.Series]
-    var ceiling: Double?
-    var axisLabel: (Double) -> String = { MenuBarFormatter.percent($0, decimals: false) }
-    @ViewBuilder var live: () -> Live
-    @AppStorage(ChartRange.storageKey) private var range = ChartRange.live
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: PocketSpacing.s) {
-            Picker("Grafik aralığı", selection: $range) {
-                ForEach(ChartRange.allCases) { Text($0.title).tag($0) }
-            }
-            .pickerStyle(.segmented)
-            .labelsHidden()
-            .controlSize(.small)
-            if let metricRange = range.metricRange {
-                HistoryChart(series: series(metricRange), ceiling: ceiling, axisLabel: axisLabel)
-            } else {
-                live()
-            }
-        }
-        .menuBarSection()
-    }
-}
-
-extension MenuBarInsights {
-    /// (date, value) pairs of one metric over `range`, skipping points the Mac did not report.
-    func series(_ range: MetricRange, _ value: (MetricPoint) -> Double?) -> [(Date, Double)] {
-        history.points(range).compactMap { point in value(point).map { (point.date, $0) } }
-    }
-}
-
-/// Free space on the startup disk over the last week, and when it fills at that pace.
-struct DiskTrend: View {
-    let binary: Bool
+/// When the startup disk fills at the pace of the last week, in one line; nothing until there is a trend.
+struct DiskForecastRow: View {
     private let insights = MenuBarInsights.shared
 
     var body: some View {
-        VStack(alignment: .leading, spacing: PocketSpacing.xs + 2) {
-            SectionTitle(title: "Son 7 günde boş alan")
-            HistoryChart(series: [.init(name: String(localized: "Boş alan"), color: MenuBarModule.disk.tint,
-                                        values: insights.series(.week) { $0.diskFree })],
-                         axisLabel: { MenuBarFormatter.bytes($0, binary: binary) })
-            if let days = insights.diskDaysLeft {
-                Label(days >= 365 ? String(localized: "Bu hızla bir yıldan uzun sürede dolar.")
-                                  : String(localized: "Bu hızla yaklaşık \(Int(days.rounded())) gün içinde dolar."),
-                      systemImage: days < 30 ? "exclamationmark.triangle.fill" : "calendar")
-                    .font(.callout).foregroundStyle(days < 30 ? Color.orange : Color.secondary)
-            } else {
-                Text("Boş alan azalmıyor ya da tahmin için yeterli geçmiş yok.").font(.callout).foregroundStyle(.secondary)
-            }
+        if let days = insights.diskDaysLeft {
+            Label(days >= 365 ? String(localized: "Bu hızla bir yıldan uzun sürede dolar.")
+                              : String(localized: "Bu hızla yaklaşık \(Int(days.rounded())) gün içinde dolar."),
+                  systemImage: days < 30 ? "exclamationmark.triangle.fill" : "calendar")
+                .font(.callout).foregroundStyle(days < 30 ? Color.orange : Color.secondary)
+                .menuBarSection()
         }
-        .menuBarSection()
     }
 }
