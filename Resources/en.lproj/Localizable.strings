@@ -5362,3 +5362,8 @@
 "Tüm geçmiş" = "Full History";
 "Yapıştırmak için tıkla" = "Click to paste";
 "Öğe sayısı" = "Item count";
+"%@ kaydedilmemiş verilerini kaybedebilir." = "%@ may lose unsaved data.";
+"24 sa" = "24 h";
+"7 g" = "7 d";
+"Görev Yöneticisi’nde Aç" = "Open in Task Manager";
+"Zorla Sonlandır…" = "Force Quit…";

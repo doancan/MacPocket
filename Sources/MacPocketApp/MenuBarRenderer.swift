@@ -196,11 +196,14 @@ enum MenuBarRenderer {
         static let secondarySeries: CGFloat = 0.62
     }
 
-    /// Smallest point sizes text is drawn at, whatever the chosen text size: below these the glyphs no longer
-    /// resolve on a 1× display.
-    private enum MinimumFont {
-        static let label: CGFloat = 8.5
-        static let value: CGFloat = 9.5
+    /// System type sizes the item uses, so it sets like the menu bar's own items instead of invented sizes.
+    private enum TypeSize {
+        /// The menu bar's font (the clock's): single-line values and symbols.
+        static var menuBar: CGFloat { NSFont.menuBarFont(ofSize: 0).pointSize }
+        /// Small labels and stacked lines: the system label size, which is also the HIG minimum (10 pt) on macOS.
+        static var label: CGFloat { NSFont.labelFontSize }
+        /// A stacked value under its label: the system's small size, one step above the label.
+        static var stackedValue: CGFloat { NSFont.smallSystemFontSize }
     }
 
     private static func font(_ size: CGFloat, _ weight: NSFont.Weight = .medium) -> NSFont {
@@ -246,7 +249,7 @@ enum MenuBarRenderer {
     }
 
     /// Draws an SF Symbol fitted (up or down) into `rect`, centered on whole device pixels.
-    private static func drawSymbol(_ name: String, in rect: NSRect, pointSize: CGFloat, weight: NSFont.Weight = .medium) {
+    private static func drawSymbol(_ name: String, in rect: NSRect, pointSize: CGFloat, weight: NSFont.Weight = .regular) {
         var configuration = NSImage.SymbolConfiguration(pointSize: pointSize, weight: weight)
         if ink.colored { configuration = configuration.applying(.init(paletteColors: [ink.neutral])) }
         guard let image = NSImage(systemSymbolName: name, accessibilityDescription: nil)?
@@ -567,7 +570,7 @@ enum MenuBarRenderer {
         let graphicY = ((height - graphicHeight) / 2).rounded()
         if settings.style == .icon {
             let side = graphicHeight + 2
-            return (side, [{ drawSymbol(symbolName, in: NSRect(x: 0, y: (height - side) / 2, width: side, height: side), pointSize: (14 * scale).rounded()) }])
+            return (side, [{ drawSymbol(symbolName, in: NSRect(x: 0, y: (height - side) / 2, width: side, height: side), pointSize: (TypeSize.menuBar * scale).rounded(), weight: .regular) }])
         }
         let showText = settings.style == .value || settings.showValue
         let twoLines = reading.lines.count > 1
@@ -578,9 +581,11 @@ enum MenuBarRenderer {
         }
         let sideLabel = settings.showLabel && !stackedLabel
 
-        let labelStyle = TextStyle(font: font(max(MinimumFont.label, 8.5 * scale), .semibold), role: .label)
-        let sideLabelStyle = TextStyle(font: font(max(MinimumFont.value, 10 * scale), .semibold), role: .label)
-        let valueStyle = TextStyle(font: font(max(MinimumFont.value, (twoLines ? 10 : stackedLabel ? 10.5 : 13) * scale), twoLines || stackedLabel ? .semibold : .medium))
+        // Smaller text sizes never go below the system label size (the HIG minimum); icons and text share a weight.
+        let labelStyle = TextStyle(font: font(max(TypeSize.label, TypeSize.label * scale), .regular), role: .label)
+        let sideLabelStyle = TextStyle(font: font(max(TypeSize.label, TypeSize.label * scale), .medium), role: .label)
+        let valueSize = twoLines ? TypeSize.label : stackedLabel ? TypeSize.stackedValue : TypeSize.menuBar
+        let valueStyle = TextStyle(font: font(max(TypeSize.label, valueSize * scale), twoLines || stackedLabel ? .medium : .regular))
 
         var x: CGFloat = 0
         var operations: [() -> Void] = []
@@ -592,13 +597,13 @@ enum MenuBarRenderer {
         }
 
         if showsVPN(module, settings: settings, snapshot: snapshot) {
-            add(width: 9, gap: 2) { start in drawSymbol("lock.fill", in: NSRect(x: start, y: (height - 11) / 2, width: 9, height: 11), pointSize: 9, weight: .semibold) }
+            add(width: 9, gap: 2) { start in drawSymbol("lock.fill", in: NSRect(x: start, y: (height - 11) / 2, width: 9, height: 11), pointSize: 9, weight: .medium) }
         }
         // Offline: the slashed Wi-Fi glyph says it even when the user hid the icon.
         if settings.showIcon || (module == .network && snapshot?.connectivity?.online == false) {
             let glyph = graphicHeight
             add(width: glyph) { start in
-                drawSymbol(symbolName, in: NSRect(x: start, y: (height - glyph) / 2, width: glyph, height: glyph), pointSize: (13 * scale).rounded())
+                drawSymbol(symbolName, in: NSRect(x: start, y: (height - glyph) / 2, width: glyph, height: glyph), pointSize: (TypeSize.menuBar * scale).rounded(), weight: .regular)
             }
         }
         if sideLabel {
@@ -620,7 +625,7 @@ enum MenuBarRenderer {
             add(width: graphicHeight) { start in drawPie(fraction, in: NSRect(x: start, y: graphicY, width: graphicHeight, height: graphicHeight)) }
         case .ring:
             add(width: graphicHeight) { start in
-                drawRing(fraction, symbol: nil, center: NSPoint(x: start + graphicHeight / 2, y: height / 2), radius: graphicHeight / 2 - 1.25, line: 2.5)
+                drawRing(fraction, symbol: nil, center: NSPoint(x: start + graphicHeight / 2, y: height / 2), radius: graphicHeight / 2 - 1.25, line: RoundGlyph.value)
             }
         case .cores:
             let cores = snapshot?.cpuCorePercents ?? []
@@ -748,7 +753,7 @@ enum MenuBarRenderer {
 
     static func grouped(_ state: GroupedState, appearance: NSAppearance? = nil) -> NSImage {
         let color = itemColor(level: state.alarm, accent: state.accent)
-        let valueStyle = TextStyle(font: font(13, .medium))
+        let valueStyle = TextStyle(font: font(TypeSize.menuBar, .regular))
         let valueWidth = state.style == .value ? max(valueStyle.width(state.text), valueStyle.width(state.reserve)) : 0
         let body: CGFloat = switch state.style {
         case .sparkline: sparklineWidth
@@ -761,7 +766,7 @@ enum MenuBarRenderer {
         return image(width: width, color: color, appearance: appearance) {
             switch state.style {
             case .symbol:
-                drawSymbol("gauge.with.dots.needle.67percent", in: box, pointSize: 15, weight: .semibold)
+                drawSymbol("gauge.with.dots.needle.67percent", in: box, pointSize: 15, weight: .regular)
             case .dial:
                 drawDial(level, in: box)
             case .ring:
@@ -771,7 +776,7 @@ enum MenuBarRenderer {
             case .sparkline:
                 drawGraph(state.series, in: NSRect(x: 0, y: (height - 16) / 2, width: sparklineWidth, height: 16), kind: .area, samples: sparklineSamples)
             case .value:
-                drawSymbol(state.symbol, in: box.insetBy(dx: 1, dy: 1), pointSize: 13, weight: .semibold)
+                drawSymbol(state.symbol, in: box.insetBy(dx: 1, dy: 1), pointSize: 13, weight: .regular)
                 let text = state.text.isEmpty ? "—" : state.text
                 // Leading-aligned beside the symbol; the reserved width stays on the trailing side so neighbors don't move.
                 drawText(text, x: glyphSide + 3, baseline: centeredBaseline(valueStyle.font), valueStyle)
@@ -782,8 +787,8 @@ enum MenuBarRenderer {
 
     /// Stroke weights of the dial and ring: a hairline track under a heavy value arc.
     private enum RoundGlyph {
-        static let track: CGFloat = 1.25
-        static let value: CGFloat = 3
+        static let track: CGFloat = 1.1
+        static let value: CGFloat = 2.25
     }
 
     /// Speedometer: a 250° track, the filled arc and a needle at the level, all from the lower left. The arc's
@@ -808,8 +813,8 @@ enum MenuBarRenderer {
         let needle = NSBezierPath()
         needle.move(to: center)
         needle.line(to: NSPoint(x: center.x + cos(radians) * (radius - 3), y: center.y + sin(radians) * (radius - 3)))
-        stroke(needle, width: 2)
-        fill(NSBezierPath(ovalIn: NSRect(x: center.x - 2.25, y: center.y - 2.25, width: 4.5, height: 4.5)))
+        stroke(needle, width: 1.6)
+        fill(NSBezierPath(ovalIn: NSRect(x: center.x - 1.9, y: center.y - 1.9, width: 3.8, height: 3.8)))
     }
 
     /// Three meters side by side (CPU, memory, disk), each a whole number of points wide.
@@ -838,7 +843,7 @@ enum MenuBarRenderer {
         // Inside a 16-pt ring the symbol has about 9 pt; that resolves on Retina displays only.
         guard let symbol, ink.scale >= 2 else { return }
         let side = (radius - line) * 2 - 1
-        drawSymbol(symbol, in: NSRect(x: center.x - side / 2, y: center.y - side / 2, width: side, height: side), pointSize: 8, weight: .bold)
+        drawSymbol(symbol, in: NSRect(x: center.x - side / 2, y: center.y - side / 2, width: side, height: side), pointSize: 8, weight: .medium)
     }
 
     /// A dot with a transparent moat, so it stays distinct where it overlaps the icon; drawn in the item's emphasis ink.

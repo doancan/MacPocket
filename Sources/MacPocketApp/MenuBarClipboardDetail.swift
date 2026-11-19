@@ -55,7 +55,7 @@ struct ClipboardMenuDetail: View {
                 .accessibilityLabel("Aramayı temizle")
             }
         }
-        .font(.system(size: 13))
+        .font(.body)
         .padding(.horizontal, 10)
         .frame(height: 30)
         .background(MenuBarPlatter.fill, in: RoundedRectangle(cornerRadius: PocketRadius.large, style: .continuous))
@@ -74,8 +74,8 @@ struct ClipboardMenuDetail: View {
         let selected = search.kind == kind
         return Button { search.kind = kind } label: {
             HStack(spacing: 3) {
-                if let symbol { Image(systemName: symbol).font(.system(size: 10, weight: .semibold)) }
-                Text(title).font(.system(size: 11.5, weight: selected ? .semibold : .medium))
+                if let symbol { Image(systemName: symbol).font(.caption) }
+                Text(title).font(selected ? .subheadline.weight(.semibold) : .subheadline)
             }
             .padding(.horizontal, 8)
             .frame(height: 22)
@@ -141,7 +141,7 @@ struct ClipboardMenuDetail: View {
 
     private var disabledState: some View {
         VStack(spacing: PocketSpacing.s) {
-            Image(systemName: "doc.on.clipboard").font(.system(size: 26, weight: .medium)).foregroundStyle(.secondary)
+            Image(systemName: "doc.on.clipboard").font(.largeTitle).foregroundStyle(.secondary)
             Text("Pano geçmişi kapalı").font(.headline)
             Text("Açıldığında kopyaladığın metin, bağlantı, görsel ve dosyalar burada listelenir.")
                 .font(.callout).foregroundStyle(.secondary).multilineTextAlignment(.center)
@@ -182,14 +182,14 @@ private struct ClipboardMenuRow: View {
                 preview.frame(width: 30, height: 30)
                 VStack(alignment: .leading, spacing: 1) {
                     Text(item.title)
-                        .font(.system(size: 12.5))
+                        .font(.body)
                         .lineLimit(1)
                         .truncationMode(item.content.kind == .link ? .middle : .tail)
-                    Text(subtitle).font(.system(size: 11)).foregroundStyle(.secondary).lineLimit(1)
+                    Text(subtitle).font(.subheadline).foregroundStyle(.secondary).lineLimit(1)
                 }
                 Spacer(minLength: PocketSpacing.xs)
                 if item.pinned {
-                    Image(systemName: "pin.fill").font(.system(size: 10)).foregroundStyle(Color.accentColor)
+                    Image(systemName: "pin.fill").font(.caption).foregroundStyle(Color.accentColor)
                         .accessibilityLabel("Sabitlenmiş")
                 }
             }
@@ -235,7 +235,7 @@ private struct ClipboardMenuRow: View {
 
     private var kindIcon: some View {
         Image(systemName: item.content.kind.symbol)
-            .font(.system(size: 13, weight: .semibold))
+            .font(.body)
             .foregroundStyle(item.content.kind.tint)
             .frame(width: 30, height: 30)
             .background(item.content.kind.tint.opacity(0.15), in: RoundedRectangle(cornerRadius: 7, style: .continuous))

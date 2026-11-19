@@ -125,7 +125,7 @@ struct PocketMenuBarView: View {
         HStack(spacing: PocketSpacing.xs) {
             Button { model.openMainWindow?() } label: {
                 Label("MacPocket’ı aç", systemImage: "macwindow")
-                    .font(.system(size: 12, weight: .medium))
+                    .font(.callout)
                     .padding(.horizontal, PocketSpacing.s)
                     .frame(height: 28)
                     .contentShape(Rectangle())
@@ -135,7 +135,7 @@ struct PocketMenuBarView: View {
             .help("MacPocket’ı aç (⌘0)")
             if model.paused {
                 Label("Duraklatıldı", systemImage: "pause.circle.fill")
-                    .font(.system(size: 11, weight: .medium))
+                    .font(.subheadline)
                     .foregroundStyle(.orange)
                     .labelStyle(.titleAndIcon)
                     .accessibilityLabel("İzleme duraklatıldı")
@@ -157,7 +157,7 @@ struct PocketMenuBarView: View {
     private func footerButton(_ title: LocalizedStringKey, symbol: String, action: @escaping () -> Void) -> some View {
         Button(action: action) {
             Image(systemName: symbol)
-                .font(.system(size: 14, weight: .medium))
+                .font(.body).imageScale(.large)
                 .frame(width: 30, height: 28)
                 .contentShape(Rectangle())
         }

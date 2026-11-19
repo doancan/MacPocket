@@ -35,14 +35,14 @@ private struct ModuleHeader<Trailing: View>: View {
     var body: some View {
         HStack(alignment: .center, spacing: PocketSpacing.s + 2) {
             VStack(alignment: .leading, spacing: 0) {
-                Text(value).font(.system(size: 22, weight: .semibold, design: .rounded)).monospacedDigit()
+                Text(value).font(.title).monospacedDigit()
                     .lineLimit(1).minimumScaleFactor(0.7)
                     .contentTransition(.numericText())
             }
             Spacer(minLength: PocketSpacing.s)
             // On the glass popover, hierarchy comes from size and weight: secondary text falls below 4.5:1 there.
             VStack(alignment: .trailing, spacing: 2) { trailing() }
-                .font(.system(size: 11.5, weight: .medium)).foregroundStyle(.primary.opacity(0.85)).monospacedDigit()
+                .font(.callout).foregroundStyle(.primary).monospacedDigit()
         }
         .accessibilityElement(children: .combine)
         .accessibilityLabel("\(module.title): \(value). \(subtitle)")
@@ -162,7 +162,7 @@ private struct HistoryChart: View {
             .chartYAxis {
                 AxisMarks(position: .trailing, values: .automatic(desiredCount: 2)) { value in
                     AxisGridLine(stroke: StrokeStyle(lineWidth: 0.5, dash: [2, 3]))
-                    AxisValueLabel { if let number = value.as(Double.self) { Text(axisLabel(number)).font(.system(size: 9)).foregroundStyle(.secondary) } }
+                    AxisValueLabel { if let number = value.as(Double.self) { Text(axisLabel(number)).font(.caption).foregroundStyle(.secondary) } }
                 }
             }
             .chartLegend(series.count > 1 ? .visible : .hidden)
@@ -173,12 +173,16 @@ private struct HistoryChart: View {
     }
 }
 
+/// The heaviest processes, each with the actions of a task manager in its context menu. Terminating goes
+/// through the model, which revalidates the process's identity and owner and refuses system processes.
 private struct TopProcessList: View {
     enum Metric { case cpu, memory }
-    let processes: [ProcessEntry]
+    var model: PocketModel
     let metric: Metric
+    @State private var forceQuitCandidate: ProcessEntry?
 
     var body: some View {
+        let processes = model.processes
         let sorted: [ProcessEntry] = switch metric {
         case .cpu: Array(processes.filter(\.cpuSampleAvailable).sorted { $0.cpuPercent > $1.cpuPercent }.prefix(5))
         case .memory: Array(processes.filter(\.memorySampleAvailable).sorted { $0.residentBytes > $1.residentBytes }.prefix(5))
@@ -197,12 +201,42 @@ private struct TopProcessList: View {
                         ProcessIcon(command: process.command)
                         Text(process.name).lineLimit(1).truncationMode(.middle)
                         Spacer(minLength: PocketSpacing.s)
+                        if model.terminatingPID == process.pid { ProgressView().controlSize(.mini) }
                         Text(value(process)).monospacedDigit().foregroundStyle(.secondary)
                     }
                     .font(.callout)
+                    .contentShape(Rectangle())
                     .accessibilityElement(children: .combine)
+                    .contextMenu { actions(for: process) }
+                }
+                if let status = model.signalStatus {
+                    Text(status).font(.caption).foregroundStyle(.secondary).lineLimit(2)
                 }
             }
+        }
+        .confirmationDialog("Süreç zorla sonlandırılsın mı?", isPresented: Binding(
+            get: { forceQuitCandidate != nil }, set: { if !$0 { forceQuitCandidate = nil } }),
+                            presenting: forceQuitCandidate) { process in
+            Button("Zorla Sonlandır", role: .destructive) { Task { await model.terminate(process, force: true) } }
+        } message: { process in
+            Text("\(process.name) kaydedilmemiş verilerini kaybedebilir.")
+        }
+    }
+
+    @ViewBuilder private func actions(for process: ProcessEntry) -> some View {
+        Button("Sonlandır") { Task { await model.terminate(process, force: false) } }
+            .disabled(!process.canTerminate)
+        Button("Zorla Sonlandır…") { forceQuitCandidate = process }
+            .disabled(!process.canTerminate)
+        Divider()
+        if !process.command.isEmpty {
+            Button("Finder’da Göster") {
+                NSWorkspace.shared.activateFileViewerSelecting([URL(fileURLWithPath: process.command)])
+            }
+        }
+        Button("Görev Yöneticisi’nde Aç") {
+            model.navigation.open(.taskManager)
+            model.openMainWindow?()
         }
     }
 
@@ -222,7 +256,7 @@ private struct ProcessIcon: View {
             PocketAppIcon(url: URL(fileURLWithPath: String(command[..<range.lowerBound]) + ".app"), size: 16)
         } else {
             // Daemons and command-line tools: a neutral tile the size of an app icon, so rows stay aligned.
-            Image(systemName: "gearshape.fill").font(.system(size: 9, weight: .semibold)).foregroundStyle(.secondary)
+            Image(systemName: "gearshape.fill").font(.caption2).foregroundStyle(.secondary)
                 .frame(width: 16, height: 16)
                 .background(Color.primary.opacity(0.1), in: RoundedRectangle(cornerRadius: 4, style: .continuous))
                 .accessibilityHidden(true)
@@ -322,7 +356,7 @@ private struct CPUDetail: View {
             }
             .menuBarSection()
 
-            TopProcessList(processes: model.processes, metric: .cpu).menuBarSection()
+            TopProcessList(model: model, metric: .cpu).menuBarSection()
         }
     }
 
@@ -430,7 +464,7 @@ private struct MemoryDetail: View {
                          ceiling: 100)
                 .menuBarSection()
 
-            TopProcessList(processes: model.processes, metric: .memory).menuBarSection()
+            TopProcessList(model: model, metric: .memory).menuBarSection()
         }
     }
 
@@ -579,13 +613,13 @@ private struct NetworkDetail: View {
     private func rate(title: LocalizedStringKey, symbol: String, value: Double?, color: Color) -> some View {
         HStack(spacing: PocketSpacing.s) {
             Image(systemName: symbol)
-                .font(.system(size: 12, weight: .bold)).foregroundStyle(.white)
+                .font(.callout.weight(.semibold)).foregroundStyle(.white)
                 .frame(width: 26, height: 26)
                 .background(color.gradient, in: Circle())
             VStack(alignment: .leading, spacing: 0) {
                 Text(title).font(.caption.weight(.semibold)).foregroundStyle(.secondary)
                 Text(MenuBarFormatter.rate(value, binary: binary))
-                    .font(.system(size: 17, weight: .semibold, design: .rounded)).monospacedDigit()
+                    .font(.title2).monospacedDigit()
                     .lineLimit(1).minimumScaleFactor(0.7)
                     .contentTransition(.numericText())
             }
@@ -651,13 +685,13 @@ private struct PowerDetail: View {
                     ZStack {
                         PocketRing(fraction: (power.chargePercent ?? 0) / 100, color: batteryColor(power), lineWidth: 6)
                         Image(systemName: MenuBarRenderer.symbol(for: .power, snapshot: system))
-                            .font(.system(size: 15, weight: .semibold)).foregroundStyle(batteryColor(power))
+                            .font(.title3).foregroundStyle(batteryColor(power))
                     }
                     .frame(width: 52, height: 52)
                     VStack(alignment: .leading, spacing: 1) {
                         Text("Pil").font(.caption.weight(.semibold)).foregroundStyle(.secondary)
                         Text(percentText(power.chargePercent))
-                            .font(.system(size: 22, weight: .semibold, design: .rounded)).monospacedDigit()
+                            .font(.title).monospacedDigit()
                         Text(batteryStatus(power)).font(.caption).foregroundStyle(.secondary)
                     }
                     Spacer(minLength: 0)
@@ -813,7 +847,7 @@ private struct AwakeMenuDetail: View {
                 } else {
                     PocketRing(fraction: 1, color: module.tint, lineWidth: 6)
                 }
-                Image(systemName: "cup.and.saucer.fill").font(.system(size: 15, weight: .semibold)).foregroundStyle(module.tint)
+                Image(systemName: "cup.and.saucer.fill").font(.title3).foregroundStyle(module.tint)
             }
             .frame(width: 52, height: 52)
             .accessibilityHidden(true)
@@ -822,10 +856,10 @@ private struct AwakeMenuDetail: View {
                     .font(.caption.weight(.semibold)).foregroundStyle(.secondary)
                 if let end = session.endsAt {
                     Text(timerInterval: Date()...max(Date(), end), countsDown: true)
-                        .font(.system(size: 22, weight: .semibold, design: .rounded)).monospacedDigit()
+                        .font(.title).monospacedDigit()
                     Text("Bitiş \(end.formatted(date: .omitted, time: .shortened))").font(.caption).foregroundStyle(.secondary)
                 } else {
-                    Text("Süresiz").font(.system(size: 22, weight: .semibold, design: .rounded))
+                    Text("Süresiz").font(.title)
                     Text("Durdurana kadar").font(.caption).foregroundStyle(.secondary)
                 }
                 Text(session.keepDisplayAwake ? "Ekran da açık" : "Yalnız sistem").font(.caption2).foregroundStyle(.tertiary)
@@ -842,7 +876,7 @@ private struct AwakeMenuDetail: View {
             HStack(spacing: PocketSpacing.s + 2) {
                 PocketIconTile(symbol: "cup.and.saucer", tint: module.tint, size: 30)
                 VStack(alignment: .leading, spacing: 1) {
-                    Text("Kapalı").font(.system(size: 22, weight: .semibold, design: .rounded))
+                    Text("Kapalı").font(.title)
                     Text("Mac normal enerji ayarlarına göre uyur.").font(.caption).foregroundStyle(.secondary)
                 }
             }
@@ -920,14 +954,14 @@ private struct FocusMenuDetail: View {
                     let total = max(1, end.timeIntervalSince(start))
                     PocketRing(fraction: min(1, max(0, context.date.timeIntervalSince(start) / total)), color: module.tint, lineWidth: 6)
                 }
-                Image(systemName: "scope").font(.system(size: 15, weight: .semibold)).foregroundStyle(module.tint)
+                Image(systemName: "scope").font(.title3).foregroundStyle(module.tint)
             }
             .frame(width: 52, height: 52)
             .accessibilityHidden(true)
             VStack(alignment: .leading, spacing: 1) {
                 Text("Odaklanıyorsun").font(.caption.weight(.semibold)).foregroundStyle(.secondary)
                 Text(timerInterval: Date()...max(Date(), end), countsDown: true)
-                    .font(.system(size: 22, weight: .semibold, design: .rounded)).monospacedDigit()
+                    .font(.title).monospacedDigit()
                 Text("Bitiş \(end.formatted(date: .omitted, time: .shortened))").font(.caption).foregroundStyle(.secondary)
                 if !service.applied.isEmpty {
                     Text("\(service.applied.count) değişiklik bitince geri alınır").font(.caption2).foregroundStyle(.tertiary)
@@ -969,7 +1003,7 @@ private struct FocusMenuDetail: View {
     /// A glyph per session option: bright when on, dimmed when off; the name is the tooltip and VoiceOver label.
     private func option(_ symbol: String, _ title: LocalizedStringKey, _ on: Bool) -> some View {
         Image(systemName: symbol)
-            .font(.system(size: 11, weight: .semibold))
+            .font(.subheadline.weight(.semibold))
             .frame(width: 24, height: 22)
             .foregroundStyle(on ? module.tint : Color.secondary.opacity(0.45))
             .background(Color.primary.opacity(on ? 0.08 : 0.03), in: RoundedRectangle(cornerRadius: PocketRadius.small, style: .continuous))

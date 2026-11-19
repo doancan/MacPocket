@@ -12,6 +12,10 @@ struct MenuBarTabBar: View {
     @Namespace private var highlight
     @PocketReduceMotion private var reduceMotion
 
+    /// A click carries no momentum, so the highlight settles critically damped (no overshoot), at Apple's
+    /// reposition response.
+    static let highlightSpring = Animation.spring(response: 0.3, dampingFraction: 1)
+
     /// Narrowest a tab may get before the bar scrolls instead.
     private static let minimumTabWidth: CGFloat = 64
 
@@ -25,7 +29,7 @@ struct MenuBarTabBar: View {
                         ForEach(Array(tabs.enumerated()), id: \.element.id) { index, tab in
                             MenuBarTabButton(tab: tab, index: index, selected: tab.id == selection, highlight: highlight) {
                                 // Only the highlight moves; the content swaps at once, so nothing slides or resizes.
-                                withAnimation(reduceMotion ? nil : .snappy(duration: 0.22)) { selection = tab.id }
+                                withAnimation(reduceMotion ? nil : Self.highlightSpring) { selection = tab.id }
                             }
                             .frame(width: tabWidth)
                             .id(tab.id)
@@ -37,7 +41,7 @@ struct MenuBarTabBar: View {
                 .onAppear { scroller.scrollTo(selection, anchor: .center) }
                 .onChange(of: selection) { _, tab in
                     guard !fits else { return }
-                    withAnimation(reduceMotion ? nil : .snappy(duration: 0.22)) { scroller.scrollTo(tab, anchor: .center) }
+                    withAnimation(reduceMotion ? nil : Self.highlightSpring) { scroller.scrollTo(tab, anchor: .center) }
                 }
             }
         }
@@ -61,10 +65,10 @@ private struct MenuBarTabButton: View {
         Button(action: action) {
             VStack(spacing: 3) {
                 Image(systemName: tab.symbol ?? "circle")
-                    .font(.system(size: 15, weight: .medium))
+                    .font(.title3)
                     .frame(height: 18)
                 tab.title
-                    .font(.system(size: 10.5, weight: selected ? .semibold : .medium))
+                    .font(.subheadline)
                     .lineLimit(1)
                     .minimumScaleFactor(0.85)
             }
@@ -83,11 +87,18 @@ private struct MenuBarTabButton: View {
             .padding(.horizontal, 2)
             .contentShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
         }
-        .buttonStyle(.plain)
+        .buttonStyle(MenuBarTabPressStyle())
         .frame(height: Self.height)
         .onHover { hovering = $0 }
         .help(index < 9 ? Text("\(tab.title) (⌘\(index + 1))") : tab.title)
         .accessibilityLabel(tab.title)
         .accessibilityAddTraits(selected ? [.isSelected, .isButton] : .isButton)
+    }
+}
+
+/// Feedback on press, not on release: the tab dims the moment the pointer goes down.
+private struct MenuBarTabPressStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label.opacity(configuration.isPressed ? 0.6 : 1)
     }
 }
