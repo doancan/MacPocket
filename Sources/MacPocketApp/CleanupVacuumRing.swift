@@ -18,7 +18,12 @@ struct CleanupVacuumRing: View {
 
     @PocketReduceMotion private var reduceMotion
     @State private var simulation = VacuumSimulation()
-    @State private var settleUntil = Date.distantPast
+    /// The ring keeps moving briefly after a change so the liquid can settle. This must be state that a task
+    /// clears, not a deadline compared with `Date()` in `body`: nothing re-evaluates `body` when the deadline
+    /// passes, so the timeline never paused and redrew at 60 fps while the page sat idle (~25 % CPU).
+    @State private var settling = false
+    @State private var settleRequest = 0
+    @State private var settleSeconds: TimeInterval = 0
 
     var body: some View {
         let level = Self.level(for: bytes)
@@ -52,12 +57,22 @@ struct CleanupVacuumRing: View {
             keepAnimating(for: 2)
         }
         .onAppear { keepAnimating(for: 2.5) }
+        .task(id: settleRequest) {
+            guard settleRequest > 0 else { return }
+            settling = true
+            do { try await Task.sleep(for: .seconds(settleSeconds)) } catch { return }
+            settling = false
+        }
         .accessibilityHidden(true)
     }
 
-    private var isAnimating: Bool { scanning || working || settleUntil > Date() }
+    private var isAnimating: Bool { scanning || working || settling }
 
-    private func keepAnimating(for seconds: TimeInterval) { settleUntil = Date().addingTimeInterval(seconds) }
+    /// A newer request restarts the wait (the previous task is cancelled by the new id).
+    private func keepAnimating(for seconds: TimeInterval) {
+        settleSeconds = seconds
+        settleRequest &+= 1
+    }
 
     private func staticRing(level: Double) -> some View {
         ZStack {
