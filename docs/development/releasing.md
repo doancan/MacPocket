@@ -9,7 +9,8 @@ Releases are produced by `.github/workflows/release.yml` when a `v*` tag is push
    an incremented `CFBundleVersion`.
 2. Turn the `Unreleased` section of `CHANGELOG.md` into one for the version (see [Changelog format](#changelog-format)).
    The release workflow and `scripts/release/make-appcast.sh` extract the notes for that
-   version by its heading.
+   version by its heading. Run `make site-changelog` so the public changelog page matches
+   (`make verify` fails otherwise).
 3. Run `make verify`, commit, and push to `main`.
 4. Wait for the **CI** check on that commit to pass.
 5. Tag the commit: `git tag -a v<version> -m "MacPocket <version>" && git push origin v<version>`.

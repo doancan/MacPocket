@@ -3,11 +3,10 @@
 All notable changes to MacPocket are documented in this file. Each release lists only the
 sections that apply, in this order: Features, Improved, Changed, Fixed, Removed, Security.
 
-## Unreleased
+## 1.0.1 — November 27, 2026
 
 ### Features
 - **SSH Manager:** Import hosts and keys from another Mac in one step. Choose a copied `~/.ssh` folder or a config file (local or in iCloud Drive); a review sheet lists new hosts, keys and warnings before anything changes. `Include`d hosts are merged into the config, keys are copied with owner-only permissions, and an existing file is never overwritten.
-
 - **SSH Manager:** "Enable for System ssh" makes Terminal, VS Code Remote-SSH and git see a config kept elsewhere, such as iCloud Drive. A review sheet shows the exact change to `~/.ssh/config` (an `Include` line) and the `known_hosts` entries to add; changed files are backed up first and a symlinked `~/.ssh` or config is kept.
 
 ### Improved
@@ -15,12 +14,12 @@ sections that apply, in this order: Features, Improved, Changed, Fixed, Removed,
 - **SSH Manager:** A config that lives in iCloud Drive and has not been downloaded yet is downloaded and explained instead of being offered as a new empty file.
 - **SSH Manager:** Banner and toolbar buttons keep their natural width, so labels no longer get squeezed on narrow windows.
 
-### Security
-- **SSH Manager:** Hosts warn when a private key can be read by other users (ssh refuses such keys) and offer a one-click permission fix, and when a private key sits in a cloud-synced folder.
-
 ### Fixed
 - **Language:** The first launch follows the macOS language order instead of always opening in Turkish, and a system language that is neither English nor Turkish falls back to English.
 - **Installer:** The disk image window shows its whole artwork again on macOS 27, the icon labels no longer collide with the card edges, and the instructions lead in English with Turkish below.
+
+### Security
+- **SSH Manager:** Hosts warn when a private key can be read by other users (ssh refuses such keys) and offer a one-click permission fix, and when a private key sits in a cloud-synced folder.
 
 ## 1.0.0 — November 27, 2026
 
