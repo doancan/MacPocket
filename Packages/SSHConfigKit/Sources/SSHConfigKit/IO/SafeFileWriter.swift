@@ -1,0 +1,97 @@
+import Foundation
+
+public enum SafeFileWriterError: Error, Equatable, Sendable {
+    /// The file on disk no longer matches what was loaded.
+    case conflict
+    case backupFailed(String)
+    case writeFailed(String)
+}
+
+/// Conflict check → backup → temp file in the same directory → fsync → rename(2).
+/// Symlinks are resolved so the real file is replaced and the link is kept.
+public struct SafeFileWriter: Sendable {
+    public let backups: BackupManager?
+
+    public init(backups: BackupManager?) {
+        self.backups = backups
+    }
+
+    public func write(
+        _ text: String,
+        to url: URL,
+        expected: FileFingerprint?,
+        ignoreConflict: Bool = false,
+        backupKind: String
+    ) throws {
+        let fm = FileManager.default
+        let target: URL
+        do { target = try Self.destination(of: url) }
+        catch { throw SafeFileWriterError.writeFailed(error.localizedDescription) }
+
+        if !ignoreConflict {
+            let current: FileFingerprint?
+            do { current = try FileFingerprint.of(fileAt: target) }
+            catch { throw SafeFileWriterError.writeFailed(error.localizedDescription) }
+            guard current == expected else { throw SafeFileWriterError.conflict }
+        }
+
+        let exists = fm.fileExists(atPath: target.path)
+        if exists, let backups {
+            do { try backups.backup(fileAt: target, kind: backupKind) }
+            catch { throw SafeFileWriterError.backupFailed(error.localizedDescription) }
+        }
+
+        let permissions = exists
+            ? ((try? fm.attributesOfItem(atPath: target.path)[.posixPermissions]) as? Int ?? 0o600)
+            : 0o600
+        let temp = target.deletingLastPathComponent()
+            .appending(path: ".\(target.lastPathComponent).tmp-\(UUID().uuidString)")
+
+        do {
+            guard fm.createFile(atPath: temp.path, contents: nil, attributes: [.posixPermissions: permissions]) else {
+                throw CocoaError(.fileWriteNoPermission, userInfo: [NSFilePathErrorKey: temp.path])
+            }
+            let handle = try FileHandle(forWritingTo: temp)
+            do {
+                try handle.write(contentsOf: Data(text.utf8))
+                try handle.synchronize()
+                try handle.close()
+            } catch {
+                try? handle.close()
+                throw error
+            }
+            // createFile's mode is filtered by umask; set it explicitly.
+            try fm.setAttributes([.posixPermissions: permissions], ofItemAtPath: temp.path)
+            guard rename(temp.path, target.path) == 0 else {
+                throw POSIXError(POSIXErrorCode(rawValue: errno) ?? .EIO)
+            }
+            // Best effort: persist the rename itself. Failure here must not fail a completed write.
+            let directoryFD = open(target.deletingLastPathComponent().path, O_RDONLY)
+            if directoryFD >= 0 {
+                _ = fsync(directoryFD)
+                close(directoryFD)
+            }
+        } catch {
+            try? fm.removeItem(at: temp)
+            throw SafeFileWriterError.writeFailed(error.localizedDescription)
+        }
+    }
+
+    /// The file a write to `url` must replace: symlinks are followed even when their target does not
+    /// exist yet (`resolvingSymlinksInPath` returns a dangling link unchanged, and replacing it would turn
+    /// `~/.ssh/config -> ~/dotfiles/ssh/config` into a regular file). Relative targets resolve against the
+    /// link's directory.
+    static func destination(of url: URL) throws -> URL {
+        var current = url.resolvingSymlinksInPath()
+        for _ in 0..<32 {
+            guard let link = try? FileManager.default.destinationOfSymbolicLink(atPath: current.path) else {
+                return current
+            }
+            let next = link.hasPrefix("/")
+                ? URL(filePath: link)
+                : current.deletingLastPathComponent().appending(path: link)
+            current = next.standardizedFileURL.resolvingSymlinksInPath()
+        }
+        throw POSIXError(.ELOOP)
+    }
+}

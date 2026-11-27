@@ -1,0 +1,616 @@
+import AppKit
+import Combine
+import SwiftUI
+import MacPocketAIUsage
+import MacPocketCore
+import MacPocketSSH
+
+@main
+@MainActor
+struct MacPocketApplication: App {
+    @NSApplicationDelegateAdaptor(PocketAppDelegate.self) var delegate
+    @StateObject private var state = PocketApplicationState.shared
+
+    init() {
+        SwitcherNativeKeyEntry.runIfRequested()
+        #if DEBUG
+        // StateObject's wrapped-value thunk has not run: inspect existing TCC grants without
+        // loading application state, changing preferences, opening windows, or starting modules.
+        ProductExpansionRuntimeAudit.runNativeIfRequested()
+        CableImpactRuntimeAudit.configureIfRequested()
+        UninstallRuntimeAudit.configureIfRequested()
+        WeatherBasketRuntimeAudit.configureIfRequested()
+        StatusPopoverRuntimeAudit.configureIfRequested()
+        SystemDataRuntimeAudit.configureIfRequested()
+        WindowSwitcherPermissionProbe.runIfRequested()
+        WindowExternalRuntimeAudit.runIfRequested()
+        WindowLifecycleAuditProducer.runIfRequested()
+        #endif
+        SwitcherCLIEntry.runIfRequested()
+        // Must run before the ordinary app resolves localized strings. CLI clients do not migrate defaults.
+        PocketDefaults.applyLanguageDefault()
+    }
+
+    var body: some Scene {
+        Window("MacPocket", id: "main") {
+            PocketRootView(model: state.model)
+                .pocketAppearanceRoot()
+        }
+        // Wide enough for Overview's four-column layout (content width >= 1180 pt plus the sidebar).
+        .defaultSize(width: 1480, height: 820)
+        .windowToolbarStyle(.unified)
+        .commands {
+            PocketCommands(model: state.model)
+            SSHCommands()
+        }
+
+        Window("MacPocket’a Hoş Geldin", id: "onboarding") {
+            OnboardingView(loginItem: state.loginItem)
+                .pocketAppearanceRoot(rebuildsOnTokenChange: false)
+        }
+        .windowStyle(.hiddenTitleBar)
+        .windowResizability(.contentSize)
+        .defaultPosition(.center)
+        .restorationBehavior(.disabled)
+
+        Window("AI Kotaları", id: "ai-usage") {
+            AIUsageSettingsView()
+                .pocketAppearanceRoot()
+                .frame(minWidth: 620, idealWidth: 680, minHeight: 560, idealHeight: 720)
+        }
+        .defaultSize(width: 680, height: 720)
+
+        Settings {
+            PocketSettingsView(model: state.model, loginItem: state.loginItem)
+                .pocketAppearanceRoot(rebuildsOnTokenChange: false)
+        }
+
+    }
+}
+
+@MainActor
+final class PocketAppDelegate: NSObject, NSApplicationDelegate {
+    private var defaultsObserver: NSObjectProtocol?
+    private var switcherCommandListener: SwitcherCLIListener?
+
+    func applicationDidFinishLaunching(_ notification: Notification) {
+        #if DEBUG
+        if ProductExpansionRuntimeAudit.nativeRequested { ProductExpansionRuntimeAudit.launchNative(); return }
+        if CableImpactRuntimeAudit.requested { CableImpactRuntimeAudit.launch(); return }
+        if UninstallRuntimeAudit.requested { UninstallRuntimeAudit.launch(); return }
+        if WeatherBasketRuntimeAudit.requested { WeatherBasketRuntimeAudit.launch(); return }
+        if StatusPopoverRuntimeAudit.requested { StatusPopoverRuntimeAudit.launch(); return }
+        if SystemDataRuntimeAudit.requested { SystemDataRuntimeAudit.launch(); return }
+        #endif
+        _ = PocketRelaunch.languageAtLaunch
+        RetiredPreferences.remove()
+        ConnectionWatchService.shared.start()
+        PocketDock.apply()
+        let commandService = SwitcherCommandService(controller: .shared)
+        switcherCommandListener = try? SwitcherCLIListener(portName: SwitcherCLITransport.portName(bundleIdentifier: Bundle.main.bundleIdentifier ?? "com.doancan.MacPocket")) { request in
+            await commandService.execute(request)
+        }
+        // The Dock icon must come back if the menu bar item is hidden from anywhere (Settings, menu, import).
+        defaultsObserver = NotificationCenter.default.addObserver(forName: UserDefaults.didChangeNotification, object: nil,
+                                                                  queue: .main) { _ in
+            MainActor.assumeIsolated { PocketDock.apply() }
+        }
+        SSHRuntime.shared.start {
+            let model = PocketApplicationState.shared.model
+            model.navigation.select(.ssh)
+            model.openMainWindow?()
+        }
+        if PocketLaunch.showsWindow { NSApp.activate(ignoringOtherApps: true) }
+        #if DEBUG
+        // Exercise the ordinary scan from the signed app, whose identifier the root helper requires.
+        let arguments = CommandLine.arguments
+        if let index = arguments.firstIndex(of: "--audit-switcher"), arguments.indices.contains(index + 1) {
+            Task { @MainActor in await WindowSwitcherRuntimeAudit.run(destination: URL(fileURLWithPath: arguments[index + 1])) }
+        }
+        if let index = arguments.firstIndex(of: "--audit-ai-usage"), arguments.indices.contains(index + 1) {
+            Task { @MainActor in await AIUsageRuntimeAudit.run(destination: URL(fileURLWithPath: arguments[index + 1])) }
+        }
+        if let index = arguments.firstIndex(of: "--audit-modules"), arguments.indices.contains(index + 1) {
+            Task { @MainActor in await ModuleRuntimeAudit.run(destination: URL(fileURLWithPath: arguments[index + 1])) }
+        }
+        if let index = arguments.firstIndex(of: "--audit-ssh"), arguments.indices.contains(index + 1) {
+            let destination = URL(fileURLWithPath: arguments[index + 1])
+            Task { @MainActor in await SSHRuntimeAudit.run(destination: destination) }
+        }
+        if let index = arguments.firstIndex(of: "--audit-network"), arguments.indices.contains(index + 1) {
+            let destination = URL(fileURLWithPath: arguments[index + 1])
+            Task { @MainActor in
+                try? await Task.sleep(for: .seconds(2))
+                await NetworkRuntimeAudit.run(destination: destination)
+            }
+        }
+        // Opens one catalog tool at launch, so every page can be captured without driving the UI.
+        if let index = arguments.firstIndex(of: "--open-tool"), arguments.indices.contains(index + 1) {
+            PocketApplicationState.shared.model.openCatalogTool(arguments[index + 1])
+        }
+        if arguments.contains("--open-practical") { PocketApplicationState.shared.model.navigation.open(.practical) }
+        if arguments.contains("--open-case-converter") {
+            PracticalWorkspace.shared.selected = .caseConverter
+            PocketApplicationState.shared.model.navigation.open(.practical)
+        }
+        if let index = arguments.firstIndex(of: "--audit-practical"), arguments.indices.contains(index + 1) {
+            let destination = URL(fileURLWithPath: arguments[index + 1])
+            Task { @MainActor in await ToolUIAudit.runPractical(destination: destination) }
+        }
+        if let index = arguments.firstIndex(of: "--audit-tools"), arguments.indices.contains(index + 1) {
+            let destination = URL(fileURLWithPath: arguments[index + 1])
+            Task { @MainActor in await ToolUIAudit.run(destination: destination) }
+        }
+        if arguments.contains("--open-usb-eject") {
+            PocketApplicationState.shared.model.navigation.open(.usbEject)
+        }
+        if let index = arguments.firstIndex(of: "--snapshot-main-window"), arguments.indices.contains(index + 1) {
+            let destination = URL(fileURLWithPath: arguments[index + 1])
+            Task { @MainActor in
+                try? await Task.sleep(for: .seconds(2))
+                // Render only our own view hierarchy; this does not capture the screen or other applications.
+                guard let window = NSApp.mainWindow ?? NSApp.windows.first(where: { $0.isVisible && $0.canBecomeMain }), let view = window.contentView,
+                      let bitmap = view.bitmapImageRepForCachingDisplay(in: view.bounds) else { return }
+                view.cacheDisplay(in: view.bounds, to: bitmap)
+                try? bitmap.representation(using: .png, properties: [:])?.write(to: destination, options: .atomic)
+            }
+        }
+        if let index = arguments.firstIndex(of: "--diagnose-weather"), arguments.indices.contains(index + 2) {
+            let query = arguments[index + 1]
+            let destination = URL(fileURLWithPath: arguments[index + 2])
+            Task { @MainActor in
+                var report: [String: Any] = [:]
+                do {
+                    let places = try await WeatherLocationSearch.find(query)
+                    report["places"] = places.map { ["name": $0.name, "latitude": $0.latitude,
+                                                    "longitude": $0.longitude, "timeZone": $0.timeZone] as [String: Any] }
+                    if let place = places.first {
+                        let result = try await WeatherProviderClient.fetch(source: .openMeteo, location: place, language: "tr")
+                        report["temperature"] = result.current.temperature
+                        report["hourlyCount"] = result.hourly.count
+                        report["forecastCount"] = result.forecast.count
+                        report["symbol"] = result.symbol
+                        report["timeZone"] = result.timeZone.identifier
+                        let settings = MenuBarModuleSettings.defaults(for: .weather)
+                        report["menuBarText"] = MenuBarFormatter.reading(.weather, settings: settings, snapshot: nil, weather: result).lines
+                    }
+                } catch { report["error"] = error.localizedDescription }
+                report["ui"] = PocketApplicationState.shared.statusItem.showWeatherForDiagnostics()
+                if let data = try? JSONSerialization.data(withJSONObject: report, options: [.prettyPrinted, .sortedKeys]) {
+                    try? data.write(to: destination, options: .atomic)
+                }
+            }
+        }
+        if let index = arguments.firstIndex(of: "--diagnose-lan"), arguments.indices.contains(index + 1) {
+            let destination = URL(fileURLWithPath: arguments[index + 1])
+            Task { @MainActor in
+                if arguments.contains("--restore-wizard-helper") {
+                    try? await FanControlService.shared.restoreWizardRegistration()
+                }
+                PocketApplicationState.shared.model.navigation.open(NetworkTab.localNetwork)
+                let model = LANScannerModel.shared
+                await model.scan()
+                while model.scanning { try? await Task.sleep(for: .milliseconds(100)) }
+                let report: [String: Any] = [
+                    "error": model.error ?? "",
+                    "helper": String(describing: FanControlService.shared.availability),
+                    "networks": model.results.map { result in [
+                        "cidr": result.network.subnet.description,
+                        "devices": result.devices.map { ["ip": $0.ip, "mac": $0.mac ?? "", "source": $0.macSource.rawValue] }
+                    ] as [String: Any] },
+                ]
+                if let data = try? JSONSerialization.data(withJSONObject: report, options: [.prettyPrinted, .sortedKeys]) {
+                    try? data.write(to: destination, options: .atomic)
+                }
+            }
+        }
+        #endif
+    }
+
+    /// Dock icon click with no window open (for example after "show window at launch" was turned off).
+    func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
+        guard !flag, let open = PocketApplicationState.shared.model.openMainWindow else { return true }
+        open()
+        return false
+    }
+
+    func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
+        if PocketOperationState.shared.preventTermination {
+            let alert = NSAlert()
+            alert.messageText = String(localized: "Uygulama işlemi sürüyor")
+            alert.informativeText = String(localized: "Homebrew işleminin tamamlanmasını beklemelisin. Sonucu Uygulamalar bölümünde görebilirsin.")
+            alert.addButton(withTitle: String(localized: "Bekle"))
+            alert.runModal()
+            return .terminateCancel
+        }
+        let defaults = UserDefaults.standard
+        if PocketApplicationState.shared.model.awakeSession?.active == true,
+           defaults.object(forKey: PocketPreferenceKey.confirmQuitWhileAwake) as? Bool ?? true {
+            let alert = NSAlert()
+            alert.messageText = String(localized: "Mac’i uyanık tutma etkin")
+            alert.informativeText = String(localized: "MacPocket’tan çıkarsan uyanık tutma sona erer ve Mac yeniden normal şekilde uyuyabilir.")
+            alert.addButton(withTitle: String(localized: "Çık"))
+            alert.addButton(withTitle: String(localized: "Vazgeç"))
+            alert.showsSuppressionButton = true
+            alert.suppressionButton?.title = String(localized: "Bir daha sorma")
+            NSApp.activate(ignoringOtherApps: true)
+            let response = alert.runModal()
+            if alert.suppressionButton?.state == .on { defaults.set(false, forKey: PocketPreferenceKey.confirmQuitWhileAwake) }
+            if response != .alertFirstButtonReturn { return .terminateCancel }
+        }
+        let sshReply = SSHRuntime.shared.prepareToTerminate(sender) { PocketLaunch.terminating = true }
+        guard sshReply == .terminateNow else { return sshReply }
+        PocketLaunch.terminating = true
+        return .terminateNow
+    }
+
+    func applicationWillTerminate(_ notification: Notification) {
+        switcherCommandListener?.stop()
+        switcherCommandListener = nil
+        AIUsageIntegration.shared.stop()
+        SSHRuntime.shared.stop()
+        PocketModuleRuntime.shared.shutdown()
+        PocketRelaunch.spawnIfPending()
+    }
+
+    func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { false }
+}
+
+extension PocketApplicationState {
+    /// One per process; the app delegate reaches the model through it.
+    static let shared = PocketApplicationState()
+}
+
+@MainActor
+@Observable
+final class PocketModel {
+    var system: SystemSnapshot?
+    var processes: [ProcessEntry] = []
+    var appPIDs: Set<Int32> = []
+    var paused = false
+    var refreshSeconds = 2.0 {
+        didSet {
+            if refreshSeconds != oldValue { UserDefaults.standard.set(refreshSeconds, forKey: "MacPocket.refreshSeconds") }
+        }
+    }
+    let navigation = PocketNavigation()
+    let storage = FileWorkspaceModel()
+    let cleanup = FileWorkspaceModel(cleanup: true)
+    let applications = ApplicationWorkspaceModel()
+    var error: String?
+    var lastUpdate: Date?
+    var unreadableCount = 0
+    private(set) var samples: [PocketSample] = []
+    var signalStatus: String?
+    var terminatingPID: Int32?
+    var awakeSession: AwakeSession?
+    var awakeError: String?
+    var powerHistory: [PowerHistoryEntry] = []
+    var powerHistoryError: String?
+    @ObservationIgnored private(set) var mainWindowVisible = false
+    /// Set by the menu bar while a popover showing top processes is open; process sampling is
+    /// otherwise limited to the visible Task Manager.
+    @ObservationIgnored var menuBarProcessesWanted = false
+    @ObservationIgnored var openMainWindow: (() -> Void)?
+    @ObservationIgnored var openSettingsWindow: (() -> Void)?
+    let processMonitor = ProcessMonitor()
+    let systemMonitor = SystemMonitor()
+    let sleepController: any SleepControlling
+    @ObservationIgnored private var awakeOperationGeneration = 0
+    @ObservationIgnored private var idleDisplayPolicy = IdleDisplayOffPolicy()
+    @ObservationIgnored private var awakeAutomationInstance: AwakeAutomationService?
+    var awakeAutomation: AwakeAutomationService {
+        if let awakeAutomationInstance { return awakeAutomationInstance }
+        let service = AwakeAutomationService(controller: sleepController, sessionChanged: { [weak self] session in
+            if self?.awakeSession != session { self?.awakeSession = session }
+        })
+        awakeAutomationInstance = service
+        return service
+    }
+    var awakeIsAutomatic: Bool { awakeSession != nil && awakeAutomationInstance?.ownedSessionID == awakeSession?.id }
+    @ObservationIgnored private var historyDays = PowerHistoryRetention.days(from: .standard)
+    #if DEBUG
+    @ObservationIgnored private lazy var historyStore = PowerHistoryStore(url: ModuleRuntimeAudit.dataURL("power-history.json"), maximumEntries: PowerHistoryRetention.maximumEntries(days: historyDays))
+    #else
+    @ObservationIgnored private lazy var historyStore = PowerHistoryStore(maximumEntries: PowerHistoryRetention.maximumEntries(days: historyDays))
+    #endif
+    @ObservationIgnored private var historyLoaded = false
+    private let alerts = PocketAlertNotifier()
+    @ObservationIgnored private var subscriptions = Set<AnyCancellable>()
+    @ObservationIgnored private var refreshing = false
+    @ObservationIgnored private var pendingAutomaticProcessRefresh = false
+    @ObservationIgnored private var pollingTask: Task<Void, Never>?
+    private let readSystemSnapshot: (@Sendable () async throws -> SystemSnapshot)?
+    private let readProcessSnapshot: (@Sendable () async throws -> ProcessSnapshot)?
+
+    init(sleepController: any SleepControlling = SleepController(), startMonitoring: Bool = true,
+         readSystemSnapshot: (@Sendable () async throws -> SystemSnapshot)? = nil,
+         readProcessSnapshot: (@Sendable () async throws -> ProcessSnapshot)? = nil,
+         historyStore: PowerHistoryStore? = nil) {
+        self.sleepController = sleepController
+        self.readSystemSnapshot = readSystemSnapshot
+        self.readProcessSnapshot = readProcessSnapshot
+        if let historyStore { self.historyStore = historyStore }
+        let interval = UserDefaults.standard.double(forKey: "MacPocket.refreshSeconds")
+        if [1.0, 2.0, 5.0, 10.0].contains(interval) { refreshSeconds = interval }
+        guard startMonitoring else { return }
+        for (notification, event) in [(NSWorkspace.willSleepNotification, "Uyku"), (NSWorkspace.didWakeNotification, "Uyanma")] {
+            NSWorkspace.shared.notificationCenter.publisher(for: notification).sink { [weak self] _ in
+                Task { @MainActor [weak self] in await self?.recordPowerEvent(event) }
+            }.store(in: &subscriptions)
+        }
+        // Regular apps (the Task Manager marks them) change only when an app launches or quits; asking the
+        // workspace for every running application on each sample was a large share of a process refresh.
+        for notification in [NSWorkspace.didLaunchApplicationNotification, NSWorkspace.didTerminateApplicationNotification] {
+            NSWorkspace.shared.notificationCenter.publisher(for: notification).receive(on: RunLoop.main).sink { [weak self] _ in
+                MainActor.assumeIsolated { self?.updateAppPIDs() }
+            }.store(in: &subscriptions)
+        }
+        updateAppPIDs()
+        // A booted simulator ignores the quit request and makes macOS wait for its service timeout; shut them
+        // down first.
+        NSWorkspace.shared.notificationCenter.publisher(for: NSWorkspace.willPowerOffNotification).sink { _ in
+            if SimulatorShutdown.isEnabled() { SimulatorShutdown.shutdownAll() }
+        }.store(in: &subscriptions)
+        pollingTask = Task { [weak self] in
+            while !Task.isCancelled {
+                guard let seconds = await self?.monitoringTick() else { return }
+                do { try await Task.sleep(for: .seconds(seconds)) }
+                catch { return }
+            }
+        }
+    }
+
+    deinit { pollingTask?.cancel() }
+
+    private func updateAppPIDs() {
+        let pids = Set(NSWorkspace.shared.runningApplications.filter { $0.activationPolicy == .regular }.map(\.processIdentifier))
+        if pids != appPIDs { appPIDs = pids }
+    }
+
+    static let sampleCapacity = 150
+
+    var cpuLabel: String { system?.cpuTotalPercent.map { pocketPercent($0) } ?? "—" }
+
+    var processSamplingWanted: Bool {
+        (mainWindowVisible && navigation.tool == .taskManager) || menuBarProcessesWanted
+    }
+
+    func setMainWindowVisible(_ visible: Bool) {
+        guard mainWindowVisible != visible else { return }
+        let wasWanted = processSamplingWanted
+        mainWindowVisible = visible
+        if visible && !wasWanted && processSamplingWanted && !paused {
+            if refreshing { pendingAutomaticProcessRefresh = true }
+            else {
+                Task { [weak self] in
+                    guard let self, self.processSamplingWanted, !self.paused else { return }
+                    await self.refresh()
+                }
+            }
+        }
+    }
+
+    private func monitoringTick() async -> Double {
+        let days = PowerHistoryRetention.days(from: .standard)
+        if days != historyDays {
+            // History length changed in Settings: reopen the log with the new bound.
+            historyDays = days
+            historyStore = PowerHistoryStore(maximumEntries: PowerHistoryRetention.maximumEntries(days: days))
+            historyLoaded = false
+        }
+        if !historyLoaded {
+            do { powerHistory = try await historyStore.entries(); historyLoaded = true }
+            catch { powerHistoryError = error.localizedDescription; historyLoaded = true }
+        }
+        // Observation notifies readers on every write, even with an equal value; write only changes.
+        let awakeGeneration = awakeOperationGeneration
+        let session = await sleepController.status()
+        if awakeGeneration == awakeOperationGeneration, session != awakeSession { awakeSession = session }
+        if awakeAutomationInstance != nil || UserDefaults.standard.data(forKey: AwakeAutomationSettings.key) != nil {
+            await awakeAutomation.refreshPreferencesAndReconcile()
+        }
+        await sleepDisplayIfIdle()
+        SystemDataAutomationService.shared.tick()
+        SystemDataMenuBarController.shared.refresh()
+        if !paused {
+            await refresh()
+        }
+        return refreshSeconds
+    }
+
+    /// Turns only the display off (the keep-awake assertion keeps the Mac running); keyboard or mouse input
+    /// wakes it.
+    private func sleepDisplayIfIdle() async {
+        let settings = IdleDisplayOffSettings.load(from: .standard)
+        guard settings.enabled else { idleDisplayPolicy = .init(); return }
+        let idle = CGEventSource.secondsSinceLastEventType(.combinedSessionState, eventType: CGEventType(rawValue: ~0)!)
+        guard idleDisplayPolicy.shouldSleepDisplay(settings, idleSeconds: idle, session: awakeSession) else { return }
+        do {
+            let result = try await BoundedProcess.run("/usr/bin/pmset", ["displaysleepnow"], timeout: 5)
+            if result.status != 0 { awakeError = String(localized: "Ekran kapatılamadı.") }
+        } catch { awakeError = error.localizedDescription }
+    }
+
+    func refresh(includeProcesses: Bool? = nil) async {
+        guard !refreshing else {
+            if includeProcesses == nil && processSamplingWanted { pendingAutomaticProcessRefresh = true }
+            return
+        }
+        refreshing = true
+        defer {
+            refreshing = false
+            let retry = pendingAutomaticProcessRefresh
+            pendingAutomaticProcessRefresh = false
+            if retry {
+                Task { [weak self] in
+                    guard let self, self.processSamplingWanted, !self.paused else { return }
+                    await self.refresh()
+                }
+            }
+        }
+        do {
+            let system = if let readSystemSnapshot { try await readSystemSnapshot() } else { try await systemMonitor.snapshot() }
+            self.system = system
+            // Resolve automatic demand after the await: the window may have become hidden meanwhile.
+            if includeProcesses ?? processSamplingWanted {
+                // All requests received so far are fulfilled by this read. A request arriving
+                // after it starts remains pending, including a restore during history I/O.
+                pendingAutomaticProcessRefresh = false
+                let snapshot = if let readProcessSnapshot { try await readProcessSnapshot() } else { try await processMonitor.snapshot() }
+                processes = snapshot.processes
+                if unreadableCount != snapshot.unreadableProcessCount { unreadableCount = snapshot.unreadableProcessCount }
+            }
+            lastUpdate = system.capturedAt
+            alerts.evaluate(system)
+            do {
+                if let entries = try await historyStore.record(system) { powerHistory = entries }
+                if powerHistoryError != nil { powerHistoryError = nil }
+            } catch { powerHistoryError = error.localizedDescription }
+            if let user = system.cpuUserPercent, let kernel = system.cpuSystemPercent {
+                let memory = system.usedMemoryBytes.map { Double($0) / Double(max(1, system.physicalMemoryBytes)) }
+                var updated = samples
+                updated.append(PocketSample(date: system.capturedAt, cpuUser: user, cpuSystem: kernel, memoryUsedFraction: memory))
+                if updated.count > Self.sampleCapacity { updated.removeFirst(updated.count - Self.sampleCapacity) }
+                samples = updated
+            }
+            if error != nil { error = nil }
+        } catch { self.error = error.localizedDescription }
+    }
+
+    /// Deletes the stored power history (Settings → Advanced).
+    func clearPowerHistory() async {
+        do {
+            try await historyStore.clear()
+            powerHistory = []
+            powerHistoryError = nil
+        } catch { powerHistoryError = error.localizedDescription }
+    }
+
+    /// `event` is stored as-is ("Uyku"/"Uyanma" are persisted identifiers, localized when shown).
+    private func recordPowerEvent(_ event: String) async {
+        do {
+            let snapshot = try await systemMonitor.snapshot()
+            if let entries = try await historyStore.record(snapshot, event: event) { powerHistory = entries }
+        } catch { powerHistoryError = error.localizedDescription }
+    }
+
+    static let awakeDisplayKey = "MacPocket.power.awakeDisplay"
+    /// Users expect "keep awake" to keep the screen on, so the display is held unless they opt out.
+    static let awakeDisplayDefault = true
+
+    /// `duration` nil keeps the Mac awake until stopped; `display` nil follows the saved preference.
+    @discardableResult func startAwake(duration: Double? = 1800, display: Bool? = nil) async -> AwakeSession? {
+        if let duration, (!duration.isFinite || duration <= 0 || duration > SleepController.maximumDurationSeconds) {
+            awakeError = SleepControllerError.invalidDuration.localizedDescription
+            return nil
+        }
+        awakeOperationGeneration += 1
+        let generation = awakeOperationGeneration
+        awakeAutomation.pauseForManualControl()
+        let keepDisplayAwake = display
+            ?? (UserDefaults.standard.object(forKey: Self.awakeDisplayKey) as? Bool ?? Self.awakeDisplayDefault)
+        do {
+            let created = try await sleepController.start(durationSeconds: duration, keepDisplayAwake: keepDisplayAwake)
+            if generation == awakeOperationGeneration { awakeSession = created; awakeError = nil }
+            return created
+        } catch {
+            let current = await sleepController.status()
+            if generation == awakeOperationGeneration { awakeError = error.localizedDescription; awakeSession = current }
+            return nil
+        }
+    }
+
+    func stopAwake() async {
+        awakeOperationGeneration += 1
+        let generation = awakeOperationGeneration
+        awakeAutomation.pauseForManualControl()
+        do {
+            try await sleepController.stop()
+            let current = await sleepController.status()
+            if generation == awakeOperationGeneration { awakeSession = current; awakeError = nil }
+        } catch { if generation == awakeOperationGeneration { awakeError = error.localizedDescription } }
+    }
+
+    /// Focus owns its original session only; a later manual or automatic replacement is independent.
+    func stopAwake(sessionID: UUID) async {
+        let generation = awakeOperationGeneration
+        do {
+            _ = try await sleepController.stop(sessionID: sessionID)
+            let current = await sleepController.status()
+            if generation == awakeOperationGeneration { awakeSession = current }
+        } catch { if generation == awakeOperationGeneration { awakeError = error.localizedDescription } }
+    }
+
+    func terminate(_ entry: ProcessEntry, force: Bool) async {
+        guard terminatingPID == nil else { return }
+        terminatingPID = entry.pid
+        defer { terminatingPID = nil }
+        do {
+            try await processMonitor.terminate(entry: entry, force: force)
+            signalStatus = String(localized: "PID \(entry.pid): istek gönderildi; çıkış bekleniyor.")
+            for _ in 0..<8 {
+                try await Task.sleep(for: .milliseconds(250))
+                await refresh()
+                if !processes.contains(where: { $0.identity == entry.identity }) {
+                    signalStatus = String(localized: "\(entry.name) · PID \(entry.pid) sonlandı.")
+                    return
+                }
+            }
+            signalStatus = String(localized: "PID \(entry.pid) hâlâ çalışıyor. Listeyi yeniden kontrol et.")
+        } catch { signalStatus = error.localizedDescription }
+    }
+}
+
+/// Chart-only ring buffer: ResourceStrip and the menu bar read the same live samples as the main window.
+struct PocketSample: Identifiable, Sendable {
+    let date: Date
+    let cpuUser: Double
+    let cpuSystem: Double
+    let memoryUsedFraction: Double?
+    var id: Date { date }
+    var cpuTotal: Double { min(100, cpuUser + cpuSystem) }
+}
+
+struct ResourceStrip: View {
+    var model: PocketModel
+    var body: some View {
+        let system = model.system
+        let volume = system?.volumes.first
+        let usedMemory = system?.usedMemoryBytes
+        ViewThatFits(in: .horizontal) {
+            HStack(spacing: PocketSpacing.m) { tiles(system, volume, usedMemory) }
+            Grid(horizontalSpacing: PocketSpacing.m, verticalSpacing: PocketSpacing.m) {
+                let views = Array(0..<4)
+                GridRow { tile(views[0], system, volume, usedMemory); tile(views[1], system, volume, usedMemory) }
+                GridRow { tile(views[2], system, volume, usedMemory); tile(views[3], system, volume, usedMemory) }
+            }
+        }
+    }
+
+    @ViewBuilder private func tiles(_ system: SystemSnapshot?, _ volume: VolumeSnapshot?, _ usedMemory: UInt64?) -> some View {
+        ForEach(0..<4, id: \.self) { tile($0, system, volume, usedMemory) }
+    }
+
+    @ViewBuilder private func tile(_ index: Int, _ system: SystemSnapshot?, _ volume: VolumeSnapshot?, _ usedMemory: UInt64?) -> some View {
+        switch index {
+        case 0:
+            PocketMetricTile(title: "CPU", value: "\(system?.cpuTotalPercent.map { pocketPercent($0, decimals: true) } ?? "—")",
+                             detail: system.map { "\($0.logicalCPUCount) mantıksal çekirdek" } ?? "Örnek bekleniyor",
+                             icon: "cpu", color: PocketTheme.accent, history: model.samples.map(\.cpuTotal))
+        case 1:
+            PocketMetricTile(title: "Bellek", value: "\(usedMemory.map(pocketBytes) ?? "—")",
+                             detail: system.map { "\(pocketBytes($0.physicalMemoryBytes)) fiziksel · Sıkıştırılmış \(pocketBytes($0.compressedMemoryBytes))" } ?? "Örnek bekleniyor",
+                             icon: "memorychip", color: PocketTheme.memory,
+                             history: model.samples.compactMap(\.memoryUsedFraction).map { $0 * 100 })
+        case 2:
+            PocketMetricTile(title: "Disk · Boş", value: "\(volume.map { pocketDiskBytes($0.availableBytes) } ?? "—")",
+                             detail: volume.map { "\($0.name) · \(pocketDiskBytes($0.totalBytes)) toplam" } ?? "—",
+                             icon: "internaldrive", color: PocketTheme.disk)
+        default:
+            PocketMetricTile(title: "Termal durum", value: "\(pocketThermalTitle(system?.thermalState))",
+                             detail: "Güç: \(pocketPowerSourceTitle(system?.power.source))",
+                             icon: "thermometer.medium", color: pocketThermalTone(system?.thermalState).color)
+        }
+    }
+}

@@ -1,0 +1,1441 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>%lld bağlantı</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key>
+		<string>%#@count@</string>
+		<key>count</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key>
+			<string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key>
+			<string>lld</string>
+			<key>one</key>
+			<string>%lld connection</string>
+			<key>other</key>
+			<string>%lld connections</string>
+		</dict>
+	</dict>
+	<key>%lld açık dosya</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key>
+		<string>%#@count@</string>
+		<key>count</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key>
+			<string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key>
+			<string>lld</string>
+			<key>one</key>
+			<string>%lld open file</string>
+			<key>other</key>
+			<string>%lld open files</string>
+		</dict>
+	</dict>
+	<key>%lld Homebrew güncellemesi</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key>
+		<string>%#@count@</string>
+		<key>count</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key>
+			<string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key>
+			<string>lld</string>
+			<key>one</key>
+			<string>%lld Homebrew update</string>
+			<key>other</key>
+			<string>%lld Homebrew updates</string>
+		</dict>
+	</dict>
+	<key>%lld aday</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key>
+		<string>%#@count@</string>
+		<key>count</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key>
+			<string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key>
+			<string>lld</string>
+			<key>one</key>
+			<string>%lld candidate</string>
+			<key>other</key>
+			<string>%lld candidates</string>
+		</dict>
+	</dict>
+	<key>%lld aday bulundu.</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key>
+		<string>%#@count@</string>
+		<key>count</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key>
+			<string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key>
+			<string>lld</string>
+			<key>one</key>
+			<string>Found %lld candidate.</string>
+			<key>other</key>
+			<string>Found %lld candidates.</string>
+		</dict>
+	</dict>
+	<key>%lld analiz</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key>
+		<string>%#@count@</string>
+		<key>count</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key>
+			<string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key>
+			<string>lld</string>
+			<key>one</key>
+			<string>%lld analyzed</string>
+			<key>other</key>
+			<string>%lld analyzed</string>
+		</dict>
+	</dict>
+	<key>%lld araç</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key>
+		<string>%#@count@</string>
+		<key>count</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key>
+			<string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key>
+			<string>lld</string>
+			<key>one</key>
+			<string>%lld tool</string>
+			<key>other</key>
+			<string>%lld tools</string>
+		</dict>
+	</dict>
+	<key>%lld arka plan uyanması</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key>
+		<string>%#@count@</string>
+		<key>count</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key>
+			<string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key>
+			<string>lld</string>
+			<key>one</key>
+			<string>%lld dark wake</string>
+			<key>other</key>
+			<string>%lld dark wakes</string>
+		</dict>
+	</dict>
+	<key>%lld ayar kaydedildi.</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key>
+		<string>%#@count@</string>
+		<key>count</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key>
+			<string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key>
+			<string>lld</string>
+			<key>one</key>
+			<string>%lld setting saved.</string>
+			<key>other</key>
+			<string>%lld settings saved.</string>
+		</dict>
+	</dict>
+	<key>%lld dakika odaklandın. Kısa bir mola iyi gelir.</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key>
+		<string>%#@count@</string>
+		<key>count</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key>
+			<string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key>
+			<string>lld</string>
+			<key>one</key>
+			<string>You focused for %lld minute. A short break helps.</string>
+			<key>other</key>
+			<string>You focused for %lld minutes. A short break helps.</string>
+		</dict>
+	</dict>
+	<key>%lld değişiklik bekliyor</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key>
+		<string>%#@count@</string>
+		<key>count</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key>
+			<string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key>
+			<string>lld</string>
+			<key>one</key>
+			<string>%lld change pending</string>
+			<key>other</key>
+			<string>%lld changes pending</string>
+		</dict>
+	</dict>
+	<key>%lld disk çıkarıldı.</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key>
+		<string>%#@count@</string>
+		<key>count</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key>
+			<string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key>
+			<string>lld</string>
+			<key>one</key>
+			<string>%lld disk ejected.</string>
+			<key>other</key>
+			<string>%lld disks ejected.</string>
+		</dict>
+	</dict>
+	<key>%lld disk çıkarıldı; kullanımda olduğu için çıkarılamayan: %@.</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key>
+		<string>%#@count@</string>
+		<key>count</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key>
+			<string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key>
+			<string>lld</string>
+			<key>one</key>
+			<string>%lld disk ejected; couldn’t eject because in use: %@.</string>
+			<key>other</key>
+			<string>%lld disks ejected; couldn’t eject because in use: %@.</string>
+		</dict>
+	</dict>
+	<key>%lld dosya</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key>
+		<string>%#@count@</string>
+		<key>count</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key>
+			<string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key>
+			<string>lld</string>
+			<key>one</key>
+			<string>%lld file</string>
+			<key>other</key>
+			<string>%lld files</string>
+		</dict>
+	</dict>
+	<key>%lld dosya .app veya .photoslibrary gibi paketlerin içinde; toplamlara dahil ama tek tek listelenmez. Paketleri “Klasörler” görünümünde tek öğe olarak bulabilirsin.</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key>
+		<string>%#@count@</string>
+		<key>count</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key>
+			<string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key>
+			<string>lld</string>
+			<key>one</key>
+			<string>%lld file is inside a package such as .app or .photoslibrary. It counts toward the totals but isn’t listed individually. Find packages as single items in the “Folders” view.</string>
+			<key>other</key>
+			<string>%lld files are inside packages such as .app or .photoslibrary. They count toward the totals but aren’t listed individually. Find packages as single items in the “Folders” view.</string>
+		</dict>
+	</dict>
+	<key>%lld grup</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key>
+		<string>%#@count@</string>
+		<key>count</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key>
+			<string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key>
+			<string>lld</string>
+			<key>one</key>
+			<string>%lld group</string>
+			<key>other</key>
+			<string>%lld groups</string>
+		</dict>
+	</dict>
+	<key>%lld gün</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key>
+		<string>%#@count@</string>
+		<key>count</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key>
+			<string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key>
+			<string>lld</string>
+			<key>one</key>
+			<string>%lld day</string>
+			<key>other</key>
+			<string>%lld days</string>
+		</dict>
+	</dict>
+	<key>%lld güncelleme</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key>
+		<string>%#@count@</string>
+		<key>count</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key>
+			<string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key>
+			<string>lld</string>
+			<key>one</key>
+			<string>%lld update</string>
+			<key>other</key>
+			<string>%lld updates</string>
+		</dict>
+	</dict>
+	<key>%lld güncelleme hazır</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key>
+		<string>%#@count@</string>
+		<key>count</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key>
+			<string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key>
+			<string>lld</string>
+			<key>one</key>
+			<string>%lld update ready</string>
+			<key>other</key>
+			<string>%lld updates ready</string>
+		</dict>
+	</dict>
+	<key>%lld günden uzun süredir dokunulmamış indirilen öğeler. Seçmeden önce incele.</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key>
+		<string>%#@count@</string>
+		<key>count</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key>
+			<string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key>
+			<string>lld</string>
+			<key>one</key>
+			<string>Downloads untouched for more than %lld day. Review before selecting.</string>
+			<key>other</key>
+			<string>Downloads untouched for more than %lld days. Review before selecting.</string>
+		</dict>
+	</dict>
+	<key>%lld kez çalıştır</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key>
+		<string>%#@count@</string>
+		<key>count</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key>
+			<string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key>
+			<string>lld</string>
+			<key>one</key>
+			<string>Run %lld time</string>
+			<key>other</key>
+			<string>Run %lld times</string>
+		</dict>
+	</dict>
+	<key>%lld kurulu uygulama</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key>
+		<string>%#@count@</string>
+		<key>count</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key>
+			<string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key>
+			<string>lld</string>
+			<key>one</key>
+			<string>%lld installed app</string>
+			<key>other</key>
+			<string>%lld installed apps</string>
+		</dict>
+	</dict>
+	<key>%lld küçük öğe</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key>
+		<string>%#@count@</string>
+		<key>count</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key>
+			<string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key>
+			<string>lld</string>
+			<key>one</key>
+			<string>%lld small item</string>
+			<key>other</key>
+			<string>%lld small items</string>
+		</dict>
+	</dict>
+	<key>%lld makro dışa aktarıldı.</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key>
+		<string>%#@count@</string>
+		<key>count</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key>
+			<string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key>
+			<string>lld</string>
+			<key>one</key>
+			<string>%lld macro exported.</string>
+			<key>other</key>
+			<string>%lld macros exported.</string>
+		</dict>
+	</dict>
+	<key>%lld makro içe aktarıldı. Kısayolları kontrol et.</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key>
+		<string>%#@count@</string>
+		<key>count</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key>
+			<string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key>
+			<string>lld</string>
+			<key>one</key>
+			<string>%lld macro imported. Check its shortcut.</string>
+			<key>other</key>
+			<string>%lld macros imported. Check their shortcuts.</string>
+		</dict>
+	</dict>
+	<key>%lld mantıksal çekirdek</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key>
+		<string>%#@count@</string>
+		<key>count</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key>
+			<string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key>
+			<string>lld</string>
+			<key>one</key>
+			<string>%lld logical core</string>
+			<key>other</key>
+			<string>%lld logical cores</string>
+		</dict>
+	</dict>
+	<key>%lld süreç ağdan gelen bağlantılara açık; diğerleri yalnız bu Mac’ten erişilebilir.</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key>
+		<string>%#@count@</string>
+		<key>count</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key>
+			<string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key>
+			<string>lld</string>
+			<key>one</key>
+			<string>%lld process accepts connections from the network; the rest are reachable only from this Mac.</string>
+			<key>other</key>
+			<string>%lld processes accept connections from the network; the rest are reachable only from this Mac.</string>
+		</dict>
+	</dict>
+	<key>%lld tekil dosya</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key>
+		<string>%#@count@</string>
+		<key>count</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key>
+			<string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key>
+			<string>lld</string>
+			<key>one</key>
+			<string>%lld unique file</string>
+			<key>other</key>
+			<string>%lld unique files</string>
+		</dict>
+	</dict>
+	<key>%lld uyanma</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key>
+		<string>%#@count@</string>
+		<key>count</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key>
+			<string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key>
+			<string>lld</string>
+			<key>one</key>
+			<string>%lld wake</string>
+			<key>other</key>
+			<string>%lld wakes</string>
+		</dict>
+	</dict>
+	<key>%lld uygulama</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key>
+		<string>%#@count@</string>
+		<key>count</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key>
+			<string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key>
+			<string>lld</string>
+			<key>one</key>
+			<string>%lld app</string>
+			<key>other</key>
+			<string>%lld apps</string>
+		</dict>
+	</dict>
+	<key>%lld uyku engeli</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key>
+		<string>%#@count@</string>
+		<key>count</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key>
+			<string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key>
+			<string>lld</string>
+			<key>one</key>
+			<string>%lld sleep blocker</string>
+			<key>other</key>
+			<string>%lld sleep blockers</string>
+		</dict>
+	</dict>
+	<key>%lld yinelenen grup bulundu.</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key>
+		<string>%#@count@</string>
+		<key>count</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key>
+			<string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key>
+			<string>lld</string>
+			<key>one</key>
+			<string>Found %lld duplicate group.</string>
+			<key>other</key>
+			<string>Found %lld duplicate groups.</string>
+		</dict>
+	</dict>
+	<key>%lld çekirdek</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key>
+		<string>%#@count@</string>
+		<key>count</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key>
+			<string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key>
+			<string>lld</string>
+			<key>one</key>
+			<string>%lld core</string>
+			<key>other</key>
+			<string>%lld cores</string>
+		</dict>
+	</dict>
+	<key>%lld öğe</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key>
+		<string>%#@count@</string>
+		<key>count</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key>
+			<string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key>
+			<string>lld</string>
+			<key>one</key>
+			<string>%lld item</string>
+			<key>other</key>
+			<string>%lld items</string>
+		</dict>
+	</dict>
+	<key>Pano geçmişinde %lld öğe</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key>
+		<string>%#@count@</string>
+		<key>count</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key>
+			<string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key>
+			<string>lld</string>
+			<key>one</key>
+			<string>%lld item in clipboard history</string>
+			<key>other</key>
+			<string>%lld items in clipboard history</string>
+		</dict>
+	</dict>
+	<key>%lld favori</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key>
+		<string>%#@count@</string>
+		<key>count</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key>
+			<string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key>
+			<string>lld</string>
+			<key>one</key>
+			<string>%lld favorite</string>
+			<key>other</key>
+			<string>%lld favorites</string>
+		</dict>
+	</dict>
+	<key>%lld konu dikkat istiyor.</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key>
+		<string>%#@count@</string>
+		<key>count</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key>
+			<string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key>
+			<string>lld</string>
+			<key>one</key>
+			<string>%lld issue needs attention.</string>
+			<key>other</key>
+			<string>%lld issues need attention.</string>
+		</dict>
+	</dict>
+	<key>Son haftanın hızıyla yaklaşık %lld gün içinde dolacak.</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key>
+		<string>%#@count@</string>
+		<key>count</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key>
+			<string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key>
+			<string>lld</string>
+			<key>one</key>
+			<string>At last week’s pace it fills in about %lld day.</string>
+			<key>other</key>
+			<string>At last week’s pace it fills in about %lld days.</string>
+		</dict>
+	</dict>
+	<key>Bu hızla yaklaşık %lld gün içinde dolar.</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key>
+		<string>%#@count@</string>
+		<key>count</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key>
+			<string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key>
+			<string>lld</string>
+			<key>one</key>
+			<string>At this pace it fills in about %lld day.</string>
+			<key>other</key>
+			<string>At this pace it fills in about %lld days.</string>
+		</dict>
+	</dict>
+	<key>%lld öğe seçili</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key>
+		<string>%#@count@</string>
+		<key>count</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key>
+			<string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key>
+			<string>lld</string>
+			<key>one</key>
+			<string>%lld item selected</string>
+			<key>other</key>
+			<string>%lld items selected</string>
+		</dict>
+	</dict>
+	<key>%lld öğe Çöp’e taşındı.</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key>
+		<string>%#@count@</string>
+		<key>count</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key>
+			<string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key>
+			<string>lld</string>
+			<key>one</key>
+			<string>%lld item moved to the Trash.</string>
+			<key>other</key>
+			<string>%lld items moved to the Trash.</string>
+		</dict>
+	</dict>
+	<key>%lld öğe Çöp’e taşındı. Toplamlar bir sonraki taramada güncellenir.</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key>
+		<string>%#@count@</string>
+		<key>count</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key>
+			<string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key>
+			<string>lld</string>
+			<key>one</key>
+			<string>Moved %lld item to the Trash. Totals update on the next scan.</string>
+			<key>other</key>
+			<string>Moved %lld items to the Trash. Totals update on the next scan.</string>
+		</dict>
+	</dict>
+	<key>%lld öğe Çöp’e taşınıyor…</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key>
+		<string>%#@count@</string>
+		<key>count</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key>
+			<string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key>
+			<string>lld</string>
+			<key>one</key>
+			<string>Moving %lld item to the Trash…</string>
+			<key>other</key>
+			<string>Moving %lld items to the Trash…</string>
+		</dict>
+	</dict>
+	<key>%lld öğenin uygulaması açık veya incelenmesi gerekiyor.</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key>
+		<string>%#@count@</string>
+		<key>count</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key>
+			<string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key>
+			<string>lld</string>
+			<key>one</key>
+			<string>%lld item belongs to an open app or needs review.</string>
+			<key>other</key>
+			<string>%lld items belong to an open app or need review.</string>
+		</dict>
+	</dict>
+	<key>%lld öğeye erişilemedi (izin gerekebilir).</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key>
+		<string>%#@count@</string>
+		<key>count</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key>
+			<string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key>
+			<string>lld</string>
+			<key>one</key>
+			<string>Couldn’t access %lld item (permission may be required).</string>
+			<key>other</key>
+			<string>Couldn’t access %lld items (permission may be required).</string>
+		</dict>
+	</dict>
+	<key>%lld öğeye erişilemedi.</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key>
+		<string>%#@count@</string>
+		<key>count</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key>
+			<string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key>
+			<string>lld</string>
+			<key>one</key>
+			<string>Couldn’t access %lld item.</string>
+			<key>other</key>
+			<string>Couldn’t access %lld items.</string>
+		</dict>
+	</dict>
+	<key>%lld öğeye erişilemedi; boyut eksik olabilir.</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key>
+		<string>%#@count@</string>
+		<key>count</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key>
+			<string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key>
+			<string>lld</string>
+			<key>one</key>
+			<string>Couldn’t access %lld item; the size may be incomplete.</string>
+			<key>other</key>
+			<string>Couldn’t access %lld items; the size may be incomplete.</string>
+		</dict>
+	</dict>
+	<key>24 saatte %lld uyku</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key>
+		<string>%#@count@</string>
+		<key>count</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key>
+			<string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key>
+			<string>lld</string>
+			<key>one</key>
+			<string>%lld sleep in 24 hours</string>
+			<key>other</key>
+			<string>%lld sleeps in 24 hours</string>
+		</dict>
+	</dict>
+	<key>Açık kalma süresi: %lld saat</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key>
+		<string>%#@count@</string>
+		<key>count</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key>
+			<string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key>
+			<string>lld</string>
+			<key>one</key>
+			<string>Uptime: %lld hour</string>
+			<key>other</key>
+			<string>Uptime: %lld hours</string>
+		</dict>
+	</dict>
+	<key>Bu oturumda %lld kez genişletildi.</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key>
+		<string>%#@count@</string>
+		<key>count</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key>
+			<string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key>
+			<string>lld</string>
+			<key>one</key>
+			<string>Expanded %lld time this session.</string>
+			<key>other</key>
+			<string>Expanded %lld times this session.</string>
+		</dict>
+	</dict>
+	<key>En büyük %lld dosya listeleniyor.</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key>
+		<string>%#@count@</string>
+		<key>count</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key>
+			<string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key>
+			<string>lld</string>
+			<key>one</key>
+			<string>Showing the largest %lld file.</string>
+			<key>other</key>
+			<string>Showing the largest %lld files.</string>
+		</dict>
+	</dict>
+	<key>Oturum %lld dakikada bitirildi.</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key>
+		<string>%#@count@</string>
+		<key>count</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key>
+			<string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key>
+			<string>lld</string>
+			<key>one</key>
+			<string>Session ended after %lld minute.</string>
+			<key>other</key>
+			<string>Session ended after %lld minutes.</string>
+		</dict>
+	</dict>
+	<key>Son %lld ölçüm:</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key>
+		<string>%#@count@</string>
+		<key>count</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key>
+			<string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key>
+			<string>lld</string>
+			<key>one</key>
+			<string>Last %lld sample:</string>
+			<key>other</key>
+			<string>Last %lld samples:</string>
+		</dict>
+	</dict>
+	<key>Çentik başına %lld satır</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key>
+		<string>%#@count@</string>
+		<key>count</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key>
+			<string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key>
+			<string>lld</string>
+			<key>one</key>
+			<string>%lld line per notch</string>
+			<key>other</key>
+			<string>%lld lines per notch</string>
+		</dict>
+	</dict>
+	<key>İşlemci kullanımı %lld dakikadır %@ üzerinde. Görev Yöneticisi’nden en çok tüketen süreçlere bakabilirsin.</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key>
+		<string>%#@count@</string>
+		<key>count</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key>
+			<string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key>
+			<string>lld</string>
+			<key>one</key>
+			<string>For %lld minute, CPU use has stayed above %@. Task Manager shows the processes using the most.</string>
+			<key>other</key>
+			<string>For %lld minutes, CPU use has stayed above %@. Task Manager shows the processes using the most.</string>
+		</dict>
+	</dict>
+	<key>%lld sensör</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key>
+		<string>%#@count@</string>
+		<key>count</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key>
+			<string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key>
+			<string>lld</string>
+			<key>one</key>
+			<string>%lld sensor</string>
+			<key>other</key>
+			<string>%lld sensors</string>
+		</dict>
+	</dict>
+	<key>%lld sensör; en yüksek ve ortalama</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key>
+		<string>%#@count@</string>
+		<key>count</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key>
+			<string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key>
+			<string>lld</string>
+			<key>one</key>
+			<string>%lld sensor; maximum and average</string>
+			<key>other</key>
+			<string>%lld sensors; maximum and average</string>
+		</dict>
+	</dict>
+	<key>%lld sonuç</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key>
+		<string>%#@count@</string>
+		<key>count</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key>
+			<string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key>
+			<string>lld</string>
+			<key>one</key>
+			<string>%lld result</string>
+			<key>other</key>
+			<string>%lld results</string>
+		</dict>
+	</dict>
+	<key>%lld dakika uyanık tut</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key>
+		<string>%#@count@</string>
+		<key>count</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key>
+			<string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key>
+			<string>lld</string>
+			<key>one</key>
+			<string>Keep awake for %lld minute</string>
+			<key>other</key>
+			<string>Keep awake for %lld minutes</string>
+		</dict>
+	</dict>
+	<key>Mac %lld dakika uyanık tutulacak</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key>
+		<string>%#@count@</string>
+		<key>count</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key>
+			<string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key>
+			<string>lld</string>
+			<key>one</key>
+			<string>Your Mac will stay awake for %lld minute</string>
+			<key>other</key>
+			<string>Your Mac will stay awake for %lld minutes</string>
+		</dict>
+	</dict>
+	<key>%lld karakter</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key>
+		<string>%#@count@</string>
+		<key>count</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key>
+			<string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key>
+			<string>lld</string>
+			<key>one</key>
+			<string>%lld character</string>
+			<key>other</key>
+			<string>%lld characters</string>
+		</dict>
+	</dict>
+	<key>%lld raf öğesi</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key>
+		<string>%#@count@</string>
+		<key>count</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key>
+			<string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key>
+			<string>lld</string>
+			<key>one</key>
+			<string>%lld shelf item</string>
+			<key>other</key>
+			<string>%lld shelf items</string>
+		</dict>
+	</dict>
+	<key>%lld pencere</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key>
+		<string>%#@count@</string>
+		<key>count</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key>
+			<string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key>
+			<string>lld</string>
+			<key>one</key>
+			<string>%lld window</string>
+			<key>other</key>
+			<string>%lld windows</string>
+		</dict>
+	</dict>
+	<key>%lld bölüm · %lld piksel</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key>
+		<string>%#@sections@ · %#@pixels@</string>
+		<key>sections</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key>
+			<string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key>
+			<string>lld</string>
+			<key>one</key>
+			<string>%lld section</string>
+			<key>other</key>
+			<string>%lld sections</string>
+		</dict>
+		<key>pixels</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key>
+			<string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key>
+			<string>lld</string>
+			<key>one</key>
+			<string>%lld pixel</string>
+			<key>other</key>
+			<string>%lld pixels</string>
+		</dict>
+	</dict>
+	<key>%lld öğe kalıcı olarak silindi.</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key>
+		<string>%#@count@</string>
+		<key>count</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key>
+			<string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key>
+			<string>lld</string>
+			<key>one</key>
+			<string>%lld item permanently deleted.</string>
+			<key>other</key>
+			<string>%lld items permanently deleted.</string>
+		</dict>
+	</dict>
+	<key>%lld öğe kalıcı olarak siliniyor…</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key>
+		<string>%#@count@</string>
+		<key>count</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key>
+			<string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key>
+			<string>lld</string>
+			<key>one</key>
+			<string>Permanently deleting %lld item…</string>
+			<key>other</key>
+			<string>Permanently deleting %lld items…</string>
+		</dict>
+	</dict>
+	<key>%lld öğe seçili · %@</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key>
+		<string>%#@count@ · %@</string>
+		<key>count</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key>
+			<string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key>
+			<string>lld</string>
+			<key>one</key>
+			<string>%lld item selected</string>
+			<key>other</key>
+			<string>%lld items selected</string>
+		</dict>
+	</dict>
+	<key>%lld seçili öğe filtre yüzünden görünmüyor</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key>
+		<string>%#@count@</string>
+		<key>count</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key>
+			<string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key>
+			<string>lld</string>
+			<key>one</key>
+			<string>%lld selected item is hidden by the filter</string>
+			<key>other</key>
+			<string>%lld selected items are hidden by the filter</string>
+		</dict>
+	</dict>
+	<key>%lld gizli kalemi geri getir</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key>
+		<string>%#@count@</string>
+		<key>count</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key>
+			<string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key>
+			<string>lld</string>
+			<key>one</key>
+			<string>Bring back %lld hidden item</string>
+			<key>other</key>
+			<string>Bring back %lld hidden items</string>
+		</dict>
+	</dict>
+	<key>%lld öğe Çöp’e taşındı (%@); alan Çöp boşaltılınca geri gelir.</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key>
+		<string>%#@count@ (%@); the space returns when you empty it.</string>
+		<key>count</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key>
+			<string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key>
+			<string>lld</string>
+			<key>one</key>
+			<string>%lld item moved to the Trash</string>
+			<key>other</key>
+			<string>%lld items moved to the Trash</string>
+		</dict>
+	</dict>
+	<key>%lld öğe kaldırıldı; %@ boşaldı.</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key>
+		<string>%#@count@; %@ freed.</string>
+		<key>count</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key>
+			<string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key>
+			<string>lld</string>
+			<key>one</key>
+			<string>%lld item removed</string>
+			<key>other</key>
+			<string>%lld items removed</string>
+		</dict>
+	</dict>
+	<key>%lld öğe kaldırılamadı. İlki: %@: %@</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key>
+		<string>%#@count@ First: %@: %@</string>
+		<key>count</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key>
+			<string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key>
+			<string>lld</string>
+			<key>one</key>
+			<string>%lld item could not be removed.</string>
+			<key>other</key>
+			<string>%lld items could not be removed.</string>
+		</dict>
+	</dict>
+	<key>%lld güvenli öğe kaldırıldı; %@ boşaldı.</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key>
+		<string>%#@count@; %@ freed.</string>
+		<key>count</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key>
+			<string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key>
+			<string>lld</string>
+			<key>one</key>
+			<string>%lld safe item removed</string>
+			<key>other</key>
+			<string>%lld safe items removed</string>
+		</dict>
+	</dict>
+	<key>%lld işlem yönetici parolası ister; mümkün olan her şey tek istemde toplanır.</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key>
+		<string>%#@count@</string>
+		<key>count</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key>
+			<string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key>
+			<string>lld</string>
+			<key>one</key>
+			<string>%lld operation needs the administrator password; everything possible is folded into one prompt.</string>
+			<key>other</key>
+			<string>%lld operations need the administrator password; everything possible is folded into one prompt.</string>
+		</dict>
+	</dict>
+	<key>%lld aygıtın uygulamaları, verileri ve fotoğrafları. Sıfırlamak aygıtı fabrika durumuna getirir.</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key>
+		<string>%#@count@</string>
+		<key>count</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key>
+			<string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key>
+			<string>lld</string>
+			<key>one</key>
+			<string>Apps, data and photos of %lld device. Erasing resets it to factory state.</string>
+			<key>other</key>
+			<string>Apps, data and photos of %lld devices. Erasing resets a device to factory state.</string>
+		</dict>
+	</dict>
+	<key>Bu sürümde %lld simülatör aygıtı var; kaldırırsan aygıtlar da kullanılamaz olur.</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key>
+		<string>%#@count@</string>
+		<key>count</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key>
+			<string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key>
+			<string>lld</string>
+			<key>one</key>
+			<string>This version has %lld simulator device; removing it makes it unusable too.</string>
+			<key>other</key>
+			<string>This version has %lld simulator devices; removing it makes them unusable too.</string>
+		</dict>
+	</dict>
+	<key>Çalışma zamanı kaldırılmış %lld aygıt; hiçbir zaman açılamazlar.</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key>
+		<string>%#@count@</string>
+		<key>count</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key>
+			<string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key>
+			<string>lld</string>
+			<key>one</key>
+			<string>%lld device whose runtime was removed; it can never boot.</string>
+			<key>other</key>
+			<string>%lld devices whose runtime was removed; they can never boot.</string>
+		</dict>
+	</dict>
+	<key>%lld gündür boşta</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key>
+		<string>%#@count@</string>
+		<key>count</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key>
+			<string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key>
+			<string>lld</string>
+			<key>one</key>
+			<string>Idle for %lld day</string>
+			<key>other</key>
+			<string>Idle for %lld days</string>
+		</dict>
+	</dict>
+	<key>%lld gündür dokunulmadı</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key>
+		<string>%#@count@</string>
+		<key>count</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key>
+			<string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key>
+			<string>lld</string>
+			<key>one</key>
+			<string>Untouched for %lld day</string>
+			<key>other</key>
+			<string>Untouched for %lld days</string>
+		</dict>
+	</dict>
+	<key>Kullanıcı geçici klasöründe %lld günden uzun süredir dokunulmamış dosyalar.</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key>
+		<string>%#@count@</string>
+		<key>count</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key>
+			<string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key>
+			<string>lld</string>
+			<key>one</key>
+			<string>Files in the user temporary folder untouched for more than %lld day.</string>
+			<key>other</key>
+			<string>Files in the user temporary folder untouched for more than %lld days.</string>
+		</dict>
+	</dict>
+	<key>%@ içinde %lld günden eski öğeleri sil</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key>
+		<string>Delete items in %@ older than %#@count@</string>
+		<key>count</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key>
+			<string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key>
+			<string>lld</string>
+			<key>one</key>
+			<string>%lld day</string>
+			<key>other</key>
+			<string>%lld days</string>
+		</dict>
+	</dict>
+	<key>%lld klasör arşivlendi; %@ kazanıldı. Gerektiğinde “Arşivler”den geri yükleyebilirsin.</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key>
+		<string>%#@count@; %@ saved. You can restore from “Archives” when needed.</string>
+		<key>count</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key>
+			<string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key>
+			<string>lld</string>
+			<key>one</key>
+			<string>%lld folder archived</string>
+			<key>other</key>
+			<string>%lld folders archived</string>
+		</dict>
+	</dict>
+	<key>%lld güvenli kalem kaldırıldı; %@ boşaldı.</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key>
+		<string>%#@count@; %@ freed.</string>
+		<key>count</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key>
+			<string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key>
+			<string>lld</string>
+			<key>one</key>
+			<string>%lld safe item removed</string>
+			<key>other</key>
+			<string>%lld safe items removed</string>
+		</dict>
+	</dict>
+	<key>%lld öğe sıkıştırıldı; %@ kazanıldı. Hiçbir şey silinmedi, tüm yollar çalışmaya devam ediyor.</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key>
+		<string>%#@count@; %@ saved. Nothing was deleted and every path keeps working.</string>
+		<key>count</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key>
+			<string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key>
+			<string>lld</string>
+			<key>one</key>
+			<string>%lld item compressed</string>
+			<key>other</key>
+			<string>%lld items compressed</string>
+		</dict>
+	</dict>
+	<key>Klasördeki %lld dosya başka dosyalarla aynı alanı paylaşıyor (sabit bağ veya APFS klonu); sıkıştırmak bu paylaşımı bozar. Dokunulmadı.</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key>
+		<string>%#@count@</string>
+		<key>count</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key>
+			<string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key>
+			<string>lld</string>
+			<key>one</key>
+			<string>%lld file in the folder shares its space with other files (hard link or APFS clone); compressing would break that sharing. Left untouched.</string>
+			<key>other</key>
+			<string>%lld files in the folder share their space with other files (hard links or APFS clones); compressing would break that sharing. Left untouched.</string>
+		</dict>
+	</dict>
+	<key>%lld Güvenli kalem; her komut silmeden önce gösterilir ve onayını bekler.</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key>
+		<string>%#@count@; every command is shown before deleting and waits for your confirmation.</string>
+		<key>count</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key>
+			<string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key>
+			<string>lld</string>
+			<key>one</key>
+			<string>%lld Safe item</string>
+			<key>other</key>
+			<string>%lld Safe items</string>
+		</dict>
+	</dict>
+	<key>%lld kalem</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key>
+		<string>%#@count@</string>
+		<key>count</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key>
+			<string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key>
+			<string>lld</string>
+			<key>one</key>
+			<string>%lld item</string>
+			<key>other</key>
+			<string>%lld items</string>
+		</dict>
+	</dict>
+	<key>%lld yer okunamadı (izin yok); bunların boyutu toplamlara dahil değil. Tam Disk Erişimi daha eksiksiz bir tarama sağlar.</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key>
+		<string>%#@count@ (no permission); their size is not in the totals. Full Disk Access gives a more complete scan.</string>
+		<key>count</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key>
+			<string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key>
+			<string>lld</string>
+			<key>one</key>
+			<string>%lld place could not be read</string>
+			<key>other</key>
+			<string>%lld places could not be read</string>
+		</dict>
+	</dict>
+	<key>%lld öğe · toplam %@</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key>
+		<string>%#@count@ · total %@</string>
+		<key>count</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key>
+			<string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key>
+			<string>lld</string>
+			<key>one</key>
+			<string>%lld item</string>
+			<key>other</key>
+			<string>%lld items</string>
+		</dict>
+	</dict>
+</dict>
+</plist>

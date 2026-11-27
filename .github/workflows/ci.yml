@@ -1,0 +1,47 @@
+name: CI
+on:
+  pull_request:
+  push:
+    branches: [main]
+permissions:
+  contents: read
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+# The three parts of `make verify` are independent and compile separately, so they run side by side.
+jobs:
+  app:
+    name: App tests
+    runs-on: xcode-27
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - run: make verify-app
+  packages:
+    name: Package tests
+    runs-on: xcode-27
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - run: make verify-packages
+  localizations:
+    name: Localizations
+    runs-on: xcode-27
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - run: make verify-localizations
+  # One stable check name for branch protection. `always()` matters: without it a failed job would leave this
+  # one skipped, and a skipped required check counts as passing.
+  verify:
+    name: verify
+    needs: [app, packages, localizations]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: All parts passed
+        env:
+          RESULTS: ${{ join(needs.*.result, ' ') }}
+        run: |
+          echo "results: $RESULTS"
+          [[ "$RESULTS" == "success success success" ]]

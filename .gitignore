@@ -1,0 +1,22 @@
+.DS_Store
+.build/
+.env
+.env.*
+!.env.example
+node_modules/
+DerivedData/
+*.xcuserstate
+xcuserdata/
+*.swp
+
+# Apple signing inputs stay local or in CI secrets.
+*.provisionprofile
+*.mobileprovision
+*.p12
+*.p8
+
+# Xcode workspace state created when the package is opened in Xcode
+.swiftpm/
+
+# Website images are copied from docs/assets at build time
+site/assets/

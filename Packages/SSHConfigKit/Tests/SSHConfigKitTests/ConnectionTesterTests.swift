@@ -1,0 +1,118 @@
+import Foundation
+import Synchronization
+import Testing
+@testable import SSHConfigKit
+
+@Suite(.timeLimit(.minutes(1)))
+struct ConnectionTesterTests {
+    static let changedKey = """
+    @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+    @    WARNING: REMOTE HOST IDENTIFICATION HAS CHANGED!     @
+    @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+    Host key verification failed.
+    """
+
+    @Test(arguments: [
+        (Int32(0), "", false, ConnectionStatus.reachable),
+        (255, changedKey, false, .hostKeyChanged),
+        (255, "No ED25519 host key is known for x and you have requested strict checking.\r\nHost key verification failed.\r\n", false, .unknownHostKey),
+        (255, "ssh: Could not resolve hostname nope.invalid: nodename nor servname provided, or not known\r\n", false, .dnsFailure),
+        (255, "ssh: connect to host 127.0.0.1 port 1: Connection refused\r\n", false, .connectionRefused),
+        (255, "ssh: connect to host 10.255.255.1 port 22: Operation timed out\r\n", false, .timeout),
+        (255, "deploy@10.0.0.1: Permission denied (publickey,password).\r\n", false, .authenticationRequired),
+        (255, "Received disconnect from 1.2.3.4 port 22:2: Too many authentication failures\r\n", false, .authenticationRequired),
+        (255, "", true, .timeout),
+        (255, "kex_exchange_identification: read: Connection reset by peer\r\n", false, .other),
+        (1, "PTY allocation request failed\r\nHi user! You've successfully authenticated, but GitHub does not provide shell access.\r\n", false, .reachable),
+        // Server banner prose on stderr must not decide the outcome (ssh failed for another reason).
+        (255, "Permission denied for unauthorized users.\r\nkex_exchange_identification: Connection closed by remote host\r\n", false, .other),
+        (255, "NOTICE: Connection refused by policy for guests\r\nkex_exchange_identification: read: Connection reset by peer\r\n", false, .other),
+        (255, "Permission denied (this is a private system)\r\nConnection closed by 1.2.3.4 port 22\r\n", false, .other),
+        (255, "Warning: Permanently added 'x' (ED25519) to the list of known hosts.\r\nweb@x: Permission denied (publickey,keyboard-interactive).\r\n", false, .authenticationRequired),
+        (255, "Welcome. Permission denied (publickey) is what you get if you are not staff.\r\n", false, .other),
+        // OpenSSH 10.x ProxyJump output.
+        (255, "channel 0: open failed: connect failed: Connection refused\r\nstdio forwarding failed\r\nConnection closed by UNKNOWN port 65535\r\n", false, .connectionRefused),
+        (255, "channel 0: open failed: connect failed: Operation timed out\r\nstdio forwarding failed\r\nConnection closed by UNKNOWN port 65535\r\n", false, .timeout),
+        (255, "channel 0: open failed: connect failed: nodename nor servname provided, or not known\r\nstdio forwarding failed\r\n", false, .dnsFailure),
+        (255, "channel 0: open failed: connect failed: Name or service not known\r\nstdio forwarding failed\r\n", false, .dnsFailure),
+        (255, "ssh_dispatch_run_fatal: Connection to 10.0.0.1 port 22: Operation timed out\r\n", false, .timeout),
+        (255, "kex_exchange_identification: read: Operation timed out\r\n", false, .timeout),
+        (255, "kex_exchange_identification: read: Connection refused\r\n", false, .connectionRefused),
+        (255, "Read from remote host 10.0.0.1: Connection timed out\r\n", false, .timeout),
+        (255, "Connection timed out during banner exchange\r\nConnection to UNKNOWN port 65535 timed out\r\n", false, .timeout),
+        (255, "ssh: Could not resolve hostname jump: Name or service not known\r\n", false, .dnsFailure),
+        (255, "Disconnected from invalid user x 1.2.3.4 port 22: Too many authentication failures\r\n", false, .authenticationRequired),
+        (255, "channel 0: open failed: administratively prohibited: open failed\r\n", false, .other),
+        (255, "web@x: Permission denied, please try again.\r\n", false, .authenticationRequired),
+    ])
+    func classification(exitCode: Int32, stderr: String, timedOut: Bool, expected: ConnectionStatus) {
+        #expect(ConnectionClassifier.classify(exitCode: exitCode, stderr: stderr, timedOut: timedOut) == expected)
+    }
+
+    @Test func firstLineSkipsBannersAndBlankLines() {
+        #expect(ConnectionClassifier.firstLine("\r\n  \nssh: boom\r\nnext") == "ssh: boom")
+        #expect(ConnectionClassifier.firstLine(Self.changedKey) == "@    WARNING: REMOTE HOST IDENTIFICATION HAS CHANGED!     @")
+    }
+
+    @Test func firstLineSkipsWarnings() {
+        #expect(ConnectionClassifier.firstLine("Warning: Permanently added 'x' to the list of known hosts.\r\nweb@x: Permission denied (publickey).\r\n") == "web@x: Permission denied (publickey).")
+    }
+
+    @Test func testBuildsSafeArguments() async throws {
+        let fake = FakeRunner { _ in ProcessResult(exitCode: 0, stdout: "", stderr: "", timedOut: false) }
+        let builder = SSHCommandBuilder(configFile: URL(filePath: "/x/custom"), homeDirectory: URL(filePath: "/h"))
+        let result = await ConnectionTester(commandBuilder: builder, runner: fake).test(alias: "web")
+        #expect(result == ConnectionTestResult(status: .reachable, detail: ""))
+        #expect(try #require(fake.calls.first) == ["-F", "/x/custom", "-T",
+            "-o", "BatchMode=yes", "-o", "ConnectTimeout=5", "-o", "StrictHostKeyChecking=yes",
+            "-o", "ControlPath=none", "--", "web", "exit"])
+    }
+
+    @Test func runnerErrorBecomesOther() async {
+        let failing = FailingRunner()
+        let builder = SSHCommandBuilder(configFile: URL(filePath: "/h/.ssh/config"), homeDirectory: URL(filePath: "/h"))
+        let result = await ConnectionTester(commandBuilder: builder, runner: failing).test(alias: "a")
+        #expect(result.status == .other)
+    }
+
+    @Test func testAllLimitsConcurrencyAndReportsEveryAlias() async {
+        let fake = FakeRunner(delay: .milliseconds(50)) { _ in ProcessResult(exitCode: 0, stdout: "", stderr: "", timedOut: false) }
+        let builder = SSHCommandBuilder(configFile: URL(filePath: "/h/.ssh/config"), homeDirectory: URL(filePath: "/h"))
+        let collected = Collected()
+        let aliases = (1...10).map { "h\($0)" }
+        await ConnectionTester(commandBuilder: builder, runner: fake).testAll(aliases, maxConcurrent: 4) { alias, _ in
+            collected.add(alias)
+        }
+        #expect(fake.maxConcurrent <= 4)
+        #expect(fake.maxConcurrent >= 2)
+        #expect(collected.values.sorted() == aliases.sorted())
+    }
+
+    @Test(.timeLimit(.minutes(1))) func cancelledTestAllReportsNothingAndStopsQueueing() async {
+        let gated = GatedRunner()
+        let builder = SSHCommandBuilder(configFile: URL(filePath: "/h/.ssh/config"), homeDirectory: URL(filePath: "/h"))
+        let collected = Collected()
+        let task = Task {
+            await ConnectionTester(commandBuilder: builder, runner: gated).testAll((1...10).map { "h\($0)" }, maxConcurrent: 4) { alias, _ in
+                collected.add(alias)
+            }
+        }
+        await gated.waitUntilEntered(count: 4)   // the first four are running and pending
+        task.cancel()
+        await task.value
+        #expect(collected.values.isEmpty)
+        #expect(gated.arguments.count <= 4)
+    }
+}
+
+private struct FailingRunner: ProcessRunning {
+    func run(_ executable: URL, arguments: [String], environment: [String: String], timeout: Duration) async throws -> ProcessResult {
+        throw CocoaError(.fileNoSuchFile)
+    }
+}
+
+private final class Collected: Sendable {
+    private let storage = Mutex<[String]>([])
+    func add(_ value: String) { storage.withLock { $0.append(value) } }
+    var values: [String] { storage.withLock { $0 } }
+}

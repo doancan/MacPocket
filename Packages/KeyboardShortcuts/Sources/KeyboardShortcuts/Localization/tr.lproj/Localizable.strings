@@ -1,0 +1,9 @@
+"record_shortcut" = "Kısayol Kaydet";
+"press_shortcut" = "Kısayola Basın";
+"keyboard_shortcut_used_by_menu_item" = "Bu klavye kısayolu “%@” menü öğesi tarafından kullanılıyor.";
+"keyboard_shortcut_used_by_system" = "Bu klavye kısayolu sistem tarafından kullanılıyor.";
+"keyboard_shortcuts_can_be_changed" = "Sistem kısayollarının çoğunu Sistem Ayarları › Klavye › Klavye Kısayolları bölümünden değiştirebilirsiniz.";
+"keyboard_shortcut_disallowed" = "Option tuşu Command veya Control ile birlikte kullanılmalıdır.";
+"force_use_shortcut" = "Yine de Kullan";
+"ok" = "Tamam";
+"space_key" = "Boşluk";

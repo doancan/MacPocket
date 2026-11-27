@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "https://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0"><dict>
+  <key>CFBundleDevelopmentRegion</key><string>tr</string>
+  <key>CFBundleLocalizations</key><array><string>tr</string><string>en</string></array>
+  <key>CFBundleInfoDictionaryVersion</key><string>6.0</string>
+  <key>CFBundleExecutable</key><string>MacPocket</string>
+  <key>CFBundleIdentifier</key><string>com.doancan.MacPocket</string>
+  <key>CFBundleName</key><string>MacPocket</string>
+  <key>CFBundleDisplayName</key><string>MacPocket</string>
+  <key>CFBundlePackageType</key><string>APPL</string>
+  <key>CFBundleShortVersionString</key><string>1.0.0</string>
+  <key>CFBundleVersion</key><string>16</string>
+  <key>CFBundleIconFile</key><string>AppIcon</string>
+  <key>LSMinimumSystemVersion</key><string>27.0</string>
+  <key>NSHighResolutionCapable</key><true/>
+  <key>NSPrincipalClass</key><string>NSApplication</string>
+  <key>LSApplicationCategoryType</key><string>public.app-category.utilities</string>
+  <key>NSHumanReadableCopyright</key><string>© 2026 MacPocket contributors</string>
+  <key>NSSupportsAutomaticTermination</key><false/>
+  <key>NSSupportsSuddenTermination</key><false/>
+  <key>SUFeedURL</key><string>https://github.com/doancan/MacPocket/releases/latest/download/appcast.xml</string>
+  <key>SUPublicEDKey</key><string>MuuM3vPVr12fsO7/rZ9i1YZ5AAGXUu+f2Vmb4YFaApo=</string>
+  <key>SUEnableAutomaticChecks</key><true/>
+  <key>SUScheduledCheckInterval</key><integer>86400</integer>
+  <key>SUEnableSystemProfiling</key><false/>
+  <key>NSLocalNetworkUsageDescription</key><string>MacPocket, Yerel Ağ aracında evindeki cihazları bulmak ve adlarını göstermek için yerel ağı tarar; bu bilgiler internete gönderilmez.</string>
+  <key>NSBonjourServices</key><array><string>_companion-link._tcp</string><string>_airplay._tcp</string><string>_raop._tcp</string><string>_googlecast._tcp</string><string>_ipp._tcp</string><string>_ipps._tcp</string><string>_printer._tcp</string><string>_pdl-datastream._tcp</string><string>_hap._tcp</string><string>_matter._tcp</string><string>_smb._tcp</string><string>_afpovertcp._tcp</string><string>_ssh._tcp</string><string>_sftp-ssh._tcp</string><string>_rfb._tcp</string><string>_spotify-connect._tcp</string><string>_sonos._tcp</string><string>_apple-mobdev2._tcp</string><string>_device-info._tcp</string><string>_http._tcp</string></array>
+  <key>NSAudioCaptureUsageDescription</key><string>MacPocket, ses mikserinde seçtiğin uygulamaların sesini yakalayıp ayarladığın seviyede yeniden çalar; ses kaydedilmez ve bu Mac’ten çıkmaz.</string>
+  <key>NSMicrophoneUsageDescription</key><string>MacPocket, ekran kaydına mikrofonu eklemeni seçtiğinde sesini kaydeder.</string>
+  <key>NSAppleEventsUsageDescription</key><string>MacPocket, hızlı işlemler için Finder ve System Events’i, SSH bağlantılarını açmak için seçtiğiniz terminali kontrol eder.</string>
+  <key>NSLocationUsageDescription</key><string>MacPocket, gece modunda gün doğumu ve gün batımı saatlerini hesaplamak için yaklaşık konumunu kullanır; konum bu Mac’ten çıkmaz.</string>
+  <key>NSLocationWhenInUseUsageDescription</key><string>MacPocket, gece modunda gün doğumu ve gün batımı saatlerini hesaplamak için yaklaşık konumunu kullanır; konum bu Mac’ten çıkmaz.</string>
+    <key>NSSystemExtensionUsageDescription</key>
+    <string>MacPocket, uygulama kurallarına göre ağ bağlantılarına izin verir veya engeller.</string>
+</dict></plist>

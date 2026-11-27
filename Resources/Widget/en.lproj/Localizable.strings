@@ -1,0 +1,8 @@
+"Disk Röntgeni" = "Disk X-Ray";
+"Henüz tarama yok. MacPocket’ta Disk Röntgeni’ni aç ve tara." = "No scan yet. Open Disk X-Ray in MacPocket and scan.";
+"Sistem Verisi" = "System Data";
+"Güvenle boşaltılabilir" = "Safe to free";
+"Boş alan" = "Free space";
+"%@ güvenle boşaltılabilir" = "%@ safe to free";
+"%@ boş" = "%@ free";
+"Sistem Verisi boyutu, güvenle boşaltılabilir miktar ve boş alan; son taramaya göre." = "System Data size, how much is safe to free and free space, as of the last scan.";

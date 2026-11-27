@@ -1,0 +1,62 @@
+import XCTest
+import Foundation
+@testable import UsageCore
+
+final class FileCodexAuthReaderTests: XCTestCase {
+    private func tempDir() throws -> URL {
+        let dir = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString, isDirectory: true)
+        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        return dir
+    }
+
+    func testMissingFileThrowsNotFound() throws {
+        let reader = FileCodexAuthReader(fileURL: try tempDir().appendingPathComponent("auth.json"))
+        XCTAssertThrowsError(try reader.readCodexAuth()) {
+            XCTAssertEqual($0 as? TokenReaderError, .notFound)
+        }
+    }
+
+    func testReadsValidFile() throws {
+        let url = try tempDir().appendingPathComponent("auth.json")
+        try Fixtures.data("codex_auth").write(to: url)
+        let auth = try FileCodexAuthReader(fileURL: url).readCodexAuth()
+        XCTAssertEqual(auth.accessToken, "fake.access.token")
+    }
+
+    func testBadFileThrowsMalformed() throws {
+        let url = try tempDir().appendingPathComponent("auth.json")
+        try "{".data(using: .utf8)!.write(to: url)
+        XCTAssertThrowsError(try FileCodexAuthReader(fileURL: url).readCodexAuth()) {
+            XCTAssertEqual($0 as? TokenReaderError, .malformed)
+        }
+    }
+
+    func testDefaultURLWithoutCodexHomeIsDotCodexInHome() {
+        let url = FileCodexAuthReader.defaultURL(environment: [:])
+        XCTAssertEqual(url.lastPathComponent, "auth.json")
+        XCTAssertEqual(url.deletingLastPathComponent().lastPathComponent, ".codex")
+        XCTAssertTrue(url.path.hasPrefix(FileManager.default.homeDirectoryForCurrentUser.path))
+    }
+
+    func testDefaultURLHonorsCodexHome() {
+        let url = FileCodexAuthReader.defaultURL(environment: ["CODEX_HOME": "/tmp/codex-home"])
+        XCTAssertEqual(url.path, "/tmp/codex-home/auth.json")
+    }
+
+    func testNamedPipeIsRefusedInsteadOfBlocking() throws {
+        let url = try tempDir().appendingPathComponent("auth.json")
+        XCTAssertEqual(mkfifo(url.path, 0o600), 0)
+        XCTAssertThrowsError(try FileCodexAuthReader(fileURL: url).readCodexAuth()) {
+            XCTAssertEqual($0 as? TokenReaderError, .accessDenied)
+        }
+    }
+
+    func testOversizedFileIsRefused() throws {
+        let url = try tempDir().appendingPathComponent("auth.json")
+        try Data(repeating: 0x20, count: 300 * 1024).write(to: url)
+        XCTAssertThrowsError(try FileCodexAuthReader(fileURL: url).readCodexAuth()) {
+            XCTAssertEqual($0 as? TokenReaderError, .accessDenied)
+        }
+    }
+}
