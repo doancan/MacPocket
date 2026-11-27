@@ -89,3 +89,15 @@ struct ConfigDocumentReadTests {
         #expect(ValueFormatter.encode(key: "IdentityFile", value: "") == "")
     }
 }
+
+struct UnparsableLineTests {
+    @Test func strayCharactersAreReportedWithTheirLineNumber() {
+        let document = ConfigDocument(parsing: "Host a\n  HostName a\n≈\n# fine\n\n  User = bob\n$$\n")
+        #expect(document.unparsableLineNumbers == [3, 7])
+    }
+
+    @Test func aCleanConfigAndAByteOrderMarkAreNotReported() {
+        #expect(ConfigDocument(parsing: "Host a\n  HostName a\n").unparsableLineNumbers.isEmpty)
+        #expect(ConfigDocument(parsing: "\u{FEFF}Host a\n  HostName a\n").unparsableLineNumbers.isEmpty)
+    }
+}

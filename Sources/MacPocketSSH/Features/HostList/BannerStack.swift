@@ -64,6 +64,12 @@ struct BannerStack: View {
                     do { try model.store.apply { $0.removeByteOrderMark() } } catch { model.errorMessage = Messages.text(for: error) }
                 }
             }
+        case .unparsableLines(let first, let count):
+            let line = String(first)
+            let message = count == 1
+                ? String(localized: "SSH.banner.unparsable.one %@", defaultValue: "\(line). satırı ssh okuyamıyor; kaydederken doğrulama reddeder.")
+                : String(localized: "SSH.banner.unparsable.many %@ %lld", defaultValue: "\(line). satır dahil \(count) satırı ssh okuyamıyor; kaydederken doğrulama reddeder.")
+            BannerRow(icon: "exclamationmark.triangle", tint: .orange, message: message) { EmptyView() }
         case .externalChange:
             BannerRow(icon: "arrow.triangle.2.circlepath", tint: .orange, message: Messages.text(for: ConfigStoreError.conflict)) {
                 Button(String(localized: "SSH.banner.external.reload", defaultValue: "Yeniden Yükle")) {

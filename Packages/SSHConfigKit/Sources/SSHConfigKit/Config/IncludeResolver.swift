@@ -97,6 +97,9 @@ public struct IncludeResolver: Sendable {
         return String(cString: dir) + body.dropFirst(name.count)
     }
 
+    /// The existing files one Include pattern names, in ssh's order.
+    public func resolvedFiles(for pattern: String) -> [URL] { expand(pattern) }
+
     private func expand(_ pattern: String) -> [URL] {
         let path: String
         if pattern == "~" {

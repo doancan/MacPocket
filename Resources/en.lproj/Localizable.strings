@@ -5119,3 +5119,20 @@
 "SSH.knownHosts.notDownloaded" = "The known_hosts file is in iCloud and has not been downloaded to this Mac yet.";
 "SSH.load.notDownloaded" = "The config file is in iCloud and is being downloaded to this Mac. Try again in a few seconds.";
 "SSH.onboarding.import" = "Import from Another Mac…";
+
+"SSH.banner.unparsable.many %@ %lld" = "ssh cannot read %2$lld lines, starting at line %1$@; validation will reject the file when you save.";
+"SSH.banner.unparsable.one %@" = "ssh cannot read line %@; validation will reject the file when you save.";
+"SSH.systemLink.apply" = "Apply";
+"SSH.systemLink.backup" = "Changed files are backed up first; you can restore them from the Backups tab.";
+"SSH.systemLink.config" = "~/.ssh/config";
+"SSH.systemLink.config.done" = "Already reads this file.";
+"SSH.systemLink.explain" = "Terminal, VS Code Remote-SSH and git only read the files in ~/.ssh. The changes below make the files MacPocket uses visible to them too.";
+"SSH.systemLink.help" = "Makes tools such as Terminal and VS Code see this config.";
+"SSH.systemLink.knownHosts" = "~/.ssh/known_hosts";
+"SSH.systemLink.knownHosts.add %@" = "%@ entries will be added. Existing entries are not removed.";
+"SSH.systemLink.knownHosts.done" = "No missing entries.";
+"SSH.systemLink.note.configLink %@" = "~/.ssh/config is a symbolic link; the change is written to the real file and the link is kept: %@";
+"SSH.systemLink.note.dirLink %@" = "~/.ssh is a symbolic link; files are written to: %@";
+"SSH.systemLink.note.notUTF8 %@" = "A file that is not UTF-8 is left alone: %@";
+"SSH.systemLink.note.unreadable %@" = "Could not be read, so it is left alone: %@";
+"SSH.systemLink.open" = "Enable for System ssh…";

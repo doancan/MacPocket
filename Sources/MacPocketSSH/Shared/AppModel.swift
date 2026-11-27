@@ -24,6 +24,8 @@ final class AppModel {
     var errorMessage: String?
     /// The import being reviewed (a sheet shows it); nil when none.
     var importPlan: SSHImportPlan?
+    /// The system-ssh link being reviewed (a sheet shows it); nil when none.
+    var systemLinkPlan: SystemLinkPlan?
     /// Narrows the sidebar to hosts whose last connection test fell in this category.
     var statusFilter: StatusCategory?
     /// A host waiting for the user to confirm its deletion (menu, context menu or the delete key).
