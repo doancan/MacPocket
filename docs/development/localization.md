@@ -15,6 +15,12 @@ when an English translation is missing.
 - The SSH shortcut recorder package ships its own translations inside
   `Packages/KeyboardShortcuts`.
 
+## Which language the app uses
+
+A fresh install follows the macOS language order. Settings can pin Turkish or English, which writes the app's
+own `AppleLanguages` default; choosing *System* again removes it. When none of the user's languages is
+supported, the app falls back to English (`CFBundleDevelopmentRegion` in `Resources/Info.plist`).
+
 ## Adding or changing text
 
 1. Write the Turkish string in code.
