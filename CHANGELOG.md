@@ -3,6 +3,12 @@
 All notable changes to MacPocket are documented in this file. Each release lists only the
 sections that apply, in this order: Features, Improved, Changed, Fixed, Removed, Security.
 
+## Unreleased
+
+### Fixed
+- **Language:** The first launch follows the macOS language order instead of always opening in Turkish, and a system language that is neither English nor Turkish falls back to English.
+- **Installer:** The disk image window shows its whole artwork again on macOS 27, the icon labels no longer collide with the card edges, and the instructions lead in English with Turkish below.
+
 ## 1.0.0 — November 27, 2026
 
 First public release. MacPocket is now open source under the MIT License.

@@ -7,7 +7,7 @@ Releases are produced by `.github/workflows/release.yml` when a `v*` tag is push
 
 1. Update the version in `Resources/Info.plist`: `CFBundleShortVersionString` and
    an incremented `CFBundleVersion`.
-2. Add a section to `CHANGELOG.md` for the version (see [Changelog format](#changelog-format)).
+2. Turn the `Unreleased` section of `CHANGELOG.md` into one for the version (see [Changelog format](#changelog-format)).
    The release workflow and `scripts/release/make-appcast.sh` extract the notes for that
    version by its heading.
 3. Run `make verify`, commit, and push to `main`.
