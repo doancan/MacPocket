@@ -16,7 +16,30 @@ jobs:
     timeout-minutes: 60
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      # Compiling the app from scratch is most of this job. The build directory is cached per toolchain image and
+      # dependency set; the newest entry is restored and only files that changed since are compiled again.
+      - name: Name the build cache
+        id: image
+        env:
+          DEPENDENCIES: ${{ hashFiles('Package.swift', 'Package.resolved', 'Packages/*/Package.swift') }}
+        run: echo "prefix=build-app-${ImageVersion:-unknown}-${DEPENDENCIES}" >> "$GITHUB_OUTPUT"
+      - name: Restore build cache
+        id: cache
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: .build
+          key: ${{ steps.image.outputs.prefix }}-${{ github.sha }}
+          restore-keys: ${{ steps.image.outputs.prefix }}-
+      # A fresh checkout gives every file a new time, which would make the restored cache useless.
+      - name: Keep unchanged files unchanged for the build system
+        run: scripts/ci/restore-source-times.py .build/ci-source-hashes.json
       - run: make verify-app
+      - name: Save build cache
+        if: success() && steps.cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: .build
+          key: ${{ steps.image.outputs.prefix }}-${{ github.sha }}
   packages:
     name: Package tests
     runs-on: xcode-27

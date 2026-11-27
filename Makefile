@@ -10,8 +10,9 @@ test:
 # `make -j3 verify` does the same locally; plain `make verify` runs them one after another.
 verify: verify-app verify-packages verify-localizations
 
+# XCTest classes run in parallel processes (Swift Testing already runs in parallel): same tests, about half the time.
 verify-app:
-	swift test
+	swift test --parallel
 
 verify-packages:
 	for package in Packages/*/; do swift test --package-path "$$package" || exit 1; done

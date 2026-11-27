@@ -51,6 +51,7 @@ notarization.
 | --- | --- |
 | `scripts/build/` | App bundle, disk image, widget and network filter embedding, local install |
 | `scripts/release/` | Appcast generation |
+| `scripts/ci/` | Build cache support for the CI app job (pins unchanged files' times so a restored cache is reused) |
 | `scripts/check/` | Localization completeness, installer artwork strings, file-shelf promise check |
 | `scripts/data/` | Refresh of the bundled offline databases |
 | `scripts/audit/` | Manual runtime audits and their fixture apps |
