@@ -22,6 +22,7 @@ struct SidebarView: View {
                     Spacer()
                     Button(String(localized: "SSH.status.filter.clear", defaultValue: "Tümünü Göster")) { model.statusFilter = nil }
                         .buttonStyle(.link)
+                        .fixedSize()
                 }
             }
             ForEach(sections.hostGroups) { group in

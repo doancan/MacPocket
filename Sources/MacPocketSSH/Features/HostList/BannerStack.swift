@@ -46,6 +46,10 @@ struct BannerStack: View {
                 }
                 Button(String(localized: "SSH.banner.missing.choose", defaultValue: "Başka Dosya Seç…")) { navigate(.settings) }
             }
+        case .notDownloaded:
+            BannerRow(icon: "icloud.and.arrow.down", tint: .blue, message: Messages.text(for: ConfigLoadState.notDownloaded) ?? "") {
+                Button(String(localized: "SSH.banner.retry", defaultValue: "Yeniden Dene")) { model.store.load() }
+            }
         case .notUTF8:
             BannerRow(icon: "exclamationmark.triangle", tint: .red, message: Messages.text(for: ConfigLoadState.notUTF8) ?? "") {
                 EmptyView()
@@ -88,8 +92,11 @@ private struct BannerRow<Actions: View>: View {
     var body: some View {
         HStack(spacing: 10) {
             Image(systemName: icon).foregroundStyle(tint).accessibilityHidden(true)
-            Text(message).frame(maxWidth: .infinity, alignment: .leading)
-            actions()
+            Text(message)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .fixedSize(horizontal: false, vertical: true)
+            // Buttons keep their natural width; only the message wraps when the window is narrow.
+            HStack(spacing: 8) { actions() }.fixedSize()
         }
         // Bordered, not glass: the card is already glass and glass must not sit on glass.
         .buttonStyle(.bordered)

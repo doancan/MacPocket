@@ -23,6 +23,39 @@ struct HostLintTests {
         #expect(issues == [.unencryptedKey("~/.ssh/plain")])
     }
 
+    private func permissionLint(mode: UInt16?, encryption: KeyEncryption = .encrypted) -> HostLint {
+        HostLint(home: home, fileExists: { _ in true }, encryption: { _ in encryption }, permissions: { _ in mode })
+    }
+
+    @Test func aKeyOthersCanReadIsReportedAndOwnerOnlyIsNot() {
+        let doc = ConfigDocument(parsing: "Host a\n  IdentityFile ~/.ssh/k\n")
+        func issues(_ mode: UInt16?) -> [HostIssue] {
+            permissionLint(mode: mode).issues(for: doc.hosts[0], duplicates: [:], exactDuplicates: [:], firstBlocks: [:])
+        }
+        #expect(issues(0o644) == [.keyPermissionsTooOpen("~/.ssh/k")])
+        #expect(issues(0o640) == [.keyPermissionsTooOpen("~/.ssh/k")])
+        #expect(issues(0o600).isEmpty)
+        #expect(issues(0o400).isEmpty)
+        #expect(issues(nil).isEmpty)
+    }
+
+    @Test func aFileThatIsNotAKeyGetsNoKeyAdvice() {
+        let doc = ConfigDocument(parsing: "Host a\n  IdentityFile ~/.ssh/notes\n")
+        let issues = permissionLint(mode: 0o644, encryption: .unknown)
+            .issues(for: doc.hosts[0], duplicates: [:], exactDuplicates: [:], firstBlocks: [:])
+        #expect(issues.isEmpty)
+    }
+
+    @Test func keysInCloudSyncedFoldersAreReported() {
+        let icloud = "/h/Library/Mobile Documents/com~apple~CloudDocs/ssh/id"
+        let doc = ConfigDocument(parsing: "Host a\n  IdentityFile \"\(icloud)\"\nHost b\n  IdentityFile \"/h/Library/CloudStorage/Dropbox/k\"\nHost c\n  IdentityFile ~/.ssh/k\n")
+        let lint = permissionLint(mode: 0o600)
+        let result = doc.hosts.map { lint.issues(for: $0, duplicates: [:], exactDuplicates: [:], firstBlocks: [:]) }
+        #expect(result[0] == [.keyInSyncedFolder(icloud)])
+        #expect(result[1] == [.keyInSyncedFolder("/h/Library/CloudStorage/Dropbox/k")])
+        #expect(result[2].isEmpty)
+    }
+
     private func lintIssues(_ text: String, included: [IncludedHost] = []) -> [[HostIssue]] {
         let doc = ConfigDocument(parsing: text)
         let counts = HostLint.duplicateCounts(document: doc, included: included)

@@ -69,7 +69,7 @@ extension AppModel {
             checkHostIP = host.checkHostIP
             otherFile = otherKnownHostsFile(sshReads: host.userKnownHostsFiles, candidates: host.userKnownHostsFileCandidates)
             switch knownHosts.loadState {
-            case .notUTF8, .unreadable:
+            case .notUTF8, .unreadable, .notDownloaded:
                 // An unreadable file has an empty document: "nothing found" would be a lie.
                 phase = .failed(Messages.knownHostsLoadText(for: knownHosts.loadState) ?? "")
             case .loaded, .missing:

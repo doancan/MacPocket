@@ -81,6 +81,14 @@ struct ConfigStoreTests {
         #expect(!store.hasUnsavedChanges)
     }
 
+    @Test @MainActor func anEvictedICloudConfigIsNotOfferedAsNewFile() throws {
+        let tmp = try TempDir()
+        try tmp.file(".config.icloud", "stub")
+        let store = makeStore(tmp)
+        store.load()
+        #expect(store.loadState == .notDownloaded)
+    }
+
     @Test func missingFileCanBeCreated() throws {
         let tmp = try TempDir()
         let store = makeStore(tmp, name: "sub/.ssh/config")

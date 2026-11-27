@@ -23,11 +23,14 @@ public struct IncludeResolver: Sendable {
     public let homeDirectory: URL
     public let maxDepth: Int
 
-    public var sshDirectory: URL { homeDirectory.appending(path: ".ssh", directoryHint: .isDirectory) }
+    /// Where a relative Include path starts: `~/.ssh`, or the folder of a copied configuration being imported.
+    public let sshDirectory: URL
 
-    public init(homeDirectory: URL = FileManager.default.homeDirectoryForCurrentUser, maxDepth: Int = 16) {
+    public init(homeDirectory: URL = FileManager.default.homeDirectoryForCurrentUser, maxDepth: Int = 16,
+                relativeBase: URL? = nil) {
         self.homeDirectory = homeDirectory
         self.maxDepth = maxDepth
+        sshDirectory = relativeBase ?? homeDirectory.appending(path: ".ssh", directoryHint: .isDirectory)
     }
 
     public func includedHosts(of document: ConfigDocument, rootFile: URL?) -> [IncludedHost] {

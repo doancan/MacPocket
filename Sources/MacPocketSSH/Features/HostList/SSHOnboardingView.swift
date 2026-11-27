@@ -9,6 +9,11 @@ struct OnboardingView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
             Text(String(localized: "SSH.onboarding.title", defaultValue: "İlk sunucunu ekleyelim")).font(.title2.bold())
+            HStack(spacing: 12) {
+                Image(systemName: "square.and.arrow.down").frame(width: 28, height: 28).accessibilityHidden(true)
+                ImportButton(model: model, title: String(localized: "SSH.onboarding.import", defaultValue: "Başka bir Mac’ten içe aktar…"))
+                    .buttonStyle(.adaptiveGlass)
+            }
             step(1, title: String(localized: "SSH.onboarding.addHost", defaultValue: "İlk host'u ekle")) {
                 model.addHost()
             }
