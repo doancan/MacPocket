@@ -49,7 +49,7 @@ update dialog, so write them for users, not for maintainers.
    filter) and notarizes and staples it.
 5. Builds, notarizes and staples the disk image.
 6. Signs the update zip with the Sparkle EdDSA key and generates `appcast.xml`.
-7. Creates the GitHub release with the zip, the dmg, `SHA256SUMS` and `appcast.xml`.
+7. Creates the GitHub release with the zip, the dmg, a version-less copy of the dmg (the website's download link), `SHA256SUMS` and `appcast.xml`.
 8. Deletes the temporary keychain and signing material.
 
 The app's `SUFeedURL` points at `releases/latest/download/appcast.xml`, so

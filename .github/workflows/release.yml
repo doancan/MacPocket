@@ -130,6 +130,8 @@ jobs:
           xcrun stapler staple "$dmg"
           xcrun stapler validate "$dmg"
           spctl --assess --type open --context context:primary-signature --verbose=2 "$dmg"
+          # A version-less copy gives the website a stable link: releases/latest/download/MacPocket-macOS-arm64.dmg
+          cp "$dmg" dist/MacPocket-macOS-arm64.dmg
           cd dist
           shasum -a 256 *.zip *.dmg > SHA256SUMS
       - name: Sign update and build appcast

@@ -40,6 +40,7 @@ The canonical URLs, `hreflang` links and `sitemap.xml` use that domain, so chang
 
 - Keep both languages in step: a change to a section in one file belongs in the other.
 - Do not copy version numbers into the site. The download button points at
-  `releases/latest`, which always resolves to the newest release.
+  `releases/latest/download/MacPocket-macOS-arm64.dmg`, a version-less copy of the disk image that the
+  release workflow attaches to every release, so the link always downloads the newest build.
 - The Sparkle update feed stays on GitHub Releases (`SUFeedURL` in `Resources/Info.plist`);
   moving it to the domain would orphan installed copies.
