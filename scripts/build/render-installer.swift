@@ -12,7 +12,8 @@ let minimum = info["LSMinimumSystemVersion"] as! String
 let englishURL = root.appendingPathComponent("Resources/en.lproj/Localizable.strings")
 let english = try PropertyListSerialization.propertyList(from: Data(contentsOf: englishURL), format: nil) as! [String: String]
 
-// Turkish is the source language. Both copies are drawn because a Finder background cannot change language.
+// English leads and Turkish follows in smaller type: both are drawn because a Finder background cannot change language.
+// Everything essential sits in the top 424 pt; a Finder with its path bar and status bar on hides the rest.
 let heading = "MacPocket’ı yükle"
 let instruction = "MacPocket’ı Uygulamalar klasörüne sürükle."
 let completion = "Ardından Uygulamalar’dan açıp bu diski çıkarabilirsin."
@@ -58,46 +59,47 @@ func render(scale: Int, preview: Bool) -> NSBitmapImageRep {
 
     accent.setFill()
     NSBezierPath(roundedRect: rect(44, 38, 4, 60), xRadius: 2, yRadius: 2).fill()
-    text(heading, x: 64, y: 36, w: 500, size: 31, weight: .semibold)
-    text(english[heading]!, x: 65, y: 78, w: 500, size: 17, color: secondary)
+    text(english[heading]!, x: 64, y: 36, w: 500, size: 31, weight: .semibold)
+    text(heading, x: 65, y: 78, w: 500, size: 17, color: secondary)
     text(version, x: 595, y: 48, w: 80, size: 13, weight: .medium, color: secondary, centered: true)
 
-    // These pads align with the real Finder icons at (200, 232) and (520, 232).
+    // These cards align with the real Finder icons at (200, 212) and (520, 212) and enclose the icon and its label,
+    // so Finder's label never meets the card's edge.
     for x: CGFloat in [126, 446] {
         NSColor.white.setFill()
-        let pad = NSBezierPath(roundedRect: rect(x, 158, 148, 148), xRadius: 30, yRadius: 30)
+        let pad = NSBezierPath(roundedRect: rect(x, 138, 148, 168), xRadius: 30, yRadius: 30)
         pad.fill()
         NSColor(srgbRed: 0.86, green: 0.89, blue: 0.94, alpha: 1).setStroke()
         pad.lineWidth = 1
         pad.stroke()
     }
     accent.withAlphaComponent(0.09).setFill()
-    NSBezierPath(ovalIn: rect(336, 208, 48, 48)).fill()
+    NSBezierPath(ovalIn: rect(336, 188, 48, 48)).fill()
     accent.setStroke()
     let arrow = NSBezierPath()
-    arrow.move(to: CGPoint(x: 349, y: height - 232))
-    arrow.line(to: CGPoint(x: 371, y: height - 232))
-    arrow.move(to: CGPoint(x: 363, y: height - 224))
-    arrow.line(to: CGPoint(x: 371, y: height - 232))
-    arrow.line(to: CGPoint(x: 363, y: height - 240))
+    arrow.move(to: CGPoint(x: 349, y: height - 212))
+    arrow.line(to: CGPoint(x: 371, y: height - 212))
+    arrow.move(to: CGPoint(x: 363, y: height - 204))
+    arrow.line(to: CGPoint(x: 371, y: height - 212))
+    arrow.line(to: CGPoint(x: 363, y: height - 220))
     arrow.lineWidth = 2.5
     arrow.lineCapStyle = .round
     arrow.lineJoinStyle = .round
     arrow.stroke()
 
-    text(instruction, x: 40, y: 344, w: 640, size: 17, weight: .medium, centered: true)
-    text(english[instruction]!, x: 40, y: 373, w: 640, size: 14, color: secondary, centered: true)
+    text(english[instruction]!, x: 40, y: 322, w: 640, size: 17, weight: .medium, centered: true)
+    text(instruction, x: 40, y: 351, w: 640, size: 14, color: secondary, centered: true)
     NSColor(srgbRed: 0.86, green: 0.89, blue: 0.94, alpha: 1).setFill()
-    NSBezierPath(rect: rect(44, 417, 632, 1)).fill()
-    text(completion, x: 44, y: 433, w: 632, size: 12, color: secondary)
-    text(english[completion]!, x: 44, y: 453, w: 632, size: 11, color: secondary)
+    NSBezierPath(rect: rect(44, 374, 632, 1)).fill()
+    text(english[completion]!, x: 44, y: 382, w: 632, size: 12, color: secondary)
+    text(completion, x: 44, y: 400, w: 632, size: 11, color: secondary)
 
-    text("macOS \(minimum) · Apple Silicon", x: 44, y: 122, w: 632, size: 12, color: secondary)
+    text("macOS \(minimum) · Apple Silicon", x: 44, y: 106, w: 632, size: 12, color: secondary)
     if preview {
-        NSWorkspace.shared.icon(forFile: app).draw(in: rect(144, 176, 112, 112))
-        NSWorkspace.shared.icon(forFile: "/Applications").draw(in: rect(464, 176, 112, 112))
-        text("MacPocket", x: 120, y: 309, w: 160, size: 13, centered: true)
-        text("Applications", x: 440, y: 309, w: 160, size: 13, centered: true)
+        NSWorkspace.shared.icon(forFile: app).draw(in: rect(144, 156, 112, 112))
+        NSWorkspace.shared.icon(forFile: "/Applications").draw(in: rect(464, 156, 112, 112))
+        text("MacPocket", x: 120, y: 280, w: 160, size: 13, centered: true)
+        text("Applications", x: 440, y: 280, w: 160, size: 13, centered: true)
     }
     NSGraphicsContext.restoreGraphicsState()
     return bitmap

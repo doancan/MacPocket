@@ -8,8 +8,9 @@ format = "UDZO"
 filesystem = "HFS+"
 icon = str(Path(app) / "Contents/Resources/AppIcon.icns")
 background = defines["background"]
-# Reserve the native Finder title bar above the 720 × 480 artwork.
-window_rect = ((200, 200), (720, 508))
+# The macOS 27 title bar and toolbar take 68 pt above the 720 × 480 artwork. A Finder with the path bar and status
+# bar turned on takes another 56 pt below, so the artwork keeps everything that matters in its top 424 pt.
+window_rect = ((200, 200), (720, 548))
 default_view = "icon-view"
 show_status_bar = False
 show_tab_view = False
@@ -23,5 +24,5 @@ icon_size = 112
 text_size = 13
 label_pos = "bottom"
 arrange_by = None
-icon_locations = {Path(app).name: (200, 232), "Applications": (520, 232)}
+icon_locations = {Path(app).name: (200, 212), "Applications": (520, 212)}
 # Do not set FinderInfo on the signed app: codesign --strict rejects those attributes.
