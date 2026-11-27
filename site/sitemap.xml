@@ -10,4 +10,7 @@
     <xhtml:link rel="alternate" hreflang="en" href="https://macpocket.app/"/>
     <xhtml:link rel="alternate" hreflang="tr" href="https://macpocket.app/tr/"/>
   </url>
+  <url>
+    <loc>https://macpocket.app/changelog/</loc>
+  </url>
 </urlset>

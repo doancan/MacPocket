@@ -1,4 +1,4 @@
-.PHONY: build test probe verify verify-app verify-packages verify-localizations site app app-release install-local dmg
+.PHONY: build test probe verify verify-app verify-packages verify-localizations site site-changelog app app-release install-local dmg
 
 build:
 	swift build
@@ -20,6 +20,11 @@ verify-packages:
 verify-localizations:
 	./scripts/check/localizations.sh
 	./scripts/check/installer-strings.sh
+	./scripts/check/site.sh
+
+# Regenerate the changelog page from CHANGELOG.md (release commits include the result).
+site-changelog:
+	python3 -I scripts/site/build-changelog.py
 
 # Preview the website at http://localhost:8000 (images come from docs/assets, as in the deployed build).
 site:

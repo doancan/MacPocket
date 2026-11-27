@@ -1,0 +1,458 @@
+<!doctype html>
+<!-- Generated from CHANGELOG.md by scripts/site/build-changelog.py. Do not edit by hand. -->
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Changelog – MacPocket</title>
+  <meta name="description" content="Release notes for every MacPocket version: new features, improvements, changes, fixes and security updates.">
+  <meta name="theme-color" content="#0a5cff">
+  <link rel="icon" href="/assets/logo.png" type="image/png">
+  <link rel="canonical" href="https://macpocket.app/changelog/">
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+  <a class="skip" href="#main">Skip to content</a>
+  <header class="top">
+    <div class="wrap">
+      <a class="brand" href="/"><img src="/assets/logo.png" alt="" width="32" height="32">MacPocket</a>
+      <nav class="top-nav" aria-label="Main">
+        <a href="/#features">Features</a>
+        <a href="/#privacy">Privacy</a>
+        <a href="/#about">About</a>
+        <a href="https://github.com/doancan/MacPocket">GitHub</a>
+        <a href="/tr/" hreflang="tr" lang="tr">Türkçe</a>
+      </nav>
+    </div>
+  </header>
+
+  <main id="main" class="wrap prose">
+    <h1>Changelog</h1>
+    <p class="sub">What changed in each release. The latest version is 1.0.1; MacPocket also offers new versions itself: choose MacPocket › Check for Updates.</p>
+    <p><a class="button primary" href="https://github.com/doancan/MacPocket/releases/latest/download/MacPocket-macOS-arm64.dmg">Download 1.0.1</a></p>
+      <section class="release" id="v1-0-1">
+        <h2>1.0.1 <time datetime="2026-11-27">November 27, 2026</time></h2>
+        <h3>Features</h3>
+        <ul>
+          <li><strong>SSH Manager:</strong> Import hosts and keys from another Mac in one step. Choose a copied <code>~/.ssh</code> folder or a config file (local or in iCloud Drive); a review sheet lists new hosts, keys and warnings before anything changes. <code>Include</code>d hosts are merged into the config, keys are copied with owner-only permissions, and an existing file is never overwritten.</li>
+          <li><strong>SSH Manager:</strong> "Enable for System ssh" makes Terminal, VS Code Remote-SSH and git see a config kept elsewhere, such as iCloud Drive. A review sheet shows the exact change to <code>~/.ssh/config</code> (an <code>Include</code> line) and the <code>known_hosts</code> entries to add; changed files are backed up first and a symlinked <code>~/.ssh</code> or config is kept.</li>
+        </ul>
+        <h3>Improved</h3>
+        <ul>
+          <li><strong>SSH Manager:</strong> Lines ssh cannot read, such as a stray character, now show a warning with the line number before saving.</li>
+          <li><strong>SSH Manager:</strong> A config that lives in iCloud Drive and has not been downloaded yet is downloaded and explained instead of being offered as a new empty file.</li>
+          <li><strong>SSH Manager:</strong> Banner and toolbar buttons keep their natural width, so labels no longer get squeezed on narrow windows.</li>
+        </ul>
+        <h3>Fixed</h3>
+        <ul>
+          <li><strong>Language:</strong> The first launch follows the macOS language order instead of always opening in Turkish, and a system language that is neither English nor Turkish falls back to English.</li>
+          <li><strong>Installer:</strong> The disk image window shows its whole artwork again on macOS 27, the icon labels no longer collide with the card edges, and the instructions lead in English with Turkish below.</li>
+        </ul>
+        <h3>Security</h3>
+        <ul>
+          <li><strong>SSH Manager:</strong> Hosts warn when a private key can be read by other users (ssh refuses such keys) and offer a one-click permission fix, and when a private key sits in a cloud-synced folder.</li>
+        </ul>
+      </section>
+      <section class="release" id="v1-0-0">
+        <h2>1.0.0 <time datetime="2026-11-27">November 27, 2026</time></h2>
+        <p>First public release. MacPocket is now open source under the MIT License.</p>
+        <h3>Features</h3>
+        <ul>
+          <li><strong>Project:</strong> Source code, contribution guide, security policy and architecture documentation are public.</li>
+        </ul>
+        <h3>Improved</h3>
+        <ul>
+          <li><strong>Network Speed:</strong> The test no longer ties up worker threads for its whole duration.</li>
+        </ul>
+        <h3>Changed</h3>
+        <ul>
+          <li><strong>Main window:</strong> The window opens at a size that shows the Overview in four columns without resizing.</li>
+          <li><strong>Weather:</strong> Forecasts come only from public providers: Visual Crossing, MET Norway and Open-Meteo without a key, and WeatherAPI.com, Pirate Weather, OpenWeather and Tomorrow.io with your own free API key. A saved selection of the removed source falls back to Visual Crossing.</li>
+        </ul>
+        <h3>Fixed</h3>
+        <ul>
+          <li><strong>Fan control:</strong> If the temperature sensor stays unreadable for five seconds, the fans go back to macOS instead of running unsupervised.</li>
+          <li><strong>Fan control:</strong> A fan release that fails is retried every second instead of being forgotten, and a failed first request no longer leaves the diagnostic unlock set.</li>
+          <li><strong>Port Manager:</strong> A hanging <code>lsof</code> now times out after 15 seconds instead of blocking the page.</li>
+          <li><strong>Commands:</strong> Many commands timing out at once no longer delay each other, and a command that leaves a background child behind returns its output at once.</li>
+          <li><strong>Cleanup:</strong> When an administrator removal times out or is cancelled, the result lists what was actually removed instead of reporting everything as failed.</li>
+        </ul>
+        <h3>Removed</h3>
+        <ul>
+          <li><strong>Weather:</strong> The previous third-party weather connection.</li>
+        </ul>
+        <h3>Security</h3>
+        <ul>
+          <li><strong>AI Usage:</strong> Codex sign-in files that are named pipes or larger than 256 KiB are refused, and a sign-in command that ignores a termination request is killed after two seconds.</li>
+          <li><strong>Fan helper:</strong> A fault is logged when the helper can identify its client only by name.</li>
+          <li><strong>Cleanup:</strong> Removal with administrator rights refuses system folders, the home folder and its Library on its own, not only behind the earlier checks.</li>
+        </ul>
+      </section>
+      <section class="release" id="v0-5-1">
+        <h2>0.5.1 <time datetime="2026-11-23">November 23, 2026</time></h2>
+        <h3>Changed</h3>
+        <ul>
+          <li><strong>Release:</strong> All 0.5.0 changes (the Liquid Glass setting, the Leftovers tab in Apps, consistent page layout, fan and network helper fixes) ship for the first time in this release. See the 0.5.0 changes below.</li>
+        </ul>
+        <h3>Fixed</h3>
+        <ul>
+          <li><strong>Overview:</strong> Row names were shown twice in Overview › Quick Settings.</li>
+          <li><strong>Command Bar:</strong> The Command Bar ignored Return and Esc coming from the Accessibility Keyboard, Switch Control, or scripts. It now runs the selected command and closes the panel.</li>
+        </ul>
+      </section>
+      <section class="release" id="v0-5-0">
+        <h2>0.5.0 <time datetime="2026-11-23">November 23, 2026</time></h2>
+        <h3>Features</h3>
+        <ul>
+          <li><strong>Liquid Glass:</strong> A new setting at Settings › Appearance › Material. When on, tabs, search fields, buttons, and floating panels are drawn with Liquid Glass; when off, MacPocket's own controls use opaque, flat surfaces.</li>
+          <li><strong>SSH Manager:</strong> The SSH Manager follows the Liquid Glass setting too.</li>
+          <li><strong>Connection Diagnostics:</strong> The first tab of Network Management. The modem, the internet (1.1.1.1), and DNS are measured separately, the faulty link along the connection path is flagged, and the recommended action is stated. Ping runs only when the button is pressed. <code>macpocket-probe connection</code>.</li>
+          <li><strong>Internet outages:</strong> While MacPocket is open, disconnections are recorded (drops shorter than 5 seconds are not counted). Optional notifications are available when the connection drops and when it returns.</li>
+          <li><strong>Sidebar search:</strong> Search across all pages, tools, and network tabs that ignores Turkish diacritics, available with ⌥⌘F.</li>
+          <li><strong>Last open page:</strong> A "Last open page" option under Settings › General › Page to open at launch. The tool and network tab are remembered as well.</li>
+          <li><strong>Shortcuts and Spotlight:</strong> "Open MacPocket Page" and "Diagnose Connection" actions.</li>
+          <li><strong>Help menu:</strong> MacPocket Help, Changelog, and Report a Problem replace the empty "Help isn't available" item.</li>
+          <li><strong>Network Management:</strong> Network Traffic, Wi-Fi Analysis, Local Network, Network Speed Test, Port Manager, Hosts File, and Internet Control appear in the sidebar as a single page with tabs. Only the selected tab's tool runs.</li>
+          <li><strong>Stats Bar:</strong> In the grouped layout, each module can stay in the group or also get its own menu bar item (Layout in module settings, right-click in the list).</li>
+          <li><strong>Fan control:</strong> When the app updates, the helper restarts itself and manual fan speeds are re-sent.</li>
+        </ul>
+        <h3>Improved</h3>
+        <ul>
+          <li><strong>Fan control:</strong> The card distinguishes "reading", "unreadable", and "no fan" states, requests give up after 10 seconds, and "Reinstall Helper" is offered if the registration is corrupted.</li>
+          <li><strong>Accessibility:</strong> Icon-only buttons and menus have VoiceOver names, and rows selected by clicking have keyboard and VoiceOver actions. Hosts row checkboxes are read with the row name. Cleanup category checkboxes and Local Network device rows are now native buttons, focusable with the keyboard and selectable with Space/Return and VoiceOver.</li>
+          <li><strong>Accessibility:</strong> The running app's accessibility tree was scanned across 54 pages, and no unnamed interactive elements owned by the app remain.</li>
+          <li><strong>Connection Diagnostics:</strong> The ping result is evaluated using the median of three replies instead of the average, and DNS is measured twice. A single delayed reply no longer makes a fast connection look "slow".</li>
+          <li><strong>Menu Bar Editor and SSH:</strong> The plain text fields match the search fields on other pages.</li>
+          <li><strong>Page layout:</strong> Secondary buttons no longer look like primary ones. There is a single switch size, with switches on the trailing edge of settings rows, and icon boxes use one size per role. Settings forms align under the title, and the Internet Control, Cable Impact Map, and Menu Bar Editor cards span the page width.</li>
+          <li><strong>Overview:</strong> Tiles use a module-colored highlight instead of a growing hover effect. Quick Actions and Screenshot use the same style.</li>
+          <li><strong>SSH Manager:</strong> The SSH Manager uses the same icon box as other pages.</li>
+        </ul>
+        <h3>Changed</h3>
+        <ul>
+          <li><strong>Page layout:</strong> Every page now follows the same order: title, summary, full-width section tabs, content (including Disk Analysis, Network, Apps, Tools, and Disk X-Ray).</li>
+          <li><strong>Appearance:</strong> New installs start with monochrome icons.</li>
+          <li><strong>Apps:</strong> App Leftovers is now the third tab of the Apps page (also reachable from search and the Command Bar).</li>
+          <li><strong>Apps:</strong> Apps that ship with macOS and cannot be deleted are no longer listed. Apple apps installed from the App Store or downloaded separately (Xcode, Compressor, and others) can now be uninstalled, and the lock applies only to apps actually protected by System Integrity Protection.</li>
+          <li><strong>Liquid Glass:</strong> The sidebar, toolbar, and menus are always drawn with glass by macOS.</li>
+          <li><strong>Tools:</strong> Practical Tools were removed from the sidebar and open within Tools, with a new icon.</li>
+          <li><strong>Translations:</strong> 391 unused English translations left over from removed features were deleted.</li>
+        </ul>
+        <h3>Fixed</h3>
+        <ul>
+          <li><strong>Fan control:</strong> The app crashed when the helper service was unreachable.</li>
+          <li><strong>MAC scan:</strong> The app crashed when the helper was unreachable during a MAC scan.</li>
+          <li><strong>Port Manager:</strong> Process numbers for multi-port processes rendered as a vertical stack of characters.</li>
+          <li><strong>Display Brightness:</strong> Cards overflowed the page in a narrow window.</li>
+          <li><strong>Interface:</strong> "Save" buttons appeared as "Record" in English.</li>
+          <li><strong>Interface:</strong> Interface APIs deprecated in macOS 27 were updated.</li>
+          <li><strong>Apps:</strong> When macOS denies removal during app uninstall (App Management, bundles containing root-owned files), the bundles are now permanently deleted with an administrator password. Trash mode explains what to do, and the app waits 15 seconds for heavy apps to quit.</li>
+          <li><strong>Disk X-Ray:</strong> The page started a new full-disk scan each time it was revisited and left the previous one running in the background, which froze the app after a few visits. Results are now preserved and the last scan time is shown.</li>
+        </ul>
+        <h3>Removed</h3>
+        <ul>
+          <li><strong>Tools:</strong> Update Center and Workspaces were removed. Saved layouts and repository links are deleted at launch, and unused translations were cleaned up.</li>
+          <li><strong>Tools:</strong> Screen Time, Macros, Text Shortcuts, Focus Session, macOS Tools, Support Report, and Privacy Check were removed, along with background services and the Focus module in the menu bar. Saved data is left untouched, and changes left behind by a crashed focus session are reverted once.</li>
+          <li><strong>Sidebar:</strong> The logo and tagline were removed from the sidebar.</li>
+          <li><strong>Power Center:</strong> The Energy Settings and Power Reports buttons were removed from the header. They remain in the Settings tab and under Tools › System Reports.</li>
+          <li><strong>Stats Bar:</strong> The 1×/1.5×/2× selector in the preview was removed.</li>
+        </ul>
+      </section>
+      <section class="release" id="v0-4-0">
+        <h2>0.4.0 <time datetime="2026-11-19">November 19, 2026</time></h2>
+        <h3>Features</h3>
+        <ul>
+          <li><strong>Menu bar icons:</strong> A new "Icon and value" style.</li>
+          <li><strong>Menu bar popover:</strong> The Summary tab (health score, CPU/memory/disk/network tiles, recent events) is the default first tab.</li>
+          <li><strong>Menu bar popover:</strong> The Clipboard tab, shown when clipboard history is on, supports search, a type filter, click to paste into the frontmost app, and pinning.</li>
+          <li><strong>Menu bar popover:</strong> The Health tab answers "Why is my Mac slow?" with sustained load, memory pressure, swap, heat, and a filling disk, each with a one-click fix.</li>
+          <li><strong>Menu bar popover:</strong> The Events tab lists sleep/wake, network drops, heating, memory pressure, and disk mount/eject.</li>
+          <li><strong>Menu bar popover:</strong> The Launcher tab holds favorite apps, folders, files, and links.</li>
+          <li><strong>Menu bar popover:</strong> The Disk tab estimates when the disk will fill based on the last week's trend. Process lists offer Quit, Force Quit, and Show in Finder from the right-click menu.</li>
+        </ul>
+        <h3>Improved</h3>
+        <ul>
+          <li><strong>Menu bar icons:</strong> Drawings snap to the display's pixel grid (sharp on non-Retina displays as well). Values use the menu bar clock's typeface, and small text is at least 10 pt.</li>
+          <li><strong>Menu bar icons:</strong> Warning and accent colors tint only the value and the graph, while the icon and label keep the menu bar's color. The attention dot does not change the item's width. Grouped icons were redrawn.</li>
+          <li><strong>Menu bar popover:</strong> Content switches instantly. Tabs show a bold icon and name side by side, and the selected tab is highlighted in the accent color. The tab bar scrolls when it does not fit.</li>
+          <li><strong>Menu bar popover:</strong> In light and dark appearance, it uses a clean background and cards like macOS Settings, independent of the window behind it. Text uses only macOS type styles (minimum 10 pt).</li>
+          <li><strong>Performance:</strong> The main window's last page is no longer drawn in the background while the window is closed, and the process list no longer re-reads process paths on every measurement. The running-apps list updates only when an app launches or quits, and temperature sensors are read at most every 5 seconds.</li>
+          <li><strong>Performance:</strong> The menu bar uses 0.5% CPU instead of 2.0% with the window closed, and 1.4% instead of 3.1% with the popover open (development build, median measurement).</li>
+        </ul>
+        <h3>Changed</h3>
+        <ul>
+          <li><strong>Menu bar popover:</strong> The popover is a fixed-size window that does not jump when tabs change.</li>
+          <li><strong>Menu bar popover:</strong> New installs start with Summary, CPU, Memory, Network, and (if clipboard history is on) Clipboard. Existing selections are preserved.</li>
+        </ul>
+        <h3>Fixed</h3>
+        <ul>
+          <li><strong>Cleanup:</strong> The page's ring animation kept running when the page was empty and used 25% CPU (now 0.5%).</li>
+          <li><strong>Clipboard:</strong> Click-to-paste did not reach the target app.</li>
+          <li><strong>Clipboard:</strong> Saved history was deleted when the clock was set back by a few seconds.</li>
+        </ul>
+        <h3>Removed</h3>
+        <ul>
+          <li><strong>Menu bar popover:</strong> The "Advanced" switch was removed. Every tab shows full detail.</li>
+        </ul>
+      </section>
+      <section class="release" id="v0-3-0">
+        <h2>0.3.0 <time datetime="2026-11-14">November 14, 2026</time></h2>
+        <h3>Features</h3>
+        <ul>
+          <li><strong>Disk X-Ray:</strong> A new tool that breaks down "System Data" item by item. It measures Xcode, simulator runtimes and devices, package managers, developer toolchains, AI models (including Ollama), logs, temporary files, Docker, virtual machines, iOS backups, the Android SDK, app caches, project build folders, and unexplained large folders (including the owning app). Each item is classified as Safe, Review, or Manual.</li>
+          <li><strong>Disk X-Ray:</strong> Before deleting, the exact operations are shown and can be copied. "Free X GB" makes the least worrying selection. History, trends, growth alerts, and "deleted and came back" items are kept on this Mac.</li>
+          <li><strong>Disk X-Ray:</strong> "Shrink instead of delete" uses transparent APFS compression (verified, atomic swap). Verified archiving and restore are also included.</li>
+          <li><strong>Disk X-Ray:</strong> Small and medium widgets, a menu bar item, Shortcuts actions (get size, clean safe items), optional external-disk projects, closing simulators on quit, and navigating to the page from a notification.</li>
+          <li><strong>Disk X-Ray:</strong> Optional daily scan, low-space alert, weekly summary, and weekly safe automatic cleanup. <code>macpocket-probe system-data [--json | free &lt;GB&gt; | clean [--apply]]</code>.</li>
+          <li><strong>Keep Awake:</strong> A "Turn the display off when idle, keep the Mac awake" setting (1–30 min), and "7 days (longest)" in the duration list for conditional keep-awake.</li>
+          <li><strong>Apps:</strong> A single "Remove Completely" button with a single confirmation permanently deletes the app and all associated files found (including user data). The plan is re-scanned after the app quits, and files written during quit are deleted too. A single administrator password is requested for system files and root-owned items.</li>
+          <li><strong>Apps:</strong> The uninstall plan now also finds Group Containers, Application Scripts, cookies, ByHost preferences, LaunchAgents, helpers/services under /Library, and Application Support folders matching the app name.</li>
+        </ul>
+        <h3>Improved</h3>
+        <ul>
+          <li><strong>Disk X-Ray:</strong> "Shrink" now works file by file, preserving hard links within the folder and verifying every copy. It needs free space only equal to the largest file, refuses if a build tool (cargo, xcodebuild, and so on) is running in the folder, and estimates the savings beforehand from a real sample. A 188 GB Rust <code>target</code> folder shrank to 63.8 GB.</li>
+        </ul>
+        <h3>Changed</h3>
+        <ul>
+          <li><strong>Deletion:</strong> Cleanup, Space Lens, File Tools, App Leftovers, and Uninstall now permanently delete items by default, and space is freed immediately. A "Deletion mode" menu on each screen lets you choose moving to the Trash instead. The Trash is still emptied with a separate confirmation.</li>
+        </ul>
+        <h3>Security</h3>
+        <ul>
+          <li><strong>Full Disk Access:</strong> On the Cleanup, Disk Analysis, Uninstall, and Leftovers screens, a warning card appears when the permission is missing. It opens System Settings and a drag-and-drop card, and suggests restarting after the permission is granted. The explanation in the setup wizard describes these uses.</li>
+        </ul>
+      </section>
+      <section class="release" id="v0-2-0">
+        <h2>0.2.0 <time datetime="2026-11-11">November 11, 2026</time></h2>
+        <h3>Features</h3>
+        <ul>
+          <li><strong>Stats Bar:</strong> A page with a live preview (light/dark menu bar, 1×–2× zoom), a module list sorted by dragging, and separate options for each module. Options include a style gallery with real drawings, chart type (bar/line/area) and width, font size, label position and alignment, fixed accent color, and an independently ordered threshold editor.</li>
+          <li><strong>Stats Bar:</strong> New styles: horizontal bar and ring, and three bars and a live chart for the grouped icon.</li>
+          <li><strong>Clock:</strong> A new module with world clocks (city list in the popover).</li>
+          <li><strong>Menu bar values:</strong> CPU load average, swap usage, and power consumption (W).</li>
+          <li><strong>Appearance:</strong> Seventeen color themes selectable from a menu in Settings › Appearance (MacPocket, Midnight, Tokyo, Ocean, Mint, Forest, Nord, Solarized, Gruvbox, Sunset, Cherry, Coffee, Sand, Rose, Purple, Dracula, Graphite: surfaces and accent colors). Each theme's contrast is verified by a test.</li>
+        </ul>
+        <h3>Improved</h3>
+        <ul>
+          <li><strong>Stats Bar:</strong> The popover is now opaque, takes theme colors, and follows the system's light/dark appearance.</li>
+          <li><strong>Stats Bar:</strong> Stacked label/value and two-line values are vertically centered and aligned to the same edge.</li>
+          <li><strong>SSH Manager:</strong> The icon was redrawn.</li>
+        </ul>
+        <h3>Changed</h3>
+        <ul>
+          <li><strong>Stats Bar:</strong> Menu bar settings moved from Settings to the main window.</li>
+        </ul>
+        <h3>Fixed</h3>
+        <ul>
+          <li><strong>Weather:</strong> The location name was written twice ("Ankara Ankara, Türkiye").</li>
+          <li><strong>Stats Bar:</strong> The warning threshold could exceed the critical threshold.</li>
+          <li><strong>Stats Bar:</strong> The grouped popover also showed disabled modules as tabs.</li>
+          <li><strong>Settings:</strong> Popup menu pickers were unreadable in the accent color.</li>
+          <li><strong>Navigation:</strong> The ⌘ shortcut cycle crashed when more than 9 pages were added.</li>
+          <li><strong>Stats Bar:</strong> A menu bar list row toggled the module on and off instead of selecting it under VoiceOver/accessibility.</li>
+        </ul>
+      </section>
+      <section class="release" id="v0-1-7">
+        <h2>0.1.7 <time datetime="2026-11-11">November 11, 2026</time></h2>
+        <h3>Features</h3>
+        <ul>
+          <li><strong>Keep Awake:</strong> A new menu bar module that shows a full cup and remaining time when on. Preset durations, keeping the display on, and automation status are in the panel.</li>
+          <li><strong>Focus:</strong> A new menu bar module that shows remaining time and progress. Duration selection, start/end, today's time and streak are in the panel.</li>
+          <li><strong>Bluetooth batteries:</strong> A new menu bar module that shows the accessory whose battery will run out first, colored by threshold.</li>
+          <li><strong>Brightness and night mode:</strong> A new menu bar module that shows main display brightness, with a slider for each external display, night mode status, sunrise/sunset, and pausing. All four new modules are enabled from Settings › Menu Bar and appear as their own item in every layout.</li>
+          <li><strong>Weather:</strong> The hour card opens a separate details page. When the source provides them, it shows precipitation probability/amount/intensity, feels-like temperature, humidity, wind/gust/direction, pressure, cloud cover, visibility, UV, and dew point. The 1/3/6/12-hour precipitation periods are preserved, and missing fields are not filled with zeros.</li>
+          <li><strong>Weather:</strong> The panel has a large temperature/condition display, a compact humidity-wind-pressure row, a scrollable hourly forecast, and daily temperature bars on a shared scale. Location and source settings moved to a separate view, and the selected source and refresh remain at the bottom. Separate states were added for an empty location, loading, errors, a missing key, and the absence of a detailed forecast.</li>
+          <li><strong>Weather:</strong> From 11 free-access options, the ones you want can be added to the source basket, and the menu bar queries only the selected source. Visual Crossing, MET Norway, and Open-Meteo need no key, and ECMWF IFS/AIFS Single, GFS, and ICON are separate model options.</li>
+          <li><strong>Weather:</strong> WeatherAPI.com, Pirate Weather, OpenWeather's free current-weather/5-day forecast endpoints, and Tomorrow.io work with a personal API key. Provider-specific caching, persistent selection, quota/access errors, and coverage links were added, and existing users' iStat connection is preserved until the first selection change.</li>
+          <li><strong>Uninstall:</strong> The uninstall plan shows the app, caches/logs, and user data in separate groups. Group selection, Show in Finder, and a persistent selection summary were added, and user data is not selected by default.</li>
+        </ul>
+        <h3>Improved</h3>
+        <ul>
+          <li><strong>Alt+Tab panel:</strong> The closing fade was handed off to the window server, and the panel is no longer redrawn while closing. With 24 windows and the close animation on, the panel closes in 5–7 ms instead of 383–443 ms.</li>
+          <li><strong>Alt+Tab panel:</strong> The selection animation slides only a single frame, and card contents change without animation. Cards are recomputed only when their own inputs change.</li>
+          <li><strong>UI updates:</strong> The Power, Cleanup, Apps, Local Network, Weather, Screen Time, and Audio Mixer screens and the main model moved to Observation, so screens refresh only when a value they read changes. Power overview cards are limited to their own data, and when the app language is pinned, localized strings are read from a cache.</li>
+          <li><strong>AI quota view:</strong> Session and weekly percentages are larger and side by side, and model-specific limits are shown at full width. The repeated account percentage was removed, and low/full quota warnings and explicit reset times were added. The menu panel shows more accounts at once, and text and bar contrast was strengthened in the light theme.</li>
+          <li><strong>Clipboard history:</strong> JSON generation and atomic disk writes moved to a serial background queue. Changes arriving during a write are merged into the latest state, and the completion of an older write does not mark newer changes as saved.</li>
+          <li><strong>Clipboard history:</strong> The last save is preserved on quit, and deleting, or turning off on-disk storage, completes after the pending write. A late error response cannot invalidate a successful retry, and the on-disk storage preference is applied even when clipboard capture is off.</li>
+          <li><strong>Clipboard history:</strong> No save is scheduled unless content changes, and the quit/module-stop call does not rewrite the archive. History that has not yet loaded is not saved with an empty in-memory state.</li>
+          <li><strong>Clipboard history:</strong> Real changes are stored with the existing delayed save, and a failed save can be retried. When on-disk storage is turned back on, in-memory history and images are saved, and deleting everything does not recreate an empty archive.</li>
+          <li><strong>Clipboard search:</strong> The tool page and quick panel query a shared in-memory index, prepared as history changes, off the UI thread. A 120 ms debounce while typing and cancellation of the stale request were added, and while a search is pending, the previous result is not pasted with Enter or the shortcut.</li>
+          <li><strong>Clipboard search:</strong> Turkish letter conversion, source app, type filter, and pinned-first ordering are preserved. A new entry prepares only the changed search document, and an empty search shows the list without waiting.</li>
+          <li><strong>Screen Time:</strong> Cards and charts share the same day/hour summary. The same app durations are no longer summed repeatedly for day totals, active day count, average, and scale, and the comparison with the previous day uses the same live record snapshot.</li>
+          <li><strong>Clipboard list:</strong> To build the title for long text, the code advances to the first non-empty line instead of splitting the entire text into lines. Leading blank lines, Unicode line endings, whitespace trimming, and the 200-character preview are preserved, and the invisible remainder of long log text is not re-split while the title is prepared.</li>
+          <li><strong>App Leftovers:</strong> Matching looks up the candidate's full name and the app identifiers at dot/hyphen boundaries in a set, instead of walking all installed apps for each candidate. Case, helper-app boundaries, and the same-vendor warning are preserved, and different apps with the same prefix are not hidden.</li>
+          <li><strong>USB Eject:</strong> The page refreshes through Disk Arbitration change notifications instead of running <code>diskutil</code> every three seconds. Attach/detach, partition, and mount point/name changes are coalesced with a short delay.</li>
+          <li><strong>USB Eject:</strong> Listeners are removed when the page closes, and if a notification session cannot be created, the previous scan serves as a fallback. A change arriving during a refresh is not lost, and the old selection of a re-attached disk is not preserved.</li>
+          <li><strong>Fan panel:</strong> On the app side, temperature is read only for temperature-dependent profiles and off the UI thread. Unnecessary sensor scanning was removed for the automatic/fixed profile.</li>
+          <li><strong>Fan panel:</strong> When the hidden panel returns to the automatic profile, the fans are released to the system and the loop stops, while the manual profile's heartbeat continues. A pending temperature or target response does not reapply the old profile.</li>
+          <li><strong>GPU measurement:</strong> Only the performance statistics, model, and core count are read, instead of copying the entire driver property table on each read. The GPU list and values are re-queried on every measurement, and the busiest-GPU selection is preserved.</li>
+          <li><strong>Menu bar history:</strong> When the system and menu bar history fill up, append/trim is published as a single update. Each measurement produces one publish instead of two, and the buffer limit is not shown to subscribers as exceeded.</li>
+          <li><strong>Weather:</strong> Instead of a per-second UI poll, a single wait is scheduled for the time the button becomes usable again. A source/time change or the view closing cancels the old wait, and manual retry and API quota limits are preserved.</li>
+          <li><strong>Process scanning:</strong> Automatic process reads stop when Task Manager is hidden, minimized, or fully covered, and the list refreshes immediately when the window returns. Unnecessary process scanning was removed at main window launch and on pages that do not use process data. The open menu bar process panel and explicitly requested report/port reads continue to work.</li>
+          <li><strong>Live charts:</strong> Small charts are drawn on a single Canvas instead of creating a separate chart element per sample. Smooth curves, colored fill, the negative Wi-Fi scale, and the automatic upper bound are preserved. Invalid values are excluded from drawing, and sensor and menu bar refresh intervals are unchanged.</li>
+          <li><strong>Menu bar panel:</strong> Native animations are preserved for the first open/close and for size changes. Clicking another MacPocket icon switches the open panel's content and the icon it is attached to, rather than closing and reopening the panel. The Reduce Motion preference is respected, and closing with an outside click and Escape is preserved.</li>
+          <li><strong>Weather:</strong> Working previous/next buttons replaced the visual arrows in the hourly forecast. Clicking an hour card shows the date/time and Celsius temperature provided by the source, and the details can be dismissed. At scroll limits the buttons are disabled, and the Reduce Motion preference is preserved.</li>
+          <li><strong>Uninstall:</strong> After the uninstall confirmation, a normal quit is requested first. Files are not moved until the app and the helper processes inside the bundle have quit. Processes that do not quit require a separate force-quit confirmation, and on error the plan stays open. Scope and verification are documented separately.</li>
+        </ul>
+        <h3>Changed</h3>
+        <ul>
+          <li><strong>Menu bar settings:</strong> Keep Awake buttons moved from the Power and Fan panel, and night mode items from the right-click menu, into the new modules, giving a single place for these settings.</li>
+          <li><strong>Distribution:</strong> Because the repository is private, downloading requires GitHub access. Since the anonymous Sparkle update URL is not reachable, this release must be downloaded from the Release page and installed manually.</li>
+        </ul>
+        <h3>Fixed</h3>
+        <ul>
+          <li><strong>Menu bar panel:</strong> The open request was lost when clicking between the weather, AI, and other icons. A selection arriving during a real close is retained, on rapid switching the last target opens, and clicking the same icon again closes the panel.</li>
+        </ul>
+        <h3>Removed</h3>
+        <ul>
+          <li><strong>Bluetooth batteries:</strong> The separate menu bar icon was removed. If it was previously on, the new module is enabled once automatically.</li>
+        </ul>
+        <h3>Security</h3>
+        <ul>
+          <li><strong>Weather:</strong> API keys are stored in the Keychain.</li>
+        </ul>
+      </section>
+      <section class="release" id="v0-1-6">
+        <h2>0.1.6 <time datetime="2026-11-07">November 7, 2026</time></h2>
+        <h3>Features</h3>
+        <ul>
+          <li><strong>Alt+Tab window switching:</strong> Animated preview cards, selection with Tab/Shift+Tab while Alt is held, and bringing the window to the front when Alt is released.</li>
+          <li><strong>Alt+Tab window switching:</strong> Independent filter/view/release settings for nine shortcuts and customizable window actions were developed. Acceptance coverage for physical keyboard/trackpad and all Space/full-screen combinations is tracked separately, and full AltTab parity is not claimed.</li>
+          <li><strong>Cable Impact Map:</strong> For the selected USB/Thunderbolt device, it shows connected disks, open files, TCP/SSH sessions matching the local address, and display/audio effects together. Hardware evidence and user matches are kept separate, and the tool is read-only. Scope and acceptance limits are documented separately.</li>
+          <li><strong>Menu Bar Editor:</strong> Apps can be collected into a hidden group and hidden or shown with an arrow button. It includes a searchable list and opening an icon. The macOS 27 private visibility interface is checked at runtime, and the compatibility limit with system panels is explained in the tool.</li>
+          <li><strong>Update center:</strong> An independent update center with Sparkle for apps outside Homebrew, optional App Store, and public GitHub release sources linked to the app. Checks are started manually, and installation continues in the publisher's flow.</li>
+          <li><strong>Internet Control (experimental):</strong> Allow/block rules by signed app identity, a connection list, and a Network Extension. The filter is off at launch, and using it requires macOS extension/network filter approval. Rules apply to new connections, and acceptance of actual blocking is not yet complete. Scope and verification are documented separately.</li>
+        </ul>
+        <h3>Changed</h3>
+        <ul>
+          <li><strong>Distribution:</strong> Because the repository is private, downloading requires GitHub access. Since the anonymous Sparkle update URL is not reachable, this release must be downloaded from the Release page and installed manually.</li>
+        </ul>
+      </section>
+      <section class="release" id="v0-1-5">
+        <h2>0.1.5 <time datetime="2026-11-06">November 6, 2026</time></h2>
+        <h3>Features</h3>
+        <ul>
+          <li><strong>DMG installer:</strong> The installer window has MacPocket's own icon, drag-and-drop installation into the Applications folder, a Retina background, and Turkish/English instructions. The existing ZIP and Sparkle flow is preserved for automatic updates.</li>
+          <li><strong>SSH Manager:</strong> A single workspace for SSH config editing, connection and ProxyJump tests, connecting with Terminal/iTerm2/Ghostty, key and known_hosts management, backups, and quick connect with a global shortcut. A Turkish/English interface and preference/backup import from existing SSH managers were added.</li>
+          <li><strong>AI usage tracking:</strong> Quotas of Claude, Codex/ChatGPT, and Grok accounts can be monitored separately from the menu bar, the usage screen, and a small floating panel. For Claude there are separate profiles, profile folder discovery, sign-in through an explicit user action, account management, quota alerts, and a per-account refresh cooldown policy.</li>
+          <li><strong>Command Bar, File Shelf, and Dock Previews:</strong> Quick access to tools and content, collecting and transferring files/text/images, and window previews from the Dock.</li>
+          <li><strong>Screenshot and mouse tools:</strong> Scrolling screenshots, captures pinned to the screen, and per-app mouse button assignments.</li>
+        </ul>
+        <h3>Improved</h3>
+        <ul>
+          <li><strong>Modules:</strong> Enabling and disabling modules individually and releasing the resources of disabled modules were improved.</li>
+          <li><strong>Audio and updates:</strong> Per-app audio routing, channel-based update sources, and conditional keep-awake were improved.</li>
+          <li><strong>Tools:</strong> Card alignment in tabs was tidied.</li>
+          <li><strong>Alt+Tab:</strong> The panel opens without taking app focus. Quick selection, delayed panel display, and switching to the selected window on Alt release were improved.</li>
+        </ul>
+        <h3>Removed</h3>
+        <ul>
+          <li><strong>Tools:</strong> Duplicate tool cards for functions available in the sidebar or system settings were removed.</li>
+        </ul>
+        <h3>Security</h3>
+        <ul>
+          <li><strong>DMG installer:</strong> The DMG download is signed and notarized by Apple.</li>
+          <li><strong>Permissions:</strong> Showing which features use each permission was improved.</li>
+        </ul>
+      </section>
+      <section class="release" id="v0-1-4">
+        <h2>0.1.4 <time datetime="2026-11-05">November 5, 2026</time></h2>
+        <h3>Features</h3>
+        <ul>
+          <li><strong>Case Converter:</strong> 14 text/code formats, Turkish/English İ/ı rules, live preview with a 300 ms debounce, line-by-line batch conversion, acronym/number splitting, and Latin letter simplification. All formats can be compared, copied individually or in bulk, and the selected result can be used as input. Text statistics are shown. Processing is local, there is a 64 KiB input limit, and cancelled or stale results are guarded against.</li>
+          <li><strong>Practical Tools:</strong> A separate offline workspace in the left menu with JSON editing/minification, standard/URL-safe Base64, URL parameter encoding, JWT content and time inspection, SHA-256/SHA-512, bulk UUID v4, secure passwords/tokens, Unix seconds/milliseconds conversion, line diff, and text/Wi-Fi QR generation.</li>
+          <li><strong>Practical Tools:</strong> Includes search, persistent favorites, examples, temporary tool drafts, error/progress states, copying, and text/PNG export. JSON preserves large numbers and key order, and JWT signatures are not verified.</li>
+          <li><strong>Weather:</strong> The menu bar shows temperature and a condition icon, with a feels-like temperature option and hourly and five-day forecast panels. Users can search for a city/district and select their location, and the selection is preserved when the app is reopened. The location can be changed from the panel or from Menu Bar settings.</li>
+          <li><strong>Weather:</strong> Includes hourly automatic refresh and keeping the last successful data on connection errors.</li>
+          <li><strong>USB Eject Manager:</strong> Lists external physical disks and their partitions, with safe single/bulk eject, processes and open files using the disk, and switching to Finder and to the app. Internal/startup disks are protected, and a re-attached disk does not inherit the old selection.</li>
+          <li><strong>Local Network:</strong> Lists devices by name, vendor (built-in MACLookup and IEEE registries), type, IP/MAC, and latency. Multiple networks can be scanned together (Wi-Fi, Ethernet, manually added VLAN ranges). The detail panel offers a network map, live ping, port scan, risk warnings, Wake-on-LAN, and new device notification.</li>
+          <li><strong>Local Network:</strong> A normal network scan automatically completes MAC lookup on all selected subnets through the installed helper service, with no separate button or per-scan password. Direct lookup is limited to 32 concurrent pings and also adds devices not visible in a normal scan.</li>
+          <li><strong>Power Scheduling:</strong> Recurring wake/power-on and sleep/shutdown times, and one-time events.</li>
+        </ul>
+        <h3>Improved</h3>
+        <ul>
+          <li><strong>Tool interfaces:</strong> An inventory of screens and routing was made for 57 catalog entries. In a narrow window, header actions move to the next line, and short settings screens are scrollable.</li>
+          <li><strong>Tool interfaces:</strong> Loading, refreshing, empty, and error states were separated in USB/Thunderbolt, disk health, Bluetooth, network traffic, and startup items. Screen recording shows preparing/saving stages, and success is reported when the file is complete.</li>
+          <li><strong>Tool performance:</strong> Totals for Network Traffic groups are computed in a single pass. Reset no longer launches an extra <code>nettop</code>, and pending stale results do not leak into the new session.</li>
+          <li><strong>Tool performance:</strong> When no external disk is present, the USB eject list makes one <code>diskutil</code> query instead of three. Weather waits directly for the hourly refresh time instead of a per-minute check loop, and the timer does not start if no location is selected.</li>
+          <li><strong>Local Network:</strong> MAC information on other subnets uses SNMP target IP–interface matching, with an explanation for interface MACs that cannot be matched and a priority for direct ARP results and the interface/address filter.</li>
+        </ul>
+        <h3>Fixed</h3>
+        <ul>
+          <li><strong>Tool interfaces:</strong> Search focus and keyboard access to the network map were fixed. Audio output errors are now visible.</li>
+          <li><strong>Local Network:</strong> During MAC lookup, results are not written for a network that was removed. The temporary route is cleaned up only if it was added successfully, and devices found only through Bonjour are also listed.</li>
+          <li><strong>Local Network:</strong> The helper's service identifier, file path, and XPC name in the wizard are preserved, and a normal scan does not trigger reinstallation/approval.</li>
+        </ul>
+      </section>
+      <section class="release" id="v0-1-3">
+        <h2>0.1.3 <time datetime="2026-11-04">November 4, 2026</time></h2>
+        <h3>Features</h3>
+        <ul>
+          <li><strong>Updates:</strong> Automatic updates via Sparkle, with a "Check for Updates…" menu and automatic checking and downloading in Settings.</li>
+          <li><strong>Screen Time:</strong> Per-app daily and hourly time and 7- and 30-day charts. Idle, locked, and sleep time are not counted.</li>
+          <li><strong>Setup wizard:</strong> A welcome on first launch, live permission status, and a drag-and-drop card for System Settings.</li>
+          <li><strong>GPU:</strong> A module showing GPU usage, processor, and memory in the menu bar, with a detail panel.</li>
+          <li><strong>Network:</strong> Ping, Wi-Fi signal, VPN lock, and an offline warning for the Network module.</li>
+          <li><strong>Menu bar views:</strong> CPU core bars, pie, and disk read/write, with sensor selection for temperature.</li>
+        </ul>
+        <h3>Improved</h3>
+        <ul>
+          <li><strong>Menu bar editor:</strong> Drag-and-drop ordering in the live preview, add/disable from the shelf, and click to configure.</li>
+          <li><strong>Threshold colors:</strong> The value turns orange at the warning threshold and red at critical (%, °C, ms, dBm).</li>
+          <li><strong>Maintenance:</strong> Revamped with 8 tasks, administrator tasks with a single password, and live status and last-run information.</li>
+        </ul>
+        <h3>Fixed</h3>
+        <ul>
+          <li><strong>Build:</strong> All compiler warnings in the release build were cleared.</li>
+          <li><strong>Setup wizard:</strong> When macOS restarts the app after a permission is granted, the setup wizard resumes where it left off.</li>
+        </ul>
+        <h3>Security</h3>
+        <ul>
+          <li><strong>Updates:</strong> Updates are signed.</li>
+        </ul>
+      </section>
+      <section class="release" id="v0-1-2">
+        <h2>0.1.2 <time datetime="2026-11-03">November 3, 2026</time></h2>
+        <h3>Features</h3>
+        <ul>
+          <li><strong>Wi-Fi Analysis:</strong> Signal, noise, BSSID, channel congestion of nearby networks, and a channel recommendation for the modem.</li>
+          <li><strong>Network Traffic:</strong> Shows live which app downloads and uploads how much.</li>
+          <li><strong>Disk Health:</strong> SSD wear, data written, and temperature (NVMe SMART).</li>
+          <li><strong>USB and Thunderbolt:</strong> Connected devices, link speed, and power, with a slow-cable warning.</li>
+          <li><strong>Hosts File:</strong> Redirect or block domains and toggle groups with one click.</li>
+          <li><strong>Screenshot:</strong> Region, window, and full-screen capture, preview cards, history, and annotation.</li>
+          <li><strong>Display Settings:</strong> Hidden HiDPI modes, refresh rate, main display, and mirroring.</li>
+          <li><strong>Bluetooth Batteries:</strong> Device batteries including Logitech, and a low-battery notification.</li>
+          <li><strong>Fan control:</strong> Fan control and a fan card in Power Center.</li>
+          <li><strong>Menu bar:</strong> Hottest sensor and Bluetooth battery indicators.</li>
+          <li><strong>Settings:</strong> A performance group in hidden Settings with animations, App Nap, and Dock settings.</li>
+          <li><strong>Displays:</strong> Volume and mute keys for monitor speakers (DDC).</li>
+          <li><strong>Cleanup:</strong> Profiles and category selection in the scan.</li>
+          <li><strong>Energy:</strong> A new Energy page.</li>
+        </ul>
+        <h3>Improved</h3>
+        <ul>
+          <li><strong>Cleanup:</strong> A new scan animation.</li>
+        </ul>
+        <h3>Changed</h3>
+        <ul>
+          <li><strong>Platform:</strong> macOS 27 became the baseline.</li>
+        </ul>
+        <h3>Fixed</h3>
+        <ul>
+          <li><strong>Bluetooth:</strong> Devices connected with a charging cable stay in the list.</li>
+        </ul>
+      </section>
+  </main>
+
+  <footer>
+    <div class="wrap">
+      <span>© 2026 MacPocket contributors. MIT License.</span>
+      <ul>
+        <li><a href="https://github.com/doancan/MacPocket/releases">Releases</a></li>
+        <li><a href="https://github.com/doancan/MacPocket/blob/main/CHANGELOG.md">Changelog source</a></li>
+        <li><a href="https://github.com/doancan/MacPocket/blob/main/SECURITY.md">Security</a></li>
+        <li><a href="https://github.com/doancan/MacPocket/blob/main/LICENSE">License</a></li>
+      </ul>
+    </div>
+  </footer>
+</body>
+</html>
