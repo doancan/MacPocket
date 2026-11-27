@@ -151,3 +151,72 @@ struct ImportButton: View {
             }
     }
 }
+
+/// Review step for making the system's ssh read the files this app edits: the exact change to `~/.ssh/config`,
+/// the known_hosts lines that would be added, and a backup note. Nothing is written before the user confirms.
+struct SystemLinkSheet: View {
+    @Bindable var model: AppModel
+    let plan: SystemLinkPlan
+    @State private var working = false
+
+    var body: some View {
+        VStack(spacing: 0) {
+            Form {
+                Section {
+                    Text(String(localized: "SSH.systemLink.explain", defaultValue: "Terminal, VS Code Remote-SSH ve git yalnızca ~/.ssh içindeki dosyaları okur. Aşağıdaki değişiklikler, MacPocket’ın kullandığı dosyaların onlara da görünmesini sağlar."))
+                        .foregroundStyle(.secondary)
+                }
+                ForEach(Array(plan.notes.enumerated()), id: \.offset) { _, note in
+                    Label(Self.text(for: note), systemImage: "info.circle").font(.callout)
+                }
+                if let change = plan.configChange {
+                    Section(String(localized: "SSH.systemLink.config", defaultValue: "~/.ssh/config")) {
+                        DiffTextView(hunks: LineDiff.hunks(old: change.old, new: change.new))
+                            .frame(minHeight: 120, maxHeight: 200)
+                    }
+                } else {
+                    Section(String(localized: "SSH.systemLink.config", defaultValue: "~/.ssh/config")) {
+                        Label(String(localized: "SSH.systemLink.config.done", defaultValue: "Zaten bu dosyayı okuyor."), systemImage: "checkmark.circle.fill")
+                            .foregroundStyle(.green)
+                    }
+                }
+                Section(String(localized: "SSH.systemLink.knownHosts", defaultValue: "~/.ssh/known_hosts")) {
+                    if plan.knownHostsToAdd.isEmpty {
+                        Label(String(localized: "SSH.systemLink.knownHosts.done", defaultValue: "Eksik kayıt yok."), systemImage: "checkmark.circle.fill")
+                            .foregroundStyle(.green)
+                    } else {
+                        let count = String(plan.knownHostsToAdd.count)
+                        Text(String(localized: "SSH.systemLink.knownHosts.add %@", defaultValue: "\(count) kayıt eklenecek. Mevcut kayıtlar silinmez."))
+                    }
+                }
+            }
+            .formStyle(.grouped)
+            Divider()
+            HStack {
+                Text(String(localized: "SSH.systemLink.backup", defaultValue: "Değişen dosyaların yedeği önce alınır; Yedekler sekmesinden geri yükleyebilirsiniz."))
+                    .font(.footnote).foregroundStyle(.secondary)
+                Spacer()
+                Button(String(localized: "SSH.action.cancel", defaultValue: "Vazgeç"), role: .cancel) { model.systemLinkPlan = nil }
+                    .keyboardShortcut(.cancelAction)
+                Button(String(localized: "SSH.systemLink.apply", defaultValue: "Uygula")) {
+                    working = true
+                    Task { await model.confirmSystemLink(); working = false }
+                }
+                .keyboardShortcut(.defaultAction)
+                .buttonStyle(.borderedProminent)
+                .disabled(plan.isNoop || working)
+            }
+            .padding(12)
+        }
+        .frame(minWidth: 520, idealWidth: 580, minHeight: 420, idealHeight: 500)
+    }
+
+    private static func text(for note: SystemLinkNote) -> String {
+        switch note {
+        case .sshDirectoryIsSymlink(let target): String(localized: "SSH.systemLink.note.dirLink %@", defaultValue: "~/.ssh bir sembolik bağ; dosyalar şuraya yazılır: \(target)")
+        case .configIsSymlink(let target): String(localized: "SSH.systemLink.note.configLink %@", defaultValue: "~/.ssh/config bir sembolik bağ; değişiklik gerçek dosyaya yazılır ve bağ korunur: \(target)")
+        case .unreadable(let path): String(localized: "SSH.systemLink.note.unreadable %@", defaultValue: "Okunamadı, bu dosyaya dokunulmaz: \(path)")
+        case .notUTF8(let path): String(localized: "SSH.systemLink.note.notUTF8 %@", defaultValue: "UTF-8 olmayan dosyaya dokunulmaz: \(path)")
+        }
+    }
+}

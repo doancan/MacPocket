@@ -6,6 +6,7 @@ enum Banner: Hashable, Identifiable, Sendable {
     case notUTF8
     case unreadable(String)
     case byteOrderMark
+    case unparsableLines(first: Int, count: Int)
     case externalChange
     case notWatching
 
@@ -24,6 +25,8 @@ enum BannerBuilder {
         case .unreadable(let detail): banners.append(.unreadable(detail))
         case .loaded:
             if store.document.hasByteOrderMark { banners.append(.byteOrderMark) }
+            let bad = store.document.unparsableLineNumbers
+            if let first = bad.first { banners.append(.unparsableLines(first: first, count: bad.count)) }
         }
         if store.externalChangePending { banners.append(.externalChange) }
         if !store.isWatching { banners.append(.notWatching) }

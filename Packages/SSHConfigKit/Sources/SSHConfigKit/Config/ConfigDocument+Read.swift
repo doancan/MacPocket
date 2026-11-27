@@ -39,6 +39,17 @@ public struct HostEntry: Identifiable, Equatable, Sendable {
     public func value(for key: String) -> String? { values(for: key).first }
 }
 
+extension ConfigDocument {
+    /// 1-based numbers of lines ssh cannot read: not a comment, blank or `Keyword value` (a stray character, a
+    /// pasted symbol). A BOM on the first line has its own message.
+    public var unparsableLineNumbers: [Int] {
+        lines.enumerated().compactMap { index, line in
+            guard line.kind == .unknown, !(index == 0 && hasByteOrderMark) else { return nil }
+            return index + 1
+        }
+    }
+}
+
 public struct MatchEntry: Equatable, Sendable {
     public let headerLine: Int
     public let criteria: String

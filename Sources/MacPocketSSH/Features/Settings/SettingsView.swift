@@ -98,6 +98,10 @@ struct SettingsView: View {
                     .font(.footnote)
                     .foregroundStyle(.secondary)
             }
+            if !model.commandBuilder.usesDefaultConfig || model.settings.knownHostsPath != AppSettings.defaultKnownHostsPath {
+                Button(String(localized: "SSH.systemLink.open", defaultValue: "Sistem ssh’ında Etkinleştir…")) { model.beginSystemLink() }
+                    .help(String(localized: "SSH.systemLink.help", defaultValue: "Terminal ve VS Code gibi araçların bu config’i görmesini sağlar."))
+            }
         }
 
         Section(String(localized: "SSH.settings.knownHostsFile", defaultValue: "known_hosts dosyası")) {

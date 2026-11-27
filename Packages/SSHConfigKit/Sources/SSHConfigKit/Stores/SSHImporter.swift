@@ -156,8 +156,11 @@ public struct SSHImporter: Sendable {
     /// `~/Library/Mobile Documents` files not yet downloaded appear as hidden `.name.icloud` stubs.
     static func cloudPlaceholders(in directory: URL) -> [String] {
         guard let names = try? FileManager.default.contentsOfDirectory(atPath: directory.path) else { return [] }
-        return names.filter { $0.hasPrefix(".") && $0.hasSuffix(".icloud") }
-            .map { String($0.dropFirst().dropLast(".icloud".count)) }.sorted()
+        let stubs = names.filter { $0.hasPrefix(".") && $0.hasSuffix(".icloud") }
+            .map { String($0.dropFirst().dropLast(".icloud".count)) }
+        // Newer macOS keeps the name and marks the file dataless: reading it downloads it, so say so up front.
+        let dataless = names.filter { !$0.hasPrefix(".") && CloudFiles.isDataless(directory.appending(path: $0)) }
+        return (stubs + dataless).sorted()
     }
 
     private func discoverKeys(in directory: URL, warnings: inout [ImportWarning]) -> [ImportKey] {

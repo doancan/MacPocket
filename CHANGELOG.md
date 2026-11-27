@@ -8,7 +8,10 @@ sections that apply, in this order: Features, Improved, Changed, Fixed, Removed,
 ### Features
 - **SSH Manager:** Import hosts and keys from another Mac in one step. Choose a copied `~/.ssh` folder or a config file (local or in iCloud Drive); a review sheet lists new hosts, keys and warnings before anything changes. `Include`d hosts are merged into the config, keys are copied with owner-only permissions, and an existing file is never overwritten.
 
+- **SSH Manager:** "Enable for System ssh" makes Terminal, VS Code Remote-SSH and git see a config kept elsewhere, such as iCloud Drive. A review sheet shows the exact change to `~/.ssh/config` (an `Include` line) and the `known_hosts` entries to add; changed files are backed up first and a symlinked `~/.ssh` or config is kept.
+
 ### Improved
+- **SSH Manager:** Lines ssh cannot read, such as a stray character, now show a warning with the line number before saving.
 - **SSH Manager:** A config that lives in iCloud Drive and has not been downloaded yet is downloaded and explained instead of being offered as a new empty file.
 - **SSH Manager:** Banner and toolbar buttons keep their natural width, so labels no longer get squeezed on narrow windows.
 
