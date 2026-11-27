@@ -67,6 +67,30 @@ publishing a release is what ships the update to existing installs.
 
 Never commit signing inputs; `.gitignore` excludes certificates and profiles.
 
+## Renewing the signing certificate
+
+The Developer ID Application certificate expires. Apps that are already signed and notarized keep working
+after that, but new releases cannot be signed until it is replaced. Check the expiry of a published build:
+
+```sh
+codesign -d --extract-certificates MacPocket.app && openssl x509 -inform DER -in codesign0 -noout -enddate
+```
+
+The 1.0.0 certificate expires on **February 1, 2027**. Renew it at least a month before:
+
+1. The Account Holder of the signing team creates a new *Developer ID Application* certificate
+   (a certificate signing request from the Mac that will hold the key) and exports it as `.p12`.
+2. In the developer portal, edit both provisioning profiles (the app and the network filter) and tick the new
+   certificate. A profile that does not list the signing certificate makes the system extension fail to activate.
+3. Update the repository secrets `MACOS_CERTIFICATE_P12`, `MACOS_CERTIFICATE_PASSWORD`,
+   `MACPOCKET_FILTER_HOST_PROFILE` and `MACPOCKET_FILTER_PROVIDER_PROFILE` (profiles are base64-encoded).
+4. Cut a patch release and check the new build with `spctl -a -vv` and `stapler validate`.
+
+Keep the team the same: the bundle identifiers, the helper's client requirement and installed copies are tied to it.
+
+The Sparkle private key exists only as the `SPARKLE_ED_PRIVATE_KEY` secret. GitHub never shows a secret again, so
+keep an offline copy; without it no update can be published to installed copies.
+
 ## Rolling back
 
 Delete the GitHub release and tag, or publish a new patch release. Sparkle clients
