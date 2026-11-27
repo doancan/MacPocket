@@ -30,7 +30,7 @@ All network tools live on one page with tabs.
 | Port manager | Listening ports and owning processes | – |
 | Hosts file | Edit `/etc/hosts` | Administrator approval on save |
 | Internet control | Per-app rules for new connections by signed app identity | Network Extension approval |
-| SSH manager | Lossless `ssh_config` editing, connection and ProxyJump tests, keys, known hosts, backups, quick-connect shortcut | Automation (for the chosen terminal) |
+| SSH manager | Lossless `ssh_config` editing, connection and ProxyJump tests, keys, known hosts, backups, quick-connect shortcut, import of hosts and keys from another Mac (local folder or iCloud Drive) | Automation (for the chosen terminal) |
 
 ## Disk and files
 

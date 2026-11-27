@@ -16,6 +16,7 @@ struct SettingsView: View {
         Form {
             general
             files
+            importSection
             backups
         }
         .formStyle(.grouped)
@@ -119,6 +120,16 @@ struct SettingsView: View {
                     .font(.footnote)
                     .foregroundStyle(.secondary)
             }
+        }
+    }
+
+    @ViewBuilder private var importSection: some View {
+        Section {
+            ImportButton(model: model)
+        } header: {
+            Text(String(localized: "SSH.import.section", defaultValue: "İçe Aktar"))
+        } footer: {
+            Text(String(localized: "SSH.import.section.footer", defaultValue: "Başka bir Mac’ten kopyaladığınız ~/.ssh klasörünü ya da iCloud’daki bir config dosyasını seçin; hostlar ve anahtarlar birlikte alınır."))
         }
     }
 

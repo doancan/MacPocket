@@ -22,6 +22,8 @@ final class AppModel {
     private(set) var editorToken = UUID()
     var searchText = ""
     var errorMessage: String?
+    /// The import being reviewed (a sheet shows it); nil when none.
+    var importPlan: SSHImportPlan?
     /// Narrows the sidebar to hosts whose last connection test fell in this category.
     var statusFilter: StatusCategory?
     /// A host waiting for the user to confirm its deletion (menu, context menu or the delete key).
@@ -332,6 +334,8 @@ final class AppModel {
         let size: Int64
         let mtimeSeconds: Int
         let mtimeNanos: Int
+        /// chmod changes this (and ctime) but not mtime, and a permission fix must refresh the lint.
+        let mode: UInt16
 
         init?(path: String) {
             var info = stat()
@@ -340,6 +344,7 @@ final class AppModel {
             size = Int64(info.st_size)
             mtimeSeconds = Int(info.st_mtimespec.tv_sec)
             mtimeNanos = Int(info.st_mtimespec.tv_nsec)
+            mode = UInt16(info.st_mode & 0o777)
         }
     }
 
@@ -589,7 +594,8 @@ final class AppModel {
         let lint = HostLint(
             home: settings.homeDirectory,
             fileExists: { reads.exists($0) },
-            encryption: { reads.encryption(of: $0) })
+            encryption: { reads.encryption(of: $0) },
+            permissions: { reads.mode(of: $0) })
         let duplicates = HostLint.duplicateCounts(document: document, included: included)
         let exactDuplicates = HostLint.exactDuplicateCounts(document: document, included: included)
         var firstBlocks = HostLint.firstBlocks(document: document)
@@ -693,6 +699,18 @@ final class AppModel {
         Set(lintIssues(for: item).compactMap {
             if case .unencryptedKey(let path) = $0 { path } else { nil }
         })
+    }
+
+    /// Makes a private key owner-only (0600), which ssh requires. `value` is the IdentityFile text as written.
+    func restrictKeyPermissions(_ value: String) {
+        guard let url = KeyUsage.resolve(value, home: settings.homeDirectory) else { return }
+        do {
+            try FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: url.resolvingSymlinksInPath().path)
+            invalidateLint()
+        } catch {
+            AppLog.error(.edit, error)
+            errorMessage = Messages.text(for: error)
+        }
     }
 
     /// The group the selected host's block has in the document.
@@ -942,6 +960,12 @@ private final class KeyReadMemo: @unchecked Sendable {
         touched.insert(url.path)
         lock.unlock()
         return FileManager.default.fileExists(atPath: url.path)
+    }
+
+    func mode(of url: URL) -> UInt16? {
+        var info = stat()
+        guard stat(url.path, &info) == 0 else { return nil }
+        return UInt16(info.st_mode & 0o777)
     }
 
     func encryption(of url: URL) -> KeyEncryption {

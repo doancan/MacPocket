@@ -4,6 +4,8 @@ import Observation
 public enum ConfigLoadState: Equatable, Sendable {
     case loaded
     case missing
+    /// The file lives in iCloud Drive and has not been downloaded to this Mac yet; a download was requested.
+    case notDownloaded
     /// Not valid UTF-8: shown as an error; never rewritten.
     case notUTF8
     case unreadable(String)
@@ -106,7 +108,13 @@ public final class ConfigStore {
         do {
             data = try Data(contentsOf: fileURL)
         } catch let error as CocoaError where error.code == .fileReadNoSuchFile {
-            reset(state: .missing)
+            // An evicted iCloud file is a hidden `.name.icloud` stub beside the missing name: ask for the
+            // download instead of offering to create an empty file over it.
+            if Self.requestCloudDownload(of: fileURL) {
+                reset(state: .notDownloaded)
+            } else {
+                reset(state: .missing)
+            }
             return
         } catch {
             reset(state: .unreadable(error.localizedDescription))
@@ -126,6 +134,14 @@ public final class ConfigStore {
         savedIncludedHosts = includedHosts
         savedIncludeStates = includeResolver.includeFileStates(of: savedDocument, rootFile: fileURL)
         onDiskStateChange?()
+    }
+
+    /// True when `url` is an iCloud placeholder; starts its download.
+    static func requestCloudDownload(of url: URL) -> Bool {
+        let stub = url.deletingLastPathComponent().appending(path: "." + url.lastPathComponent + ".icloud")
+        guard FileManager.default.fileExists(atPath: stub.path) else { return false }
+        try? FileManager.default.startDownloadingUbiquitousItem(at: url)
+        return true
     }
 
     public func createFile() throws {

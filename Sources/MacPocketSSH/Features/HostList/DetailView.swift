@@ -82,7 +82,8 @@ private struct HostEditorContainer: View {
                     if let entry = SidebarBuilder.hostEntry(for: editor.item, in: model.store.document) {
                         // Patterns have no group; they get the IdentityFile checks only.
                         if !entry.isPattern { HostGroupRow(model: model, item: editor.item) }
-                        LintIssuesList(issues: model.lintIssues(for: editor.item).filter(\.isHostWarning))
+                        LintIssuesList(issues: model.lintIssues(for: editor.item).filter(\.isHostWarning),
+                                       fixPermissions: { model.restrictKeyPermissions($0) })
                         Divider()
                     }
                     HostEditorView(editor: editor, homeDirectory: model.settings.homeDirectory, keys: model.keys,
@@ -143,14 +144,23 @@ private struct HostGroupRow: View {
 
 private struct LintIssuesList: View {
     let issues: [HostIssue]
+    let fixPermissions: (String) -> Void
 
     var body: some View {
         if !issues.isEmpty {
             VStack(alignment: .leading, spacing: 4) {
                 ForEach(Array(issues.enumerated()), id: \.offset) { _, issue in
-                    Label(Messages.text(for: issue), systemImage: "exclamationmark.triangle.fill")
-                        .foregroundStyle(.orange)
-                        .font(.callout)
+                    HStack(alignment: .firstTextBaseline, spacing: 8) {
+                        Label(Messages.text(for: issue), systemImage: "exclamationmark.triangle.fill")
+                            .foregroundStyle(.orange)
+                            .font(.callout)
+                        Spacer(minLength: 8)
+                        if case .keyPermissionsTooOpen(let path) = issue {
+                            Button(String(localized: "SSH.issue.fixPermissions", defaultValue: "İzni Düzelt")) { fixPermissions(path) }
+                                .controlSize(.small)
+                                .fixedSize()
+                        }
+                    }
                 }
             }
             .frame(maxWidth: .infinity, alignment: .leading)

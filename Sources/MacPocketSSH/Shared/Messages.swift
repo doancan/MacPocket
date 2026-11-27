@@ -27,6 +27,8 @@ enum Messages {
             isFirst ? String(localized: "SSH.issue.lint.duplicateFirst %@", defaultValue: "“\(alias)” sonraki Host bloklarında da var; onlar yalnızca bu blokta olmayan ayarları ekler.") : String(localized: "SSH.issue.lint.duplicateLater %@", defaultValue: "“\(alias)” daha önceki bir Host bloğunda zaten tanımlı; oradaki değerler bu bloğun önüne geçer.")
         case .duplicateAliasCaseOnly(let alias): String(localized: "SSH.issue.lint.duplicateCaseOnly %@", defaultValue: "“\(alias)” başka bir Host bloğundan yalnızca büyük/küçük harfle ayrılıyor; ssh bunları farklı hostlar sayar.")
         case .unencryptedKey(let path): String(localized: "SSH.issue.lint.unencryptedKey %@", defaultValue: "Parolasız özel anahtar: \(path)")
+        case .keyPermissionsTooOpen(let path): String(localized: "SSH.issue.lint.keyPermissions %@", defaultValue: "Anahtarı başkaları da okuyabiliyor; ssh bu anahtarı reddeder: \(path)")
+        case .keyInSyncedFolder(let path): String(localized: "SSH.issue.lint.keySynced %@", defaultValue: "Özel anahtar bulut senkron klasöründe; kopyaları başka cihazlara ve buluta gider: \(path)")
         }
     }
 
@@ -68,6 +70,7 @@ enum Messages {
     static func knownHostsLoadText(for state: ConfigLoadState) -> String? {
         switch state {
         case .loaded: nil
+        case .notDownloaded: String(localized: "SSH.knownHosts.notDownloaded", defaultValue: "known_hosts dosyası iCloud’da; bu Mac’e henüz indirilmedi.")
         case .missing: String(localized: "SSH.knownHosts.missing", defaultValue: "Henüz known_hosts dosyası yok. ssh ilk bağlantıda oluşturur.")
         case .notUTF8: String(localized: "SSH.knownHosts.notUTF8", defaultValue: "known_hosts dosyası geçerli UTF-8 değil. Kayıtları gösterilemez ve dosya hiçbir zaman yeniden yazılmaz.")
         case .unreadable(let detail): String(localized: "SSH.knownHosts.unreadable %@", defaultValue: "known_hosts dosyası okunamadı: \(detail)")
@@ -78,6 +81,7 @@ enum Messages {
         switch state {
         case .loaded: nil
         case .missing: String(localized: "SSH.load.missing", defaultValue: "Config dosyası henüz yok.")
+        case .notDownloaded: String(localized: "SSH.load.notDownloaded", defaultValue: "Config dosyası iCloud’da; bu Mac’e indiriliyor. Birkaç saniye sonra yeniden deneyin.")
         case .notUTF8: String(localized: "SSH.load.notUTF8", defaultValue: "Dosya geçerli UTF-8 değil. Salt okunur gösteriliyor ve asla yeniden yazılmayacak.")
         case .unreadable(let detail): String(localized: "SSH.load.unreadable %@", defaultValue: "Dosya okunamadı: \(detail)")
         }

@@ -186,6 +186,9 @@ public struct SSHWorkspaceView: View {
         }
         .environment(\.sshNavigate, { runtime.section = $0 })
         .buttonStyle(.bordered)
+        .sheet(isPresented: Binding(get: { runtime.model.importPlan != nil }, set: { if !$0 { runtime.model.importPlan = nil } })) {
+            if let plan = runtime.model.importPlan { ImportSheet(model: runtime.model, plan: plan) }
+        }
         .onAppear { runtime.setWorkspaceVisible(true) }
         .onDisappear { runtime.setWorkspaceVisible(false) }
     }

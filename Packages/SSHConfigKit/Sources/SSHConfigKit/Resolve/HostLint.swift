@@ -9,6 +9,10 @@ public enum HostIssue: Equatable, Sendable {
     /// Another block names this alias differing only in letter case; ssh treats them as different hosts.
     case duplicateAliasCaseOnly(alias: String)
     case unencryptedKey(String)
+    /// The private key can be read by other users; ssh refuses to use such a key.
+    case keyPermissionsTooOpen(String)
+    /// The private key sits in a folder a cloud service syncs (iCloud Drive, Dropbox, …), so it leaves this Mac.
+    case keyInSyncedFolder(String)
 }
 
 /// Problems a person would want to see next to a host. File access is injected so tests never
@@ -17,11 +21,22 @@ public struct HostLint: Sendable {
     private let home: URL
     private let fileExists: @Sendable (URL) -> Bool
     private let encryption: @Sendable (URL) -> KeyEncryption
+    private let permissions: @Sendable (URL) -> UInt16?
 
-    public init(home: URL, fileExists: @escaping @Sendable (URL) -> Bool, encryption: @escaping @Sendable (URL) -> KeyEncryption) {
+    /// `permissions` returns the file's mode bits (`0o600`), nil when unknown; it defaults to "unknown" so
+    /// callers that do not care about permissions (and tests) stay unchanged.
+    public init(home: URL, fileExists: @escaping @Sendable (URL) -> Bool, encryption: @escaping @Sendable (URL) -> KeyEncryption,
+                permissions: @escaping @Sendable (URL) -> UInt16? = { _ in nil }) {
         self.home = home
         self.fileExists = fileExists
         self.encryption = encryption
+        self.permissions = permissions
+    }
+
+    /// Folders whose contents a cloud service uploads. Path-only: no disk access.
+    public static func isSyncedFolder(_ url: URL) -> Bool {
+        let path = url.standardizedFileURL.path
+        return path.contains("/Library/Mobile Documents/") || path.contains("/Library/CloudStorage/")
     }
 
     private static func plainNames(of entry: HostEntry) -> [String] {
@@ -80,8 +95,14 @@ public struct HostLint: Sendable {
             guard let url = KeyUsage.resolve(value, home: home) else { continue }
             if !fileExists(url) {
                 result.append(.missingIdentityFile(value))
-            } else if encryption(url) == .unencrypted {
-                result.append(.unencryptedKey(value))
+            } else {
+                let kind = encryption(url)
+                if kind == .unencrypted { result.append(.unencryptedKey(value)) }
+                // Only files that really are private keys: a mistyped IdentityFile must not get key advice.
+                if kind != .unknown {
+                    if let mode = permissions(url), mode & 0o077 != 0 { result.append(.keyPermissionsTooOpen(value)) }
+                    if Self.isSyncedFolder(url.resolvingSymlinksInPath()) || Self.isSyncedFolder(url) { result.append(.keyInSyncedFolder(value)) }
+                }
             }
         }
         return result

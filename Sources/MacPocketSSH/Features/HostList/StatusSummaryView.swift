@@ -66,6 +66,7 @@ struct StatusSummaryView: View {
                             .font(.callout)
                     }
                     .buttonStyle(.borderless)
+                    .fixedSize()
                     .help(help)
                     .accessibilityLabel(help)
                     .accessibilityAddTraits(model.statusFilter == category ? .isSelected : [])

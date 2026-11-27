@@ -2,6 +2,7 @@ import SSHConfigKit
 
 enum Banner: Hashable, Identifiable, Sendable {
     case missingFile
+    case notDownloaded
     case notUTF8
     case unreadable(String)
     case byteOrderMark
@@ -18,6 +19,7 @@ enum BannerBuilder {
         var banners: [Banner] = []
         switch store.loadState {
         case .missing: banners.append(.missingFile)
+        case .notDownloaded: banners.append(.notDownloaded)
         case .notUTF8: banners.append(.notUTF8)
         case .unreadable(let detail): banners.append(.unreadable(detail))
         case .loaded:
